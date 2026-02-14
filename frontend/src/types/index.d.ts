@@ -5,6 +5,7 @@ type insertTypes = 'replace' | 'append' | 'newLine' | 'NoAction'
 type ModelTier = 'nano' | 'standard' | 'reasoning' | 'image'
 
 interface ModelInfo {
+  id: string
   label: string
   type: 'chat' | 'image'
 }

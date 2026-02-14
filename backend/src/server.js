@@ -61,6 +61,7 @@ app.get('/api/models', (_req, res) => {
   const publicModels = {}
   for (const [tier, config] of Object.entries(models)) {
     publicModels[tier] = {
+      id: config.id,
       label: config.label,
       type: config.type,
     }
