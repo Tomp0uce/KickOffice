@@ -171,16 +171,31 @@
             >
               <BotMessageSquare :size="17" />
             </button>
+            <button
+              class="cursor-po flex h-7 w-7 items-center justify-center rounded-md border-none text-secondary hover:bg-accent/30 hover:text-white! [.active]:text-accent"
+              :class="{ active: mode === 'image' }"
+              :title="t('imageMode')"
+              @click="mode = 'image'"
+            >
+              <ImageIcon :size="14" />
+            </button>
           </div>
           <div class="flex min-w-0 flex-1 gap-1 overflow-hidden">
             <select
+              v-if="mode !== 'image'"
               v-model="selectedModelTier"
               class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none"
             >
-              <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
+              <option v-for="(info, tier) in chatModels" :key="tier" :value="tier">
                 {{ info.label }}
               </option>
             </select>
+            <span
+              v-else
+              class="flex h-7 items-center rounded-md border border-border bg-surface px-2 text-xs text-secondary"
+            >
+              {{ availableModels.image?.id || 'image' }}
+            </span>
           </div>
         </div>
         <div
@@ -190,7 +205,7 @@
             ref="inputTextarea"
             v-model="userInput"
             class="placeholder::text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
-            :placeholder="mode === 'ask' ? $t('askAnything') : $t('directTheAgent')"
+            :placeholder="mode === 'image' ? $t('describeImage') : mode === 'agent' ? $t('directTheAgent') : $t('askAnything')"
             rows="1"
             @keydown.enter.exact.prevent="sendMessage"
             @input="adjustTextareaHeight"
@@ -238,6 +253,7 @@ import {
   FileCheck,
   FileText,
   Globe,
+  ImageIcon,
   MessageSquare,
   Plus,
   Send,
@@ -251,7 +267,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { insertFormattedResult, insertResult } from '@/api/common'
-import { type ChatMessage, chatStream, chatSync, fetchModels, healthCheck } from '@/api/backend'
+import { type ChatMessage, chatStream, chatSync, fetchModels, generateImage, healthCheck } from '@/api/backend'
 import CustomButton from '@/components/CustomButton.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
 import { buildInPrompt, getBuiltInPrompt } from '@/utils/constant'
@@ -285,11 +301,15 @@ const backendOnline = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 
 // Chat state
-const mode = useStorage(localStorageKey.chatMode, 'ask' as 'ask' | 'agent')
+const mode = useStorage(localStorageKey.chatMode, 'ask' as 'ask' | 'agent' | 'image')
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
 const history = ref<DisplayMessage[]>([])
 const userInput = ref('')
 const loading = ref(false)
+const imageLoading = ref(false)
+
+// Filter out image model from chat selector
+const chatModels = ref<Record<string, ModelInfo>>({})
 const messagesContainer = ref<HTMLElement>()
 const inputTextarea = ref<HTMLTextAreaElement>()
 const abortController = ref<AbortController | null>(null)
@@ -507,8 +527,35 @@ async function sendMessage() {
   }
 }
 
-async function processChat(_userMessage: string) {
+async function processChat(userMessage: string) {
   const lang = replyLanguage.value || 'Fran\u00e7ais'
+
+  // Image generation mode
+  if (mode.value === 'image') {
+    history.value.push({ role: 'assistant', content: t('imageGenerating') })
+    scrollToBottom()
+    imageLoading.value = true
+    try {
+      const b64 = await generateImage({ prompt: userMessage })
+      const lastIndex = history.value.length - 1
+      history.value[lastIndex] = {
+        role: 'assistant',
+        content: '',
+        imageBase64: b64,
+      }
+    } catch (err: any) {
+      const lastIndex = history.value.length - 1
+      history.value[lastIndex] = {
+        role: 'assistant',
+        content: `${t('imageError')}: ${err.message}`,
+      }
+    } finally {
+      imageLoading.value = false
+    }
+    scrollToBottom()
+    return
+  }
+
   const isAgentMode = mode.value === 'agent'
 
   const systemPrompt =
@@ -720,6 +767,12 @@ async function checkBackend() {
   if (backendOnline.value) {
     try {
       availableModels.value = await fetchModels()
+      // Filter out image model for chat selector
+      const filtered: Record<string, ModelInfo> = {}
+      for (const [tier, info] of Object.entries(availableModels.value)) {
+        if (info.type !== 'image') filtered[tier] = info
+      }
+      chatModels.value = filtered
     } catch {
       console.error('Failed to fetch models')
     }

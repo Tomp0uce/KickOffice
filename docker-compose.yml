@@ -14,8 +14,6 @@ services:
     environment:
       - PUID=1026
       - PGID=100
-    volumes:
-      - /volume1/docker/kickoffice/backend-data:/app/data
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
       interval: 30s

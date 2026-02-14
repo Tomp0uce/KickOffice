@@ -110,7 +110,10 @@
                   class="flex items-center justify-between rounded-md border border-border bg-surface p-2"
                 >
                   <span class="text-xs font-medium text-main">{{ info.label }}</span>
-                  <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{ tier }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{ info.id }}</span>
+                    <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{ tier }}</span>
+                  </div>
                 </div>
               </div>
             </SettingCard>
