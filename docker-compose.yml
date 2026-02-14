@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  kickoffice-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kickoffice-backend
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PUID=1026
+      - PGID=100
+    volumes:
+      - /volume1/docker/kickoffice/backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - kickoffice
+
+  kickoffice-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_URL: http://192.168.50.10:3003
+    container_name: kickoffice-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    environment:
+      - PUID=1026
+      - PGID=100
+    depends_on:
+      kickoffice-backend:
+        condition: service_healthy
+    networks:
+      - kickoffice
+
+networks:
+  kickoffice:
+    driver: bridge
