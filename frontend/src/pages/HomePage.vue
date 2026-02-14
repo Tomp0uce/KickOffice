@@ -246,13 +246,12 @@ import {
   Sparkles,
   Square,
 } from 'lucide-vue-next'
-import { v4 as uuidv4 } from 'uuid'
-import { computed, nextTick, onBeforeMount, ref } from 'vue'
+import { nextTick, onBeforeMount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { insertFormattedResult, insertResult } from '@/api/common'
-import { type ChatMessage, chatStream, chatSync, fetchModels, generateImage, healthCheck } from '@/api/backend'
+import { type ChatMessage, chatStream, chatSync, fetchModels, healthCheck } from '@/api/backend'
 import CustomButton from '@/components/CustomButton.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
 import { buildInPrompt, getBuiltInPrompt } from '@/utils/constant'
@@ -627,8 +626,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
       scrollToBottom()
     }
 
-    // If finish_reason is 'stop', we're done after tool processing
-    if (choice.finish_reason === 'stop') break
+    // Loop continues: next iteration sends tool results back to LLM
   }
 
   if (iteration >= maxIter) {
