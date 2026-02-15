@@ -345,21 +345,42 @@ FRONTEND_URL=https://kickoffice.yourdomain.com
 
 ## Credits
 
-Based on [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) by Kuingsmile (MIT License).
+### Based on [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) by Kuingsmile (MIT License)
 
-Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) by ilberpy (MIT License).
+The following was directly reused or adapted from WordGPT Plus:
 
-Modifications for KickOffice:
-- Added backend server (API key security)
-- Removed multi-provider support (single controlled endpoint)
-- Removed LangChain dependency (direct OpenAI API format)
-- Removed user model configuration (admin-only via .env)
-- Removed web search/fetch (privacy)
-- Added French translations
-- Added Docker deployment for Synology NAS
-- Added health check monitoring
+- **`wordFormatter.ts`** — Markdown-to-Word conversion engine: parses headings, bold, italic, code blocks, and lists, then applies Word built-in styles via `Word.run()`
+- **`api/common.ts`** — Document insertion logic: replace / append / newLine insertion modes using the Word.js API
+- **Chat UI architecture** — Vue 3 task pane structure, message history (user/assistant bubbles), streaming SSE parsing, stop-generation button
+- **Built-in prompt structure** (`constant.ts`) — `buildInPrompt` pattern with translate, polish, academic rewrite, summary, and grammar-check prompts
+- **Settings page architecture** (`SettingsPage.vue`) — custom prompt management (add/edit/delete), built-in prompt editor with per-prompt reset
+- **i18n framework** — `vue-i18n` integration and locale file structure
 
-Reused and modified from excel-ai-assistant for KickOffice:
-- Adapted Excel agent tooling integration to the KickOffice architecture
-- Integrated Excel-related assistant workflows into a unified Office add-in experience
-- Aligned configuration and deployment flow with KickOffice backend/Docker setup
+Removed from WordGPT Plus for KickOffice:
+- Multi-provider LLM support (OpenAI, Azure, Gemini, etc.) → single controlled backend endpoint
+- User-side API key and endpoint configuration → admin-only via `backend/.env`
+- Web search / web fetch features (privacy)
+
+Added or extended for KickOffice:
+- Backend Express proxy server (API keys never reach the client)
+- Docker deployment for Synology NAS (PUID/PGID, health check, multi-stage frontend build)
+- Extended from Word-only to Word + Excel + PowerPoint + Outlook
+- Model tier system (nano / standard / reasoning / image), configured server-side only
+- French translations added to the i18n locale files
+- Image generation support
+
+---
+
+### Based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) by ilberpy (MIT License)
+
+The following was directly reused or adapted from excel-ai-assistant:
+
+- **Tool definition schema** — the `{ name, description, inputSchema, execute }` pattern (originally a LangChain tool format) was adapted to the OpenAI function-calling JSON schema format and applied to all tool sets (Word, Excel, general)
+- **Excel tool set** (`excelTools.ts`) — tool names, descriptions, and parameter schemas for Excel operations (getSelectedCells, setCellValue, getWorksheetData, insertFormula, createChart, formatRange, sortRange, applyAutoFilter, etc.) were derived from excel-ai-assistant's tool catalogue; implementations were rewritten using `Excel.run()` directly
+- **Agent loop pattern** — the core loop (send tools to LLM → detect `tool_calls` in response → execute locally → feed result back → repeat) was adapted from excel-ai-assistant's LangChain agent to a custom TypeScript implementation
+- **Formula language localization** — concept of detecting the user's configured formula language (`getExcelFormulaLanguage()`, fr/en) to match locale-specific function names
+
+Removed from excel-ai-assistant for KickOffice:
+- LangChain dependency entirely → direct OpenAI-compatible API calls
+- Python/server-side Excel bindings → replaced by client-side `Excel.run()` (Office.js)
+- Standalone script architecture → integrated into the unified Office add-in frontend
