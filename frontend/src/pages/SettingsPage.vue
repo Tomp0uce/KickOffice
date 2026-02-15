@@ -75,6 +75,36 @@
             </SettingCard>
 
             <SettingCard>
+              <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <CustomInput
+                  v-model="userFirstName"
+                  :title="$t('userFirstNameLabel')"
+                  :placeholder="$t('userFirstNamePlaceholder')"
+                />
+                <CustomInput
+                  v-model="userLastName"
+                  :title="$t('userLastNameLabel')"
+                  :placeholder="$t('userLastNamePlaceholder')"
+                />
+              </div>
+            </SettingCard>
+
+            <SettingCard>
+              <SingleSelect
+                v-model="userGender"
+                :tight="false"
+                :key-list="genderOptions.map(item => item.value)"
+                :title="$t('userGenderLabel')"
+                :fronticon="false"
+                :placeholder="genderOptions.find(o => o.value === userGender)?.label || t('userGenderUnspecified')"
+              >
+                <template #item="{ item }">
+                  {{ genderOptions.find(o => o.value === item)?.label || item }}
+                </template>
+              </SingleSelect>
+            </SettingCard>
+
+            <SettingCard>
               <CustomInput
                 v-model.number="agentMaxIterations"
                 :title="$t('agentMaxIterationsLabel')"
@@ -387,9 +417,18 @@ const currentTab = ref('general')
 const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
 const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
+const userGender = useStorage(localStorageKey.userGender, 'unspecified')
+const userFirstName = useStorage(localStorageKey.userFirstName, '')
+const userLastName = useStorage(localStorageKey.userLastName, '')
 
 const localLanguageOptions = optionLists.localLanguageList
 const replyLanguageOptions = optionLists.replyLanguageList
+const genderOptions = [
+  { label: t('userGenderUnspecified'), value: 'unspecified' },
+  { label: t('userGenderFemale'), value: 'female' },
+  { label: t('userGenderMale'), value: 'male' },
+  { label: t('userGenderNonBinary'), value: 'nonbinary' },
+]
 
 // Backend
 const backendOnline = ref(false)
@@ -471,6 +510,18 @@ watch(replyLanguage, (val) => {
 
 watch(agentMaxIterations, (val) => {
   localStorage.setItem(localStorageKey.agentMaxIterations, String(val))
+})
+
+watch(userGender, (val) => {
+  localStorage.setItem(localStorageKey.userGender, val)
+})
+
+watch(userFirstName, (val) => {
+  localStorage.setItem(localStorageKey.userFirstName, val.trim())
+})
+
+watch(userLastName, (val) => {
+  localStorage.setItem(localStorageKey.userLastName, val.trim())
 })
 
 // Prompt management

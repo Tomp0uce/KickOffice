@@ -162,5 +162,17 @@
   "wordTool_selectText": "Select Text",
   "wordTool_selectText_desc": "Select all text.",
   "wordTool_setFontName": "Set Font Name",
-  "wordTool_setFontName_desc": "Set font for selected text."
+  "wordTool_setFontName_desc": "Set font for selected text.",
+  "userFirstNameLabel": "First Name",
+  "userFirstNamePlaceholder": "e.g. Marie",
+  "userLastNameLabel": "Last Name",
+  "userLastNamePlaceholder": "e.g. Dupont",
+  "userGenderLabel": "Gender",
+  "userGenderFemale": "Female",
+  "userGenderMale": "Male",
+  "userGenderNonBinary": "Non-binary",
+  "userGenderUnspecified": "Unspecified",
+  "userProfileUnknownName": "Name not provided",
+  "userProfileUnknownFirstName": "First name not provided",
+  "userProfileUnknownLastName": "Last name not provided"
 }
