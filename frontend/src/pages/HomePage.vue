@@ -162,7 +162,8 @@
       <!-- Input Area -->
       <div class="flex flex-col gap-1 rounded-md">
         <div class="flex items-center justify-between gap-2 overflow-hidden">
-          <div class="flex min-w-0 flex-1 gap-1 overflow-hidden">
+          <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            <span class="shrink-0 text-xs font-medium text-secondary">Type de tâche :</span>
             <select
               v-model="selectedModelTier"
               class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none"
@@ -391,6 +392,14 @@ const quickActions = computed(() => {
 })
 
 const selectedModelInfo = computed(() => availableModels.value[selectedModelTier.value])
+const firstChatModelTier = computed<ModelTier>(() => {
+  for (const [tier, model] of Object.entries(availableModels.value)) {
+    if (model.type !== 'image') {
+      return tier as ModelTier
+    }
+  }
+  return 'standard'
+})
 const inputPlaceholder = computed(() => selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'))
 
 // Think tag parsing
@@ -1015,9 +1024,17 @@ async function applyQuickAction(actionKey: string) {
       { role: 'user', content: userMsg },
     ]
 
+    const quickActionModelTier = selectedModelInfo.value?.type === 'image'
+      ? firstChatModelTier.value
+      : selectedModelTier.value
+
+    if (selectedModelInfo.value?.type === 'image') {
+      messageUtil.info('Les actions rapides utilisent automatiquement un modèle texte.')
+    }
+
     await chatStream({
       messages,
-      modelTier: selectedModelTier.value,
+      modelTier: quickActionModelTier,
       abortSignal: abortController.value?.signal,
       onStream: (text: string) => {
         const lastIndex = history.value.length - 1
