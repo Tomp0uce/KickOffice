@@ -701,9 +701,23 @@ async function sendMessage() {
   userInput.value = ''
   adjustTextareaHeight()
 
+  const replyContextPrefix = '[Email context for reply]\n'
+  const lastHistoryItem = history.value[history.value.length - 1]
+  const pendingReplyContext = hostIsOutlook
+    && lastHistoryItem?.role === 'user'
+    && typeof lastHistoryItem.content === 'string'
+    && lastHistoryItem.content.startsWith(replyContextPrefix)
+
+  let replyContextText = ''
+  if (pendingReplyContext) {
+    replyContextText = lastHistoryItem.content.slice(replyContextPrefix.length).trim()
+    // Single-use context: remove placeholder entry and merge into the outgoing message once.
+    history.value.pop()
+  }
+
   // Get selected content from the active Office app
   let selectedText = ''
-  if (useSelectedText.value) {
+  if (useSelectedText.value && !replyContextText) {
     try {
       if (hostIsOutlook) {
         selectedText = await getOutlookMailBody()
@@ -730,9 +744,10 @@ async function sendMessage() {
   }
 
   const selectionLabel = hostIsOutlook ? 'Email body' : hostIsExcel ? 'Selected cells' : 'Selected text'
-  const fullMessage = selectedText
-    ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]`
-    : userMessage
+  const selectedTextContext = selectedText ? `[${selectionLabel}: "${selectedText}"]` : ''
+  const replyPrefillContext = replyContextText ? `${replyContextPrefix}${replyContextText}` : ''
+  const extraContexts = [replyPrefillContext, selectedTextContext].filter(Boolean).join('\n\n')
+  const fullMessage = extraContexts ? `${userMessage}\n\n${extraContexts}` : userMessage
 
   history.value.push({ role: 'user', content: fullMessage })
   scrollToBottom()
