@@ -57,8 +57,13 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 1. **Clone the repository** on the NAS or copy the project to `/volume1/docker/kickoffice/`
 
-2. **Create the backend `.env` file**:
+2. **Create environment files**:
    ```bash
+   # Root .env – server IP and ports (used by docker-compose + manifest generation)
+   cp .env.example .env
+   # Edit .env if your NAS IP or ports differ from the defaults
+
+   # Backend .env – LLM API key and model config
    cp backend/.env.example backend/.env
    # Edit backend/.env and set your LLM_API_KEY
    ```
@@ -67,6 +72,10 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    ```bash
    docker compose up -d --build
    ```
+   > The `manifest-gen` init service automatically generates `manifest.xml` from
+   > `manifest.template.xml` using the `SERVER_IP`, `FRONTEND_PORT`, and
+   > `BACKEND_PORT` variables defined in the root `.env`. No manual URL editing
+   > is required.
 
 4. **Verify**:
    - Backend health: `curl http://192.168.50.10:3003/health`
@@ -79,10 +88,11 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 ### Docker Compose Details
 
-| Container | Port | Image |
-|-----------|------|-------|
-| `kickoffice-backend` | 3003 | Node 22 Alpine |
-| `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) |
+| Container | Port | Image | Notes |
+|-----------|------|-------|-------|
+| `kickoffice-manifest-gen` | — | Alpine (init) | Generates `manifest.xml` from template, then exits |
+| `kickoffice-backend` | 3003 | Node 22 Alpine | |
+| `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) | |
 
 Both containers use `PUID=1026` / `PGID=100` for Synology compatibility.
 
@@ -132,8 +142,10 @@ KickOffice/
 │           ├── wordTools.ts      # Word API tools (for agent)
 │           ├── common.ts         # Option lists
 │           └── message.ts        # Toast notifications
+├── .env.example              # Root env vars: SERVER_IP, ports (copy to .env)
 ├── docker-compose.yml
-├── manifest.xml              # Office add-in manifest (Word + Excel + PowerPoint + Outlook)
+├── manifest.template.xml     # Template with {{FRONTEND_URL}} / {{BACKEND_URL}} placeholders
+├── manifest.xml              # Generated at docker-compose up (do not edit by hand)
 └── README.md
 ```
 
@@ -277,6 +289,13 @@ npm run dev            # Starts on port 3002 with HMR
 
 ### Environment Variables
 
+#### Root (`.env`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_IP` | Host machine IP address | `192.168.50.10` |
+| `FRONTEND_PORT` | Published port for the frontend | `3002` |
+| `BACKEND_PORT` | Published port for the backend | `3003` |
+
 #### Backend (`backend/.env`)
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -303,7 +322,7 @@ For production, the architecture stays the same but:
 1. **Server**: Azure VM or App Service instead of Synology NAS
 2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
 3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: `manifest.xml` ne lit pas `.env`; mettez à jour l'entité `ADDIN_HOST` (et les ports si besoin) en tête du fichier pour changer toutes les URLs en un seul endroit
+4. **Manifest**: `manifest.xml` is auto-generated from `manifest.template.xml` at `docker compose up`. Update `SERVER_IP` / ports in the root `.env` to change all URLs
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:
