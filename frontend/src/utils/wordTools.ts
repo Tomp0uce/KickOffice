@@ -833,29 +833,76 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   applyTaggedFormatting: {
     name: 'applyTaggedFormatting',
     description:
-      'Convert inline formatting tags in the document into real Word formatting (e.g., <b_red>text</b_red> becomes bold red text).',
+      'Convert inline formatting tags in the document into real Word formatting (e.g., <format>text</format> can apply size, font, italic, bold, underline, strike, highlight, color, and other font settings).',
     inputSchema: {
       type: 'object',
       properties: {
         tagName: {
           type: 'string',
-          description: 'Tag name to process (default: "b_red")',
+          description: 'Tag name to process (default: "format")',
+        },
+        fontName: {
+          type: 'string',
+          description: 'Font family name (e.g., "Calibri", "Arial")',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in points',
         },
         color: {
           type: 'string',
-          description: 'Font color to apply as hex (default: "#FF0000")',
+          description: 'Font color to apply as hex or named color',
+        },
+        highlightColor: {
+          type: 'string',
+          description:
+            'Highlight color: Yellow, Green, Cyan, Pink, Blue, Red, DarkBlue, Teal, Lime, Purple, Orange, etc.',
         },
         bold: {
           type: 'boolean',
-          description: 'Whether to apply bold formatting (default: true)',
+          description: 'Whether to apply bold formatting',
+        },
+        italic: {
+          type: 'boolean',
+          description: 'Whether to apply italic formatting',
+        },
+        underline: {
+          type: 'boolean',
+          description: 'Whether to apply underline formatting',
+        },
+        strikethrough: {
+          type: 'boolean',
+          description: 'Whether to apply strikethrough formatting',
+        },
+        allCaps: {
+          type: 'boolean',
+          description: 'Whether to format text in all caps',
+        },
+        subscript: {
+          type: 'boolean',
+          description: 'Whether to apply subscript formatting',
+        },
+        superscript: {
+          type: 'boolean',
+          description: 'Whether to apply superscript formatting',
         },
       },
       required: [],
     },
     execute: async args => {
-      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'b_red'
-      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : '#FF0000'
-      const bold = args.bold !== undefined ? Boolean(args.bold) : true
+      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'format'
+      const fontName = typeof args.fontName === 'string' && args.fontName.trim() ? args.fontName.trim() : undefined
+      const fontSize = typeof args.fontSize === 'number' ? args.fontSize : undefined
+      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : undefined
+      const highlightColor =
+        typeof args.highlightColor === 'string' && args.highlightColor.trim() ? args.highlightColor.trim() : undefined
+      const bold = args.bold !== undefined ? Boolean(args.bold) : undefined
+      const italic = args.italic !== undefined ? Boolean(args.italic) : undefined
+      const underline = args.underline !== undefined ? Boolean(args.underline) : undefined
+      const strikethrough = args.strikethrough !== undefined ? Boolean(args.strikethrough) : undefined
+      const allCaps = args.allCaps !== undefined ? Boolean(args.allCaps) : undefined
+      const subscript = args.subscript !== undefined ? Boolean(args.subscript) : undefined
+      const superscript = args.superscript !== undefined ? Boolean(args.superscript) : undefined
 
       return Word.run(async context => {
         const body = context.document.body
@@ -898,8 +945,19 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
           const innerText = taggedText.slice(openingTag.length, taggedText.length - closingTag.length)
           const formattedRange = taggedRange.insertText(innerText, 'Replace')
-          formattedRange.font.bold = bold
-          formattedRange.font.color = color
+
+          if (fontName !== undefined) formattedRange.font.name = fontName
+          if (fontSize !== undefined) formattedRange.font.size = fontSize
+          if (color !== undefined) formattedRange.font.color = color
+          if (highlightColor !== undefined) formattedRange.font.highlightColor = highlightColor
+          if (bold !== undefined) formattedRange.font.bold = bold
+          if (italic !== undefined) formattedRange.font.italic = italic
+          if (underline !== undefined) formattedRange.font.underline = underline ? 'Single' : 'None'
+          if (strikethrough !== undefined) formattedRange.font.strikeThrough = strikethrough
+          if (allCaps !== undefined) formattedRange.font.allCaps = allCaps
+          if (subscript !== undefined) formattedRange.font.subscript = subscript
+          if (superscript !== undefined) formattedRange.font.superscript = superscript
+
           replacedCount++
           await context.sync()
         }
