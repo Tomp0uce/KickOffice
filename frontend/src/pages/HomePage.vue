@@ -294,6 +294,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
+import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 const router = useRouter()
@@ -818,7 +819,7 @@ async function processChat(userMessage: string) {
 }
 
 async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
-  const appToolDefs = hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
   const generalToolDefs = getGeneralToolDefinitions()
 
   // Build OpenAI-format tool definitions
@@ -962,8 +963,9 @@ async function applyQuickAction(actionKey: string) {
       inputTextarea.value.focus()
     }
     // Store the email context so it can be used when the user sends
+    // Use 'user' role so buildChatMessages includes it in the request
     history.value.push({
-      role: 'system',
+      role: 'user',
       content: `[Email context for reply]\n${selectedText}`,
     })
     return
