@@ -182,6 +182,120 @@ export const excelBuiltInPrompt = {
   },
 }
 
+export const outlookBuiltInPrompt = {
+  reply: {
+    system: (language: string) =>
+      `You are an expert email assistant. Your task is to draft professional, context-aware email replies in ${language}.
+      Maintain a courteous and professional tone, address all points raised in the original email, and keep the reply concise.`,
+    user: (text: string, language: string) =>
+      `Task: Draft a professional reply to the following email thread.
+      Guidelines:
+      1. Address all key points raised in the original email.
+      2. Use a courteous, professional tone appropriate for business communication.
+      3. Keep the reply concise and well-structured.
+      4. Respond in ${language}.
+      5. OUTPUT ONLY the reply text, ready to send. Do not include "Here is your reply" or any meta-commentary.
+
+      Email thread:
+      ${text}`,
+  },
+
+  formalize: {
+    system: (language: string) =>
+      `You are a professional communication specialist. Your task is to transform draft emails into polished, professional correspondence in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Rewrite this text to make it professional, polite, and courteous without changing its meaning.
+      Requirements:
+      - Use formal, business-appropriate language.
+      - Ensure proper salutation and closing.
+      - Maintain the original intent and all key information.
+      - Fix any grammar or spelling errors.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the rewritten professional email text.
+
+      Text: ${text}`,
+  },
+
+  concise: {
+    system: (language: string) =>
+      `You are a concise writing expert. Your task is to shorten texts by 30% to 50% while preserving all essential information in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Condense this text to reduce the word count by 30% to 50% while keeping all key information.
+      Requirements:
+      - Remove redundancies and verbose expressions.
+      - Preserve all important facts, dates, names, and action items.
+      - Maintain a clear and professional tone.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the condensed text.
+
+      Text: ${text}`,
+  },
+
+  proofread: {
+    system: (language: string) =>
+      `You are a meticulous proofreader. Your sole focus is correcting grammar and spelling without altering the style or tone of the text in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Correct only the grammar and spelling in the following text without changing the style or tone.
+      Focus:
+      - Fix all spelling and punctuation errors.
+      - Correct subject-verb agreement and tense inconsistencies.
+      - Ensure proper sentence structure.
+      - Do NOT change vocabulary, tone, or style.
+      Constraints:
+      1. If the text is already perfect, respond exactly with: "No corrections needed."
+      2. Otherwise, provide ONLY the corrected text without explaining the changes.
+      3. Respond in ${language}.
+
+      Text: ${text}`,
+  },
+
+  extract: {
+    system: (language: string) =>
+      `You are an expert email analyst. Your task is to extract structured information from email threads, identifying summaries, key points, and required actions in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Analyze this email and extract structured information.
+      Provide a bulleted list with:
+      - **Summary**: A brief overview of the email content (2-3 sentences).
+      - **Key Points**: The main topics and decisions mentioned.
+      - **Required Actions**: Specific tasks, deadlines, or follow-ups mentioned.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the structured analysis.
+
+      Email: ${text}`,
+  },
+}
+
+export const getOutlookBuiltInPrompt = () => {
+  const stored = localStorage.getItem('customOutlookBuiltInPrompts')
+  if (!stored) {
+    return outlookBuiltInPrompt
+  }
+
+  try {
+    const customPrompts = JSON.parse(stored)
+    const result = { ...outlookBuiltInPrompt }
+
+    Object.keys(customPrompts).forEach(key => {
+      const typedKey = key as keyof typeof outlookBuiltInPrompt
+      if (result[typedKey]) {
+        result[typedKey] = {
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          user: (text: string, language: string) =>
+            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+        }
+      }
+    })
+
+    return result
+  } catch (error) {
+    console.error('Error loading custom Outlook built-in prompts:', error)
+    return outlookBuiltInPrompt
+  }
+}
+
 export const getExcelBuiltInPrompt = () => {
   const stored = localStorage.getItem('customExcelBuiltInPrompts')
   if (!stored) {

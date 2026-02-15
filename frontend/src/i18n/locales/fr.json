@@ -185,5 +185,15 @@
   "wordTool_applyTaggedFormatting": "Appliquer le formatage des balises",
   "wordTool_applyTaggedFormatting_desc": "Convertit les balises inline (ex. <b_red>texte</b_red>) en texte Word formaté.",
   "failedToInsert": "Échec de l'insertion du contenu",
-  "inserted": "Inséré dans le document"
+  "inserted": "Inséré dans le document",
+  "outlookReply": "Répondre",
+  "outlookFormalize": "Formaliser",
+  "outlookConcise": "Synthétiser",
+  "outlookProofread": "Relecture",
+  "outlookExtract": "Extraire tâches",
+  "outlookReplyPrePrompt": "Rédige une réponse à ce mail en disant que : ",
+  "emptySubtitleOutlook": "Ouvrez un email et laissez-moi vous aider à rédiger, résumer ou extraire les tâches",
+  "includeSelectionLabelOutlook": "Inclure le corps du mail",
+  "selectEmailPrompt": "Veuillez d'abord ouvrir un email",
+  "insertedToEmail": "Inséré dans l'email"
 }
