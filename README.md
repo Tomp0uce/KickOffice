@@ -4,7 +4,7 @@ AI-powered add-in for Microsoft Office applications. Provides a chat interface, 
 
 Built for **professional environments**: all LLM traffic goes through a controlled backend server (no API keys on the client), and no data is sent to third-party services.
 
-Based on the [WordGPT Plus](https://github.com/AkademieOlworworthy/word-GPT-Plus) open-source project, heavily modified for enterprise use.
+Based on the [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) open-source project, heavily modified for enterprise use.
 
 Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) (MIT License), with additional adaptations for KickOffice.
 
@@ -302,7 +302,7 @@ FRONTEND_URL=https://kickoffice.yourdomain.com
 
 ## Credits
 
-Based on [WordGPT Plus](https://github.com/AkademieOlworworthy/word-GPT-Plus) by Kuingsmile (MIT License).
+Based on [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) by Kuingsmile (MIT License).
 
 Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) by ilberpy (MIT License).
 
