@@ -72,7 +72,7 @@
             {{ $t('emptyTitle') }}
           </p>
           <p class="text-xs font-semibold text-secondary">
-            {{ $t('emptySubtitle') }}
+            {{ $t(hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle') }}
           </p>
           <!-- Backend status -->
           <div
@@ -229,13 +229,13 @@
           </button>
         </div>
         <div class="flex justify-center gap-3 px-1">
-          <label class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
+          <label v-if="!hostIsExcel" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useWordFormatting" type="checkbox" />
             <span>{{ $t('useWordFormattingLabel') }}</span>
           </label>
           <label class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useSelectedText" type="checkbox" />
-            <span>{{ $t('includeSelectionLabel') }}</span>
+            <span>{{ $t(hostIsExcel ? 'includeSelectionLabelExcel' : 'includeSelectionLabel') }}</span>
           </label>
         </div>
       </div>
@@ -246,14 +246,18 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
 import {
+  BarChart3,
   BookOpen,
   BotMessageSquare,
+  Calculator,
   CheckCircle,
   Copy,
   FileCheck,
+  FileSpreadsheet,
   FileText,
   Globe,
   ImageIcon,
+  LineChart,
   MessageSquare,
   Plus,
   Send,
@@ -261,8 +265,9 @@ import {
   Sparkle,
   Sparkles,
   Square,
+  TableProperties,
 } from 'lucide-vue-next'
-import { nextTick, onBeforeMount, ref } from 'vue'
+import { computed, nextTick, onBeforeMount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -270,9 +275,11 @@ import { insertFormattedResult, insertResult } from '@/api/common'
 import { type ChatMessage, chatStream, chatSync, fetchModels, generateImage, healthCheck } from '@/api/backend'
 import CustomButton from '@/components/CustomButton.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt, getBuiltInPrompt } from '@/utils/constant'
+import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt } from '@/utils/constant'
 import { localStorageKey } from '@/utils/enum'
+import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
+import { isExcel, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
@@ -321,9 +328,13 @@ const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
 const insertType = ref<insertTypes>('replace')
 
-// Quick actions
-const quickActions: {
-  key: keyof typeof buildInPrompt
+// Host detection
+const hostIsExcel = isExcel()
+const hostIsWord = isWord()
+
+// Quick actions - different for Word vs Excel
+const wordQuickActions: {
+  key: string
   label: string
   icon: any
 }[] = [
@@ -333,6 +344,20 @@ const quickActions: {
   { key: 'summary', label: t('summary'), icon: FileCheck },
   { key: 'grammar', label: t('grammar'), icon: CheckCircle },
 ]
+
+const excelQuickActions: {
+  key: string
+  label: string
+  icon: any
+}[] = [
+  { key: 'analyze', label: t('excelAnalyze'), icon: BarChart3 },
+  { key: 'chart', label: t('excelChart'), icon: LineChart },
+  { key: 'formula', label: t('excelFormula'), icon: Calculator },
+  { key: 'format', label: t('excelFormat'), icon: TableProperties },
+  { key: 'explain', label: t('excelExplain'), icon: FileSpreadsheet },
+]
+
+const quickActions = computed(() => hostIsExcel ? excelQuickActions : wordQuickActions)
 
 // Think tag parsing
 const THINK_TAG = '<think>'
@@ -451,7 +476,7 @@ function buildChatMessages(systemPrompt: string): ChatMessage[] {
   return messages
 }
 
-const agentPrompt = (lang: string) =>
+const wordAgentPrompt = (lang: string) =>
   `
 # Role
 You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist users in creating, editing, and formatting documents with professional precision.
@@ -470,8 +495,38 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
 Do not perform destructive actions (like clearing the whole document) unless explicitly instructed.
 `.trim()
 
-const standardPrompt = (lang: string) =>
+const excelAgentPrompt = (lang: string) =>
+  `
+# Role
+You are a highly skilled Microsoft Excel Expert Agent. Your goal is to assist users with data analysis, formulas, charts, formatting, and spreadsheet operations with professional precision.
+
+# Capabilities
+- You can interact with the spreadsheet directly using provided tools (reading cells, writing values, inserting formulas, creating charts, formatting ranges, etc.).
+- You understand data analysis, statistical methods, Excel formulas, and data visualization best practices.
+- You can perform operations like sorting, filtering, formatting, and creating charts.
+
+# Guidelines
+1. **Tool First**: If a request requires spreadsheet modification or data reading, prioritize using the available tools.
+2. **Read First**: Before modifying data, read the current state to understand the structure.
+3. **Accuracy**: Ensure formulas, formatting, and data operations are precise and follow the user's intent.
+4. **Conciseness**: Provide brief, helpful explanations of your actions and results.
+5. **Language**: You must communicate entirely in ${lang}.
+
+# Safety
+Do not perform destructive actions (like clearing all data or deleting sheets) unless explicitly instructed.
+`.trim()
+
+const agentPrompt = (lang: string) =>
+  hostIsExcel ? excelAgentPrompt(lang) : wordAgentPrompt(lang)
+
+const wordStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Word specialist. Help users with drafting, brainstorming, and Word-related questions. Reply in ${lang}.`
+
+const excelStandardPrompt = (lang: string) =>
+  `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}.`
+
+const standardPrompt = (lang: string) =>
+  hostIsExcel ? excelStandardPrompt(lang) : wordStandardPrompt(lang)
 
 async function sendMessage() {
   if (!userInput.value.trim() || loading.value) return
@@ -484,23 +539,35 @@ async function sendMessage() {
   userInput.value = ''
   adjustTextareaHeight()
 
-  // Get selected text from Word
+  // Get selected content from the active Office app
   let selectedText = ''
   if (useSelectedText.value) {
     try {
-      selectedText = await Word.run(async ctx => {
-        const range = ctx.document.getSelection()
-        range.load('text')
-        await ctx.sync()
-        return range.text
-      })
+      if (hostIsExcel) {
+        selectedText = await Excel.run(async (ctx) => {
+          const range = ctx.workbook.getSelectedRange()
+          range.load('values, address')
+          await ctx.sync()
+          const values = range.values
+          const formatted = values.map((row: any[]) => row.join('\t')).join('\n')
+          return `[${range.address}]\n${formatted}`
+        })
+      } else {
+        selectedText = await Word.run(async ctx => {
+          const range = ctx.document.getSelection()
+          range.load('text')
+          await ctx.sync()
+          return range.text
+        })
+      }
     } catch {
-      // Not in Word context
+      // Not in Office context
     }
   }
 
+  const selectionLabel = hostIsExcel ? 'Selected cells' : 'Selected text'
   const fullMessage = selectedText
-    ? `${userMessage}\n\n[Selected text: "${selectedText}"]`
+    ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]`
     : userMessage
 
   history.value.push({ role: 'user', content: fullMessage })
@@ -585,11 +652,11 @@ async function processChat(userMessage: string) {
 }
 
 async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
-  const wordToolDefs = getWordToolDefinitions()
+  const appToolDefs = hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
   const generalToolDefs = getGeneralToolDefinitions()
 
   // Build OpenAI-format tool definitions
-  const tools = [...generalToolDefs, ...wordToolDefs].map(def => ({
+  const tools = [...generalToolDefs, ...appToolDefs].map(def => ({
     type: 'function' as const,
     function: {
       name: def.name,
@@ -646,7 +713,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
 
       // Execute the tool
       let result = ''
-      const allTools = [...generalToolDefs, ...wordToolDefs]
+      const allTools = [...generalToolDefs, ...appToolDefs]
       const toolDef = allTools.find(t => t.name === toolName)
       if (toolDef) {
         try {
@@ -681,7 +748,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
   }
 }
 
-async function applyQuickAction(actionKey: keyof typeof buildInPrompt) {
+async function applyQuickAction(actionKey: string) {
   if (!backendOnline.value) {
     messageUtil.error(t('backendOffline'))
     return
@@ -689,29 +756,50 @@ async function applyQuickAction(actionKey: keyof typeof buildInPrompt) {
 
   let selectedText = ''
   try {
-    selectedText = await Word.run(async ctx => {
-      const range = ctx.document.getSelection()
-      range.load('text')
-      await ctx.sync()
-      return range.text
-    })
+    if (hostIsExcel) {
+      selectedText = await Excel.run(async (ctx) => {
+        const range = ctx.workbook.getSelectedRange()
+        range.load('values, address')
+        await ctx.sync()
+        const values = range.values
+        const formatted = values.map((row: any[]) => row.join('\t')).join('\n')
+        return `[${range.address}]\n${formatted}`
+      })
+    } else {
+      selectedText = await Word.run(async ctx => {
+        const range = ctx.document.getSelection()
+        range.load('text')
+        await ctx.sync()
+        return range.text
+      })
+    }
   } catch {
-    // Not in Word context
+    // Not in Office context
   }
 
   if (!selectedText) {
-    messageUtil.error(t('selectTextPrompt'))
+    messageUtil.error(t(hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
     return
   }
 
-  const builtInPrompts = getBuiltInPrompt()
-  const action = builtInPrompts[actionKey]
-  const lang = replyLanguage.value || 'Fran\u00e7ais'
+  // Get the right prompt set based on host
+  let action: { system: (lang: string) => string; user: (text: string, lang: string) => string }
+  if (hostIsExcel) {
+    const excelPrompts = getExcelBuiltInPrompt()
+    action = excelPrompts[actionKey as keyof typeof excelBuiltInPrompt]
+  } else {
+    const wordPrompts = getBuiltInPrompt()
+    action = wordPrompts[actionKey as keyof typeof buildInPrompt]
+  }
 
+  if (!action) return
+
+  const lang = replyLanguage.value || 'Français'
   const systemMsg = action.system(lang)
   const userMsg = action.user(selectedText, lang)
 
-  history.value.push({ role: 'user', content: `[${t(actionKey)}] ${selectedText.substring(0, 100)}...` })
+  const displayKey = hostIsExcel ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}` : actionKey
+  history.value.push({ role: 'user', content: `[${t(displayKey)}] ${selectedText.substring(0, 100)}...` })
   history.value.push({ role: 'assistant', content: '' })
   scrollToBottom()
 
@@ -749,6 +837,23 @@ async function applyQuickAction(actionKey: keyof typeof buildInPrompt) {
 }
 
 async function insertToDocument(content: string, type: insertTypes) {
+  if (hostIsExcel) {
+    // For Excel: write content to the selected cell
+    try {
+      await Excel.run(async (ctx) => {
+        const range = ctx.workbook.getSelectedRange()
+        range.values = [[content]]
+        await ctx.sync()
+      })
+      messageUtil.success(t('insertedToCell'))
+    } catch (err: any) {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(content)
+      messageUtil.info(t('copiedFallback'))
+    }
+    return
+  }
+
   insertType.value = type
   if (useWordFormatting.value) {
     await insertFormattedResult(content, insertType)

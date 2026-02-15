@@ -5,8 +5,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { i18n } from './i18n'
 import router from './router'
+import { detectOfficeHost } from './utils/hostDetection'
 
 window.Office.onReady(() => {
+  detectOfficeHost()
   const app = createApp(App)
   const debounce = (fn: (...args: any[]) => void, delay?: number) => {
     let timer: number | null = null

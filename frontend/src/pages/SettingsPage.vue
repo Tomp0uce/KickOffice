@@ -243,7 +243,7 @@
               >
                 <div class="flex flex-row items-start justify-between">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-secondary">{{ t(key) || key }}</span>
+                    <span class="text-sm font-semibold text-secondary">{{ t(hostIsExcel ? `excel${key.charAt(0).toUpperCase() + key.slice(1)}` : key) || key }}</span>
                   </div>
                   <div class="flex gap-1">
                     <CustomButton
@@ -312,7 +312,7 @@
               </div>
               <div class="rounded-md border border-border-secondary p-1 shadow-sm">
                 <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
-                  {{ t('wordToolsDescription') }}
+                  {{ t(hostIsExcel ? 'excelToolsDescription' : 'wordToolsDescription') }}
                 </p>
               </div>
               <div class="flex flex-col gap-2">
@@ -330,10 +330,10 @@
                   />
                   <div class="flex flex-col" @click="toggleTool(tool.name)">
                     <label :for="'tool-' + tool.name" class="text-xs font-semibold text-secondary">
-                      {{ $t(`wordTool_${tool.name}`) }}
+                      {{ $t(`${hostIsExcel ? 'excelTool' : 'wordTool'}_${tool.name}`) }}
                     </label>
                     <span class="text-xs text-secondary/90">
-                      {{ $t(`wordTool_${tool.name}_desc`) }}
+                      {{ $t(`${hostIsExcel ? 'excelTool' : 'wordTool'}_${tool.name}_desc`) }}
                     </span>
                   </div>
                 </div>
@@ -369,10 +369,12 @@ import CustomButton from '@/components/CustomButton.vue'
 import CustomInput from '@/components/CustomInput.vue'
 import SettingCard from '@/components/SettingCard.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt } from '@/utils/constant'
+import { buildInPrompt, excelBuiltInPrompt } from '@/utils/constant'
 import { optionLists } from '@/utils/common'
 import { localStorageKey } from '@/utils/enum'
+import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
+import { isExcel } from '@/utils/hostDetection'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { i18n } from '@/i18n'
 
@@ -393,8 +395,12 @@ const replyLanguageOptions = optionLists.replyLanguageList
 const backendOnline = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 
-// Tools
-const allToolsList = [...getGeneralToolDefinitions(), ...getWordToolDefinitions()]
+// Host detection
+const hostIsExcel = isExcel()
+
+// Tools - switch based on host
+const appToolsList = hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
 const enabledTools = ref<Set<string>>(new Set())
 
 // Prompt management
@@ -409,25 +415,42 @@ const savedPrompts = ref<Prompt[]>([])
 const editingPromptId = ref<string>('')
 const editingPrompt = ref<Prompt>({ id: '', name: '', systemPrompt: '', userPrompt: '' })
 
-// Built-in prompts
-type BuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
+// Built-in prompts - switch between Word and Excel
+type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
+type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
+type BuiltinPromptKey = WordBuiltinPromptKey | ExcelBuiltinPromptKey
 
 interface BuiltinPromptConfig {
   system: (language: string) => string
   user: (text: string, language: string) => string
 }
 
-const builtInPromptsData = ref<Record<BuiltinPromptKey, BuiltinPromptConfig>>({
+const wordBuiltInPromptsData: Record<WordBuiltinPromptKey, BuiltinPromptConfig> = {
   translate: { ...buildInPrompt.translate },
   polish: { ...buildInPrompt.polish },
   academic: { ...buildInPrompt.academic },
   summary: { ...buildInPrompt.summary },
   grammar: { ...buildInPrompt.grammar },
-})
+}
+
+const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig> = {
+  analyze: { ...excelBuiltInPrompt.analyze },
+  chart: { ...excelBuiltInPrompt.chart },
+  formula: { ...excelBuiltInPrompt.formula },
+  format: { ...excelBuiltInPrompt.format },
+  explain: { ...excelBuiltInPrompt.explain },
+}
+
+const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(
+  hostIsExcel ? { ...excelBuiltInPromptsData } : { ...wordBuiltInPromptsData },
+)
 
 const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('')
 const editingBuiltinPrompt = ref<{ system: string; user: string }>({ system: '', user: '' })
-const originalBuiltInPrompts = { ...buildInPrompt }
+const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = hostIsExcel
+  ? { ...excelBuiltInPrompt }
+  : { ...buildInPrompt }
+const builtInPromptsStorageKey = hostIsExcel ? 'customExcelBuiltInPrompts' : 'customBuiltInPrompts'
 
 const tabs = [
   { id: 'general', label: 'general', defaultLabel: 'General', icon: Globe },
@@ -512,17 +535,16 @@ function deletePrompt(id: string) {
 
 // Built-in prompts
 function loadBuiltInPrompts() {
-  const stored = localStorage.getItem('customBuiltInPrompts')
+  const stored = localStorage.getItem(builtInPromptsStorageKey)
   if (stored) {
     try {
       const customPrompts = JSON.parse(stored)
       Object.keys(customPrompts).forEach(key => {
-        const typedKey = key as BuiltinPromptKey
-        if (builtInPromptsData.value[typedKey]) {
-          builtInPromptsData.value[typedKey] = {
-            system: (language: string) => customPrompts[key].system.replace('${language}', language),
+        if (builtInPromptsData.value[key]) {
+          builtInPromptsData.value[key] = {
+            system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
             user: (text: string, language: string) =>
-              customPrompts[key].user.replace('${text}', text).replace('${language}', language),
+              customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
           }
         }
       })
@@ -535,16 +557,15 @@ function loadBuiltInPrompts() {
 function saveBuiltInPrompts() {
   const customPrompts: Record<string, { system: string; user: string }> = {}
   Object.keys(builtInPromptsData.value).forEach(key => {
-    const typedKey = key as BuiltinPromptKey
     customPrompts[key] = {
-      system: builtInPromptsData.value[typedKey].system('${language}'),
-      user: builtInPromptsData.value[typedKey].user('${text}', '${language}'),
+      system: builtInPromptsData.value[key].system('${language}'),
+      user: builtInPromptsData.value[key].user('${text}', '${language}'),
     }
   })
-  localStorage.setItem('customBuiltInPrompts', JSON.stringify(customPrompts))
+  localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts))
 }
 
-function toggleEditBuiltinPrompt(key: BuiltinPromptKey) {
+function toggleEditBuiltinPrompt(key: string) {
   if (editingBuiltinPromptKey.value === key) {
     builtInPromptsData.value[key] = {
       system: (language: string) => editingBuiltinPrompt.value.system.replace(/\$\{language\}/g, language),
@@ -554,7 +575,7 @@ function toggleEditBuiltinPrompt(key: BuiltinPromptKey) {
     saveBuiltInPrompts()
     editingBuiltinPromptKey.value = ''
   } else {
-    editingBuiltinPromptKey.value = key
+    editingBuiltinPromptKey.value = key as BuiltinPromptKey
     editingBuiltinPrompt.value = {
       system: builtInPromptsData.value[key].system('${language}'),
       user: builtInPromptsData.value[key].user('${text}', '${language}'),
@@ -562,7 +583,8 @@ function toggleEditBuiltinPrompt(key: BuiltinPromptKey) {
   }
 }
 
-function isBuiltinPromptModified(key: BuiltinPromptKey): boolean {
+function isBuiltinPromptModified(key: string): boolean {
+  if (!originalBuiltInPrompts[key]) return false
   const current = {
     system: builtInPromptsData.value[key].system('English'),
     user: builtInPromptsData.value[key].user('sample text', 'English'),
@@ -574,7 +596,8 @@ function isBuiltinPromptModified(key: BuiltinPromptKey): boolean {
   return current.system !== original.system || current.user !== original.user
 }
 
-function resetBuiltinPrompt(key: BuiltinPromptKey) {
+function resetBuiltinPrompt(key: string) {
+  if (!originalBuiltInPrompts[key]) return
   builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] }
   saveBuiltInPrompts()
   if (editingBuiltinPromptKey.value === key) {

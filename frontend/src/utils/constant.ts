@@ -97,6 +97,119 @@ export const buildInPrompt = {
   },
 }
 
+export const excelBuiltInPrompt = {
+  analyze: {
+    system: (language: string) =>
+      `You are an expert data analyst. You specialize in interpreting spreadsheet data, identifying patterns, computing statistics, and presenting insights in a clear, actionable manner in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Analyze the following Excel data and provide insights.
+      Structure:
+      - Identify column types (numeric, text, date).
+      - Calculate key statistics (sum, average, min, max, median) for numeric columns.
+      - Identify patterns, trends, or anomalies.
+      - Provide 3-5 actionable insights.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the analysis results, clearly structured.
+
+      Data: ${text}`,
+  },
+
+  chart: {
+    system: (language: string) =>
+      `You are a data visualization expert. You help users choose the best chart type and presentation for their data in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Based on the following data, recommend the best chart type and explain why.
+      Consider:
+      - The nature of the data (categorical, time series, comparison, distribution).
+      - The best chart type (bar, line, pie, scatter, etc.) and why.
+      - Any data preparation needed before charting.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the recommendation with brief justification.
+
+      Data: ${text}`,
+  },
+
+  formula: {
+    system: (language: string) =>
+      `You are an Excel formula expert. You help users write efficient and correct Excel formulas for their specific needs in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Based on the following data and context, suggest the most appropriate Excel formula(s).
+      Requirements:
+      - Provide the exact formula(s) ready to use.
+      - Explain briefly what each formula does.
+      - If multiple approaches exist, suggest the most efficient one.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the formula suggestions with brief explanations.
+
+      Context: ${text}`,
+  },
+
+  format: {
+    system: (language: string) =>
+      `You are a spreadsheet formatting specialist. You help users present their data professionally with appropriate formatting in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Suggest formatting improvements for the following data.
+      Consider:
+      - Number formats (currency, percentage, dates).
+      - Conditional formatting rules.
+      - Header styling and cell alignment.
+      - Color coding for readability.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the formatting recommendations.
+
+      Data: ${text}`,
+  },
+
+  explain: {
+    system: (language: string) =>
+      `You are a data interpretation expert. You help users understand their spreadsheet data by providing clear explanations in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Explain the following spreadsheet data in simple terms.
+      Include:
+      - What the data represents.
+      - Key numbers and what they mean.
+      - Any notable patterns or outliers.
+      - A brief plain-language summary.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the explanation.
+
+      Data: ${text}`,
+  },
+}
+
+export const getExcelBuiltInPrompt = () => {
+  const stored = localStorage.getItem('customExcelBuiltInPrompts')
+  if (!stored) {
+    return excelBuiltInPrompt
+  }
+
+  try {
+    const customPrompts = JSON.parse(stored)
+    const result = { ...excelBuiltInPrompt }
+
+    Object.keys(customPrompts).forEach(key => {
+      const typedKey = key as keyof typeof excelBuiltInPrompt
+      if (result[typedKey]) {
+        result[typedKey] = {
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          user: (text: string, language: string) =>
+            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+        }
+      }
+    })
+
+    return result
+  } catch (error) {
+    console.error('Error loading custom Excel built-in prompts:', error)
+    return excelBuiltInPrompt
+  }
+}
+
 export const getBuiltInPrompt = () => {
   const stored = localStorage.getItem('customBuiltInPrompts')
   if (!stored) {
