@@ -1030,8 +1030,8 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
           }
         } else if (ruleType === 'dataBar') {
           cf.dataBar.barColor = dataBarColor
-          cf.dataBar.lowerBoundRule = { type: Excel.ConditionalDataBarRuleType.lowestValue }
-          cf.dataBar.upperBoundRule = { type: Excel.ConditionalDataBarRuleType.highestValue }
+          cf.dataBar.lowerBoundRule = { type: Excel.ConditionalFormatRuleType.lowestValue }
+          cf.dataBar.upperBoundRule = { type: Excel.ConditionalFormatRuleType.highestValue }
         } else if (ruleType === 'iconSet') {
           const iconSetMap: Record<string, any> = {
             threeTrafficLights1: Excel.IconSet.threeTrafficLights1,
