@@ -185,5 +185,15 @@
   "excelTool_applyConditionalFormatting": "Apply Conditional Formatting",
   "excelTool_applyConditionalFormatting_desc": "Create conditional formatting rules (cell value, text, custom formula, color scales, data bars, icon sets).",
   "wordTool_applyTaggedFormatting": "Apply Tagged Formatting",
-  "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <b_red>text</b_red>) into formatted Word text."
+  "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <b_red>text</b_red>) into formatted Word text.",
+  "outlookReply": "Smart Reply",
+  "outlookFormalize": "Formalize",
+  "outlookConcise": "Concise",
+  "outlookProofread": "Proofread",
+  "outlookExtract": "Extract Tasks",
+  "outlookReplyPrePrompt": "Draft a reply to this email saying that: ",
+  "emptySubtitleOutlook": "Open an email and let me help you draft replies, summarize, or extract tasks",
+  "includeSelectionLabelOutlook": "Include Email Body",
+  "selectEmailPrompt": "Please open an email first",
+  "insertedToEmail": "Inserted into email"
 }

@@ -80,7 +80,7 @@
             {{ $t('emptyTitle') }}
           </p>
           <p class="text-xs font-semibold text-secondary">
-            {{ $t(hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle') }}
+            {{ $t(hostIsOutlook ? 'emptySubtitleOutlook' : hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle') }}
           </p>
           <!-- Backend status -->
           <div
@@ -237,13 +237,13 @@
           </button>
         </div>
         <div class="flex justify-center gap-3 px-1">
-          <label v-if="!hostIsExcel" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
+          <label v-if="!hostIsExcel && !hostIsOutlook" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useWordFormatting" type="checkbox" />
             <span>{{ $t('useWordFormattingLabel') }}</span>
           </label>
           <label class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useSelectedText" type="checkbox" />
-            <span>{{ $t(hostIsExcel ? 'includeSelectionLabelExcel' : 'includeSelectionLabel') }}</span>
+            <span>{{ $t(hostIsOutlook ? 'includeSelectionLabelOutlook' : hostIsExcel ? 'includeSelectionLabelExcel' : 'includeSelectionLabel') }}</span>
           </label>
         </div>
       </div>
@@ -257,7 +257,9 @@ import {
   BarChart3,
   BookOpen,
   BotMessageSquare,
+  Briefcase,
   Calculator,
+  CheckCheck,
   CheckCircle,
   Copy,
   FileCheck,
@@ -266,8 +268,11 @@ import {
   Globe,
   ImageIcon,
   LineChart,
+  ListTodo,
+  Mail,
   MessageSquare,
   Plus,
+  Scissors,
   Send,
   Settings,
   Sparkle,
@@ -283,11 +288,11 @@ import { insertFormattedResult, insertResult } from '@/api/common'
 import { type ChatMessage, chatStream, chatSync, fetchModels, generateImage, healthCheck } from '@/api/backend'
 import CustomButton from '@/components/CustomButton.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt } from '@/utils/constant'
+import { buildInPrompt, excelBuiltInPrompt, outlookBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt } from '@/utils/constant'
 import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { isExcel, isWord } from '@/utils/hostDetection'
+import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
@@ -343,6 +348,7 @@ const insertType = ref<insertTypes>('replace')
 // Host detection
 const hostIsExcel = isExcel()
 const hostIsWord = isWord()
+const hostIsOutlook = isOutlook()
 
 // Quick actions - different for Word vs Excel
 const wordQuickActions: {
@@ -369,7 +375,23 @@ const excelQuickActions: {
   { key: 'explain', label: t('excelExplain'), icon: FileSpreadsheet },
 ]
 
-const quickActions = computed(() => hostIsExcel ? excelQuickActions : wordQuickActions)
+const outlookQuickActions: {
+  key: string
+  label: string
+  icon: any
+}[] = [
+  { key: 'reply', label: t('outlookReply'), icon: Mail },
+  { key: 'formalize', label: t('outlookFormalize'), icon: Briefcase },
+  { key: 'concise', label: t('outlookConcise'), icon: Scissors },
+  { key: 'proofread', label: t('outlookProofread'), icon: CheckCheck },
+  { key: 'extract', label: t('outlookExtract'), icon: ListTodo },
+]
+
+const quickActions = computed(() => {
+  if (hostIsOutlook) return outlookQuickActions
+  if (hostIsExcel) return excelQuickActions
+  return wordQuickActions
+})
 
 // Think tag parsing
 const THINK_TAG = '<think>'
@@ -569,8 +591,33 @@ User profile context for communications (especially emails):
 Use this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
 }
 
-const agentPrompt = (lang: string) =>
-  `${hostIsExcel ? excelAgentPrompt(lang) : wordAgentPrompt(lang)}${userProfilePromptBlock()}`
+const outlookAgentPrompt = (lang: string) =>
+  `
+# Role
+You are a highly skilled Microsoft Outlook Email Expert Agent. Your goal is to assist users with email drafting, replying, summarizing email threads, extracting tasks, and improving email communication with professional precision.
+
+# Capabilities
+- You excel at drafting professional emails, replies, and follow-ups.
+- You can summarize long email threads and extract action items.
+- You understand business communication etiquette and professional writing standards.
+
+# Guidelines
+1. **Context Aware**: Use the email context provided to craft relevant responses.
+2. **Professional Tone**: Maintain a courteous, professional tone appropriate for business communication.
+3. **Conciseness**: Keep responses clear and to the point.
+4. **Language**: You must communicate entirely in ${lang}.
+
+# Safety
+Do not fabricate information not present in the email context. Do not include sensitive personal data unless present in the original email.
+`.trim()
+
+const agentPrompt = (lang: string) => {
+  let base: string
+  if (hostIsOutlook) base = outlookAgentPrompt(lang)
+  else if (hostIsExcel) base = excelAgentPrompt(lang)
+  else base = wordAgentPrompt(lang)
+  return `${base}${userProfilePromptBlock()}`
+}
 
 const wordStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Word specialist. Help users with drafting, brainstorming, and Word-related questions. Reply in ${lang}.`
@@ -578,8 +625,69 @@ const wordStandardPrompt = (lang: string) =>
 const excelStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}. ${excelFormulaLanguageInstruction()}`
 
-const standardPrompt = (lang: string) =>
-  `${hostIsExcel ? excelStandardPrompt(lang) : wordStandardPrompt(lang)}${userProfilePromptBlock()}`
+const outlookStandardPrompt = (lang: string) =>
+  `You are a helpful Microsoft Outlook email specialist. Help users with drafting emails, replying, summarizing email threads, extracting tasks, and improving email communication. Reply in ${lang}.`
+
+const standardPrompt = (lang: string) => {
+  let base: string
+  if (hostIsOutlook) base = outlookStandardPrompt(lang)
+  else if (hostIsExcel) base = excelStandardPrompt(lang)
+  else base = wordStandardPrompt(lang)
+  return `${base}${userProfilePromptBlock()}`
+}
+
+function getOutlookMailBody(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const mailbox = (window as any).Office?.context?.mailbox
+      if (!mailbox || !mailbox.item) {
+        resolve('')
+        return
+      }
+      mailbox.item.body.getAsync(
+        (window as any).Office.CoercionType.Text,
+        (result: any) => {
+          if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
+            resolve(result.value || '')
+          } else {
+            resolve('')
+          }
+        },
+      )
+    } catch {
+      resolve('')
+    }
+  })
+}
+
+function getOutlookSelectedText(): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const mailbox = (window as any).Office?.context?.mailbox
+      if (!mailbox || !mailbox.item) {
+        resolve('')
+        return
+      }
+      // getSelectedDataAsync works in compose mode
+      if (typeof mailbox.item.getSelectedDataAsync === 'function') {
+        mailbox.item.getSelectedDataAsync(
+          (window as any).Office.CoercionType.Text,
+          (result: any) => {
+            if (result.status === (window as any).Office.AsyncResultStatus.Succeeded && result.value?.data) {
+              resolve(result.value.data)
+            } else {
+              resolve('')
+            }
+          },
+        )
+      } else {
+        resolve('')
+      }
+    } catch {
+      resolve('')
+    }
+  })
+}
 
 async function sendMessage() {
   if (!userInput.value.trim() || loading.value) return
@@ -596,7 +704,9 @@ async function sendMessage() {
   let selectedText = ''
   if (useSelectedText.value) {
     try {
-      if (hostIsExcel) {
+      if (hostIsOutlook) {
+        selectedText = await getOutlookMailBody()
+      } else if (hostIsExcel) {
         selectedText = await Excel.run(async (ctx) => {
           const range = ctx.workbook.getSelectedRange()
           range.load('values, address')
@@ -618,7 +728,7 @@ async function sendMessage() {
     }
   }
 
-  const selectionLabel = hostIsExcel ? 'Selected cells' : 'Selected text'
+  const selectionLabel = hostIsOutlook ? 'Email body' : hostIsExcel ? 'Selected cells' : 'Selected text'
   const fullMessage = selectedText
     ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]`
     : userMessage
@@ -812,7 +922,13 @@ async function applyQuickAction(actionKey: string) {
 
   let selectedText = ''
   try {
-    if (hostIsExcel) {
+    if (hostIsOutlook) {
+      // Try to get selected text first, fall back to full email body
+      selectedText = await getOutlookSelectedText()
+      if (!selectedText) {
+        selectedText = await getOutlookMailBody()
+      }
+    } else if (hostIsExcel) {
       selectedText = await Excel.run(async (ctx) => {
         const range = ctx.workbook.getSelectedRange()
         range.load('values, address')
@@ -834,13 +950,31 @@ async function applyQuickAction(actionKey: string) {
   }
 
   if (!selectedText) {
-    messageUtil.error(t(hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
+    messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
+    return
+  }
+
+  // Special behavior for Smart Reply: pre-fill user input instead of sending immediately
+  if (hostIsOutlook && actionKey === 'reply') {
+    userInput.value = t('outlookReplyPrePrompt')
+    adjustTextareaHeight()
+    if (inputTextarea.value) {
+      inputTextarea.value.focus()
+    }
+    // Store the email context so it can be used when the user sends
+    history.value.push({
+      role: 'system',
+      content: `[Email context for reply]\n${selectedText}`,
+    })
     return
   }
 
   // Get the right prompt set based on host
   let action: { system: (lang: string) => string; user: (text: string, lang: string) => string }
-  if (hostIsExcel) {
+  if (hostIsOutlook) {
+    const outlookPrompts = getOutlookBuiltInPrompt()
+    action = outlookPrompts[actionKey as keyof typeof outlookBuiltInPrompt]
+  } else if (hostIsExcel) {
     const excelPrompts = getExcelBuiltInPrompt()
     action = excelPrompts[actionKey as keyof typeof excelBuiltInPrompt]
   } else {
@@ -854,7 +988,11 @@ async function applyQuickAction(actionKey: string) {
   const systemMsg = action.system(lang)
   const userMsg = action.user(selectedText, lang)
 
-  const displayKey = hostIsExcel ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}` : actionKey
+  const displayKey = hostIsOutlook
+    ? `outlook${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
+    : hostIsExcel
+      ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
+      : actionKey
   history.value.push({ role: 'user', content: `[${t(displayKey)}] ${selectedText.substring(0, 100)}...` })
   history.value.push({ role: 'assistant', content: '' })
   scrollToBottom()
@@ -894,6 +1032,34 @@ async function applyQuickAction(actionKey: string) {
 
 async function insertToDocument(content: string, type: insertTypes) {
   if (!content.trim()) {
+    return
+  }
+
+  if (hostIsOutlook) {
+    // For Outlook: try to set body in compose mode, fallback to clipboard
+    try {
+      const mailbox = (window as any).Office?.context?.mailbox
+      if (mailbox?.item?.body?.setAsync) {
+        await new Promise<void>((resolve, reject) => {
+          mailbox.item.body.setAsync(
+            content,
+            { coercionType: (window as any).Office.CoercionType.Text },
+            (result: any) => {
+              if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
+                resolve()
+              } else {
+                reject(new Error(result.error?.message || 'setAsync failed'))
+              }
+            },
+          )
+        })
+        messageUtil.success(t('insertedToEmail'))
+      } else {
+        await copyToClipboard(content, true)
+      }
+    } catch {
+      await copyToClipboard(content, true)
+    }
     return
   }
 

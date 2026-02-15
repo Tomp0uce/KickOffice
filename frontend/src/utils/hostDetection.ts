@@ -1,4 +1,4 @@
-export type OfficeHostType = 'Word' | 'Excel' | 'Unknown'
+export type OfficeHostType = 'Word' | 'Excel' | 'Outlook' | 'Unknown'
 
 let detectedHost: OfficeHostType = 'Unknown'
 
@@ -12,6 +12,8 @@ export function detectOfficeHost(): OfficeHostType {
       detectedHost = 'Word'
     } else if (host === 'Excel' || host === 'Workbook') {
       detectedHost = 'Excel'
+    } else if (host === 'Outlook' || host === 'Mailbox') {
+      detectedHost = 'Outlook'
     }
   } catch {
     // Fallback: check global objects
@@ -22,6 +24,8 @@ export function detectOfficeHost(): OfficeHostType {
       detectedHost = 'Word'
     } else if (typeof (window as any).Excel !== 'undefined') {
       detectedHost = 'Excel'
+    } else if (typeof (window as any).Office?.context?.mailbox !== 'undefined') {
+      detectedHost = 'Outlook'
     }
   }
 
@@ -34,6 +38,10 @@ export function isExcel(): boolean {
 
 export function isWord(): boolean {
   return detectOfficeHost() === 'Word'
+}
+
+export function isOutlook(): boolean {
+  return detectOfficeHost() === 'Outlook'
 }
 
 export function getHostName(): string {

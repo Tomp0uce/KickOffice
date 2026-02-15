@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered add-in for Microsoft Office applications. Provides a chat interface, document manipulation agent, and quick AI actions (translate, polish, summarize, etc.) directly inside Office apps.
+AI-powered add-in for Microsoft Office applications. Provides a chat interface, document manipulation agent, and quick AI actions (translate, polish, summarize, email reply, etc.) directly inside Word, Excel, and Outlook.
 
 Built for **professional environments**: all LLM traffic goes through a controlled backend server (no API keys on the client), and no data is sent to third-party services.
 
@@ -22,8 +22,8 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
         │                              │
         │  Office.js API               │  Health check
         ▼                              │  Model config
-   Word / Excel /                      │  API key storage
-   PowerPoint / Outlook                ▼
+   Word / Excel / Outlook /            │  API key storage
+   PowerPoint                          ▼
                                   .env file
 ```
 
@@ -118,12 +118,12 @@ KickOffice/
 │       │       ├── en.json
 │       │       └── fr.json
 │       ├── pages/
-│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions
+│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions (Word/Excel/Outlook)
 │       │   └── SettingsPage.vue  # Settings (language, prompts, tools)
 │       ├── router/
 │       ├── types/
 │       └── utils/
-│           ├── constant.ts       # Built-in prompts (translate, polish, etc.)
+│           ├── constant.ts       # Built-in prompts (Word, Excel, Outlook)
 │           ├── enum.ts           # localStorage keys
 │           ├── generalTools.ts   # Date + Math tools (for agent)
 │           ├── excelTools.ts     # Excel API tools (for agent)
@@ -132,7 +132,7 @@ KickOffice/
 │           ├── common.ts         # Option lists
 │           └── message.ts        # Toast notifications
 ├── docker-compose.yml
-├── manifest.xml              # Office add-in manifest (Word + Excel)
+├── manifest.xml              # Office add-in manifest (Word + Excel + Outlook)
 └── README.md
 ```
 
@@ -150,7 +150,7 @@ KickOffice/
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
 - [x] Backend Dockerfile with health check
 - [x] Frontend Dockerfile (multi-stage build + nginx)
-- [x] Office add-in manifest for Word + Excel
+- [x] Office add-in manifest for Word + Excel + Outlook
 
 ### Frontend - Chat Interface
 - [x] Chat UI with message history (user/assistant bubbles)
@@ -176,13 +176,20 @@ KickOffice/
 - [x] 22 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight
 - [x] 2 General tools: getCurrentDate, calculateMath
 
-### Frontend - Quick Actions
+### Frontend - Quick Actions (Word)
 - [x] Translate (with target language)
 - [x] Polish / Rewrite
 - [x] Academic rewriting
 - [x] Summary
 - [x] Grammar check
 - [x] Customizable built-in prompts (editable in settings)
+
+### Frontend - Quick Actions (Outlook)
+- [x] Smart Reply (pre-fills prompt, user completes intent, sends with email context)
+- [x] Formalize (transforms draft into professional email)
+- [x] Concise (reduces text by 30-50% while keeping key info)
+- [x] Proofread (grammar and spelling correction only, preserves style)
+- [x] Extract Tasks (extracts summary, key points, and required actions from email)
 
 ### Frontend - Settings
 - [x] UI language selector (French / English)
@@ -210,9 +217,17 @@ KickOffice/
 - [ ] Rate limiting on backend
 - [ ] Request logging / audit trail
 
+### Frontend - Outlook Support
+- [x] Outlook host detection (`isOutlook()`)
+- [x] Manifest extension points: `MessageReadCommandSurface` + `MessageComposeCommandSurface`
+- [x] Asynchronous email body retrieval (`body.getAsync`)
+- [x] Selected text retrieval in compose mode (`getSelectedDataAsync`)
+- [x] Email body insertion in compose mode (`body.setAsync`)
+- [x] Outlook-specific standard and agent prompts
+- [x] `ReadWriteMailbox` permission
+
 ### Not Yet Implemented
 - [ ] PowerPoint support (add-in manifest + slide generation, image insertion, content generation)
-- [ ] Outlook support (add-in manifest + email drafting, reply suggestions, summary)
 - [ ] Conversation history persistence (currently in-memory only, lost on page reload)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)
