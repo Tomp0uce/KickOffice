@@ -162,48 +162,15 @@
       <!-- Input Area -->
       <div class="flex flex-col gap-1 rounded-md">
         <div class="flex items-center justify-between gap-2 overflow-hidden">
-          <div class="flex shrink-0 gap-1 rounded-sm border border-border bg-surface p-0.5">
-            <button
-              class="cursor-po flex h-7 w-7 items-center justify-center rounded-md border-none text-secondary hover:bg-accent/30 hover:text-white! [.active]:text-accent"
-              :class="{ active: mode === 'ask' }"
-              :title="t('askMode')"
-              @click="mode = 'ask'"
-            >
-              <MessageSquare :size="14" />
-            </button>
-            <button
-              class="cursor-po flex h-7 w-7 items-center justify-center rounded-md border-none text-secondary hover:bg-accent/30 hover:text-white! [.active]:text-accent"
-              :class="{ active: mode === 'agent' }"
-              :title="t('agentMode')"
-              @click="mode = 'agent'"
-            >
-              <BotMessageSquare :size="17" />
-            </button>
-            <button
-              class="cursor-po flex h-7 w-7 items-center justify-center rounded-md border-none text-secondary hover:bg-accent/30 hover:text-white! [.active]:text-accent"
-              :class="{ active: mode === 'image' }"
-              :title="t('imageMode')"
-              @click="mode = 'image'"
-            >
-              <ImageIcon :size="14" />
-            </button>
-          </div>
           <div class="flex min-w-0 flex-1 gap-1 overflow-hidden">
             <select
-              v-if="mode !== 'image'"
               v-model="selectedModelTier"
               class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none"
             >
-              <option v-for="(info, tier) in chatModels" :key="tier" :value="tier">
+              <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
                 {{ info.label }}
               </option>
             </select>
-            <span
-              v-else
-              class="flex h-7 items-center rounded-md border border-border bg-surface px-2 text-xs text-secondary"
-            >
-              {{ availableModels.image?.id || 'image' }}
-            </span>
           </div>
         </div>
         <div
@@ -213,7 +180,7 @@
             ref="inputTextarea"
             v-model="userInput"
             class="placeholder::text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
-            :placeholder="mode === 'image' ? $t('describeImage') : mode === 'agent' ? $t('directTheAgent') : $t('askAnything')"
+            :placeholder="inputPlaceholder"
             rows="1"
             @keydown.enter.exact.prevent="sendMessage"
             @input="adjustTextareaHeight"
@@ -255,7 +222,6 @@
 import { useStorage } from '@vueuse/core'
 import {
   BookOpen,
-  BotMessageSquare,
   Brush,
   Briefcase,
   CheckCheck,
@@ -267,10 +233,8 @@ import {
   FileText,
   FunctionSquare,
   Globe,
-  ImageIcon,
   ListTodo,
   Mail,
-  MessageSquare,
   Plus,
   Scissors,
   Send,
@@ -322,15 +286,12 @@ const backendOnline = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 
 // Chat state
-const mode = useStorage(localStorageKey.chatMode, 'ask' as 'ask' | 'agent' | 'image')
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
 const history = ref<DisplayMessage[]>([])
 const userInput = ref('')
 const loading = ref(false)
 const imageLoading = ref(false)
 
-// Filter out image model from chat selector
-const chatModels = ref<Record<string, ModelInfo>>({})
 const messagesContainer = ref<HTMLElement>()
 const inputTextarea = ref<HTMLTextAreaElement>()
 const abortController = ref<AbortController | null>(null)
@@ -428,6 +389,9 @@ const quickActions = computed(() => {
   if (hostIsExcel) return excelQuickActions.value
   return wordQuickActions
 })
+
+const selectedModelInfo = computed(() => availableModels.value[selectedModelTier.value])
+const inputPlaceholder = computed(() => selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'))
 
 // Think tag parsing
 const THINK_TAG = '<think>'
@@ -655,23 +619,6 @@ const agentPrompt = (lang: string) => {
   return `${base}${userProfilePromptBlock()}`
 }
 
-const wordStandardPrompt = (lang: string) =>
-  `You are a helpful Microsoft Word specialist. Help users with drafting, brainstorming, and Word-related questions. Reply in ${lang}.`
-
-const excelStandardPrompt = (lang: string) =>
-  `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}. ${excelFormulaLanguageInstruction()}`
-
-const outlookStandardPrompt = (lang: string) =>
-  `You are a helpful Microsoft Outlook email specialist. Help users with drafting emails, replying, summarizing email threads, extracting tasks, and improving email communication. Reply in ${lang}.`
-
-const standardPrompt = (lang: string) => {
-  let base: string
-  if (hostIsOutlook) base = outlookStandardPrompt(lang)
-  else if (hostIsExcel) base = excelStandardPrompt(lang)
-  else base = wordStandardPrompt(lang)
-  return `${base}${userProfilePromptBlock()}`
-}
-
 function getOutlookMailBody(): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
@@ -810,9 +757,9 @@ async function sendMessage() {
 
 async function processChat(userMessage: string) {
   const lang = replyLanguage.value || 'Fran\u00e7ais'
+  const modelConfig = availableModels.value[selectedModelTier.value]
 
-  // Image generation mode
-  if (mode.value === 'image') {
+  if (modelConfig?.type === 'image') {
     history.value.push({ role: 'assistant', content: t('imageGenerating') })
     scrollToBottom()
     imageLoading.value = true
@@ -840,30 +787,10 @@ async function processChat(userMessage: string) {
     return
   }
 
-  const isAgentMode = mode.value === 'agent'
-
-  const systemPrompt =
-    customSystemPrompt.value || (isAgentMode ? agentPrompt(lang) : standardPrompt(lang))
+  const systemPrompt = customSystemPrompt.value || agentPrompt(lang)
 
   const messages = buildChatMessages(systemPrompt)
-
-  // Add placeholder for assistant response
-  history.value.push({ role: 'assistant', content: '' })
-
-  if (isAgentMode) {
-    await runAgentLoop(messages, systemPrompt)
-  } else {
-    await chatStream({
-      messages,
-      modelTier: selectedModelTier.value,
-      abortSignal: abortController.value?.signal,
-      onStream: (text: string) => {
-        const lastIndex = history.value.length - 1
-        history.value[lastIndex] = { role: 'assistant', content: text }
-        scrollToBottom()
-      },
-    })
-  }
+  await runAgentLoop(messages, systemPrompt)
 
   scrollToBottom()
 }
@@ -886,6 +813,10 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
   const maxIter = Number(agentMaxIterations.value) || 25
   let currentMessages = [...messages]
 
+  history.value.push({ role: 'assistant', content: '⏳ Analyse de la demande...' })
+  const lastIndex = history.value.length - 1
+  scrollToBottom()
+
   while (iteration < maxIter) {
     iteration++
 
@@ -901,10 +832,17 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
     const assistantMsg = choice.message
     currentMessages.push(assistantMsg)
 
+    if (assistantMsg.content) {
+      history.value[lastIndex] = {
+        role: 'assistant',
+        content: assistantMsg.content,
+      }
+      scrollToBottom()
+    }
+
     // If no tool calls, we're done
     if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
-      const lastIndex = history.value.length - 1
-      history.value[lastIndex] = { role: 'assistant', content: assistantMsg.content || '' }
+      history.value[lastIndex] = { role: 'assistant', content: assistantMsg.content || history.value[lastIndex].content }
       scrollToBottom()
       break
     }
@@ -920,12 +858,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
       }
 
       // Show tool call in UI
-      const lastIndex = history.value.length - 1
-      const currentContent = history.value[lastIndex].content
-      history.value[lastIndex] = {
-        role: 'assistant',
-        content: currentContent + `\n\nTool: ${toolName}...`,
-      }
+      history.value[lastIndex].content += `\n\n⚡ Action : ${toolName}...`
       scrollToBottom()
 
       // Execute the tool
@@ -950,10 +883,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
       } as any)
 
       // Update UI
-      history.value[lastIndex] = {
-        role: 'assistant',
-        content: currentContent + `\nTool ${toolName} done.`,
-      }
+      history.value[lastIndex].content += ' ✅'
       scrollToBottom()
     }
 
@@ -1216,12 +1146,12 @@ async function checkBackend() {
   if (backendOnline.value) {
     try {
       availableModels.value = await fetchModels()
-      // Filter out image model for chat selector
-      const filtered: Record<string, ModelInfo> = {}
-      for (const [tier, info] of Object.entries(availableModels.value)) {
-        if (info.type !== 'image') filtered[tier] = info
+      if (!availableModels.value[selectedModelTier.value]) {
+        const [firstTier] = Object.keys(availableModels.value)
+        if (firstTier) {
+          selectedModelTier.value = firstTier as ModelTier
+        }
       }
-      chatModels.value = filtered
     } catch {
       console.error('Failed to fetch models')
     }
