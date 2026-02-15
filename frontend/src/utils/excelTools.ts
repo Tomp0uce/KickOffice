@@ -1,3 +1,5 @@
+import { localStorageKey } from './enum'
+
 export type ExcelToolName =
   | 'getSelectedCells'
   | 'setCellValue'
@@ -21,6 +23,14 @@ export type ExcelToolName =
   | 'addWorksheet'
   | 'setColumnWidth'
   | 'setRowHeight'
+  | 'applyConditionalFormatting'
+  | 'getConditionalFormattingRules'
+
+
+function getExcelFormulaLanguage(): 'en' | 'fr' {
+  const configured = localStorage.getItem(localStorageKey.excelFormulaLanguage)
+  return configured === 'fr' ? 'fr' : 'en'
+}
 
 const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
   getSelectedCells: {
@@ -147,10 +157,17 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
       return Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const cell = sheet.getRange(address)
-        cell.formulas = [[formula]]
+        const formulaLocale = getExcelFormulaLanguage()
+
+        if (formulaLocale === 'fr') {
+          cell.formulasLocal = [[formula]]
+        } else {
+          cell.formulas = [[formula]]
+        }
+
         cell.format.font.bold = true
         await context.sync()
-        return `Successfully inserted formula "${formula}" at ${address}`
+        return `Successfully inserted ${formulaLocale === 'fr' ? 'localized French' : 'English'} formula "${formula}" at ${address}`
       })
     },
   },
@@ -668,13 +685,14 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
       return Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
-        range.load('formulas, values, address')
+        range.load('formulas, formulasLocal, values, address')
         await context.sync()
 
         return JSON.stringify(
           {
             address: range.address,
             formulas: range.formulas,
+            formulasLocal: range.formulasLocal,
             values: range.values,
           },
           null,
@@ -816,6 +834,7 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
     },
   },
 
+
   setRowHeight: {
     name: 'setRowHeight',
     description: 'Set the height of one or more rows.',
@@ -841,6 +860,244 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
         rowRange.format.rowHeight = height
         await context.sync()
         return `Successfully set row ${rowIndex} height to ${height}`
+      })
+    },
+  },
+
+
+  applyConditionalFormatting: {
+    name: 'applyConditionalFormatting',
+    description:
+      'Create conditional formatting rules on a range, including cell value, text contains, custom formulas, color scales, data bars, and icon sets. Can also clear existing rules first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Target range address in A1 notation (e.g., "A2:A100").',
+        },
+        ruleType: {
+          type: 'string',
+          description: 'Conditional formatting rule type to apply.',
+          enum: ['cellValue', 'containsText', 'custom', 'colorScale', 'dataBar', 'iconSet'],
+        },
+        clearExisting: {
+          type: 'boolean',
+          description: 'If true, clear existing conditional formats on the target range before applying the new rule.',
+        },
+        operator: {
+          type: 'string',
+          description: 'Operator for cellValue rule.',
+          enum: ['between', 'notBetween', 'equalTo', 'notEqualTo', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'],
+        },
+        formula1: {
+          type: 'string',
+          description: 'First formula/value for cellValue or custom rule (examples: "100", "=A2>AVERAGE($A$2:$A$100)").',
+        },
+        formula2: {
+          type: 'string',
+          description: 'Second formula/value for between/notBetween operators.',
+        },
+        text: {
+          type: 'string',
+          description: 'Text to match for containsText rule.',
+        },
+        textOperator: {
+          type: 'string',
+          description: 'Operator for containsText rule.',
+          enum: ['contains', 'beginsWith', 'endsWith', 'notContains'],
+        },
+        fillColor: {
+          type: 'string',
+          description: 'Fill color (hex) for matching cells, e.g. "#FFCDD2".',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Font color (hex) for matching cells.',
+        },
+        bold: {
+          type: 'boolean',
+          description: 'Set font bold style on matching cells.',
+        },
+        colorScaleMinColor: {
+          type: 'string',
+          description: 'Minimum color for colorScale rules.',
+        },
+        colorScaleMidColor: {
+          type: 'string',
+          description: 'Midpoint color for colorScale rules.',
+        },
+        colorScaleMaxColor: {
+          type: 'string',
+          description: 'Maximum color for colorScale rules.',
+        },
+        dataBarColor: {
+          type: 'string',
+          description: 'Bar color for dataBar rules.',
+        },
+        iconSetStyle: {
+          type: 'string',
+          description: 'Icon set style for iconSet rules.',
+          enum: ['threeTrafficLights1', 'threeArrows', 'threeSymbols', 'fourArrows', 'fourTrafficLights', 'fiveArrows'],
+        },
+        stopIfTrue: {
+          type: 'boolean',
+          description: 'Whether evaluation should stop if this rule is true.',
+        },
+      },
+      required: ['address', 'ruleType'],
+    },
+    execute: async (args) => {
+      const {
+        address,
+        ruleType,
+        clearExisting = false,
+        operator = 'greaterThan',
+        formula1 = '0',
+        formula2,
+        text,
+        textOperator = 'contains',
+        fillColor,
+        fontColor,
+        bold,
+        colorScaleMinColor = '#F8696B',
+        colorScaleMidColor = '#FFEB84',
+        colorScaleMaxColor = '#63BE7B',
+        dataBarColor = '#5B9BD5',
+        iconSetStyle = 'threeTrafficLights1',
+        stopIfTrue,
+      } = args
+
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const targetRange = sheet.getRange(address)
+        const conditionalFormats: any = targetRange.conditionalFormats
+
+        if (clearExisting) {
+          conditionalFormats.clearAll()
+        }
+
+        const ruleTypeMap: Record<string, any> = {
+          cellValue: Excel.ConditionalFormatType.cellValue,
+          containsText: Excel.ConditionalFormatType.containsText,
+          custom: Excel.ConditionalFormatType.custom,
+          colorScale: Excel.ConditionalFormatType.colorScale,
+          dataBar: Excel.ConditionalFormatType.dataBar,
+          iconSet: Excel.ConditionalFormatType.iconSet,
+        }
+
+        const selectedType = ruleTypeMap[ruleType]
+        if (!selectedType) {
+          throw new Error(`Unsupported conditional formatting ruleType: ${ruleType}`)
+        }
+
+        const cf: any = conditionalFormats.add(selectedType)
+
+        if (ruleType === 'cellValue') {
+          const operatorMap: Record<string, any> = {
+            between: Excel.ConditionalCellValueOperator.between,
+            notBetween: Excel.ConditionalCellValueOperator.notBetween,
+            equalTo: Excel.ConditionalCellValueOperator.equalTo,
+            notEqualTo: Excel.ConditionalCellValueOperator.notEqualTo,
+            greaterThan: Excel.ConditionalCellValueOperator.greaterThan,
+            greaterThanOrEqual: Excel.ConditionalCellValueOperator.greaterThanOrEqual,
+            lessThan: Excel.ConditionalCellValueOperator.lessThan,
+            lessThanOrEqual: Excel.ConditionalCellValueOperator.lessThanOrEqual,
+          }
+          cf.cellValue.rule = {
+            formula1,
+            ...(formula2 ? { formula2 } : {}),
+            operator: operatorMap[operator] ?? Excel.ConditionalCellValueOperator.greaterThan,
+          }
+        } else if (ruleType === 'containsText') {
+          const textOperatorMap: Record<string, any> = {
+            contains: Excel.ConditionalTextOperator.contains,
+            beginsWith: Excel.ConditionalTextOperator.beginsWith,
+            endsWith: Excel.ConditionalTextOperator.endsWith,
+            notContains: Excel.ConditionalTextOperator.notContains,
+          }
+          cf.textComparison.rule = {
+            operator: textOperatorMap[textOperator] ?? Excel.ConditionalTextOperator.contains,
+            text: text ?? '',
+          }
+        } else if (ruleType === 'custom') {
+          cf.custom.rule.formula = formula1
+        } else if (ruleType === 'colorScale') {
+          cf.colorScale.criteria = {
+            minimum: { color: colorScaleMinColor, type: Excel.ConditionalFormatColorCriterionType.lowestValue },
+            midpoint: { color: colorScaleMidColor, type: Excel.ConditionalFormatColorCriterionType.percentile, formula: '50' },
+            maximum: { color: colorScaleMaxColor, type: Excel.ConditionalFormatColorCriterionType.highestValue },
+          }
+        } else if (ruleType === 'dataBar') {
+          cf.dataBar.barColor = dataBarColor
+          cf.dataBar.lowerBoundRule = { type: Excel.ConditionalDataBarRuleType.lowestValue }
+          cf.dataBar.upperBoundRule = { type: Excel.ConditionalDataBarRuleType.highestValue }
+        } else if (ruleType === 'iconSet') {
+          const iconSetMap: Record<string, any> = {
+            threeTrafficLights1: Excel.IconSet.threeTrafficLights1,
+            threeArrows: Excel.IconSet.threeArrows,
+            threeSymbols: Excel.IconSet.threeSymbols,
+            fourArrows: Excel.IconSet.fourArrows,
+            fourTrafficLights: Excel.IconSet.fourTrafficLights,
+            fiveArrows: Excel.IconSet.fiveArrows,
+          }
+          cf.iconSet.style = iconSetMap[iconSetStyle] ?? Excel.IconSet.threeTrafficLights1
+        }
+
+        if (fillColor) cf.format.fill.color = fillColor
+        if (fontColor) cf.format.font.color = fontColor
+        if (bold !== undefined) cf.format.font.bold = bold
+        if (stopIfTrue !== undefined) cf.stopIfTrue = stopIfTrue
+
+        await context.sync()
+        return `Successfully applied ${ruleType} conditional formatting on ${address}`
+      })
+    },
+  },
+
+  getConditionalFormattingRules: {
+    name: 'getConditionalFormattingRules',
+    description:
+      'Read conditional formatting rules from a target range (or from the worksheet used range when no address is provided).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Optional range address (e.g., "A1:D20"). Uses used range if omitted.',
+        },
+      },
+      required: [],
+    },
+    execute: async (args) => {
+      const { address } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
+        targetRange.load('address,isNullObject')
+        await context.sync()
+
+        if (targetRange.isNullObject) {
+          return 'No used range found on the active worksheet, so no conditional formatting rules were read.'
+        }
+
+        const conditionalFormats = targetRange.conditionalFormats
+        conditionalFormats.load('items/type,items/priority,items/stopIfTrue')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            address: targetRange.address,
+            totalRules: conditionalFormats.items.length,
+            rules: conditionalFormats.items.map(rule => ({
+              type: rule.type,
+              priority: rule.priority,
+              stopIfTrue: rule.stopIfTrue,
+            })),
+          },
+          null,
+          2,
+        )
       })
     },
   },

@@ -2,6 +2,7 @@ export const localStorageKey = {
   chatMode: 'chatMode',
   localLanguage: 'localLanguage',
   replyLanguage: 'replyLanguage',
+  excelFormulaLanguage: 'excelFormulaLanguage',
   insertType: 'insertType',
   useWordFormatting: 'useWordFormatting',
   useSelectedText: 'useSelectedText',

@@ -174,5 +174,12 @@
   "userGenderUnspecified": "Unspecified",
   "userProfileUnknownName": "Name not provided",
   "userProfileUnknownFirstName": "First name not provided",
-  "userProfileUnknownLastName": "Last name not provided"
+  "userProfileUnknownLastName": "Last name not provided",
+  "excelTool_getConditionalFormattingRules": "Get Conditional Formatting Rules",
+  "excelTool_getConditionalFormattingRules_desc": "Read conditional formatting rules from a range or worksheet used range.",
+  "excelFormulaLanguageLabel": "Excel Formula Interface Language",
+  "excelFormulaLanguageEnglish": "English formulas",
+  "excelFormulaLanguageFrench": "French formulas",
+  "excelTool_applyConditionalFormatting": "Apply Conditional Formatting",
+  "excelTool_applyConditionalFormatting_desc": "Create conditional formatting rules (cell value, text, custom formula, color scales, data bars, icon sets)."
 }
