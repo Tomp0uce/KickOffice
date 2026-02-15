@@ -245,7 +245,7 @@ import {
   Square,
   Wand2,
 } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeMount, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onBeforeMount, onUnmounted, ref, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -260,6 +260,7 @@ import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
+import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 const router = useRouter()
@@ -270,13 +271,6 @@ interface DisplayMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   imageSrc?: string
-}
-
-interface SavedPrompt {
-  id: string
-  name: string
-  systemPrompt: string
-  userPrompt: string
 }
 
 const savedPrompts = ref<SavedPrompt[]>([])
@@ -315,12 +309,20 @@ const hostIsExcel = isExcel()
 const hostIsWord = isWord()
 const hostIsOutlook = isOutlook()
 
-// Quick actions - different for Word vs Excel
-const wordQuickActions: {
+interface QuickAction {
   key: string
   label: string
-  icon: any
-}[] = [
+  icon: Component
+}
+
+interface ExcelQuickAction extends QuickAction {
+  mode: 'immediate' | 'draft'
+  prefix?: string
+  systemPrompt?: string
+}
+
+// Quick actions - different for Word vs Excel
+const wordQuickActions: QuickAction[] = [
   { key: 'translate', label: t('translate'), icon: Globe },
   { key: 'polish', label: t('polish'), icon: Sparkle },
   { key: 'academic', label: t('academic'), icon: BookOpen },
@@ -328,16 +330,7 @@ const wordQuickActions: {
   { key: 'grammar', label: t('grammar'), icon: CheckCircle },
 ]
 
-const excelQuickActions = computed<
-  {
-    key: string
-    label: string
-    icon: any
-    mode: 'immediate' | 'draft'
-    prefix?: string
-    systemPrompt?: string
-  }[]
->(() => [
+const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: 'clean',
     label: t('clean'),
@@ -375,11 +368,7 @@ const excelQuickActions = computed<
   },
 ])
 
-const outlookQuickActions: {
-  key: string
-  label: string
-  icon: any
-}[] = [
+const outlookQuickActions: QuickAction[] = [
   { key: 'reply', label: t('outlookReply'), icon: Mail },
   { key: 'formalize', label: t('outlookFormalize'), icon: Briefcase },
   { key: 'concise', label: t('outlookConcise'), icon: Scissors },
@@ -503,14 +492,7 @@ async function getOfficeSelection(options?: { includeOutlookSelectedText?: boole
 
 
 function loadSavedPrompts() {
-  const stored = localStorage.getItem('savedPrompts')
-  if (stored) {
-    try {
-      savedPrompts.value = JSON.parse(stored)
-    } catch {
-      savedPrompts.value = []
-    }
-  }
+  savedPrompts.value = loadSavedPromptsFromStorage([])
 }
 
 function loadSelectedPrompt() {

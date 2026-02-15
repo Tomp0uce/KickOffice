@@ -113,22 +113,17 @@ Ce fichier combine :
 4. ~~**Duplication du code de sélection Office** (`HomePage.vue:706-728` et `922-950`)~~ ✅
    - ✅ Extraction dans une fonction unique `getOfficeSelection(...)`, réutilisée par `sendMessage()` et `applyQuickAction()`.
 
-5. **Duplication de `loadSavedPrompts`** (`HomePage.vue:448-457` vs `SettingsPage.vue:552-566`)
-   Logique identique dans deux composants différents.
+5. ~~**Duplication de `loadSavedPrompts`** (`HomePage.vue:448-457` vs `SettingsPage.vue:552-566`)~~ ✅
+   - ✅ Extraction de la logique de lecture des prompts sauvegardés dans un helper partagé (`savedPrompts.ts`) réutilisé par les deux composants.
 
-6. **Watchers manuels au lieu de `useStorage`** (`SettingsPage.vue:522-549`)
-   7 watchers qui font `localStorage.setItem(...)` manuellement alors que `useStorage` gère déjà la persistance.
+6. ~~**Watchers manuels au lieu de `useStorage`** (`SettingsPage.vue:522-549`)~~ ✅
+   - ✅ Suppression des 7 watchers `localStorage.setItem(...)` redondants ; `useStorage` gère désormais seul la persistance.
 
-7. **Type `any` pour les icônes** (`HomePage.vue:357`, `369`, `381`)
-   ```typescript
-   const wordQuickActions: { key: string; label: string; icon: any }[] = [...]
-   ```
+7. ~~**Type `any` pour les icônes** (`HomePage.vue:357`, `369`, `381`)~~ ✅
+   - ✅ Remplacement des `any` par des interfaces `QuickAction` / `ExcelQuickAction` avec `icon: Component`.
 
-8. **`chatSync` retourne `Promise<any>`** (`backend.ts:81`)
-   ```typescript
-   export async function chatSync(options: ChatSyncOptions): Promise<any> {
-   ```
-   Le type de retour devrait être typé avec l'interface OpenAI ChatCompletion.
+8. ~~**`chatSync` retourne `Promise<any>`** (`backend.ts:81`)~~ ✅
+   - ✅ Ajout d'une interface `OpenAIChatCompletion` et typage de `chatSync` en `Promise<OpenAIChatCompletion>`.
 
 9. **Cast dangereux avec `as any`** (`HomePage.vue:642`, `649`, `650`, `675`)
    ```typescript
@@ -920,12 +915,12 @@ app.use(express.json({ limit: '1mb' }))
 | MOYENNE | M2 | ~~Mémoïser `renderSegments`~~ ✅ (`computed` `historyWithSegments`) | `HomePage.vue` | Faible |
 | MOYENNE | M3 | Error handler Vue global | `main.ts` | Faible |
 | MOYENNE | M4 | Accessibilité (ARIA) | Multiple fichiers | Moyen |
-| MOYENNE | M5 | Supprimer watchers redondants | `SettingsPage.vue` | Faible |
+| MOYENNE | M5 | ~~Supprimer watchers redondants~~ ✅ (`useStorage` seul pour la persistance) | `SettingsPage.vue` | Faible |
 | MOYENNE | M6 | Retry avec backoff (API client) | `backend.ts` | Moyen |
 | MOYENNE | M7 | Séparer backend en modules | `server.js` → multiple | Moyen |
 | MOYENNE | M8 | Request logging (morgan) | `server.js` | Faible |
 | BASSE | B1 | Corriger typo `cursor-po` | `HomePage.vue` | Très faible |
-| BASSE | B2 | Réduire `any` types | Multiple | Faible |
+| BASSE | B2 | ~~Réduire `any` types~~ ✅ (icônes + `chatSync` typés) | Multiple | Faible |
 | BASSE | B3 | Toggle dark mode | `SettingsPage.vue` | Faible |
 | BASSE | B4 | Extraire CSS répétées | `index.css` | Faible |
 | BASSE | B5 | Documenter `hostDetection.ts` | `README.md` | Très faible |
