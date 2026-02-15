@@ -2,10 +2,18 @@
   <div class="itemse-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1">
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <!-- Header -->
-      <div class="flex justify-between rounded-sm p-1">
+      <div class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1">
         <div class="flex flex-1 items-center gap-2 text-accent">
-          <Sparkles :size="18" />
-          <span class="text-sm font-semibold text-main">KickOffice</span>
+          <img src="/logo.svg" alt="KickAI logo" class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5" />
+          <div class="flex flex-col leading-none">
+            <span class="text-sm font-semibold text-main">KickOffice</span>
+            <span class="text-[10px] text-[#33ABC6]">AI Office Assistant</span>
+          </div>
+        </div>
+        <div class="mr-1 flex items-center gap-1">
+          <span class="h-2 w-2 rounded-full bg-[#33ABC6]" />
+          <span class="h-2 w-2 rounded-full bg-black" />
+          <span class="h-2 w-2 rounded-full border border-black/30 bg-white" />
         </div>
         <div class="flex items-center gap-1 rounded-md border border-accent/10">
           <CustomButton
@@ -326,6 +334,9 @@ const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true)
 const useSelectedText = useStorage(localStorageKey.useSelectedText, true)
 const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
+const userGender = useStorage(localStorageKey.userGender, 'unspecified')
+const userFirstName = useStorage(localStorageKey.userFirstName, '')
+const userLastName = useStorage(localStorageKey.userLastName, '')
 const insertType = ref<insertTypes>('replace')
 
 // Host detection
@@ -516,8 +527,33 @@ You are a highly skilled Microsoft Excel Expert Agent. Your goal is to assist us
 Do not perform destructive actions (like clearing all data or deleting sheets) unless explicitly instructed.
 `.trim()
 
+
+function userProfilePromptBlock() {
+  const firstName = userFirstName.value.trim()
+  const lastName = userLastName.value.trim()
+  const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName')
+
+  const genderMap: Record<string, string> = {
+    female: t('userGenderFemale'),
+    male: t('userGenderMale'),
+    nonbinary: t('userGenderNonBinary'),
+    unspecified: t('userGenderUnspecified'),
+  }
+
+  const genderLabel = genderMap[userGender.value] || t('userGenderUnspecified')
+
+  return `
+
+User profile context for communications (especially emails):
+- First name: ${firstName || t('userProfileUnknownFirstName')}
+- Last name: ${lastName || t('userProfileUnknownLastName')}
+- Full name: ${fullName}
+- Gender: ${genderLabel}
+Use this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
+}
+
 const agentPrompt = (lang: string) =>
-  hostIsExcel ? excelAgentPrompt(lang) : wordAgentPrompt(lang)
+  `${hostIsExcel ? excelAgentPrompt(lang) : wordAgentPrompt(lang)}${userProfilePromptBlock()}`
 
 const wordStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Word specialist. Help users with drafting, brainstorming, and Word-related questions. Reply in ${lang}.`
@@ -526,7 +562,7 @@ const excelStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}.`
 
 const standardPrompt = (lang: string) =>
-  hostIsExcel ? excelStandardPrompt(lang) : wordStandardPrompt(lang)
+  `${hostIsExcel ? excelStandardPrompt(lang) : wordStandardPrompt(lang)}${userProfilePromptBlock()}`
 
 async function sendMessage() {
   if (!userInput.value.trim() || loading.value) return

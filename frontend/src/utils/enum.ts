@@ -8,4 +8,7 @@ export const localStorageKey = {
   agentMaxIterations: 'agentMaxIterations',
   threadId: 'threadId',
   modelTier: 'modelTier',
+  userGender: 'userGender',
+  userFirstName: 'userFirstName',
+  userLastName: 'userLastName',
 } as const

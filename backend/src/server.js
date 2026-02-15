@@ -39,6 +39,41 @@ const models = {
   },
 }
 
+
+function isGpt5Model(modelId = '') {
+  return modelId.toLowerCase().startsWith('gpt-5')
+}
+
+function buildChatBody({ modelConfig, messages, temperature, maxTokens, stream, tools }) {
+  const modelId = modelConfig.id
+  const body = {
+    model: modelId,
+    messages,
+    stream,
+  }
+
+  const resolvedMaxTokens = maxTokens ?? modelConfig.maxTokens
+  if (resolvedMaxTokens) {
+    if (isGpt5Model(modelId)) {
+      body.max_completion_tokens = resolvedMaxTokens
+    } else {
+      body.max_tokens = resolvedMaxTokens
+    }
+  }
+
+  const resolvedTemperature = temperature ?? modelConfig.temperature
+  if (!isGpt5Model(modelId) && Number.isFinite(resolvedTemperature)) {
+    body.temperature = resolvedTemperature
+  }
+
+  if (tools && tools.length > 0) {
+    body.tools = tools
+    body.tool_choice = 'auto'
+  }
+
+  return body
+}
+
 // --- Middleware ---
 app.use(cors({
   origin: FRONTEND_URL,
@@ -91,13 +126,13 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    const body = {
-      model: modelConfig.id,
+    const body = buildChatBody({
+      modelConfig,
       messages,
-      temperature: temperature ?? modelConfig.temperature,
-      max_tokens: maxTokens ?? modelConfig.maxTokens,
+      temperature,
+      maxTokens,
       stream: true,
-    }
+    })
 
     const response = await fetch(`${LLM_API_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -161,18 +196,14 @@ app.post('/api/chat/sync', async (req, res) => {
   }
 
   try {
-    const body = {
-      model: modelConfig.id,
+    const body = buildChatBody({
+      modelConfig,
       messages,
-      temperature: temperature ?? modelConfig.temperature,
-      max_tokens: maxTokens ?? modelConfig.maxTokens,
+      temperature,
+      maxTokens,
       stream: false,
-    }
-
-    if (tools && tools.length > 0) {
-      body.tools = tools
-      body.tool_choice = 'auto'
-    }
+      tools,
+    })
 
     const response = await fetch(`${LLM_API_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -230,7 +261,6 @@ app.post('/api/image', async (req, res) => {
         size,
         quality,
         n,
-        response_format: 'b64_json',
       }),
     })
 
