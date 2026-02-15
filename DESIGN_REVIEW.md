@@ -101,25 +101,17 @@ Ce fichier combine :
 
 #### Problèmes spécifiques
 
-1. **`setInterval` sans cleanup** (`HomePage.vue:1157`)
-   ```typescript
-   setInterval(checkBackend, 30000)  // Jamais nettoyé - fuite mémoire
-   ```
+1. ~~**`setInterval` sans cleanup** (`HomePage.vue:1157`)~~ ✅
+   - ✅ L'intervalle de health check est maintenant stocké puis nettoyé dans `onUnmounted` via `clearInterval`, évitant la fuite mémoire.
 
-2. **`v-for` avec index comme key** (`HomePage.vue:99-100`)
-   ```vue
-   <div v-for="(msg, index) in history" :key="index">
-   ```
-   L'index change quand les messages sont ajoutés/supprimés, provoquant des re-renders inutiles.
+2. ~~**`v-for` avec index comme key** (`HomePage.vue:99-100`)~~ ✅
+   - ✅ Utilisation d'une clé stable par message (générée via `WeakMap`) pour éviter les re-renders inutiles liés aux index.
 
-3. **`renderSegments()` appelé à chaque render** (`HomePage.vue:110`)
-   ```vue
-   <template v-for="(segment, idx) in renderSegments(msg.content)" :key="idx">
-   ```
-   Fonction appelée dans le template sans mémoïsation - recalculée à chaque mise à jour du DOM.
+3. ~~**`renderSegments()` appelé à chaque render** (`HomePage.vue:110`)~~ ✅
+   - ✅ Les segments sont désormais pré-calculés dans un `computed` (`historyWithSegments`) et réutilisés dans le template.
 
-4. **Duplication du code de sélection Office** (`HomePage.vue:706-728` et `922-950`)
-   Le code pour récupérer le texte sélectionné (Word/Excel/Outlook) est dupliqué dans `sendMessage()` et `applyQuickAction()`.
+4. ~~**Duplication du code de sélection Office** (`HomePage.vue:706-728` et `922-950`)~~ ✅
+   - ✅ Extraction dans une fonction unique `getOfficeSelection(...)`, réutilisée par `sendMessage()` et `applyQuickAction()`.
 
 5. **Duplication de `loadSavedPrompts`** (`HomePage.vue:448-457` vs `SettingsPage.vue:552-566`)
    Logique identique dans deux composants différents.
@@ -915,17 +907,17 @@ app.use(express.json({ limit: '1mb' }))
 | CRITIQUE | C1 | Ajouter authentification backend | `server.js` | Moyen |
 | CRITIQUE | C2 | Ajouter rate limiting | `server.js` | Faible |
 | CRITIQUE | C3 | Masquer erreurs LLM brutes | `server.js` | Faible |
-| CRITIQUE | C4 | Cleanup `setInterval` | `HomePage.vue` | Très faible |
+| CRITIQUE | C4 | ~~Cleanup `setInterval`~~ ✅ (interval stocké + `clearInterval` au unmount) | `HomePage.vue` | Très faible |
 | HAUTE | H1 | Headers sécurité (helmet) | `server.js` | Faible |
 | HAUTE | H2 | Validation inputs backend | `server.js` | Moyen |
 | HAUTE | H3 | Découper `HomePage.vue` | `HomePage.vue` + nouveaux fichiers | Élevé |
-| HAUTE | H4 | Extraire logique dupliquée en composables | `HomePage.vue`, `SettingsPage.vue` | Moyen |
+| HAUTE | H4 | ~~Extraire logique dupliquée en composables~~ ✅ (sélection Office mutualisée via helper) | `HomePage.vue`, `SettingsPage.vue` | Moyen |
 | HAUTE | H5 | Mettre à jour README.md | `README.md` | Faible |
 | HAUTE | H6 | Aligner `.env.example` avec defaults | `.env.example` | Très faible |
 | HAUTE | H7 | Timeout sur requêtes fetch | `server.js`, `backend.ts` | Faible |
 | HAUTE | H8 | Renommer `WordToolDefinition` → `ToolDefinition` | `types/index.d.ts`, `excelTools.ts` | Faible |
-| MOYENNE | M1 | IDs uniques dans `v-for` | `HomePage.vue` | Faible |
-| MOYENNE | M2 | Mémoïser `renderSegments` | `HomePage.vue` | Faible |
+| MOYENNE | M1 | ~~IDs uniques dans `v-for`~~ ✅ (clé stable par message) | `HomePage.vue` | Faible |
+| MOYENNE | M2 | ~~Mémoïser `renderSegments`~~ ✅ (`computed` `historyWithSegments`) | `HomePage.vue` | Faible |
 | MOYENNE | M3 | Error handler Vue global | `main.ts` | Faible |
 | MOYENNE | M4 | Accessibilité (ARIA) | Multiple fichiers | Moyen |
 | MOYENNE | M5 | Supprimer watchers redondants | `SettingsPage.vue` | Faible |
