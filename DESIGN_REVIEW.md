@@ -125,27 +125,19 @@ Ce fichier combine :
 8. ~~**`chatSync` retourne `Promise<any>`** (`backend.ts:81`)~~ ✅
    - ✅ Ajout d'une interface `OpenAIChatCompletion` et typage de `chatSync` en `Promise<OpenAIChatCompletion>`.
 
-9. **Cast dangereux avec `as any`** (`HomePage.vue:642`, `649`, `650`, `675`)
-   ```typescript
-   const mailbox = (window as any).Office?.context?.mailbox
-   ```
-   Répété 4 fois - devrait être extrait dans un utilitaire typé.
+9. ~~**Cast dangereux avec `as any`** (`HomePage.vue:642`, `649`, `650`, `675`)~~ ✅
+   - ✅ Extraction de l'accès Outlook Office.js dans un utilitaire typé (`officeOutlook.ts`) et remplacement des 4 usages dans `HomePage.vue`.
 
-10. **Typo CSS** (`HomePage.vue:167`, `175`, `183`)
-    ```vue
-    class="cursor-po flex ..."  <!-- devrait être cursor-pointer -->
-    ```
+10. ~~**Typo CSS** (`HomePage.vue:167`, `175`, `183`)~~ ✅
+    - ✅ Correction des classes erronées (`cursor-pointer`) et du sélecteur `placeholder:text-*` invalide.
 
 ### `SettingsPage.vue` (737 lignes)
 
-1. **ExcelToolDefinitions typées avec `WordToolDefinition`** (`excelTools.ts:35`)
-   ```typescript
-   const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
-   ```
-   Le type `WordToolDefinition` est réutilisé pour Excel - devrait être un type générique `ToolDefinition`.
+1. ~~**ExcelToolDefinitions typées avec `WordToolDefinition`** (`excelTools.ts:35`)~~ ✅
+   - ✅ Introduction d'un type générique `ToolDefinition` (avec alias dédiés Word/Excel/Outlook) et migration d'`excelTools.ts` vers `ExcelToolDefinition`.
 
-2. **Pas de validation pour `agentMaxIterations`** (`SettingsPage.vue:124-129`)
-   L'utilisateur peut entrer un nombre négatif ou extrêmement grand.
+2. ~~**Pas de validation pour `agentMaxIterations`** (`SettingsPage.vue:124-129`)~~ ✅
+   - ✅ Ajout d'une sanitation avec bornes (`1..100`) + normalisation entière via `watch(..., { immediate: true })`.
 
 ### `backend.ts` - Client API
 
@@ -910,7 +902,7 @@ app.use(express.json({ limit: '1mb' }))
 | HAUTE | H5 | Mettre à jour README.md | `README.md` | Faible |
 | HAUTE | H6 | Aligner `.env.example` avec defaults | `.env.example` | Très faible |
 | HAUTE | H7 | Timeout sur requêtes fetch | `server.js`, `backend.ts` | Faible |
-| HAUTE | H8 | Renommer `WordToolDefinition` → `ToolDefinition` | `types/index.d.ts`, `excelTools.ts` | Faible |
+| HAUTE | H8 | ~~Renommer `WordToolDefinition` → `ToolDefinition`~~ ✅ (type générique + alias Word/Excel/Outlook) | `types/index.d.ts`, `excelTools.ts` | Faible |
 | MOYENNE | M1 | ~~IDs uniques dans `v-for`~~ ✅ (clé stable par message) | `HomePage.vue` | Faible |
 | MOYENNE | M2 | ~~Mémoïser `renderSegments`~~ ✅ (`computed` `historyWithSegments`) | `HomePage.vue` | Faible |
 | MOYENNE | M3 | Error handler Vue global | `main.ts` | Faible |
@@ -919,7 +911,7 @@ app.use(express.json({ limit: '1mb' }))
 | MOYENNE | M6 | Retry avec backoff (API client) | `backend.ts` | Moyen |
 | MOYENNE | M7 | Séparer backend en modules | `server.js` → multiple | Moyen |
 | MOYENNE | M8 | Request logging (morgan) | `server.js` | Faible |
-| BASSE | B1 | Corriger typo `cursor-po` | `HomePage.vue` | Très faible |
+| BASSE | B1 | ~~Corriger typo `cursor-po`~~ ✅ (classes + placeholder corrigés) | `HomePage.vue` | Très faible |
 | BASSE | B2 | ~~Réduire `any` types~~ ✅ (icônes + `chatSync` typés) | Multiple | Faible |
 | BASSE | B3 | Toggle dark mode | `SettingsPage.vue` | Faible |
 | BASSE | B4 | Extraire CSS répétées | `index.css` | Faible |

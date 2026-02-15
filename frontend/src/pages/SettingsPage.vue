@@ -433,6 +433,15 @@ const currentTab = ref('general')
 const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
 const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
+const AGENT_MAX_ITERATIONS_MIN = 1
+const AGENT_MAX_ITERATIONS_MAX = 100
+
+function sanitizeAgentMaxIterations(value: unknown): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 25
+  const normalized = Math.trunc(parsed)
+  return Math.min(AGENT_MAX_ITERATIONS_MAX, Math.max(AGENT_MAX_ITERATIONS_MIN, normalized))
+}
 const userGender = useStorage(localStorageKey.userGender, 'unspecified')
 const userFirstName = useStorage(localStorageKey.userFirstName, '')
 const userLastName = useStorage(localStorageKey.userLastName, '')
@@ -516,6 +525,13 @@ const tabs = [
 watch(localLanguage, (val) => {
   i18n.global.locale.value = val as 'en' | 'fr'
 })
+
+watch(agentMaxIterations, (value) => {
+  const sanitized = sanitizeAgentMaxIterations(value)
+  if (sanitized !== value) {
+    agentMaxIterations.value = sanitized
+  }
+}, { immediate: true })
 
 // Prompt management
 function loadPrompts() {

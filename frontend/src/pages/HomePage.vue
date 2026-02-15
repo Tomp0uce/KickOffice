@@ -180,7 +180,7 @@
           <textarea
             ref="inputTextarea"
             v-model="userInput"
-            class="placeholder::text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
+            class="placeholder:text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
             :placeholder="inputPlaceholder"
             rows="1"
             @keydown.enter.exact.prevent="sendMessage"
@@ -259,6 +259,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
+import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
 import { getWordToolDefinitions } from '@/utils/wordTools'
@@ -661,15 +662,15 @@ const agentPrompt = (lang: string) => {
 function getOutlookMailBody(): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
-      const mailbox = (window as any).Office?.context?.mailbox
+      const mailbox = getOutlookMailbox()
       if (!mailbox || !mailbox.item) {
         resolve('')
         return
       }
       mailbox.item.body.getAsync(
-        (window as any).Office.CoercionType.Text,
-        (result: any) => {
-          if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
+        getOfficeTextCoercionType(),
+        (result: OfficeAsyncResult<string>) => {
+          if (isOfficeAsyncSucceeded(result.status)) {
             resolve(result.value || '')
           } else {
             resolve('')
@@ -685,7 +686,7 @@ function getOutlookMailBody(): Promise<string> {
 function getOutlookSelectedText(): Promise<string> {
   return new Promise((resolve) => {
     try {
-      const mailbox = (window as any).Office?.context?.mailbox
+      const mailbox = getOutlookMailbox()
       if (!mailbox || !mailbox.item) {
         resolve('')
         return
@@ -693,9 +694,9 @@ function getOutlookSelectedText(): Promise<string> {
       // getSelectedDataAsync works in compose mode
       if (typeof mailbox.item.getSelectedDataAsync === 'function') {
         mailbox.item.getSelectedDataAsync(
-          (window as any).Office.CoercionType.Text,
-          (result: any) => {
-            if (result.status === (window as any).Office.AsyncResultStatus.Succeeded && result.value?.data) {
+          getOfficeTextCoercionType(),
+          (result: OfficeAsyncResult<{ data?: string }>) => {
+            if (isOfficeAsyncSucceeded(result.status) && result.value?.data) {
               resolve(result.value.data)
             } else {
               resolve('')
@@ -1053,14 +1054,14 @@ async function insertToDocument(content: string, type: insertTypes) {
   if (hostIsOutlook) {
     // For Outlook: try to set body in compose mode, fallback to clipboard
     try {
-      const mailbox = (window as any).Office?.context?.mailbox
+      const mailbox = getOutlookMailbox()
       if (mailbox?.item?.body?.setAsync) {
         await new Promise<void>((resolve, reject) => {
           mailbox.item.body.setAsync(
             content,
-            { coercionType: (window as any).Office.CoercionType.Text },
-            (result: any) => {
-              if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
+            { coercionType: getOfficeTextCoercionType() },
+            (result: OfficeAsyncResult) => {
+              if (isOfficeAsyncSucceeded(result.status)) {
                 resolve()
               } else {
                 reject(new Error(result.error?.message || 'setAsync failed'))
