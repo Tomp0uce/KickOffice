@@ -266,6 +266,7 @@ const router = useRouter()
 const { t } = useI18n()
 
 interface DisplayMessage {
+  id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   imageSrc?: string
@@ -437,23 +438,20 @@ function splitThinkSegments(text: string): RenderSegment[] {
   return segments.filter(s => s.text)
 }
 
-const messageKeys = new WeakMap<DisplayMessage, string>()
-let messageCounter = 0
-
-function getMessageKey(message: DisplayMessage): string {
-  let key = messageKeys.get(message)
-  if (!key) {
-    messageCounter += 1
-    key = `message-${messageCounter}`
-    messageKeys.set(message, key)
+function createDisplayMessage(role: DisplayMessage['role'], content: string, imageSrc?: string): DisplayMessage {
+  const id = globalThis.crypto?.randomUUID?.() || `message-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return {
+    id,
+    role,
+    content,
+    imageSrc,
   }
-  return key
 }
 
 const historyWithSegments = computed(() =>
   history.value.map(message => ({
     message,
-    key: getMessageKey(message),
+    key: message.id,
     segments: splitThinkSegments(message.content),
   })),
 )
@@ -772,7 +770,7 @@ async function sendMessage() {
   const extraContexts = [replyPrefillContext, selectedTextContext].filter(Boolean).join('\n\n')
   const fullMessage = extraContexts ? `${userMessage}\n\n${extraContexts}` : userMessage
 
-  history.value.push({ role: 'user', content: fullMessage })
+  history.value.push(createDisplayMessage('user', fullMessage))
   scrollToBottom()
 
   loading.value = true
@@ -801,7 +799,7 @@ async function processChat(userMessage: string) {
   const modelConfig = availableModels.value[selectedModelTier.value]
 
   if (modelConfig?.type === 'image') {
-    history.value.push({ role: 'assistant', content: t('imageGenerating') })
+    history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
     scrollToBottom()
     imageLoading.value = true
     try {
@@ -810,17 +808,16 @@ async function processChat(userMessage: string) {
         throw new Error('Image API returned no image payload (expected b64_json or url).')
       }
       const lastIndex = history.value.length - 1
-      history.value[lastIndex] = {
-        role: 'assistant',
-        content: '',
-        imageSrc,
-      }
+      const message = history.value[lastIndex]
+      message.role = 'assistant'
+      message.content = ''
+      message.imageSrc = imageSrc
     } catch (err: any) {
       const lastIndex = history.value.length - 1
-      history.value[lastIndex] = {
-        role: 'assistant',
-        content: `${t('imageError')}: ${err.message}`,
-      }
+      const message = history.value[lastIndex]
+      message.role = 'assistant'
+      message.content = `${t('imageError')}: ${err.message}`
+      message.imageSrc = undefined
     } finally {
       imageLoading.value = false
     }
@@ -854,7 +851,7 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
   const maxIter = Number(agentMaxIterations.value) || 25
   let currentMessages = [...messages]
 
-  history.value.push({ role: 'assistant', content: '⏳ Analyse de la demande...' })
+  history.value.push(createDisplayMessage('assistant', '⏳ Analyse de la demande...'))
   const lastIndex = history.value.length - 1
   scrollToBottom()
 
@@ -874,16 +871,17 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
     currentMessages.push(assistantMsg)
 
     if (assistantMsg.content) {
-      history.value[lastIndex] = {
-        role: 'assistant',
-        content: assistantMsg.content,
-      }
+      const message = history.value[lastIndex]
+      message.role = 'assistant'
+      message.content = assistantMsg.content
       scrollToBottom()
     }
 
     // If no tool calls, we're done
     if (!assistantMsg.tool_calls || assistantMsg.tool_calls.length === 0) {
-      history.value[lastIndex] = { role: 'assistant', content: assistantMsg.content || history.value[lastIndex].content }
+      const message = history.value[lastIndex]
+      message.role = 'assistant'
+      message.content = assistantMsg.content || message.content
       scrollToBottom()
       break
     }
@@ -979,10 +977,7 @@ async function applyQuickAction(actionKey: string) {
     }
     // Store the email context so it can be used when the user sends
     // Use 'user' role so buildChatMessages includes it in the request
-    history.value.push({
-      role: 'user',
-      content: `[Email context for reply]\n${selectedText}`,
-    })
+    history.value.push(createDisplayMessage('user', `[Email context for reply]\n${selectedText}`))
     return
   }
 
@@ -1021,8 +1016,8 @@ async function applyQuickAction(actionKey: string) {
       ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
       : actionKey
   const actionLabel = selectedQuickAction?.label || t(displayKey)
-  history.value.push({ role: 'user', content: `[${actionLabel}] ${selectedText.substring(0, 100)}...` })
-  history.value.push({ role: 'assistant', content: '' })
+  history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
+  history.value.push(createDisplayMessage('assistant', ''))
   scrollToBottom()
 
   loading.value = true
@@ -1048,7 +1043,9 @@ async function applyQuickAction(actionKey: string) {
       abortSignal: abortController.value?.signal,
       onStream: (text: string) => {
         const lastIndex = history.value.length - 1
-        history.value[lastIndex] = { role: 'assistant', content: text }
+        const message = history.value[lastIndex]
+        message.role = 'assistant'
+        message.content = text
         scrollToBottom()
       },
     })
