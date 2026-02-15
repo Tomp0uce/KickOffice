@@ -254,20 +254,20 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
 import {
-  BarChart3,
   BookOpen,
   BotMessageSquare,
+  Brush,
   Briefcase,
-  Calculator,
   CheckCheck,
   CheckCircle,
   Copy,
+  Eraser,
+  Eye,
   FileCheck,
-  FileSpreadsheet,
   FileText,
+  FunctionSquare,
   Globe,
   ImageIcon,
-  LineChart,
   ListTodo,
   Mail,
   MessageSquare,
@@ -278,7 +278,7 @@ import {
   Sparkle,
   Sparkles,
   Square,
-  TableProperties,
+  Wand2,
 } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeMount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -364,17 +364,52 @@ const wordQuickActions: {
   { key: 'grammar', label: t('grammar'), icon: CheckCircle },
 ]
 
-const excelQuickActions: {
-  key: string
-  label: string
-  icon: any
-}[] = [
-  { key: 'analyze', label: t('excelAnalyze'), icon: BarChart3 },
-  { key: 'chart', label: t('excelChart'), icon: LineChart },
-  { key: 'formula', label: t('excelFormula'), icon: Calculator },
-  { key: 'format', label: t('excelFormat'), icon: TableProperties },
-  { key: 'explain', label: t('excelExplain'), icon: FileSpreadsheet },
-]
+const excelQuickActions = computed<
+  {
+    key: string
+    label: string
+    icon: any
+    mode: 'immediate' | 'draft'
+    prefix?: string
+    systemPrompt?: string
+  }[]
+>(() => [
+  {
+    key: 'clean',
+    label: t('clean'),
+    icon: Eraser,
+    mode: 'immediate',
+    systemPrompt: 'You are a data cleaning expert. Detect and fix inconsistencies, trim whitespace, fix date formats, and standardize the dataset provided in the selection.',
+  },
+  {
+    key: 'beautify',
+    label: t('beautify'),
+    icon: Brush,
+    mode: 'immediate',
+    systemPrompt: 'You are an Excel formatting expert. Apply professional formatting (headers, borders, auto-fit columns) to the provided selection using available tools.',
+  },
+  {
+    key: 'formula',
+    label: t('excelFormula'),
+    icon: FunctionSquare,
+    mode: 'draft',
+    prefix: 'Génère une formule Excel pour : ',
+  },
+  {
+    key: 'transform',
+    label: t('transform'),
+    icon: Wand2,
+    mode: 'draft',
+    prefix: 'Transforme la sélection pour : ',
+  },
+  {
+    key: 'highlight',
+    label: t('highlight'),
+    icon: Eye,
+    mode: 'draft',
+    prefix: 'Mets en évidence (couleur) les cellules qui : ',
+  },
+])
 
 const outlookQuickActions: {
   key: string
@@ -390,7 +425,7 @@ const outlookQuickActions: {
 
 const quickActions = computed(() => {
   if (hostIsOutlook) return outlookQuickActions
-  if (hostIsExcel) return excelQuickActions
+  if (hostIsExcel) return excelQuickActions.value
   return wordQuickActions
 })
 
@@ -936,6 +971,22 @@ async function applyQuickAction(actionKey: string) {
     return
   }
 
+  const selectedQuickAction = hostIsExcel
+    ? excelQuickActions.value.find(action => action.key === actionKey)
+    : quickActions.value.find(action => action.key === actionKey)
+
+  if (hostIsExcel && selectedQuickAction?.mode === 'draft') {
+    userInput.value = selectedQuickAction.prefix || ''
+    adjustTextareaHeight()
+    await nextTick()
+    if (inputTextarea.value) {
+      inputTextarea.value.focus()
+      inputTextarea.value.selectionStart = inputTextarea.value.value.length
+      inputTextarea.value.selectionEnd = inputTextarea.value.value.length
+    }
+    return
+  }
+
   let selectedText = ''
   try {
     if (hostIsOutlook) {
@@ -987,30 +1038,41 @@ async function applyQuickAction(actionKey: string) {
   }
 
   // Get the right prompt set based on host
-  let action: { system: (lang: string) => string; user: (text: string, lang: string) => string }
+  let action: { system: (lang: string) => string; user: (text: string, lang: string) => string } | undefined
+  let systemMsg = ''
+  let userMsg = ''
+
   if (hostIsOutlook) {
     const outlookPrompts = getOutlookBuiltInPrompt()
     action = outlookPrompts[actionKey as keyof typeof outlookBuiltInPrompt]
   } else if (hostIsExcel) {
-    const excelPrompts = getExcelBuiltInPrompt()
-    action = excelPrompts[actionKey as keyof typeof excelBuiltInPrompt]
+    if (selectedQuickAction?.mode === 'immediate' && selectedQuickAction.systemPrompt) {
+      systemMsg = selectedQuickAction.systemPrompt
+      userMsg = `Selection:\n${selectedText}`
+    } else {
+      const excelPrompts = getExcelBuiltInPrompt()
+      action = excelPrompts[actionKey as keyof typeof excelBuiltInPrompt]
+    }
   } else {
     const wordPrompts = getBuiltInPrompt()
     action = wordPrompts[actionKey as keyof typeof buildInPrompt]
   }
 
-  if (!action) return
+  if (!systemMsg || !userMsg) {
+    if (!action) return
 
-  const lang = replyLanguage.value || 'Français'
-  const systemMsg = action.system(lang)
-  const userMsg = action.user(selectedText, lang)
+    const lang = replyLanguage.value || 'Français'
+    systemMsg = action.system(lang)
+    userMsg = action.user(selectedText, lang)
+  }
 
   const displayKey = hostIsOutlook
     ? `outlook${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
     : hostIsExcel
       ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
       : actionKey
-  history.value.push({ role: 'user', content: `[${t(displayKey)}] ${selectedText.substring(0, 100)}...` })
+  const actionLabel = selectedQuickAction?.label || t(displayKey)
+  history.value.push({ role: 'user', content: `[${actionLabel}] ${selectedText.substring(0, 100)}...` })
   history.value.push({ role: 'assistant', content: '' })
   scrollToBottom()
 
