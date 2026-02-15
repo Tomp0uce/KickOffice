@@ -96,10 +96,10 @@
         </div>
 
         <div
-          v-for="(msg, index) in history"
-          :key="index"
+          v-for="item in historyWithSegments"
+          :key="item.key"
           class="group flex items-end gap-4 [.user]:flex-row-reverse"
-          :class="msg.role === 'assistant' ? 'assistant' : 'user'"
+          :class="item.message.role === 'assistant' ? 'assistant' : 'user'"
         >
           <div
             class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left"
@@ -107,7 +107,7 @@
             <div
               class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word whitespace-pre-wrap text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
             >
-              <template v-for="(segment, idx) in renderSegments(msg.content)" :key="idx">
+              <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
                 <span v-if="segment.type === 'text'">{{ segment.text.trim() }}</span>
                 <details v-else class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary">
                   <summary class="cursor-pointer list-none p-1 text-sm font-semibold text-secondary">
@@ -120,13 +120,13 @@
               </template>
               <!-- Image display -->
               <img
-                v-if="msg.imageSrc"
-                :src="msg.imageSrc"
+                v-if="item.message.imageSrc"
+                :src="item.message.imageSrc"
                 class="mt-2 max-w-full rounded-md"
                 alt="Generated image"
               />
             </div>
-            <div v-if="msg.role === 'assistant'" class="flex gap-1">
+            <div v-if="item.message.role === 'assistant'" class="flex gap-1">
               <CustomButton
                 :title="t('replaceSelectedText')"
                 text=""
@@ -134,7 +134,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(getMessageActionPayload(msg), 'replace')"
+                @click="insertToDocument(getMessageActionPayload(item.message), 'replace')"
               />
               <CustomButton
                 :title="t('appendToSelection')"
@@ -143,7 +143,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(getMessageActionPayload(msg), 'append')"
+                @click="insertToDocument(getMessageActionPayload(item.message), 'append')"
               />
               <CustomButton
                 :title="t('copyToClipboard')"
@@ -152,7 +152,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="copyToClipboard(getMessageActionPayload(msg))"
+                @click="copyToClipboard(getMessageActionPayload(item.message))"
               />
             </div>
           </div>
@@ -245,7 +245,7 @@ import {
   Square,
   Wand2,
 } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeMount, ref } from 'vue'
+import { computed, nextTick, onBeforeMount, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -296,6 +296,7 @@ const imageLoading = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const inputTextarea = ref<HTMLTextAreaElement>()
 const abortController = ref<AbortController | null>(null)
+const backendCheckInterval = ref<number | null>(null)
 
 // Settings
 const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true)
@@ -436,9 +437,26 @@ function splitThinkSegments(text: string): RenderSegment[] {
   return segments.filter(s => s.text)
 }
 
-function renderSegments(content: string): RenderSegment[] {
-  return splitThinkSegments(content)
+const messageKeys = new WeakMap<DisplayMessage, string>()
+let messageCounter = 0
+
+function getMessageKey(message: DisplayMessage): string {
+  let key = messageKeys.get(message)
+  if (!key) {
+    messageCounter += 1
+    key = `message-${messageCounter}`
+    messageKeys.set(message, key)
+  }
+  return key
 }
+
+const historyWithSegments = computed(() =>
+  history.value.map(message => ({
+    message,
+    key: getMessageKey(message),
+    segments: splitThinkSegments(message.content),
+  })),
+)
 
 function cleanContent(content: string): string {
   const regex = new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
@@ -451,6 +469,38 @@ function getMessageActionPayload(message: DisplayMessage): string {
     return cleanedText
   }
   return message.imageSrc || ''
+}
+
+async function getOfficeSelection(options?: { includeOutlookSelectedText?: boolean }): Promise<string> {
+  const includeOutlookSelectedText = options?.includeOutlookSelectedText ?? false
+
+  if (hostIsOutlook) {
+    if (includeOutlookSelectedText) {
+      const selectedText = await getOutlookSelectedText()
+      if (selectedText) {
+        return selectedText
+      }
+    }
+    return getOutlookMailBody()
+  }
+
+  if (hostIsExcel) {
+    return Excel.run(async (ctx) => {
+      const range = ctx.workbook.getSelectedRange()
+      range.load('values, address')
+      await ctx.sync()
+      const values = range.values
+      const formatted = values.map((row: any[]) => row.join('\t')).join('\n')
+      return `[${range.address}]\n${formatted}`
+    })
+  }
+
+  return Word.run(async (ctx) => {
+    const range = ctx.document.getSelection()
+    range.load('text')
+    await ctx.sync()
+    return range.text
+  })
 }
 
 
@@ -710,25 +760,7 @@ async function sendMessage() {
   let selectedText = ''
   if (useSelectedText.value && !replyContextText) {
     try {
-      if (hostIsOutlook) {
-        selectedText = await getOutlookMailBody()
-      } else if (hostIsExcel) {
-        selectedText = await Excel.run(async (ctx) => {
-          const range = ctx.workbook.getSelectedRange()
-          range.load('values, address')
-          await ctx.sync()
-          const values = range.values
-          const formatted = values.map((row: any[]) => row.join('\t')).join('\n')
-          return `[${range.address}]\n${formatted}`
-        })
-      } else {
-        selectedText = await Word.run(async ctx => {
-          const range = ctx.document.getSelection()
-          range.load('text')
-          await ctx.sync()
-          return range.text
-        })
-      }
+      selectedText = await getOfficeSelection()
     } catch {
       // Not in Office context
     }
@@ -928,29 +960,7 @@ async function applyQuickAction(actionKey: string) {
 
   let selectedText = ''
   try {
-    if (hostIsOutlook) {
-      // Try to get selected text first, fall back to full email body
-      selectedText = await getOutlookSelectedText()
-      if (!selectedText) {
-        selectedText = await getOutlookMailBody()
-      }
-    } else if (hostIsExcel) {
-      selectedText = await Excel.run(async (ctx) => {
-        const range = ctx.workbook.getSelectedRange()
-        range.load('values, address')
-        await ctx.sync()
-        const values = range.values
-        const formatted = values.map((row: any[]) => row.join('\t')).join('\n')
-        return `[${range.address}]\n${formatted}`
-      })
-    } else {
-      selectedText = await Word.run(async ctx => {
-        const range = ctx.document.getSelection()
-        range.load('text')
-        await ctx.sync()
-        return range.text
-      })
-    }
+    selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
   } catch {
     // Not in Office context
   }
@@ -1180,6 +1190,13 @@ onBeforeMount(() => {
   loadSavedPrompts()
   checkBackend()
   // Re-check backend every 30 seconds
-  setInterval(checkBackend, 30000)
+  backendCheckInterval.value = window.setInterval(checkBackend, 30000)
+})
+
+onUnmounted(() => {
+  if (backendCheckInterval.value !== null) {
+    window.clearInterval(backendCheckInterval.value)
+    backendCheckInterval.value = null
+  }
 })
 </script>
