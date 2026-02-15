@@ -114,5 +114,15 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
   }
 
   const data = await res.json()
-  return data.data?.[0]?.b64_json || ''
+  const image = data.data?.[0]
+
+  if (image?.b64_json) {
+    return `data:image/png;base64,${image.b64_json}`
+  }
+
+  if (image?.url) {
+    return image.url
+  }
+
+  return ''
 }
