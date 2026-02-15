@@ -72,25 +72,29 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    ```bash
    docker compose up -d --build
    ```
-   > The `manifest-gen` init service automatically generates `manifest.xml` from
-   > `manifest.template.xml` using the `SERVER_IP`, `FRONTEND_PORT`, and
-   > `BACKEND_PORT` variables defined in the root `.env`. No manual URL editing
-   > is required.
+   > The `manifest-gen` init service (Node.js) automatically generates two
+   > manifests from the templates in `manifests-templates/`:
+   > - `manifest-office.xml` — Word, Excel, PowerPoint (TaskPaneApp)
+   > - `manifest-outlook.xml` — Outlook (MailApp)
+   >
+   > URLs are built from `SERVER_IP`, `FRONTEND_PORT`, and `BACKEND_PORT`
+   > defined in the root `.env`. No manual URL editing is required.
 
 4. **Verify**:
    - Backend health: `curl http://192.168.50.10:3003/health`
    - Frontend: open `http://192.168.50.10:3002` in a browser
    - Models endpoint: `curl http://192.168.50.10:3003/api/models`
 
-5. **Install the Office add-in**:
-   - In Word: File > Options > Trust Center > Trust Center Settings > Trusted Add-in Catalogs
-   - Or sideload `manifest.xml` via the Insert > My Add-ins > Upload My Add-in dialog
+5. **Install the Office add-ins**:
+   - Sideload `manifest-office.xml` in Word / Excel / PowerPoint via Insert > My Add-ins > Upload My Add-in
+   - Sideload `manifest-outlook.xml` in Outlook via the same dialog
+   - Or configure a shared catalog in Trust Center Settings
 
 ### Docker Compose Details
 
 | Container | Port | Image | Notes |
 |-----------|------|-------|-------|
-| `kickoffice-manifest-gen` | — | Alpine (init) | Generates `manifest.xml` from template, then exits |
+| `kickoffice-manifest-gen` | — | Node 18 Alpine (init) | Generates `manifest-office.xml` + `manifest-outlook.xml`, then exits |
 | `kickoffice-backend` | 3003 | Node 22 Alpine | |
 | `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) | |
 
@@ -142,10 +146,15 @@ KickOffice/
 │           ├── wordTools.ts      # Word API tools (for agent)
 │           ├── common.ts         # Option lists
 │           └── message.ts        # Toast notifications
+├── manifests-templates/
+│   ├── manifest-office.template.xml    # TaskPaneApp template (Word/Excel/PowerPoint)
+│   └── manifest-outlook.template.xml   # MailApp template (Outlook)
+├── scripts/
+│   └── generate-manifests.js           # Node.js script: templates → manifests
 ├── .env.example              # Root env vars: SERVER_IP, ports (copy to .env)
 ├── docker-compose.yml
-├── manifest.template.xml     # Template with {{FRONTEND_URL}} / {{BACKEND_URL}} placeholders
-├── manifest.xml              # Generated at docker-compose up (do not edit by hand)
+├── manifest-office.xml       # Generated at docker-compose up (do not edit by hand)
+├── manifest-outlook.xml      # Generated at docker-compose up (do not edit by hand)
 └── README.md
 ```
 
@@ -163,7 +172,7 @@ KickOffice/
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
 - [x] Backend Dockerfile with health check
 - [x] Frontend Dockerfile (multi-stage build + nginx)
-- [x] Office add-in manifest for Word + Excel + PowerPoint + Outlook
+- [x] Office add-in manifests: TaskPaneApp (Word/Excel/PowerPoint) + MailApp (Outlook)
 
 ### Frontend - Chat Interface
 - [x] Chat UI with message history (user/assistant bubbles)
@@ -322,7 +331,7 @@ For production, the architecture stays the same but:
 1. **Server**: Azure VM or App Service instead of Synology NAS
 2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
 3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: `manifest.xml` is auto-generated from `manifest.template.xml` at `docker compose up`. Update `SERVER_IP` / ports in the root `.env` to change all URLs
+4. **Manifest**: `manifest-office.xml` and `manifest-outlook.xml` are auto-generated at `docker compose up`. Update `SERVER_IP` / ports in the root `.env` to change all URLs
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:
