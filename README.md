@@ -116,7 +116,7 @@ KickOffice/
 │       │       ├── en.json
 │       │       └── fr.json
 │       ├── pages/
-│       │   ├── HomePage.vue      # Main chat + agent + quick actions
+│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions
 │       │   └── SettingsPage.vue  # Settings (language, prompts, tools)
 │       ├── router/
 │       ├── types/
@@ -124,12 +124,13 @@ KickOffice/
 │           ├── constant.ts       # Built-in prompts (translate, polish, etc.)
 │           ├── enum.ts           # localStorage keys
 │           ├── generalTools.ts   # Date + Math tools (for agent)
+│           ├── excelTools.ts     # Excel API tools (for agent)
 │           ├── wordFormatter.ts  # Markdown-to-Word formatting
-│           ├── wordTools.ts      # 22 Word API tools (for agent)
+│           ├── wordTools.ts      # Word API tools (for agent)
 │           ├── common.ts         # Option lists
 │           └── message.ts        # Toast notifications
 ├── docker-compose.yml
-├── manifest.xml              # Office add-in manifest (Word)
+├── manifest.xml              # Office add-in manifest (Word + Excel)
 └── README.md
 ```
 
@@ -147,7 +148,7 @@ KickOffice/
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
 - [x] Backend Dockerfile with health check
 - [x] Frontend Dockerfile (multi-stage build + nginx)
-- [x] Office add-in manifest for Word
+- [x] Office add-in manifest for Word + Excel
 
 ### Frontend - Chat Interface
 - [x] Chat UI with message history (user/assistant bubbles)
@@ -161,6 +162,7 @@ KickOffice/
 - [x] Word formatting toggle (markdown-to-Word conversion)
 - [x] `<think>` tag parsing (collapsible reasoning display)
 - [x] Backend online/offline indicator with auto-reconnect check
+- [x] Image generation mode (UI + backend integration)
 
 ### Frontend - Agent Mode
 - [x] Ask mode / Agent mode toggle
@@ -168,7 +170,8 @@ KickOffice/
 - [x] OpenAI function-calling format for tool definitions
 - [x] Tool execution status display in chat
 - [x] Max iterations limit (configurable)
-- [x] 22 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText
+- [x] 23 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText
+- [x] 22 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight
 - [x] 2 General tools: getCurrentDate, calculateMath
 
 ### Frontend - Quick Actions
@@ -183,6 +186,7 @@ KickOffice/
 - [x] UI language selector (French / English)
 - [x] Reply language selector
 - [x] Agent max iterations setting
+- [x] User profile settings (first name, last name, gender)
 - [x] Backend status display
 - [x] Configured models display (read-only)
 - [x] Custom prompts management (add/edit/delete)
@@ -205,10 +209,8 @@ KickOffice/
 - [ ] Request logging / audit trail
 
 ### Not Yet Implemented
-- [ ] Excel support (add-in manifest + Excel-specific tools: formula generation, chart creation, data analysis)
 - [ ] PowerPoint support (add-in manifest + slide generation, image insertion, content generation)
 - [ ] Outlook support (add-in manifest + email drafting, reply suggestions, summary)
-- [ ] Image generation UI (the backend endpoint exists, but no frontend UI to trigger it)
 - [ ] Conversation history persistence (currently in-memory only, lost on page reload)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)

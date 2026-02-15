@@ -120,8 +120,8 @@
               </template>
               <!-- Image display -->
               <img
-                v-if="msg.imageBase64"
-                :src="'data:image/png;base64,' + msg.imageBase64"
+                v-if="msg.imageSrc"
+                :src="msg.imageSrc"
                 class="mt-2 max-w-full rounded-md"
                 alt="Generated image"
               />
@@ -297,7 +297,7 @@ const { t } = useI18n()
 interface DisplayMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  imageBase64?: string
+  imageSrc?: string
 }
 
 interface SavedPrompt {
@@ -639,12 +639,15 @@ async function processChat(userMessage: string) {
     scrollToBottom()
     imageLoading.value = true
     try {
-      const b64 = await generateImage({ prompt: userMessage })
+      const imageSrc = await generateImage({ prompt: userMessage })
+      if (!imageSrc) {
+        throw new Error('Image API returned no image payload (expected b64_json or url).')
+      }
       const lastIndex = history.value.length - 1
       history.value[lastIndex] = {
         role: 'assistant',
         content: '',
-        imageBase64: b64,
+        imageSrc,
       }
     } catch (err: any) {
       const lastIndex = history.value.length - 1
