@@ -862,29 +862,45 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         body.load('text')
         await context.sync()
 
-        const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const tagRegex = new RegExp(`<${escapedTagName}>([\\s\\S]*?)<\\/${escapedTagName}>`, 'g')
-        const matches = [...(body.text || '').matchAll(tagRegex)]
+        const openingTag = `<${tagName}>`
+        const closingTag = `</${tagName}>`
+        const openingTagMatches = body.search(openingTag, { matchCase: true, matchWholeWord: false })
+        openingTagMatches.load('items')
+        await context.sync()
 
-        if (matches.length === 0) {
+        if (openingTagMatches.items.length === 0) {
           return `No <${tagName}>...</${tagName}> tags found.`
         }
 
         let replacedCount = 0
-        for (const match of matches) {
-          const fullMatch = match[0]
-          const innerText = match[1]
-
-          const searchResults = body.search(fullMatch, { matchCase: true, matchWholeWord: false })
-          searchResults.load('items')
+        for (let i = openingTagMatches.items.length - 1; i >= 0; i--) {
+          const openingRange = openingTagMatches.items[i]
+          const afterOpeningRange = openingRange.getRange('After')
+          const closingTagMatches = afterOpeningRange.search(closingTag, {
+            matchCase: true,
+            matchWholeWord: false,
+          })
+          closingTagMatches.load('items')
           await context.sync()
 
-          for (const item of searchResults.items) {
-            const formattedRange = item.insertText(innerText, 'Replace')
-            formattedRange.font.bold = bold
-            formattedRange.font.color = color
-            replacedCount++
+          if (closingTagMatches.items.length === 0) {
+            continue
           }
+
+          const taggedRange = openingRange.expandTo(closingTagMatches.items[0])
+          taggedRange.load('text')
+          await context.sync()
+
+          const taggedText = taggedRange.text || ''
+          if (!taggedText.endsWith(closingTag)) {
+            continue
+          }
+
+          const innerText = taggedText.slice(openingTag.length, taggedText.length - closingTag.length)
+          const formattedRange = taggedRange.insertText(innerText, 'Replace')
+          formattedRange.font.bold = bold
+          formattedRange.font.color = color
+          replacedCount++
           await context.sync()
         }
 
