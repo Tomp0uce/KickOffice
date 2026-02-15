@@ -4,7 +4,7 @@
       <!-- Header -->
       <div class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1">
         <div class="flex flex-1 items-center gap-2 text-accent">
-          <img src="/logo.svg" alt="KickAI logo" class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5" />
+          <img src="/Logo.png" alt="KickAI logo" class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5" />
           <div class="flex flex-col leading-none">
             <span class="text-sm font-semibold text-main">KickOffice</span>
             <span class="text-[10px] text-[#33ABC6]">AI Office Assistant</span>
