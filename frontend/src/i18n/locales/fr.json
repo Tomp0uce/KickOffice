@@ -181,5 +181,7 @@
   "excelFormulaLanguageEnglish": "Formules en anglais",
   "excelFormulaLanguageFrench": "Formules en français",
   "excelTool_applyConditionalFormatting": "Appliquer une mise en forme conditionnelle",
-  "excelTool_applyConditionalFormatting_desc": "Créer des règles de mise en forme conditionnelle (valeur, texte, formule personnalisée, échelles de couleurs, barres de données, jeux d’icônes)."
+  "excelTool_applyConditionalFormatting_desc": "Créer des règles de mise en forme conditionnelle (valeur, texte, formule personnalisée, échelles de couleurs, barres de données, jeux d’icônes).",
+  "wordTool_applyTaggedFormatting": "Appliquer le formatage des balises",
+  "wordTool_applyTaggedFormatting_desc": "Convertit les balises inline (ex. <b_red>texte</b_red>) en texte Word formaté."
 }

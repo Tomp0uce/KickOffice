@@ -22,6 +22,7 @@ export type WordToolName =
   | 'goToBookmark'
   | 'insertContentControl'
   | 'findText'
+  | 'applyTaggedFormatting'
 
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
@@ -825,6 +826,69 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
+      })
+    },
+  },
+
+  applyTaggedFormatting: {
+    name: 'applyTaggedFormatting',
+    description:
+      'Convert inline formatting tags in the document into real Word formatting (e.g., <b_red>text</b_red> becomes bold red text).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tagName: {
+          type: 'string',
+          description: 'Tag name to process (default: "b_red")',
+        },
+        color: {
+          type: 'string',
+          description: 'Font color to apply as hex (default: "#FF0000")',
+        },
+        bold: {
+          type: 'boolean',
+          description: 'Whether to apply bold formatting (default: true)',
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'b_red'
+      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : '#FF0000'
+      const bold = args.bold !== undefined ? Boolean(args.bold) : true
+
+      return Word.run(async context => {
+        const body = context.document.body
+        body.load('text')
+        await context.sync()
+
+        const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const tagRegex = new RegExp(`<${escapedTagName}>([\\s\\S]*?)<\\/${escapedTagName}>`, 'g')
+        const matches = [...(body.text || '').matchAll(tagRegex)]
+
+        if (matches.length === 0) {
+          return `No <${tagName}>...</${tagName}> tags found.`
+        }
+
+        let replacedCount = 0
+        for (const match of matches) {
+          const fullMatch = match[0]
+          const innerText = match[1]
+
+          const searchResults = body.search(fullMatch, { matchCase: true, matchWholeWord: false })
+          searchResults.load('items')
+          await context.sync()
+
+          for (const item of searchResults.items) {
+            const formattedRange = item.insertText(innerText, 'Replace')
+            formattedRange.font.bold = bold
+            formattedRange.font.color = color
+            replacedCount++
+          }
+          await context.sync()
+        }
+
+        return `Converted ${replacedCount} tagged occurrence(s) using <${tagName}>...</${tagName}>.`
       })
     },
   },
