@@ -184,4 +184,6 @@
   "excelTool_applyConditionalFormatting_desc": "Créer des règles de mise en forme conditionnelle (valeur, texte, formule personnalisée, échelles de couleurs, barres de données, jeux d’icônes).",
   "wordTool_applyTaggedFormatting": "Appliquer le formatage des balises",
   "wordTool_applyTaggedFormatting_desc": "Convertit les balises inline (ex. <b_red>texte</b_red>) en texte Word formaté."
+  "failedToInsert": "Échec de l'insertion du contenu",
+  "inserted": "Inséré dans le document"
 }
