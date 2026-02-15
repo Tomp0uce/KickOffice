@@ -80,7 +80,7 @@
             {{ $t('emptyTitle') }}
           </p>
           <p class="text-xs font-semibold text-secondary">
-            {{ $t(hostIsOutlook ? 'emptySubtitleOutlook' : hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle') }}
+            {{ $t(hostIsOutlook ? 'emptySubtitleOutlook' : hostIsPowerPoint ? 'emptySubtitlePowerPoint' : hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle') }}
           </p>
           <!-- Backend status -->
           <div
@@ -205,13 +205,13 @@
           </button>
         </div>
         <div class="flex justify-center gap-3 px-1">
-          <label v-if="!hostIsExcel && !hostIsOutlook" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
+          <label v-if="!hostIsExcel && !hostIsPowerPoint && !hostIsOutlook" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useWordFormatting" type="checkbox" />
             <span>{{ $t('useWordFormattingLabel') }}</span>
           </label>
           <label class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
             <input v-model="useSelectedText" type="checkbox" />
-            <span>{{ $t(hostIsOutlook ? 'includeSelectionLabelOutlook' : hostIsExcel ? 'includeSelectionLabelExcel' : 'includeSelectionLabel') }}</span>
+            <span>{{ $t(hostIsOutlook ? 'includeSelectionLabelOutlook' : hostIsPowerPoint ? 'includeSelectionLabelPowerPoint' : hostIsExcel ? 'includeSelectionLabelExcel' : 'includeSelectionLabel') }}</span>
           </label>
         </div>
       </div>
@@ -234,8 +234,11 @@ import {
   FileText,
   FunctionSquare,
   Globe,
+  Image,
   ListTodo,
   Mail,
+  MessageSquare,
+  Minus,
   Plus,
   Scissors,
   Send,
@@ -244,6 +247,7 @@ import {
   Sparkles,
   Square,
   Wand2,
+  Zap,
 } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeMount, onUnmounted, ref, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -253,15 +257,16 @@ import { insertFormattedResult, insertResult } from '@/api/common'
 import { type ChatMessage, chatStream, chatSync, fetchModels, generateImage, healthCheck } from '@/api/backend'
 import CustomButton from '@/components/CustomButton.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt, excelBuiltInPrompt, outlookBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt } from '@/utils/constant'
+import { buildInPrompt, excelBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt } from '@/utils/constant'
 import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
+import { isExcel, isOutlook, isPowerPoint, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import { getPowerPointSelection, insertIntoPowerPoint } from '@/utils/powerpointTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 const router = useRouter()
@@ -308,6 +313,7 @@ const insertType = ref<insertTypes>('replace')
 // Host detection
 const hostIsExcel = isExcel()
 const hostIsWord = isWord()
+const hostIsPowerPoint = isPowerPoint()
 const hostIsOutlook = isOutlook()
 
 interface QuickAction {
@@ -377,8 +383,21 @@ const outlookQuickActions: QuickAction[] = [
   { key: 'extract', label: t('outlookExtract'), icon: ListTodo },
 ]
 
+interface PowerPointQuickAction extends QuickAction {
+  mode: 'immediate' | 'draft'
+}
+
+const powerPointQuickActions: PowerPointQuickAction[] = [
+  { key: 'bullets', label: t('pptBullets'), icon: ListTodo, mode: 'immediate' },
+  { key: 'speakerNotes', label: t('pptSpeakerNotes'), icon: MessageSquare, mode: 'immediate' },
+  { key: 'punchify', label: t('pptPunchify'), icon: Zap, mode: 'immediate' },
+  { key: 'shrink', label: t('pptShrink'), icon: Minus, mode: 'immediate' },
+  { key: 'visual', label: t('pptVisual'), icon: Image, mode: 'draft' },
+]
+
 const quickActions = computed(() => {
   if (hostIsOutlook) return outlookQuickActions
+  if (hostIsPowerPoint) return powerPointQuickActions
   if (hostIsExcel) return excelQuickActions.value
   return wordQuickActions
 })
@@ -470,6 +489,10 @@ async function getOfficeSelection(options?: { includeOutlookSelectedText?: boole
       }
     }
     return getOutlookMailBody()
+  }
+
+  if (hostIsPowerPoint) {
+    return getPowerPointSelection()
   }
 
   if (hostIsExcel) {
@@ -631,6 +654,28 @@ User profile context for communications (especially emails):
 Use this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
 }
 
+const powerPointAgentPrompt = (lang: string) =>
+  `
+# Role
+You are a PowerPoint presentation expert. Your goal is to help users create clear, impactful slides. You favour bullet-point lists, short sentences, and a direct style. You can also write speaker notes that are conversational and engaging.
+
+# Capabilities
+- Rewrite text for maximum slide impact (bullet points, headlines, concise phrasing).
+- Generate speaker notes (conversational, with transition cues).
+- Shorten or restructure content for better visual flow.
+- Suggest image prompts for slide visuals.
+
+# Guidelines
+1. **Slide-first mindset**: Always think in terms of what looks good on a slide.
+2. **Brevity**: Prefer short phrases over full sentences on slides.
+3. **Speaker notes**: When asked, write notes that are conversational, engaging, and suitable for reading aloud.
+4. **Conciseness**: Provide brief, helpful explanations of your actions.
+5. **Language**: You must communicate entirely in ${lang}.
+
+# Safety
+Do not fabricate data or statistics not present in the original content.
+`.trim()
+
 const outlookAgentPrompt = (lang: string) =>
   `
 # Role
@@ -654,6 +699,7 @@ Do not fabricate information not present in the email context. Do not include se
 const agentPrompt = (lang: string) => {
   let base: string
   if (hostIsOutlook) base = outlookAgentPrompt(lang)
+  else if (hostIsPowerPoint) base = powerPointAgentPrompt(lang)
   else if (hostIsExcel) base = excelAgentPrompt(lang)
   else base = wordAgentPrompt(lang)
   return `${base}${userProfilePromptBlock()}`
@@ -747,7 +793,7 @@ async function sendMessage() {
     }
   }
 
-  const selectionLabel = hostIsOutlook ? 'Email body' : hostIsExcel ? 'Selected cells' : 'Selected text'
+  const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
   const selectedTextContext = selectedText ? `[${selectionLabel}: "${selectedText}"]` : ''
   const replyPrefillContext = replyContextText ? `${replyContextPrefix}${replyContextText}` : ''
   const extraContexts = [replyPrefillContext, selectedTextContext].filter(Boolean).join('\n\n')
@@ -817,7 +863,7 @@ async function processChat(userMessage: string) {
 }
 
 async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
-  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? [] : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
   const generalToolDefs = getGeneralToolDefinitions()
 
   // Build OpenAI-format tool definitions
@@ -925,10 +971,24 @@ async function applyQuickAction(actionKey: string) {
 
   const selectedQuickAction = hostIsExcel
     ? excelQuickActions.value.find(action => action.key === actionKey)
-    : quickActions.value.find(action => action.key === actionKey)
+    : hostIsPowerPoint
+      ? powerPointQuickActions.find(action => action.key === actionKey)
+      : quickActions.value.find(action => action.key === actionKey)
 
   if (hostIsExcel && selectedQuickAction?.mode === 'draft') {
     userInput.value = selectedQuickAction.prefix || ''
+    adjustTextareaHeight()
+    await nextTick()
+    if (inputTextarea.value) {
+      inputTextarea.value.focus()
+      inputTextarea.value.selectionStart = inputTextarea.value.value.length
+      inputTextarea.value.selectionEnd = inputTextarea.value.value.length
+    }
+    return
+  }
+
+  if (hostIsPowerPoint && (selectedQuickAction as PowerPointQuickAction)?.mode === 'draft') {
+    userInput.value = t('pptVisualPrefix')
     adjustTextareaHeight()
     await nextTick()
     if (inputTextarea.value) {
@@ -947,7 +1007,7 @@ async function applyQuickAction(actionKey: string) {
   }
 
   if (!selectedText) {
-    messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
+    messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
     return
   }
 
@@ -972,6 +1032,9 @@ async function applyQuickAction(actionKey: string) {
   if (hostIsOutlook) {
     const outlookPrompts = getOutlookBuiltInPrompt()
     action = outlookPrompts[actionKey as keyof typeof outlookBuiltInPrompt]
+  } else if (hostIsPowerPoint) {
+    const pptPrompts = getPowerPointBuiltInPrompt()
+    action = pptPrompts[actionKey as keyof typeof powerPointBuiltInPrompt]
   } else if (hostIsExcel) {
     if (selectedQuickAction?.mode === 'immediate' && selectedQuickAction.systemPrompt) {
       systemMsg = selectedQuickAction.systemPrompt
@@ -995,9 +1058,11 @@ async function applyQuickAction(actionKey: string) {
 
   const displayKey = hostIsOutlook
     ? `outlook${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
-    : hostIsExcel
-      ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
-      : actionKey
+    : hostIsPowerPoint
+      ? `ppt${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
+      : hostIsExcel
+        ? `excel${actionKey.charAt(0).toUpperCase() + actionKey.slice(1)}`
+        : actionKey
   const actionLabel = selectedQuickAction?.label || t(displayKey)
   history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
   history.value.push(createDisplayMessage('assistant', ''))
@@ -1073,6 +1138,16 @@ async function insertToDocument(content: string, type: insertTypes) {
       } else {
         await copyToClipboard(content, true)
       }
+    } catch {
+      await copyToClipboard(content, true)
+    }
+    return
+  }
+
+  if (hostIsPowerPoint) {
+    try {
+      await insertIntoPowerPoint(content)
+      messageUtil.success(t('insertedToSlide'))
     } catch {
       await copyToClipboard(content, true)
     }

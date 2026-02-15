@@ -182,6 +182,121 @@ export const excelBuiltInPrompt = {
   },
 }
 
+export const powerPointBuiltInPrompt = {
+  bullets: {
+    system: (language: string) =>
+      `You are a PowerPoint presentation expert. Your task is to transform text into clear, concise bullet points suitable for presentation slides in ${language}. Prioritize brevity, clarity, and visual hierarchy.`,
+    user: (text: string, language: string) =>
+      `Task: Convert the following text into a concise bullet-point list for a PowerPoint slide.
+      Requirements:
+      - Use short, punchy phrases (max 8-10 words per bullet).
+      - Organize into a logical hierarchy if needed (main points + sub-points).
+      - Remove filler words and redundancies.
+      - Keep only the essential information.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
+
+      Text: ${text}`,
+  },
+
+  speakerNotes: {
+    system: (language: string) =>
+      `You are an expert public speaker and presentation coach. Your task is to write engaging, conversational speaker notes that a presenter can read or reference during their talk in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Generate speaker notes for a presenter based on the following slide content.
+      Requirements:
+      - Write in a natural, conversational tone (as if speaking to an audience).
+      - Expand on each point with context, examples, or transitions.
+      - Include suggested pauses, emphasis cues, or audience engagement prompts where appropriate.
+      - Keep it concise enough to be glanced at during a presentation (150-250 words).
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the speaker notes. No meta-commentary.
+
+      Slide content: ${text}`,
+  },
+
+  punchify: {
+    system: (language: string) =>
+      `You are a marketing copywriter and presentation designer. Your task is to rewrite text in a punchy, impactful style suitable for slide titles and key messages in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Rewrite the following text to make it more impactful and punchy for a presentation.
+      Requirements:
+      - Use strong, active verbs and power words.
+      - Make it memorable and quotable.
+      - Adopt a title/headline style when appropriate.
+      - Remove weak qualifiers and passive constructions.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the rewritten text. No explanations.
+
+      Text: ${text}`,
+  },
+
+  shrink: {
+    system: (language: string) =>
+      `You are a concise writing expert specialized in presentation content. Your task is to reduce text length by approximately 30% while preserving all key information in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Shorten the following text by approximately 30%, keeping all essential information.
+      Requirements:
+      - Remove redundancies and verbose expressions.
+      - Combine related ideas where possible.
+      - Preserve all key facts, numbers, and conclusions.
+      - Maintain readability and flow.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the shortened text.
+
+      Text: ${text}`,
+  },
+
+  visual: {
+    system: (language: string) =>
+      `You are a visual communication expert and creative director. Your task is to generate detailed image prompts for presentation visuals based on slide content in ${language}.`,
+    user: (text: string, language: string) =>
+      `Task: Based on the following slide content, generate a detailed image generation prompt.
+      Requirements:
+      - Describe a professional, clean visual that would complement the slide content.
+      - Include style direction (e.g., flat illustration, photo-realistic, infographic style).
+      - Specify colors, mood, and composition.
+      - Keep it suitable for a professional presentation context.
+      Constraints:
+      1. Respond in ${language}.
+      2. OUTPUT ONLY the image prompt, ready to be used with an image generation tool.
+
+      Slide content: ${text}`,
+  },
+}
+
+export const getPowerPointBuiltInPrompt = () => {
+  const stored = localStorage.getItem('customPowerPointBuiltInPrompts')
+  if (!stored) {
+    return powerPointBuiltInPrompt
+  }
+
+  try {
+    const customPrompts = JSON.parse(stored)
+    const result = { ...powerPointBuiltInPrompt }
+
+    Object.keys(customPrompts).forEach(key => {
+      const typedKey = key as keyof typeof powerPointBuiltInPrompt
+      if (result[typedKey]) {
+        result[typedKey] = {
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          user: (text: string, language: string) =>
+            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+        }
+      }
+    })
+
+    return result
+  } catch (error) {
+    console.error('Error loading custom PowerPoint built-in prompts:', error)
+    return powerPointBuiltInPrompt
+  }
+}
+
 export const outlookBuiltInPrompt = {
   reply: {
     system: (language: string) =>

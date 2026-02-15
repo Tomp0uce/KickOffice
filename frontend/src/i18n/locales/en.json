@@ -199,5 +199,15 @@
   "emptySubtitleOutlook": "Open an email and let me help you draft replies, summarize, or extract tasks",
   "includeSelectionLabelOutlook": "Include Email Body",
   "selectEmailPrompt": "Please open an email first",
-  "insertedToEmail": "Inserted into email"
+  "insertedToEmail": "Inserted into email",
+  "pptBullets": "Bullets",
+  "pptSpeakerNotes": "Notes",
+  "pptPunchify": "Impact",
+  "pptShrink": "Shrink",
+  "pptVisual": "Visual",
+  "pptVisualPrefix": "Generate an image prompt for a slide about: ",
+  "emptySubtitlePowerPoint": "Select text in a slide and let me help you create impactful presentations",
+  "includeSelectionLabelPowerPoint": "Include Selected Slide Text",
+  "selectSlideTextPrompt": "Please select text inside a shape first",
+  "insertedToSlide": "Inserted into slide"
 }

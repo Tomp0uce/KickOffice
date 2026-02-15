@@ -10,7 +10,7 @@ This document provides operational guidance for AI coding agents working in this
 KickOffice is a Microsoft Office add-in with:
 - `frontend/` (Vue 3 + Vite): task pane UI, chat/agent/image UX, Office.js tool execution.
 - `backend/` (Express): secure proxy for model calls and model configuration exposure.
-- `manifest.xml`: Office add-in manifest for Word and Excel hosts.
+- `manifest.xml`: Office add-in manifest for Word, Excel, PowerPoint and Outlook hosts.
 
 Backend API surface:
 - `POST /api/chat` (streaming)
@@ -44,7 +44,7 @@ Any contract change should update both backend and frontend in the same change s
 - Keep type names explicit and stable.
 - Avoid silent failures in user-facing flows; surface understandable errors.
 - Preserve i18n behavior and existing translation keys when possible.
-- For Office tool changes, ensure host-specific behavior remains correct (Word vs Excel).
+- For Office tool changes, ensure host-specific behavior remains correct (Word vs Excel vs PowerPoint vs Outlook).
 
 ## 6) Backend Editing Guidelines
 - Keep proxy logic provider-agnostic for OpenAI-compatible endpoints.
@@ -58,13 +58,20 @@ When updating `README.md`:
 - Keep deployment and environment variable sections accurate.
 - Reflect implemented capabilities without speculative roadmap edits.
 
-## 8) Validation Checklist Before Commit
+## 8) PowerPoint Agent
+- **Persona**: Expert in visual communication and public speaking.
+- **Style**: Concise, punchy, structured (bullet points), slide-oriented.
+- **System prompt basis**: "Tu es un expert en présentations PowerPoint. Ton but est d'aider l'utilisateur à créer des diapositives claires et percutantes. Tu privilégies les listes à puces, les phrases courtes et le style direct. Tu peux aussi rédiger des notes pour l'orateur qui sont, à l'inverse, conversationnelles et engageantes."
+- **API layer**: Uses the Office Common API (`Office.context.document.getSelectedDataAsync` / `setSelectedDataAsync`) with `CoercionType.Text`. Unlike Word or Excel, PowerPoint has no host-specific `run()` context. Text interaction is limited to the active text selection within a shape.
+- **Quick actions**: Bullets, Speaker Notes, Impact (Punchify), Shrink, Visual (draft mode).
+
+## 9) Validation Checklist Before Commit
 - Run at least one relevant build/check command (frontend and/or backend depending on change).
 - Verify touched UI flows if applicable.
 - Ensure changed docs match actual code behavior.
 - Keep commit message clear and scoped.
 
-## 9) Commit/PR Quality Bar
+## 10) Commit/PR Quality Bar
 - Commit title should describe user-facing impact.
 - PR summary should include:
   - what changed,
