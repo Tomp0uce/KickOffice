@@ -70,24 +70,19 @@ Cependant, l'audit révèle **plusieurs problèmes critiques et importants** qui
    })
    ```
 
-2. **Pas de validation des paramètres** (`server.js:109`, `183`, `236`)
-   - `temperature` et `maxTokens` sont parsés via `parseInt`/`parseFloat` sans vérification de plage
-   - `prompt` pour `/api/image` n'a pas de limite de longueur
-   - `size`, `quality`, `n` pour `/api/image` ne sont pas validés
+2. ~~**Pas de validation des paramètres** (`server.js:109`, `183`, `236`)~~ ✅
+   - ✅ Validation de `temperature` (0..2) et `maxTokens` (1..32768), avec rejet explicite pour les modèles `chatgpt-*` qui ne supportent pas ces paramètres.
+   - ✅ Limite de longueur sur `prompt` (`<= 4000` caractères).
+   - ✅ Validation stricte de `size`, `quality` et `n` pour `/api/image`.
 
-3. **`buildChatBody` accepte n'importe quel tools array** (`server.js:69-72`)
-   ```javascript
-   if (tools && tools.length > 0) {
-     body.tools = tools  // Aucune validation de la structure
-     body.tool_choice = 'auto'
-   }
-   ```
+3. ~~**`buildChatBody` accepte n'importe quel tools array** (`server.js:69-72`)~~ ✅
+   - ✅ Ajout d'une validation de structure des `tools` (type `function`, `name`, `parameters`, etc.) et sanitization avant envoi au provider.
 
-4. **Pas de timeout sur les requêtes fetch vers l'API LLM** (`server.js:137`, `208`, `252`)
-   - Si l'API LLM ne répond pas, la connexion reste ouverte indéfiniment
+4. ~~**Pas de timeout sur les requêtes fetch vers l'API LLM** (`server.js:137`, `208`, `252`)~~ ✅
+   - ✅ Ajout d'un `AbortController` avec timeout différencié : `nano` 60s, `standard` 120s, `reasoning` 300s, image 120s.
 
-5. **Express 5 avec body parser 10MB** (`server.js:83`)
-   - La limite de 10MB est très généreuse pour un proxy chat - un attaquant pourrait envoyer des payloads volumineux
+5. ~~**Express 5 avec body parser 10MB** (`server.js:83`)~~ ✅
+   - ✅ Réduction de la limite JSON de `10mb` à `4mb`.
 
 ---
 
