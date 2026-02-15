@@ -78,7 +78,30 @@ export interface ChatSyncOptions {
   tools?: any[]
 }
 
-export async function chatSync(options: ChatSyncOptions): Promise<any> {
+export interface OpenAIChatCompletion {
+  id: string
+  object: 'chat.completion'
+  created: number
+  model: string
+  choices: Array<{
+    index: number
+    finish_reason: string | null
+    message: {
+      role: 'assistant'
+      content: string | null
+      tool_calls?: Array<{
+        id: string
+        type: 'function'
+        function: {
+          name: string
+          arguments: string
+        }
+      }>
+    }
+  }>
+}
+
+export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatCompletion> {
   const { messages, modelTier, tools } = options
 
   const res = await fetch(`${BACKEND_URL}/api/chat/sync`, {

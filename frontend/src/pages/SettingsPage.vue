@@ -420,6 +420,7 @@ import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { isExcel } from '@/utils/hostDetection'
+import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { i18n } from '@/i18n'
 
@@ -463,16 +464,9 @@ const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
 const enabledTools = ref<Set<string>>(new Set())
 
 // Prompt management
-interface Prompt {
-  id: string
-  name: string
-  systemPrompt: string
-  userPrompt: string
-}
-
-const savedPrompts = ref<Prompt[]>([])
+const savedPrompts = ref<SavedPrompt[]>([])
 const editingPromptId = ref<string>('')
-const editingPrompt = ref<Prompt>({ id: '', name: '', systemPrompt: '', userPrompt: '' })
+const editingPrompt = ref<SavedPrompt>({ id: '', name: '', systemPrompt: '', userPrompt: '' })
 
 // Built-in prompts - switch between Word and Excel
 type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
@@ -521,47 +515,17 @@ const tabs = [
 // Watchers
 watch(localLanguage, (val) => {
   i18n.global.locale.value = val as 'en' | 'fr'
-  localStorage.setItem(localStorageKey.localLanguage, val)
-})
-
-watch(replyLanguage, (val) => {
-  localStorage.setItem(localStorageKey.replyLanguage, val)
-})
-
-watch(agentMaxIterations, (val) => {
-  localStorage.setItem(localStorageKey.agentMaxIterations, String(val))
-})
-
-watch(userGender, (val) => {
-  localStorage.setItem(localStorageKey.userGender, val)
-})
-
-watch(userFirstName, (val) => {
-  localStorage.setItem(localStorageKey.userFirstName, val.trim())
-})
-
-watch(userLastName, (val) => {
-  localStorage.setItem(localStorageKey.userLastName, val.trim())
-})
-
-watch(excelFormulaLanguage, (val) => {
-  localStorage.setItem(localStorageKey.excelFormulaLanguage, val)
 })
 
 // Prompt management
 function loadPrompts() {
-  const stored = localStorage.getItem('savedPrompts')
-  if (stored) {
-    try {
-      savedPrompts.value = JSON.parse(stored)
-      return
-    } catch {
-      localStorage.removeItem('savedPrompts')
-    }
-  }
-  savedPrompts.value = [
+  const defaultPrompts: SavedPrompt[] = [
     { id: 'default', name: 'Default', systemPrompt: '', userPrompt: '' },
   ]
+  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts)
+  if (savedPrompts.value.length === 0) {
+    savedPrompts.value = defaultPrompts
+  }
   savePromptsToStorage()
 }
 
@@ -570,7 +534,7 @@ function savePromptsToStorage() {
 }
 
 function addNewPrompt() {
-  const newPrompt: Prompt = {
+  const newPrompt: SavedPrompt = {
     id: `prompt_${Date.now()}`,
     name: `Prompt ${savedPrompts.value.length + 1}`,
     systemPrompt: '',
@@ -581,7 +545,7 @@ function addNewPrompt() {
   startEditPrompt(newPrompt)
 }
 
-function startEditPrompt(prompt: Prompt) {
+function startEditPrompt(prompt: SavedPrompt) {
   editingPromptId.value = prompt.id
   editingPrompt.value = { ...prompt }
 }
