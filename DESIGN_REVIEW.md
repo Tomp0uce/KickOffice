@@ -141,16 +141,14 @@ Ce fichier combine :
 
 ### `backend.ts` - Client API
 
-1. **Pas de timeout sur les requêtes fetch** (`backend.ts:33`, `84`, `105`)
-   Si le backend ne répond pas, pas de mécanisme de timeout.
+1. ~~**Pas de timeout sur les requêtes fetch** (`backend.ts:33`, `84`, `105`)~~ ✅
+   - ✅ Ajout d'un timeout global côté frontend (`45s`) appliqué à toutes les requêtes API via un wrapper `fetchWithTimeoutAndRetry`.
 
-2. **Pas de retry avec backoff** - En cas d'erreur réseau transitoire, la requête échoue immédiatement.
+2. ~~**Pas de retry avec backoff**~~ ✅
+   - ✅ Ajout de 2 retries ciblés sur erreurs réseau/timeout, avec backoff fixe : +10s puis +30s.
 
-3. **URL par défaut hardcodée** (`backend.ts:1`)
-   ```typescript
-   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.50.10:3003'
-   ```
-   L'IP privée est en dur dans le code source.
+3. ~~**URL par défaut hardcodée** (`backend.ts:1`)~~ ✅
+   - ✅ Suppression de l'IP privée hardcodée ; `VITE_BACKEND_URL` est maintenant obligatoire via `.env` (et documenté dans `frontend/.env.example`).
 
 ---
 

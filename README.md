@@ -277,7 +277,7 @@ npm run dev            # Starts on port 3002 with HMR
 #### Frontend (`frontend/.env`)
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_BACKEND_URL` | Backend URL (build-time) | `http://192.168.50.10:3003` |
+| `VITE_BACKEND_URL` | Backend URL (build-time) | `http://localhost:3003` |
 
 ---
 
@@ -288,7 +288,7 @@ For production, the architecture stays the same but:
 1. **Server**: Azure VM or App Service instead of Synology NAS
 2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
 3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: Update `manifest.xml` URLs from `http://192.168.50.10:*` to production domain
+4. **Manifest**: `manifest.xml` ne lit pas `.env`; mettez à jour l'entité `ADDIN_HOST` (et les ports si besoin) en tête du fichier pour changer toutes les URLs en un seul endroit
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:
