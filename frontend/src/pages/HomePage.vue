@@ -134,7 +134,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(cleanContent(msg.content), 'replace')"
+                @click="insertToDocument(getMessageActionPayload(msg), 'replace')"
               />
               <CustomButton
                 :title="t('appendToSelection')"
@@ -143,7 +143,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(cleanContent(msg.content), 'append')"
+                @click="insertToDocument(getMessageActionPayload(msg), 'append')"
               />
               <CustomButton
                 :title="t('copyToClipboard')"
@@ -152,7 +152,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="copyToClipboard(cleanContent(msg.content))"
+                @click="copyToClipboard(getMessageActionPayload(msg))"
               />
             </div>
           </div>
@@ -413,6 +413,15 @@ function cleanContent(content: string): string {
   const regex = new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
   return content.replace(regex, '').trim()
 }
+
+function getMessageActionPayload(message: DisplayMessage): string {
+  const cleanedText = cleanContent(message.content)
+  if (cleanedText) {
+    return cleanedText
+  }
+  return message.imageSrc || ''
+}
+
 
 function loadSavedPrompts() {
   const stored = localStorage.getItem('savedPrompts')
@@ -883,6 +892,10 @@ async function applyQuickAction(actionKey: string) {
 }
 
 async function insertToDocument(content: string, type: insertTypes) {
+  if (!content.trim()) {
+    return
+  }
+
   if (hostIsExcel) {
     // For Excel: write content to the selected cell
     try {
@@ -894,23 +907,62 @@ async function insertToDocument(content: string, type: insertTypes) {
       messageUtil.success(t('insertedToCell'))
     } catch (err: any) {
       // Fallback to clipboard
-      navigator.clipboard.writeText(content)
-      messageUtil.info(t('copiedFallback'))
+      await copyToClipboard(content, true)
     }
     return
   }
 
-  insertType.value = type
-  if (useWordFormatting.value) {
-    await insertFormattedResult(content, insertType)
-  } else {
-    insertResult(content, insertType)
+  try {
+    insertType.value = type
+    if (useWordFormatting.value) {
+      await insertFormattedResult(content, insertType)
+    } else {
+      await insertResult(content, insertType)
+    }
+    messageUtil.success(t('inserted'))
+  } catch (err: any) {
+    console.warn('Document insertion failed, falling back to clipboard:', err)
+    await copyToClipboard(content, true)
   }
 }
 
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
-  messageUtil.success(t('copied'))
+async function copyToClipboard(text: string, fallback = false) {
+  if (!text.trim()) {
+    return
+  }
+
+  const notifySuccess = () => messageUtil.success(t(fallback ? 'copiedFallback' : 'copied'))
+
+  try {
+    await navigator.clipboard.writeText(text)
+    notifySuccess()
+    return
+  } catch (err: any) {
+    console.warn('Clipboard API write failed, trying legacy copy fallback:', err)
+  }
+
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    textarea.style.pointerEvents = 'none'
+    document.body.appendChild(textarea)
+    textarea.select()
+    textarea.setSelectionRange(0, text.length)
+    const copied = document.execCommand('copy')
+    document.body.removeChild(textarea)
+
+    if (copied) {
+      notifySuccess()
+    } else {
+      messageUtil.error(t('failedToInsert'))
+    }
+  } catch (err: any) {
+    console.error('Legacy clipboard copy failed:', err)
+    messageUtil.error(t('failedToInsert'))
+  }
 }
 
 async function checkBackend() {
