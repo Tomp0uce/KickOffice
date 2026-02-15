@@ -1,14 +1,88 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://192.168.50.10:3003'
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
+
+if (!BACKEND_URL) {
+  throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env')
+}
+
+const REQUEST_TIMEOUT_MS = 45_000
+const RETRY_DELAYS_MS = [10_000, 30_000] as const
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function isRetryableError(error: unknown): boolean {
+  return error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
+}
+
+function createTimeoutSignal(timeoutMs: number, externalSignal?: AbortSignal): { signal: AbortSignal; cleanup: () => void } {
+  const timeoutController = new AbortController()
+
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort(new DOMException('Request timed out', 'TimeoutError'))
+  }, timeoutMs)
+
+  const abortFromExternal = () => {
+    timeoutController.abort(externalSignal?.reason)
+  }
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      abortFromExternal()
+    } else {
+      externalSignal.addEventListener('abort', abortFromExternal, { once: true })
+    }
+  }
+
+  return {
+    signal: timeoutController.signal,
+    cleanup: () => {
+      clearTimeout(timeoutId)
+      externalSignal?.removeEventListener('abort', abortFromExternal)
+    },
+  }
+}
+
+async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Promise<Response> {
+  let attempt = 0
+
+  while (true) {
+    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS, init.signal)
+
+    try {
+      return await fetch(url, {
+        ...init,
+        signal,
+      })
+    } catch (error) {
+      if (init.signal?.aborted) {
+        throw error
+      }
+
+      const shouldRetry = attempt < RETRY_DELAYS_MS.length && isRetryableError(error)
+      if (!shouldRetry) {
+        throw error
+      }
+
+      await wait(RETRY_DELAYS_MS[attempt])
+      attempt += 1
+    } finally {
+      cleanup()
+    }
+  }
+}
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
-  const res = await fetch(`${BACKEND_URL}/api/models`)
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`)
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
   return res.json()
 }
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetch(`${BACKEND_URL}/health`)
+    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/health`)
     return res.ok
   } catch {
     return false
@@ -30,7 +104,7 @@ export interface ChatStreamOptions {
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
   const { messages, modelTier, onStream, abortSignal } = options
 
-  const res = await fetch(`${BACKEND_URL}/api/chat`, {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, modelTier }),
@@ -104,7 +178,7 @@ export interface OpenAIChatCompletion {
 export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatCompletion> {
   const { messages, modelTier, tools } = options
 
-  const res = await fetch(`${BACKEND_URL}/api/chat/sync`, {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, modelTier, tools }),
@@ -125,7 +199,7 @@ export interface ImageGenerateOptions {
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
-  const res = await fetch(`${BACKEND_URL}/api/image`, {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options),
