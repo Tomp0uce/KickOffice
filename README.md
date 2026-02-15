@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered add-in for Microsoft Office applications. Provides a chat interface, document manipulation agent, and quick AI actions (translate, polish, summarize, email reply, etc.) directly inside Word, Excel, and Outlook.
+AI-powered add-in for Microsoft Office applications. Provides a chat interface, document manipulation agent, and quick AI actions (translate, polish, summarize, email reply, presentation helpers, etc.) directly inside Word, Excel, PowerPoint, and Outlook.
 
 Built for **professional environments**: all LLM traffic goes through a controlled backend server (no API keys on the client), and no data is sent to third-party services.
 
@@ -22,7 +22,7 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
         │                              │
         │  Office.js API               │  Health check
         ▼                              │  Model config
-   Word / Excel / Outlook /            │  API key storage
+   Word / Excel / PowerPoint /            │  API key storage
    PowerPoint                          ▼
                                   .env file
 ```
@@ -57,8 +57,13 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 1. **Clone the repository** on the NAS or copy the project to `/volume1/docker/kickoffice/`
 
-2. **Create the backend `.env` file**:
+2. **Create environment files**:
    ```bash
+   # Root .env – server IP and ports (used by docker-compose + manifest generation)
+   cp .env.example .env
+   # Edit .env if your NAS IP or ports differ from the defaults
+
+   # Backend .env – LLM API key and model config
    cp backend/.env.example backend/.env
    # Edit backend/.env and set your LLM_API_KEY
    ```
@@ -67,22 +72,31 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    ```bash
    docker compose up -d --build
    ```
+   > The `manifest-gen` init service (Node.js) automatically generates two
+   > manifests from the templates in `manifests-templates/`:
+   > - `manifest-office.xml` — Word, Excel, PowerPoint (TaskPaneApp)
+   > - `manifest-outlook.xml` — Outlook (MailApp)
+   >
+   > URLs are built from `SERVER_IP`, `FRONTEND_PORT`, and `BACKEND_PORT`
+   > defined in the root `.env`. No manual URL editing is required.
 
 4. **Verify**:
    - Backend health: `curl http://192.168.50.10:3003/health`
    - Frontend: open `http://192.168.50.10:3002` in a browser
    - Models endpoint: `curl http://192.168.50.10:3003/api/models`
 
-5. **Install the Office add-in**:
-   - In Word: File > Options > Trust Center > Trust Center Settings > Trusted Add-in Catalogs
-   - Or sideload `manifest.xml` via the Insert > My Add-ins > Upload My Add-in dialog
+5. **Install the Office add-ins**:
+   - Sideload `manifest-office.xml` in Word / Excel / PowerPoint via Insert > My Add-ins > Upload My Add-in
+   - Sideload `manifest-outlook.xml` in Outlook via the same dialog
+   - Or configure a shared catalog in Trust Center Settings
 
 ### Docker Compose Details
 
-| Container | Port | Image |
-|-----------|------|-------|
-| `kickoffice-backend` | 3003 | Node 22 Alpine |
-| `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) |
+| Container | Port | Image | Notes |
+|-----------|------|-------|-------|
+| `kickoffice-manifest-gen` | — | Node 18 Alpine (init) | Generates `manifest-office.xml` + `manifest-outlook.xml`, then exits |
+| `kickoffice-backend` | 3003 | Node 22 Alpine | |
+| `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) | |
 
 Both containers use `PUID=1026` / `PGID=100` for Synology compatibility.
 
@@ -118,21 +132,29 @@ KickOffice/
 │       │       ├── en.json
 │       │       └── fr.json
 │       ├── pages/
-│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions (Word/Excel/Outlook)
+│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions (Word/Excel/PowerPoint/Outlook)
 │       │   └── SettingsPage.vue  # Settings (language, prompts, tools)
 │       ├── router/
 │       ├── types/
 │       └── utils/
-│           ├── constant.ts       # Built-in prompts (Word, Excel, Outlook)
+│           ├── constant.ts       # Built-in prompts (Word, Excel, PowerPoint, Outlook)
 │           ├── enum.ts           # localStorage keys
 │           ├── generalTools.ts   # Date + Math tools (for agent)
 │           ├── excelTools.ts     # Excel API tools (for agent)
+│           ├── powerpointTools.ts # PowerPoint Common API helpers
 │           ├── wordFormatter.ts  # Markdown-to-Word formatting
 │           ├── wordTools.ts      # Word API tools (for agent)
 │           ├── common.ts         # Option lists
 │           └── message.ts        # Toast notifications
+├── manifests-templates/
+│   ├── manifest-office.template.xml    # TaskPaneApp template (Word/Excel/PowerPoint)
+│   └── manifest-outlook.template.xml   # MailApp template (Outlook)
+├── scripts/
+│   └── generate-manifests.js           # Node.js script: templates → manifests
+├── .env.example              # Root env vars: SERVER_IP, ports (copy to .env)
 ├── docker-compose.yml
-├── manifest.xml              # Office add-in manifest (Word + Excel + Outlook)
+├── manifest-office.xml       # Generated at docker-compose up (do not edit by hand)
+├── manifest-outlook.xml      # Generated at docker-compose up (do not edit by hand)
 └── README.md
 ```
 
@@ -150,7 +172,7 @@ KickOffice/
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
 - [x] Backend Dockerfile with health check
 - [x] Frontend Dockerfile (multi-stage build + nginx)
-- [x] Office add-in manifest for Word + Excel + Outlook
+- [x] Office add-in manifests: TaskPaneApp (Word/Excel/PowerPoint) + MailApp (Outlook)
 
 ### Frontend - Chat Interface
 - [x] Chat UI with message history (user/assistant bubbles)
@@ -191,6 +213,21 @@ KickOffice/
 - [x] Proofread (grammar and spelling correction only, preserves style)
 - [x] Extract Tasks (extracts summary, key points, and required actions from email)
 
+### Frontend - Quick Actions (PowerPoint)
+- [x] Bullets (convert selected text to concise bullet-point list)
+- [x] Speaker Notes (generate conversational presenter notes from slide content)
+- [x] Impact / Punchify (rewrite text in punchy headline/marketing style)
+- [x] Shrink (reduce text length by ~30% while preserving key info)
+- [x] Visual (draft mode: generate an image prompt for slide visuals)
+
+### Frontend - PowerPoint Support
+- [x] PowerPoint host detection (`isPowerPoint()`)
+- [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
+- [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
+- [x] Text insertion via Common API (`setSelectedDataAsync`)
+- [x] PowerPoint-specific agent prompt (slide-first, concise, visual-oriented)
+- [x] PowerPoint-specific built-in prompts (customizable)
+
 ### Frontend - Settings
 - [x] UI language selector (French / English)
 - [x] Reply language selector
@@ -227,7 +264,6 @@ KickOffice/
 - [x] `ReadWriteMailbox` permission
 
 ### Not Yet Implemented
-- [ ] PowerPoint support (add-in manifest + slide generation, image insertion, content generation)
 - [ ] Conversation history persistence (currently in-memory only, lost on page reload)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)
@@ -262,6 +298,13 @@ npm run dev            # Starts on port 3002 with HMR
 
 ### Environment Variables
 
+#### Root (`.env`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_IP` | Host machine IP address | `192.168.50.10` |
+| `FRONTEND_PORT` | Published port for the frontend | `3002` |
+| `BACKEND_PORT` | Published port for the backend | `3003` |
+
 #### Backend (`backend/.env`)
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -288,7 +331,7 @@ For production, the architecture stays the same but:
 1. **Server**: Azure VM or App Service instead of Synology NAS
 2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
 3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: `manifest.xml` ne lit pas `.env`; mettez à jour l'entité `ADDIN_HOST` (et les ports si besoin) en tête du fichier pour changer toutes les URLs en un seul endroit
+4. **Manifest**: `manifest-office.xml` and `manifest-outlook.xml` are auto-generated at `docker compose up`. Update `SERVER_IP` / ports in the root `.env` to change all URLs
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:

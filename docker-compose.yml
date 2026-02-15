@@ -2,12 +2,16 @@ version: "3.8"
 
 services:
   manifest-gen:
-    image: alpine:latest
+    image: node:18-alpine
     container_name: kickoffice-manifest-gen
     volumes:
       - ./:/app
-    command: >
-      sh -ec "sed -e 's|{{FRONTEND_URL}}|http://${SERVER_IP}:${FRONTEND_PORT}|g' -e 's|{{BACKEND_URL}}|http://${SERVER_IP}:${BACKEND_PORT}|g' /app/manifest.template.xml > /app/manifest.xml; echo 'Manifest generated for ${SERVER_IP}'"
+    working_dir: /app
+    environment:
+      - SERVER_IP=${SERVER_IP}
+      - FRONTEND_PORT=${FRONTEND_PORT}
+      - BACKEND_PORT=${BACKEND_PORT}
+    command: ["node", "scripts/generate-manifests.js"]
     restart: "no"
 
   kickoffice-backend:

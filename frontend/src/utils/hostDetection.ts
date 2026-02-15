@@ -1,4 +1,4 @@
-export type OfficeHostType = 'Word' | 'Excel' | 'Outlook' | 'Unknown'
+export type OfficeHostType = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook' | 'Unknown'
 
 let detectedHost: OfficeHostType = 'Unknown'
 
@@ -12,6 +12,8 @@ export function detectOfficeHost(): OfficeHostType {
       detectedHost = 'Word'
     } else if (host === 'Excel' || host === 'Workbook') {
       detectedHost = 'Excel'
+    } else if (host === 'PowerPoint' || host === 'Presentation') {
+      detectedHost = 'PowerPoint'
     } else if (host === 'Outlook' || host === 'Mailbox') {
       detectedHost = 'Outlook'
     }
@@ -24,6 +26,8 @@ export function detectOfficeHost(): OfficeHostType {
       detectedHost = 'Word'
     } else if (typeof (window as any).Excel !== 'undefined') {
       detectedHost = 'Excel'
+    } else if (typeof (window as any).PowerPoint !== 'undefined') {
+      detectedHost = 'PowerPoint'
     } else if (typeof (window as any).Office?.context?.mailbox !== 'undefined') {
       detectedHost = 'Outlook'
     }
@@ -38,6 +42,10 @@ export function isExcel(): boolean {
 
 export function isWord(): boolean {
   return detectOfficeHost() === 'Word'
+}
+
+export function isPowerPoint(): boolean {
+  return detectOfficeHost() === 'PowerPoint'
 }
 
 export function isOutlook(): boolean {

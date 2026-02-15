@@ -199,5 +199,15 @@
   "emptySubtitleOutlook": "Ouvrez un email et laissez-moi vous aider à rédiger, résumer ou extraire les tâches",
   "includeSelectionLabelOutlook": "Inclure le corps du mail",
   "selectEmailPrompt": "Veuillez d'abord ouvrir un email",
-  "insertedToEmail": "Inséré dans l'email"
+  "insertedToEmail": "Inséré dans l'email",
+  "pptBullets": "Puces",
+  "pptSpeakerNotes": "Notes",
+  "pptPunchify": "Impact",
+  "pptShrink": "Raccourcir",
+  "pptVisual": "Visuel",
+  "pptVisualPrefix": "Génère un prompt d'image pour une diapo sur : ",
+  "emptySubtitlePowerPoint": "Sélectionnez du texte dans une diapositive et laissez-moi vous aider à créer des présentations percutantes",
+  "includeSelectionLabelPowerPoint": "Inclure le texte de la diapo",
+  "selectSlideTextPrompt": "Veuillez d'abord sélectionner du texte dans une forme",
+  "insertedToSlide": "Inséré dans la diapositive"
 }

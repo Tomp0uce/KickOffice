@@ -21,6 +21,10 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Generated manifests (produced by scripts/generate-manifests.js)
+manifest-office.xml
+manifest-outlook.xml
+
 # Docker volumes
 backend-data/
 
