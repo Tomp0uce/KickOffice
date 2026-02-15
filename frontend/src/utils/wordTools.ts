@@ -101,16 +101,41 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           type: 'string',
           description: 'The new text to replace the selection with',
         },
+        preserveFormatting: {
+          type: 'boolean',
+          description: 'Keep the original font styling (name, size, color, bold, italic, underline, highlight) from the selected text. Default: true.',
+        },
       },
       required: ['newText'],
     },
     execute: async args => {
-      const { newText } = args
+      const { newText, preserveFormatting = true } = args
       return Word.run(async context => {
         const range = context.document.getSelection()
-        range.insertText(newText, 'Replace')
+        range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
         await context.sync()
-        return 'Successfully replaced selected text'
+
+        if (!range.text || range.text.length === 0) {
+          return 'Error: No text selected. Select text in the document, then try again.'
+        }
+
+        const insertedRange = range.insertText(newText, 'Replace')
+
+        if (preserveFormatting) {
+          insertedRange.styleBuiltIn = range.styleBuiltIn
+          insertedRange.font.name = range.font.name
+          insertedRange.font.size = range.font.size
+          insertedRange.font.bold = range.font.bold
+          insertedRange.font.italic = range.font.italic
+          insertedRange.font.underline = range.font.underline
+          insertedRange.font.color = range.font.color
+          insertedRange.font.highlightColor = range.font.highlightColor
+        }
+
+        await context.sync()
+        return preserveFormatting
+          ? 'Successfully replaced selected text while preserving formatting'
+          : 'Successfully replaced selected text'
       })
     },
   },
@@ -195,7 +220,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   formatText: {
     name: 'formatText',
-    description: 'Apply formatting to the currently selected text.',
+    description: 'Apply formatting to the currently selected text. At least one text character must be selected.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -231,6 +256,12 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       const { bold, italic, underline, fontSize, fontColor, highlightColor } = args
       return Word.run(async context => {
         const range = context.document.getSelection()
+        range.load('text')
+        await context.sync()
+
+        if (!range.text || range.text.length === 0) {
+          return 'Error: No text selected. Select text in the document, then try again.'
+        }
 
         if (bold !== undefined) range.font.bold = bold
         if (italic !== undefined) range.font.italic = italic
