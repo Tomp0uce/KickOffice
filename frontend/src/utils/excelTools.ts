@@ -32,7 +32,7 @@ function getExcelFormulaLanguage(): 'en' | 'fr' {
   return configured === 'fr' ? 'fr' : 'en'
 }
 
-const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
+const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
   getSelectedCells: {
     name: 'getSelectedCells',
     description:
@@ -1103,11 +1103,11 @@ const excelToolDefinitions: Record<ExcelToolName, WordToolDefinition> = {
   },
 }
 
-export function getExcelToolDefinitions(): WordToolDefinition[] {
+export function getExcelToolDefinitions(): ExcelToolDefinition[] {
   return Object.values(excelToolDefinitions)
 }
 
-export function getExcelTool(name: ExcelToolName): WordToolDefinition | undefined {
+export function getExcelTool(name: ExcelToolName): ExcelToolDefinition | undefined {
   return excelToolDefinitions[name]
 }
 

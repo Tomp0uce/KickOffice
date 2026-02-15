@@ -24,14 +24,15 @@ interface ToolProperty {
   default?: any
 }
 
-interface WordToolDefinition {
+interface ToolDefinition {
   name: string
   description: string
   inputSchema: ToolInputSchema
   execute: (args: Record<string, any>) => Promise<string>
 }
 
-// Excel tools reuse the same interface structure
-type ExcelToolDefinition = WordToolDefinition
+type WordToolDefinition = ToolDefinition
+type ExcelToolDefinition = ToolDefinition
+type OutlookToolDefinition = ToolDefinition
 
 type OfficeHostType = 'Word' | 'Excel' | 'Unknown'
