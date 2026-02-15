@@ -22,6 +22,7 @@ export type WordToolName =
   | 'goToBookmark'
   | 'insertContentControl'
   | 'findText'
+  | 'applyTaggedFormatting'
 
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
@@ -825,6 +826,85 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
+      })
+    },
+  },
+
+  applyTaggedFormatting: {
+    name: 'applyTaggedFormatting',
+    description:
+      'Convert inline formatting tags in the document into real Word formatting (e.g., <b_red>text</b_red> becomes bold red text).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tagName: {
+          type: 'string',
+          description: 'Tag name to process (default: "b_red")',
+        },
+        color: {
+          type: 'string',
+          description: 'Font color to apply as hex (default: "#FF0000")',
+        },
+        bold: {
+          type: 'boolean',
+          description: 'Whether to apply bold formatting (default: true)',
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'b_red'
+      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : '#FF0000'
+      const bold = args.bold !== undefined ? Boolean(args.bold) : true
+
+      return Word.run(async context => {
+        const body = context.document.body
+        body.load('text')
+        await context.sync()
+
+        const openingTag = `<${tagName}>`
+        const closingTag = `</${tagName}>`
+        const openingTagMatches = body.search(openingTag, { matchCase: true, matchWholeWord: false })
+        openingTagMatches.load('items')
+        await context.sync()
+
+        if (openingTagMatches.items.length === 0) {
+          return `No <${tagName}>...</${tagName}> tags found.`
+        }
+
+        let replacedCount = 0
+        for (let i = openingTagMatches.items.length - 1; i >= 0; i--) {
+          const openingRange = openingTagMatches.items[i]
+          const afterOpeningRange = openingRange.getRange('After')
+          const closingTagMatches = afterOpeningRange.search(closingTag, {
+            matchCase: true,
+            matchWholeWord: false,
+          })
+          closingTagMatches.load('items')
+          await context.sync()
+
+          if (closingTagMatches.items.length === 0) {
+            continue
+          }
+
+          const taggedRange = openingRange.expandTo(closingTagMatches.items[0])
+          taggedRange.load('text')
+          await context.sync()
+
+          const taggedText = taggedRange.text || ''
+          if (!taggedText.endsWith(closingTag)) {
+            continue
+          }
+
+          const innerText = taggedText.slice(openingTag.length, taggedText.length - closingTag.length)
+          const formattedRange = taggedRange.insertText(innerText, 'Replace')
+          formattedRange.font.bold = bold
+          formattedRange.font.color = color
+          replacedCount++
+          await context.sync()
+        }
+
+        return `Converted ${replacedCount} tagged occurrence(s) using <${tagName}>...</${tagName}>.`
       })
     },
   },

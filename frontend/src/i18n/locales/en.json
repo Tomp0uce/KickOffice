@@ -183,5 +183,7 @@
   "excelFormulaLanguageEnglish": "English formulas",
   "excelFormulaLanguageFrench": "French formulas",
   "excelTool_applyConditionalFormatting": "Apply Conditional Formatting",
-  "excelTool_applyConditionalFormatting_desc": "Create conditional formatting rules (cell value, text, custom formula, color scales, data bars, icon sets)."
+  "excelTool_applyConditionalFormatting_desc": "Create conditional formatting rules (cell value, text, custom formula, color scales, data bars, icon sets).",
+  "wordTool_applyTaggedFormatting": "Apply Tagged Formatting",
+  "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <b_red>text</b_red>) into formatted Word text."
 }
