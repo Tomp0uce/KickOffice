@@ -24,6 +24,60 @@ export type WordToolName =
   | 'findText'
   | 'applyTaggedFormatting'
 
+type FontFormattingOptions = {
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean | string
+  fontSize?: number
+  fontColor?: string
+  color?: string
+  highlightColor?: string
+  fontName?: string
+  strikethrough?: boolean
+  doubleStrikethrough?: boolean
+  allCaps?: boolean
+  smallCaps?: boolean
+  subscript?: boolean
+  superscript?: boolean
+}
+
+function applyFontFormatting(range: Word.Range, options: FontFormattingOptions): void {
+  const {
+    bold,
+    italic,
+    underline,
+    fontSize,
+    fontColor,
+    color,
+    highlightColor,
+    fontName,
+    strikethrough,
+    doubleStrikethrough,
+    allCaps,
+    smallCaps,
+    subscript,
+    superscript,
+  } = options
+
+  if (bold !== undefined) range.font.bold = Boolean(bold)
+  if (italic !== undefined) range.font.italic = Boolean(italic)
+  if (underline !== undefined) {
+    range.font.underline =
+      typeof underline === 'string' ? (underline as Word.UnderlineType) : underline ? 'Single' : 'None'
+  }
+  if (fontSize !== undefined) range.font.size = fontSize
+  if (fontColor !== undefined) range.font.color = fontColor
+  else if (color !== undefined) range.font.color = color
+  if (highlightColor !== undefined) range.font.highlightColor = highlightColor
+  if (fontName !== undefined) range.font.name = fontName
+  if (strikethrough !== undefined) range.font.strikeThrough = Boolean(strikethrough)
+  if (doubleStrikethrough !== undefined) range.font.doubleStrikeThrough = Boolean(doubleStrikethrough)
+  if (allCaps !== undefined) range.font.allCaps = Boolean(allCaps)
+  if (smallCaps !== undefined) range.font.smallCaps = Boolean(smallCaps)
+  if (subscript !== undefined) range.font.subscript = Boolean(subscript)
+  if (superscript !== undefined) range.font.superscript = Boolean(superscript)
+}
+
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
     name: 'getSelectedText',
@@ -195,7 +249,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   formatText: {
     name: 'formatText',
-    description: 'Apply formatting to the currently selected text.',
+    description: 'Apply font formatting to the currently selected text.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -208,8 +262,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           description: 'Make text italic',
         },
         underline: {
-          type: 'boolean',
-          description: 'Underline text',
+          oneOf: [{ type: 'boolean' }, { type: 'string' }],
+          description: 'Underline formatting: true/false or a Word underline style (e.g., "Single", "Double", "Wavy")',
         },
         fontSize: {
           type: 'number',
@@ -217,27 +271,47 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         },
         fontColor: {
           type: 'string',
-          description: 'Font color as hex (e.g., "#FF0000" for red)',
+          description: 'Font color as hex or named value (e.g., "#FF0000")',
         },
         highlightColor: {
           type: 'string',
-          description:
-            'Highlight color: Yellow, Green, Cyan, Pink, Blue, Red, DarkBlue, Teal, Lime, Purple, Orange, etc.',
+          description: 'Highlight color (e.g., "Yellow", "Turquoise", "NoColor", "#FFFF00")',
+        },
+        fontName: {
+          type: 'string',
+          description: 'Font family name (e.g., "Calibri", "Arial")',
+        },
+        strikethrough: {
+          type: 'boolean',
+          description: 'Apply strike-through text',
+        },
+        doubleStrikethrough: {
+          type: 'boolean',
+          description: 'Apply double strike-through text',
+        },
+        allCaps: {
+          type: 'boolean',
+          description: 'Display text in all caps',
+        },
+        smallCaps: {
+          type: 'boolean',
+          description: 'Display text in small caps',
+        },
+        subscript: {
+          type: 'boolean',
+          description: 'Apply subscript formatting',
+        },
+        superscript: {
+          type: 'boolean',
+          description: 'Apply superscript formatting',
         },
       },
       required: [],
     },
     execute: async args => {
-      const { bold, italic, underline, fontSize, fontColor, highlightColor } = args
       return Word.run(async context => {
         const range = context.document.getSelection()
-
-        if (bold !== undefined) range.font.bold = bold
-        if (italic !== undefined) range.font.italic = italic
-        if (underline !== undefined) range.font.underline = underline ? 'Single' : 'None'
-        if (fontSize !== undefined) range.font.size = fontSize
-        if (fontColor !== undefined) range.font.color = fontColor
-        if (highlightColor !== undefined) range.font.highlightColor = highlightColor
+        applyFontFormatting(range, args)
 
         await context.sync()
         return 'Successfully applied formatting'
@@ -833,7 +907,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   applyTaggedFormatting: {
     name: 'applyTaggedFormatting',
     description:
-      'Convert inline formatting tags in the document into real Word formatting (e.g., <b_red>text</b_red> becomes bold red text).',
+      'Convert inline tags in the document into Word text with configurable font styling (bold, italic, underline, size, font, colors, strike-through, caps, sub/superscript, etc.).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -843,11 +917,59 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         },
         color: {
           type: 'string',
-          description: 'Font color to apply as hex (default: "#FF0000")',
+          description: 'Legacy alias for font color (default behavior keeps "#FF0000")',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Text color as hex or named value',
         },
         bold: {
           type: 'boolean',
           description: 'Whether to apply bold formatting (default: true)',
+        },
+        italic: {
+          type: 'boolean',
+          description: 'Whether to apply italic formatting',
+        },
+        underline: {
+          oneOf: [{ type: 'boolean' }, { type: 'string' }],
+          description: 'Underline formatting: true/false or a Word underline style string',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in points',
+        },
+        fontName: {
+          type: 'string',
+          description: 'Font family name',
+        },
+        highlightColor: {
+          type: 'string',
+          description: 'Highlight color name/hex',
+        },
+        strikethrough: {
+          type: 'boolean',
+          description: 'Apply strike-through text',
+        },
+        doubleStrikethrough: {
+          type: 'boolean',
+          description: 'Apply double strike-through text',
+        },
+        allCaps: {
+          type: 'boolean',
+          description: 'Display text in all caps',
+        },
+        smallCaps: {
+          type: 'boolean',
+          description: 'Display text in small caps',
+        },
+        subscript: {
+          type: 'boolean',
+          description: 'Apply subscript formatting',
+        },
+        superscript: {
+          type: 'boolean',
+          description: 'Apply superscript formatting',
         },
       },
       required: [],
@@ -855,6 +977,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     execute: async args => {
       const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'b_red'
       const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : '#FF0000'
+      const fontColor = typeof args.fontColor === 'string' && args.fontColor.trim() ? args.fontColor.trim() : color
       const bold = args.bold !== undefined ? Boolean(args.bold) : true
 
       return Word.run(async context => {
@@ -862,29 +985,48 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         body.load('text')
         await context.sync()
 
-        const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const tagRegex = new RegExp(`<${escapedTagName}>([\\s\\S]*?)<\\/${escapedTagName}>`, 'g')
-        const matches = [...(body.text || '').matchAll(tagRegex)]
+        const openingTag = `<${tagName}>`
+        const closingTag = `</${tagName}>`
+        const openingTagMatches = body.search(openingTag, { matchCase: true, matchWholeWord: false })
+        openingTagMatches.load('items')
+        await context.sync()
 
-        if (matches.length === 0) {
+        if (openingTagMatches.items.length === 0) {
           return `No <${tagName}>...</${tagName}> tags found.`
         }
 
         let replacedCount = 0
-        for (const match of matches) {
-          const fullMatch = match[0]
-          const innerText = match[1]
-
-          const searchResults = body.search(fullMatch, { matchCase: true, matchWholeWord: false })
-          searchResults.load('items')
+        for (let i = openingTagMatches.items.length - 1; i >= 0; i--) {
+          const openingRange = openingTagMatches.items[i]
+          const afterOpeningRange = openingRange.getRange('After')
+          const closingTagMatches = afterOpeningRange.search(closingTag, {
+            matchCase: true,
+            matchWholeWord: false,
+          })
+          closingTagMatches.load('items')
           await context.sync()
 
-          for (const item of searchResults.items) {
-            const formattedRange = item.insertText(innerText, 'Replace')
-            formattedRange.font.bold = bold
-            formattedRange.font.color = color
-            replacedCount++
+          if (closingTagMatches.items.length === 0) {
+            continue
           }
+
+          const taggedRange = openingRange.expandTo(closingTagMatches.items[0])
+          taggedRange.load('text')
+          await context.sync()
+
+          const taggedText = taggedRange.text || ''
+          if (!taggedText.endsWith(closingTag)) {
+            continue
+          }
+
+          const innerText = taggedText.slice(openingTag.length, taggedText.length - closingTag.length)
+          const formattedRange = taggedRange.insertText(innerText, 'Replace')
+          applyFontFormatting(formattedRange, {
+            ...args,
+            bold,
+            fontColor,
+          })
+          replacedCount++
           await context.sync()
         }
 

@@ -124,7 +124,7 @@
   "wordTool_findText": "Rechercher du texte",
   "wordTool_findText_desc": "Rechercher du texte dans le document.",
   "wordTool_formatText": "Formater le texte",
-  "wordTool_formatText_desc": "Appliquer un formatage au texte sélectionné.",
+  "wordTool_formatText_desc": "Appliquer une mise en forme de police détaillée au texte sélectionné (gras, italique, souligné, taille, police, couleurs, barré, etc.).",
   "wordTool_getCurrentDate": "Date actuelle",
   "wordTool_getCurrentDate_desc": "Obtenir la date actuelle.",
   "wordTool_getDocumentContent": "Contenu du document",
@@ -183,5 +183,5 @@
   "excelTool_applyConditionalFormatting": "Appliquer une mise en forme conditionnelle",
   "excelTool_applyConditionalFormatting_desc": "Créer des règles de mise en forme conditionnelle (valeur, texte, formule personnalisée, échelles de couleurs, barres de données, jeux d’icônes).",
   "wordTool_applyTaggedFormatting": "Appliquer le formatage des balises",
-  "wordTool_applyTaggedFormatting_desc": "Convertit les balises inline (ex. <b_red>texte</b_red>) en texte Word formaté."
+  "wordTool_applyTaggedFormatting_desc": "Convertit les balises inline (ex. <b_red>texte</b_red>) en texte Word avec une mise en forme de police complète (taille, police, italique, gras, souligné, barré, surlignage, couleurs, etc.)."
 }

@@ -124,7 +124,7 @@
   "wordTool_findText": "Find Text",
   "wordTool_findText_desc": "Find text in the document.",
   "wordTool_formatText": "Format Text",
-  "wordTool_formatText_desc": "Apply formatting to selected text.",
+  "wordTool_formatText_desc": "Apply detailed font formatting to selected text (bold, italic, underline, size, font, colors, strike-through, etc.).",
   "wordTool_getCurrentDate": "Get Current Date",
   "wordTool_getCurrentDate_desc": "Get the current date.",
   "wordTool_getDocumentContent": "Get Document Content",
@@ -183,5 +183,5 @@
   "excelTool_applyConditionalFormatting": "Apply Conditional Formatting",
   "excelTool_applyConditionalFormatting_desc": "Create conditional formatting rules (cell value, text, custom formula, color scales, data bars, icon sets).",
   "wordTool_applyTaggedFormatting": "Apply Tagged Formatting",
-  "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <b_red>text</b_red>) into formatted Word text."
+  "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <b_red>text</b_red>) into Word text with detailed font formatting (size, font, italic, bold, underline, strike-through, highlight, colors, etc.)."
 }
