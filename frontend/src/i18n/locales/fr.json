@@ -174,5 +174,12 @@
   "userGenderUnspecified": "Non précisé",
   "userProfileUnknownName": "Nom non renseigné",
   "userProfileUnknownFirstName": "Prénom non renseigné",
-  "userProfileUnknownLastName": "Nom non renseigné"
+  "userProfileUnknownLastName": "Nom non renseigné",
+  "excelTool_getConditionalFormattingRules": "Règles de mise en forme conditionnelle",
+  "excelTool_getConditionalFormattingRules_desc": "Lire les règles de mise en forme conditionnelle d'une plage ou de la plage utilisée.",
+  "excelFormulaLanguageLabel": "Langue des formules Excel",
+  "excelFormulaLanguageEnglish": "Formules en anglais",
+  "excelFormulaLanguageFrench": "Formules en français",
+  "excelTool_applyConditionalFormatting": "Appliquer une mise en forme conditionnelle",
+  "excelTool_applyConditionalFormatting_desc": "Créer des règles de mise en forme conditionnelle (valeur, texte, formule personnalisée, échelles de couleurs, barres de données, jeux d’icônes)."
 }

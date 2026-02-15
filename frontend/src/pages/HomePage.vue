@@ -337,6 +337,7 @@ const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
 const userGender = useStorage(localStorageKey.userGender, 'unspecified')
 const userFirstName = useStorage(localStorageKey.userFirstName, '')
 const userLastName = useStorage(localStorageKey.userLastName, '')
+const excelFormulaLanguage = useStorage<'en' | 'fr'>(localStorageKey.excelFormulaLanguage, 'en')
 const insertType = ref<insertTypes>('replace')
 
 // Host detection
@@ -506,6 +507,11 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
 Do not perform destructive actions (like clearing the whole document) unless explicitly instructed.
 `.trim()
 
+const excelFormulaLanguageInstruction = () =>
+  excelFormulaLanguage.value === 'fr'
+    ? 'Excel interface locale: French. Use localized French function names and separators when providing formulas, and prefer localized formula tool behavior.'
+    : 'Excel interface locale: English. Use English function names and standard English formula syntax.'
+
 const excelAgentPrompt = (lang: string) =>
   `
 # Role
@@ -522,6 +528,7 @@ You are a highly skilled Microsoft Excel Expert Agent. Your goal is to assist us
 3. **Accuracy**: Ensure formulas, formatting, and data operations are precise and follow the user's intent.
 4. **Conciseness**: Provide brief, helpful explanations of your actions and results.
 5. **Language**: You must communicate entirely in ${lang}.
+6. **Formula locale**: ${excelFormulaLanguageInstruction()}
 
 # Safety
 Do not perform destructive actions (like clearing all data or deleting sheets) unless explicitly instructed.
@@ -559,7 +566,7 @@ const wordStandardPrompt = (lang: string) =>
   `You are a helpful Microsoft Word specialist. Help users with drafting, brainstorming, and Word-related questions. Reply in ${lang}.`
 
 const excelStandardPrompt = (lang: string) =>
-  `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}.`
+  `You are a helpful Microsoft Excel specialist. Help users with data analysis, formulas, charts, formatting, and spreadsheet-related questions. Reply in ${lang}. ${excelFormulaLanguageInstruction()}`
 
 const standardPrompt = (lang: string) =>
   `${hostIsExcel ? excelStandardPrompt(lang) : wordStandardPrompt(lang)}${userProfilePromptBlock()}`

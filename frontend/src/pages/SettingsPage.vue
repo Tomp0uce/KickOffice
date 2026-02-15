@@ -74,6 +74,21 @@
               </SingleSelect>
             </SettingCard>
 
+            <SettingCard v-if="hostIsExcel">
+              <SingleSelect
+                v-model="excelFormulaLanguage"
+                :tight="false"
+                :key-list="excelFormulaLanguageOptions.map(item => item.value)"
+                :title="$t('excelFormulaLanguageLabel')"
+                :fronticon="false"
+                :placeholder="excelFormulaLanguageOptions.find(o => o.value === excelFormulaLanguage)?.label || excelFormulaLanguage"
+              >
+                <template #item="{ item }">
+                  {{ excelFormulaLanguageOptions.find(o => o.value === item)?.label || item }}
+                </template>
+              </SingleSelect>
+            </SettingCard>
+
             <SettingCard>
               <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <CustomInput
@@ -420,9 +435,14 @@ const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
 const userGender = useStorage(localStorageKey.userGender, 'unspecified')
 const userFirstName = useStorage(localStorageKey.userFirstName, '')
 const userLastName = useStorage(localStorageKey.userLastName, '')
+const excelFormulaLanguage = useStorage(localStorageKey.excelFormulaLanguage, 'en')
 
 const localLanguageOptions = optionLists.localLanguageList
 const replyLanguageOptions = optionLists.replyLanguageList
+const excelFormulaLanguageOptions = [
+  { label: t('excelFormulaLanguageEnglish'), value: 'en' },
+  { label: t('excelFormulaLanguageFrench'), value: 'fr' },
+]
 const genderOptions = [
   { label: t('userGenderUnspecified'), value: 'unspecified' },
   { label: t('userGenderFemale'), value: 'female' },
@@ -522,6 +542,10 @@ watch(userFirstName, (val) => {
 
 watch(userLastName, (val) => {
   localStorage.setItem(localStorageKey.userLastName, val.trim())
+})
+
+watch(excelFormulaLanguage, (val) => {
+  localStorage.setItem(localStorageKey.excelFormulaLanguage, val)
 })
 
 // Prompt management
