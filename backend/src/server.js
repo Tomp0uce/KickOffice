@@ -14,7 +14,7 @@ const models = {
   nano: {
     id: process.env.MODEL_NANO || 'gpt-5-nano',
     label: process.env.MODEL_NANO_LABEL || 'Nano (rapide)',
-    maxTokens: parseInt(process.env.MODEL_NANO_MAX_TOKENS || '1024', 10),
+    maxTokens: parseInt(process.env.MODEL_NANO_MAX_TOKENS || '4096', 10),
     temperature: parseFloat(process.env.MODEL_NANO_TEMPERATURE || '0.7'),
     type: 'chat',
   },

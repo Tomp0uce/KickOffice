@@ -134,7 +134,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(getMessageActionPayload(item.message), 'replace')"
+                @click="insertMessageToDocument(item.message, 'replace')"
               />
               <CustomButton
                 :title="t('appendToSelection')"
@@ -143,7 +143,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="insertToDocument(getMessageActionPayload(item.message), 'append')"
+                @click="insertMessageToDocument(item.message, 'append')"
               />
               <CustomButton
                 :title="t('copyToClipboard')"
@@ -152,7 +152,7 @@
                 type="secondary"
                 class="bg-surface! p-1.5! text-secondary!"
                 :icon-size="12"
-                @click="copyToClipboard(getMessageActionPayload(item.message))"
+                @click="copyMessageToClipboard(item.message)"
               />
             </div>
           </div>
@@ -470,12 +470,80 @@ function cleanContent(content: string): string {
   return content.replace(regex, '').trim()
 }
 
+
 function getMessageActionPayload(message: DisplayMessage): string {
   const cleanedText = cleanContent(message.content)
   if (cleanedText) {
     return cleanedText
   }
   return message.imageSrc || ''
+}
+
+function shouldTreatMessageAsImage(message: DisplayMessage): boolean {
+  const cleanedText = cleanContent(message.content)
+  return !cleanedText && !!message.imageSrc
+}
+
+async function copyImageToClipboard(imageSrc: string, fallback = false) {
+  const notifySuccess = () => messageUtil.success(t(fallback ? 'copiedFallback' : 'copied'))
+
+  try {
+    const response = await fetch(imageSrc)
+    const blob = await response.blob()
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })])
+      notifySuccess()
+      return
+    }
+  } catch (err) {
+    console.warn('Image clipboard write failed, trying URL text fallback:', err)
+  }
+
+  await copyToClipboard(imageSrc, fallback)
+}
+
+async function copyMessageToClipboard(message: DisplayMessage, fallback = false) {
+  if (shouldTreatMessageAsImage(message) && message.imageSrc) {
+    await copyImageToClipboard(message.imageSrc, fallback)
+    return
+  }
+  await copyToClipboard(getMessageActionPayload(message), fallback)
+}
+
+async function insertImageToWord(imageSrc: string, type: insertTypes) {
+  const base64Payload = imageSrc.includes(',') ? imageSrc.split(',')[1] : imageSrc
+  await Word.run(async (ctx) => {
+    const range = ctx.document.getSelection()
+    if (type === 'replace') {
+      range.insertInlinePictureFromBase64(base64Payload, 'Replace')
+    } else if (type === 'append') {
+      range.insertInlinePictureFromBase64(base64Payload, 'After')
+    } else {
+      range.insertInlinePictureFromBase64(base64Payload, 'After')
+    }
+    await ctx.sync()
+  })
+}
+
+async function insertMessageToDocument(message: DisplayMessage, type: insertTypes) {
+  if (shouldTreatMessageAsImage(message) && message.imageSrc) {
+    if (hostIsWord) {
+      try {
+        await insertImageToWord(message.imageSrc, type)
+        messageUtil.success(t('inserted'))
+      } catch (err) {
+        console.warn('Image insertion failed, copying image to clipboard:', err)
+        await copyImageToClipboard(message.imageSrc, true)
+      }
+      return
+    }
+
+    await copyImageToClipboard(message.imageSrc, true)
+    messageUtil.info(t('imageInsertWordOnly'))
+    return
+  }
+
+  await insertToDocument(getMessageActionPayload(message), type)
 }
 
 async function getOfficeSelection(options?: { includeOutlookSelectedText?: boolean }): Promise<string> {
@@ -896,6 +964,10 @@ async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
     const choice = response.choices?.[0]
     if (!choice) break
 
+    if (choice.finish_reason === 'length') {
+      messageUtil.error(t('responseTruncated'))
+    }
+
     const assistantMsg = choice.message
     currentMessages.push(assistantMsg)
 
@@ -1051,9 +1123,16 @@ async function applyQuickAction(actionKey: string) {
   if (!systemMsg || !userMsg) {
     if (!action) return
 
-    const lang = replyLanguage.value || 'Français'
-    systemMsg = action.system(lang)
-    userMsg = action.user(selectedText, lang)
+    if (!hostIsExcel && !hostIsPowerPoint && !hostIsOutlook && actionKey === 'translate') {
+      systemMsg = `You are a bilingual translator specialized in French and English only. Translate bi-directionally: if source text is French, output English; if source text is English, output French. Preserve meaning, tone, and formatting. Output only the translated text.`
+      userMsg = `Translate this text using strict FR↔EN bi-directional mode (French -> English, English -> French). Return only translated text:
+
+${selectedText}`
+    } else {
+      const lang = replyLanguage.value || 'Français'
+      systemMsg = action.system(lang)
+      userMsg = action.user(selectedText, lang)
+    }
   }
 
   const displayKey = hostIsOutlook
@@ -1089,6 +1168,11 @@ async function applyQuickAction(actionKey: string) {
       messages,
       modelTier: quickActionModelTier,
       abortSignal: abortController.value?.signal,
+      onFinishReason: (finishReason) => {
+        if (finishReason === 'length') {
+          messageUtil.error(t('responseTruncated'))
+        }
+      },
       onStream: (text: string) => {
         const lastIndex = history.value.length - 1
         const message = history.value[lastIndex]

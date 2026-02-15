@@ -1044,9 +1044,21 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           cf.iconSet.style = iconSetMap[iconSetStyle] ?? Excel.IconSet.threeTrafficLights1
         }
 
-        if (fillColor) cf.format.fill.color = fillColor
-        if (fontColor) cf.format.font.color = fontColor
-        if (bold !== undefined) cf.format.font.bold = bold
+        const applyTextAndFillFormat = (format: any) => {
+          if (!format) return
+          if (fillColor) format.fill.color = fillColor
+          if (fontColor) format.font.color = fontColor
+          if (bold !== undefined) format.font.bold = bold
+        }
+
+        if (ruleType === 'cellValue') {
+          applyTextAndFillFormat(cf.cellValue?.format)
+        } else if (ruleType === 'containsText') {
+          applyTextAndFillFormat(cf.textComparison?.format)
+        } else if (ruleType === 'custom') {
+          applyTextAndFillFormat(cf.custom?.format)
+        }
+
         if (stopIfTrue !== undefined) cf.stopIfTrue = stopIfTrue
 
         await context.sync()

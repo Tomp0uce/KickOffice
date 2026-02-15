@@ -98,11 +98,12 @@ export interface ChatStreamOptions {
   messages: ChatMessage[]
   modelTier: ModelTier
   onStream: (text: string) => void
+  onFinishReason?: (finishReason: string | null) => void
   abortSignal?: AbortSignal
 }
 
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
-  const { messages, modelTier, onStream, abortSignal } = options
+  const { messages, modelTier, onStream, onFinishReason, abortSignal } = options
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
@@ -134,6 +135,10 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
       try {
         const parsed = JSON.parse(data)
+        const finishReason = parsed.choices?.[0]?.finish_reason ?? null
+        if (finishReason !== null) {
+          onFinishReason?.(finishReason)
+        }
         const delta = parsed.choices?.[0]?.delta?.content
         if (delta) {
           fullContent += delta

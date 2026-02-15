@@ -79,6 +79,12 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    >
    > URLs are built from `SERVER_IP`, `FRONTEND_PORT`, and `BACKEND_PORT`
    > defined in the root `.env`. No manual URL editing is required.
+   >
+   > Optional cleanup (once generation is done):
+   > ```bash
+   > docker compose rm -f manifest-gen
+   > ```
+   > This removes the stopped init container from status views; it will be recreated automatically on the next `docker compose up`.
 
 4. **Verify**:
    - Backend health: `curl http://192.168.50.10:3003/health`
@@ -94,7 +100,7 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 | Container | Port | Image | Notes |
 |-----------|------|-------|-------|
-| `kickoffice-manifest-gen` | — | Node 18 Alpine (init) | Generates `manifest-office.xml` + `manifest-outlook.xml`, then exits |
+| `kickoffice-manifest-gen` | — | Node 18 Alpine (init) | Generates manifests, then exits (can be removed with `docker compose rm -f manifest-gen`) |
 | `kickoffice-backend` | 3003 | Node 22 Alpine | |
 | `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) | |
 
@@ -331,7 +337,7 @@ For production, the architecture stays the same but:
 1. **Server**: Azure VM or App Service instead of Synology NAS
 2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
 3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: `manifest-office.xml` and `manifest-outlook.xml` are auto-generated at `docker compose up`. Update `SERVER_IP` / ports in the root `.env` to change all URLs
+4. **Manifest**: `manifest-office.xml` and `manifest-outlook.xml` are auto-generated at `docker compose up`. You can remove the stopped init container with `docker compose rm -f manifest-gen`; it will be recreated on next startup. Update `SERVER_IP` / ports in the root `.env` to change all URLs
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:
