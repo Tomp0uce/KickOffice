@@ -833,13 +833,13 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   applyTaggedFormatting: {
     name: 'applyTaggedFormatting',
     description:
-      'Convert inline formatting tags in the document into real Word formatting (e.g., <b_red>text</b_red> can apply size, font, italic, bold, underline, strike, highlight, color, and other font settings).',
+      'Convert inline formatting tags in the document into real Word formatting (e.g., <format>text</format> can apply size, font, italic, bold, underline, strike, highlight, color, and other font settings).',
     inputSchema: {
       type: 'object',
       properties: {
         tagName: {
           type: 'string',
-          description: 'Tag name to process (default: "b_red")',
+          description: 'Tag name to process (default: "format")',
         },
         fontName: {
           type: 'string',
@@ -890,13 +890,13 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async args => {
-      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'b_red'
+      const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'format'
       const fontName = typeof args.fontName === 'string' && args.fontName.trim() ? args.fontName.trim() : undefined
       const fontSize = typeof args.fontSize === 'number' ? args.fontSize : undefined
-      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : '#FF0000'
+      const color = typeof args.color === 'string' && args.color.trim() ? args.color.trim() : undefined
       const highlightColor =
         typeof args.highlightColor === 'string' && args.highlightColor.trim() ? args.highlightColor.trim() : undefined
-      const bold = args.bold !== undefined ? Boolean(args.bold) : true
+      const bold = args.bold !== undefined ? Boolean(args.bold) : undefined
       const italic = args.italic !== undefined ? Boolean(args.italic) : undefined
       const underline = args.underline !== undefined ? Boolean(args.underline) : undefined
       const strikethrough = args.strikethrough !== undefined ? Boolean(args.strikethrough) : undefined
