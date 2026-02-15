@@ -12,28 +12,28 @@ const LLM_API_KEY = process.env.LLM_API_KEY || ''
 
 const models = {
   nano: {
-    id: process.env.MODEL_NANO || 'gpt-4.1-nano',
+    id: process.env.MODEL_NANO || 'gpt-5-nano',
     label: process.env.MODEL_NANO_LABEL || 'Nano (rapide)',
     maxTokens: parseInt(process.env.MODEL_NANO_MAX_TOKENS || '1024', 10),
     temperature: parseFloat(process.env.MODEL_NANO_TEMPERATURE || '0.7'),
     type: 'chat',
   },
   standard: {
-    id: process.env.MODEL_STANDARD || 'gpt-4.1',
+    id: process.env.MODEL_STANDARD || 'gpt-5-mini',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
     maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '4096', 10),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
     type: 'chat',
   },
   reasoning: {
-    id: process.env.MODEL_REASONING || 'o3',
+    id: process.env.MODEL_REASONING || 'gpt-5.2',
     label: process.env.MODEL_REASONING_LABEL || 'Raisonnement',
     maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '8192', 10),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
     type: 'chat',
   },
   image: {
-    id: process.env.MODEL_IMAGE || 'gpt-image-1',
+    id: process.env.MODEL_IMAGE || 'gpt-image-1.5',
     label: process.env.MODEL_IMAGE_LABEL || 'Image',
     type: 'image',
   },
