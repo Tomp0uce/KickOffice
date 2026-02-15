@@ -294,6 +294,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { isExcel, isOutlook, isWord } from '@/utils/hostDetection'
 import { message as messageUtil } from '@/utils/message'
+import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 const router = useRouter()
@@ -700,9 +701,23 @@ async function sendMessage() {
   userInput.value = ''
   adjustTextareaHeight()
 
+  const replyContextPrefix = '[Email context for reply]\n'
+  const lastHistoryItem = history.value[history.value.length - 1]
+  const pendingReplyContext = hostIsOutlook
+    && lastHistoryItem?.role === 'user'
+    && typeof lastHistoryItem.content === 'string'
+    && lastHistoryItem.content.startsWith(replyContextPrefix)
+
+  let replyContextText = ''
+  if (pendingReplyContext) {
+    replyContextText = lastHistoryItem.content.slice(replyContextPrefix.length).trim()
+    // Single-use context: remove placeholder entry and merge into the outgoing message once.
+    history.value.pop()
+  }
+
   // Get selected content from the active Office app
   let selectedText = ''
-  if (useSelectedText.value) {
+  if (useSelectedText.value && !replyContextText) {
     try {
       if (hostIsOutlook) {
         selectedText = await getOutlookMailBody()
@@ -729,9 +744,10 @@ async function sendMessage() {
   }
 
   const selectionLabel = hostIsOutlook ? 'Email body' : hostIsExcel ? 'Selected cells' : 'Selected text'
-  const fullMessage = selectedText
-    ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]`
-    : userMessage
+  const selectedTextContext = selectedText ? `[${selectionLabel}: "${selectedText}"]` : ''
+  const replyPrefillContext = replyContextText ? `${replyContextPrefix}${replyContextText}` : ''
+  const extraContexts = [replyPrefillContext, selectedTextContext].filter(Boolean).join('\n\n')
+  const fullMessage = extraContexts ? `${userMessage}\n\n${extraContexts}` : userMessage
 
   history.value.push({ role: 'user', content: fullMessage })
   scrollToBottom()
@@ -818,7 +834,7 @@ async function processChat(userMessage: string) {
 }
 
 async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
-  const appToolDefs = hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
   const generalToolDefs = getGeneralToolDefinitions()
 
   // Build OpenAI-format tool definitions
@@ -962,8 +978,9 @@ async function applyQuickAction(actionKey: string) {
       inputTextarea.value.focus()
     }
     // Store the email context so it can be used when the user sends
+    // Use 'user' role so buildChatMessages includes it in the request
     history.value.push({
-      role: 'system',
+      role: 'user',
       content: `[Email context for reply]\n${selectedText}`,
     })
     return
