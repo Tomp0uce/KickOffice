@@ -13,12 +13,12 @@
     <div class="flex min-w-12 items-center gap-2 rounded-md border border-border bg-surface p-2 focus-within:border-accent">
       <textarea
         ref="textareaEl"
-        :value="userInput"
+        :value="modelValue"
         class="placeholder:text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
         :placeholder="inputPlaceholder"
         rows="1"
-        @keydown.enter.exact.prevent="$emit('send')"
-        @input="$emit('update:userInput', ($event.target as HTMLTextAreaElement).value); $emit('input')"
+        @keydown.enter.exact.prevent="$emit('submit')"
+        @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value); $emit('input')"
       />
       <button
         v-if="loading"
@@ -33,9 +33,9 @@
         v-else
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50"
         :title="sendLabel"
-        :disabled="!userInput.trim() || !backendOnline"
+        :disabled="!modelValue.trim() || !backendOnline"
         :aria-label="sendLabel"
-        @click="$emit('send')"
+        @click="$emit('submit')"
       >
         <Send :size="18" />
       </button>
@@ -60,7 +60,7 @@ import { ref } from 'vue'
 defineProps<{
   availableModels: Record<string, ModelInfo>
   selectedModelTier: string
-  userInput: string
+  modelValue: string
   inputPlaceholder: string
   loading: boolean
   backendOnline: boolean
@@ -76,10 +76,10 @@ defineProps<{
 
 defineEmits<{
   (e: 'update:selectedModelTier', value: string): void
-  (e: 'update:userInput', value: string): void
+  (e: 'update:modelValue', value: string): void
   (e: 'update:useWordFormatting', value: boolean): void
   (e: 'update:useSelectedText', value: boolean): void
-  (e: 'send'): void
+  (e: 'submit'): void
   (e: 'stop'): void
   (e: 'input'): void
 }>()

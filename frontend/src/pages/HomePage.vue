@@ -33,7 +33,7 @@
       <ChatInput
         ref="chatInputRef"
         v-model:selected-model-tier="selectedModelTier"
-        v-model:user-input="userInput"
+        v-model="userInput"
         v-model:use-word-formatting="useWordFormatting"
         v-model:use-selected-text="useSelectedText"
         :available-models="availableModels"
@@ -46,7 +46,7 @@
         :task-type-label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
-        @send="sendMessage"
+        @submit="sendMessage"
         @stop="stopGeneration"
         @input="adjustTextareaHeight"
       />
