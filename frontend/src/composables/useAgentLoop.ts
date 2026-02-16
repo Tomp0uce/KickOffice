@@ -151,12 +151,28 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     selectedModelInfo.value?.type === 'image' ? firstChatModelTier.value : selectedModelTier.value
   )
 
+  function getEnabledToolNamesFromStorage(allToolNames: string[]): Set<string> {
+    const fallback = new Set(allToolNames)
+    try {
+      const stored = localStorage.getItem('enabledTools')
+      if (!stored) return fallback
+      const parsed = JSON.parse(stored)
+      if (!Array.isArray(parsed)) return fallback
+      return new Set(parsed.filter((name): name is string => typeof name === 'string'))
+    } catch {
+      return fallback
+    }
+  }
+
 
 
   async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? getPowerPointToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
     const generalToolDefs = getGeneralToolDefinitions()
-    const tools = [...generalToolDefs, ...appToolDefs].map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema } }))
+    const allToolDefs = [...generalToolDefs, ...appToolDefs]
+    const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
+    const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
+    const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema } }))
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 25
     let currentMessages: ChatRequestMessage[] = [...messages]
@@ -199,7 +215,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         let toolArgs: Record<string, any> = {}
         try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}
         let result = ''
-        const toolDef = [...generalToolDefs, ...appToolDefs].find(tool => tool.name === toolName)
+        const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {
           try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
         }
