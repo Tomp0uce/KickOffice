@@ -9,6 +9,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3002'
 // --- Configuration ---
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://api.openai.com/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
+const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
 
 const models = {
   nano: {
@@ -70,7 +71,7 @@ function validateTools(tools) {
   if (tools === undefined) return { value: undefined }
   if (!Array.isArray(tools)) return { error: 'tools must be an array' }
   if (tools.length === 0) return { value: undefined }
-  if (tools.length > 32) return { error: 'tools supports at most 32 entries' }
+  if (tools.length > MAX_TOOLS) return { error: `tools supports at most ${MAX_TOOLS} entries` }
 
   const sanitizedTools = []
   for (const tool of tools) {
