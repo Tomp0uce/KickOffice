@@ -14,6 +14,7 @@ interface ToolInputSchema {
   type: 'object'
   properties: Record<string, ToolProperty>
   required?: string[]
+  [key: string]: unknown
 }
 
 interface ToolProperty {

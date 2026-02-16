@@ -49,7 +49,7 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
   let attempt = 0
 
   while (true) {
-    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS, init.signal)
+    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS, init.signal ?? undefined)
 
     try {
       return await fetch(url, {

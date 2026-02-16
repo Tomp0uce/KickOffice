@@ -6,8 +6,13 @@
  * These helpers wrap the async callbacks in Promises.
  */
 
+import { executeOfficeAction } from './officeAction'
+
 declare const Office: any
 declare const PowerPoint: any
+
+const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
+  executeOfficeAction(() => PowerPoint.run(action) as Promise<T>)
 
 export type PowerPointToolName =
   | 'getSelectedText'
@@ -187,7 +192,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
     },
     execute: async () => {
       ensurePowerPointRunAvailable()
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -217,7 +222,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return 'Error: slideNumber must be a number greater than or equal to 1.'
       }
 
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -277,7 +282,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
     },
     execute: async args => {
       ensurePowerPointRunAvailable()
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         const layout = typeof args.layout === 'string' && args.layout.trim().length > 0
           ? args.layout.trim()
@@ -328,7 +333,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return 'Error: slideNumber must be a number greater than or equal to 1.'
       }
 
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -390,7 +395,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return 'Error: text is required.'
       }
 
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -448,7 +453,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       }
       const base64Image = base64ImageRaw.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '')
 
-      return PowerPoint.run(async (context: any) => {
+      return runPowerPoint(async (context: any) => {
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()

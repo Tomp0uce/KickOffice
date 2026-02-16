@@ -40,7 +40,7 @@ interface OfficeRuntime {
 }
 
 function getOfficeRuntime(): OfficeRuntime | null {
-  return (window as { Office?: OfficeRuntime }).Office ?? null
+  return (window as unknown as { Office?: OfficeRuntime }).Office ?? null
 }
 
 function getOutlookMailbox(): OutlookMailbox | null {

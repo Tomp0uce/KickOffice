@@ -66,9 +66,10 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     if (hostIsOutlook) {
       try {
         const mailbox = getOutlookMailbox()
-        if (mailbox?.item?.body?.setAsync) {
+        const item = mailbox?.item
+        if (item?.body?.setAsync) {
           await new Promise<void>((resolve, reject) => {
-            mailbox.item.body.setAsync(content, { coercionType: getOfficeTextCoercionType() }, (result: OfficeAsyncResult) => {
+            item.body.setAsync(content, { coercionType: getOfficeTextCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
               else reject(new Error(result.error?.message || 'setAsync failed'))
             })

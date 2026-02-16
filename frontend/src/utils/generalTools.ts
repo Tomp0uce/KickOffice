@@ -4,6 +4,7 @@ export type GeneralToolName = 'getCurrentDate' | 'calculateMath'
 
 export interface GeneralToolDefinition {
   name: GeneralToolName
+  category: ToolCategory
   description: string
   inputSchema: ToolInputSchema
   execute: (args: Record<string, any>) => Promise<string>
