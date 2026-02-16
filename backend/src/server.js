@@ -1,6 +1,7 @@
 import cors from 'cors'
 import 'dotenv/config'
 import express from 'express'
+import morgan from 'morgan'
 
 const app = express()
 const PORT = process.env.PORT || 3003
@@ -184,6 +185,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
 app.use(express.json({ limit: '4mb' }))
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
 // --- Health Check ---
 app.get('/health', (_req, res) => {
@@ -265,9 +267,8 @@ app.post('/api/chat', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`LLM API error ${response.status}:`, errorText)
-      return logAndRespond(res, response.status, {
-        error: `LLM API error: ${response.status}`,
-        details: errorText,
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat')
     }
 
@@ -360,9 +361,8 @@ app.post('/api/chat/sync', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`LLM API error ${response.status}:`, errorText)
-      return logAndRespond(res, response.status, {
-        error: `LLM API error: ${response.status}`,
-        details: errorText,
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat/sync')
     }
 
@@ -432,9 +432,8 @@ app.post('/api/image', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Image API error ${response.status}:`, errorText)
-      return logAndRespond(res, response.status, {
-        error: `Image API error: ${response.status}`,
-        details: errorText,
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/image')
     }
 
@@ -447,6 +446,19 @@ app.post('/api/image', async (req, res) => {
     console.error('Image proxy error:', error)
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/image')
   }
+})
+
+// --- Fallback + error middleware ---
+app.use((req, res) => {
+  return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)
+})
+
+app.use((err, req, res, next) => {
+  console.error(`[${req.method} ${req.originalUrl}] Unhandled server error:`, err)
+  if (res.headersSent) {
+    return next(err)
+  }
+  return logAndRespond(res, 500, { error: 'Internal server error' }, `${req.method} ${req.originalUrl}`)
 })
 
 // --- Start server ---

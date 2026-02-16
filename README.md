@@ -30,6 +30,8 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 - **Frontend**: Vue 3 task pane add-in loaded inside Office apps. Handles UI, chat, agent tool execution (Word API calls run locally in the browser).
 - **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming), `/api/chat/sync` (agent mode with tools), `/api/image`, `/api/models`, and `/health`.
   - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
+  - Request logging uses Morgan middleware for consistent HTTP access logs across endpoints.
+  - Upstream AI provider error payloads are kept in server logs only; client responses use a generic `502` error message to avoid leaking infrastructure details.
 - **LLM API**: Any OpenAI-compatible endpoint. For testing: OpenAI API directly. For production: Azure-hosted LiteLLM proxy with dedicated endpoints.
 
 ---
