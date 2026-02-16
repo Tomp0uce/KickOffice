@@ -16,6 +16,7 @@ import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickActi
 const ENABLED_TOOLS_STORAGE_KEY = 'enabledTools'
 const ENABLED_TOOLS_STORAGE_VERSION = 1
 const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
+const KICKOFFICE_DEBUG_TAG = '[KICKOFFICE_DEBUG]'
 
 interface EnabledToolsStorageState {
   version: number
@@ -269,6 +270,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response
+      console.info(`${KICKOFFICE_DEBUG_TAG} runAgentLoop iteration request`, {
+        iteration,
+        modelTier,
+        contextMessageCount: contextSafeMessages.length,
+        toolCount: tools.length,
+      })
       try {
         response = await chatSync({ messages: contextSafeMessages, modelTier, tools, abortSignal: abortController.value?.signal })
       } catch (err: any) {
@@ -285,6 +292,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         })
         throw err
       }
+      console.info(`${KICKOFFICE_DEBUG_TAG} runAgentLoop iteration response`, {
+        iteration,
+        choiceCount: response.choices?.length || 0,
+      })
       const choice = response.choices?.[0]
       console.info(`${VERBOSE_CHAT_LOG_TAG} runAgentLoop iteration response`, {
         iteration,
@@ -356,6 +367,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
   }
 
   async function processChat(userMessage: string) {
+    console.log(`${KICKOFFICE_DEBUG_TAG} processChat started with:`, userMessage.substring(0, 50))
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -377,58 +389,55 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
-    await runAgentLoop(messages, modelTier)
+    try {
+      await runAgentLoop(messages, modelTier)
+      console.log(`${KICKOFFICE_DEBUG_TAG} runAgentLoop completed successfully`)
+    } catch (error) {
+      console.error(`${KICKOFFICE_DEBUG_TAG} runAgentLoop FAILED:`, error)
+      throw error
+    }
   }
 
-  async function sendMessage(payload?: string | Event | unknown) {
-    console.group('[CRITICAL_DEBUG] sendMessage execution')
-    console.log('[CRITICAL_DEBUG] Raw payload received:', payload)
-    console.log('[CRITICAL_DEBUG] Type of payload:', typeof payload)
-    console.log('[CRITICAL_DEBUG] Current global userInput.value:', userInput.value)
+  async function sendMessage(payload?: unknown) {
+    console.group(`${KICKOFFICE_DEBUG_TAG} sendMessage execution`)
 
     let textToSend = ''
 
     if (typeof payload === 'string') {
-      console.log('[CRITICAL_DEBUG] Source: Direct String argument')
       textToSend = payload
     } else if (userInput.value && typeof userInput.value === 'string') {
-      console.log('[CRITICAL_DEBUG] Source: Fallback to userInput.value')
       textToSend = userInput.value
-    } else {
-      console.error('[CRITICAL_DEBUG] FAILURE: Could not find any text to send in payload or global ref.')
     }
 
     textToSend = textToSend?.trim() || ''
-    console.log('[CRITICAL_DEBUG] Final text to process:', textToSend)
+    console.log(`${KICKOFFICE_DEBUG_TAG} Final text to process:`, textToSend)
 
     if (!textToSend) {
-      console.error('[CRITICAL_DEBUG] ABORTING: Text is empty.')
+      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Text is empty.`)
       console.groupEnd()
       return
     }
 
     if (loading.value) {
-      console.warn('[CRITICAL_DEBUG] ABORTING: Already loading.')
+      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Already loading.`)
       console.groupEnd()
       return
     }
 
     if (!backendOnline.value) {
-      console.warn('[CRITICAL_DEBUG] ABORTING: Backend offline.')
+      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Backend offline.`)
       console.groupEnd()
       return messageUtil.error(t('backendOffline'))
     }
 
     if (userInput.value.trim() === textToSend) {
-      console.log('[CRITICAL_DEBUG] Clearing userInput ref')
       userInput.value = ''
       adjustTextareaHeight()
     }
 
-    console.log('[CRITICAL_DEBUG] Calling processChat...')
-    console.groupEnd()
-
     const userMessage = textToSend
+    console.log(`${KICKOFFICE_DEBUG_TAG} Calling processChat...`)
+    console.groupEnd()
 
     loading.value = true
     abortController.value = new AbortController()
@@ -459,11 +468,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-      const fullMessage = selectedText ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]` : userMessage
+      const fullMessage = selectedText ? `${userMessage}
+
+[${selectionLabel}: "${selectedText}"]` : userMessage
       console.info(`${VERBOSE_CHAT_LOG_TAG} sendMessage payload`, {
         selectedTextLength: selectedText.length,
         fullMessageLength: fullMessage.length,
       })
+      if (selectedText) {
+        history.value[history.value.length - 1].content = fullMessage
+      }
       await processChat(fullMessage)
     } catch (error: any) {
       if (error.name !== 'AbortError') {

@@ -7,6 +7,7 @@ if (!BACKEND_URL) {
 const REQUEST_TIMEOUT_MS = 45_000
 const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
 const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
+const KICKOFFICE_DEBUG_TAG = '[KICKOFFICE_DEBUG]'
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -223,32 +224,41 @@ export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatComp
     toolCount: tools?.length || 0,
     lastMessageRole: messages[messages.length - 1]?.role,
   })
+  console.log(`${KICKOFFICE_DEBUG_TAG} chatSync: Sending request to backend...`)
 
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, modelTier, tools }),
-    signal: abortSignal,
-  })
+  try {
+    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, modelTier, tools }),
+      signal: abortSignal,
+    })
 
-  if (!res.ok) {
-    const err = await res.text()
-    console.error(`${VERBOSE_CHAT_LOG_TAG} chatSync non-ok response`, { status: res.status, err })
-    throw new Error(`Chat sync API error ${res.status}: ${err}`)
+    console.log(`${KICKOFFICE_DEBUG_TAG} chatSync: Response received. Status:`, res.status)
+
+    if (!res.ok) {
+      const err = await res.text()
+      console.error(`${VERBOSE_CHAT_LOG_TAG} chatSync non-ok response`, { status: res.status, err })
+      console.error(`${KICKOFFICE_DEBUG_TAG} chatSync ERROR BODY:`, err)
+      throw new Error(`Chat sync API error ${res.status}: ${err}`)
+    }
+
+    const json = await res.json()
+    console.info(`${VERBOSE_CHAT_LOG_TAG} chatSync response`, {
+      id: json?.id,
+      model: json?.model,
+      choiceCount: json?.choices?.length || 0,
+      hasFirstChoice: !!json?.choices?.[0],
+      finishReason: json?.choices?.[0]?.finish_reason ?? null,
+      hasContent: !!json?.choices?.[0]?.message?.content,
+      toolCallCount: json?.choices?.[0]?.message?.tool_calls?.length || 0,
+    })
+
+    return json
+  } catch (error) {
+    console.error(`${KICKOFFICE_DEBUG_TAG} chatSync NETWORK ERROR:`, error)
+    throw error
   }
-
-  const json = await res.json()
-  console.info(`${VERBOSE_CHAT_LOG_TAG} chatSync response`, {
-    id: json?.id,
-    model: json?.model,
-    choiceCount: json?.choices?.length || 0,
-    hasFirstChoice: !!json?.choices?.[0],
-    finishReason: json?.choices?.[0]?.finish_reason ?? null,
-    hasContent: !!json?.choices?.[0]?.message?.content,
-    toolCallCount: json?.choices?.[0]?.message?.tool_calls?.length || 0,
-  })
-
-  return json
 }
 
 export interface ImageGenerateOptions {
