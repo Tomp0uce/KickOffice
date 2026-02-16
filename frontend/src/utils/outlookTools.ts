@@ -2,11 +2,81 @@ export type OutlookToolName =
   | 'getEmailBody'
   | 'getSelectedText'
   | 'setEmailBody'
+  | 'insertTextAtCursor'
+  | 'setEmailBodyHtml'
+  | 'getEmailSubject'
+  | 'setEmailSubject'
+  | 'getEmailRecipients'
+  | 'addRecipient'
+  | 'getEmailSender'
+  | 'getEmailDate'
+  | 'getAttachments'
+  | 'insertHtmlAtCursor'
 
 type OutlookToolDefinition = WordToolDefinition
 
+type RecipientField = 'to' | 'cc' | 'bcc'
+
 function getMailbox(): any | null {
   return (window as any).Office?.context?.mailbox ?? null
+}
+
+function getOfficeAsyncStatus(): any {
+  return (window as any).Office?.AsyncResultStatus
+}
+
+function getOfficeCoercionType(): any {
+  return (window as any).Office?.CoercionType
+}
+
+function resolveAsyncResult(result: any, onSuccess: (value: any) => string): string {
+  if (result.status === getOfficeAsyncStatus()?.Succeeded) {
+    return onSuccess(result.value)
+  }
+  return `Error: ${result.error?.message || 'unknown error'}`
+}
+
+function normalizeRecipient(recipient: any): { displayName: string; emailAddress: string } {
+  if (!recipient) {
+    return { displayName: '', emailAddress: '' }
+  }
+
+  if (typeof recipient === 'string') {
+    return { displayName: '', emailAddress: recipient.trim() }
+  }
+
+  return {
+    displayName: recipient.displayName || recipient.name || '',
+    emailAddress: recipient.emailAddress || recipient.address || '',
+  }
+}
+
+function normalizeRecipientsInput(recipients: any): any[] {
+  if (Array.isArray(recipients)) {
+    return recipients
+      .map(normalizeRecipient)
+      .filter(r => !!r.emailAddress)
+  }
+
+  if (typeof recipients === 'string') {
+    return recipients
+      .split(',')
+      .map(email => normalizeRecipient(email))
+      .filter(r => !!r.emailAddress)
+  }
+
+  if (recipients && typeof recipients === 'object') {
+    const normalized = normalizeRecipient(recipients)
+    return normalized.emailAddress ? [normalized] : []
+  }
+
+  return []
+}
+
+function getRecipientField(field: unknown): RecipientField {
+  const value = String(field || 'to').toLowerCase()
+  if (value === 'cc' || value === 'bcc') return value
+  return 'to'
 }
 
 const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
@@ -24,13 +94,9 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       if (!mailbox?.item) return 'No email item available.'
       return new Promise<string>((resolve) => {
         mailbox.item.body.getAsync(
-          (window as any).Office.CoercionType.Text,
+          getOfficeCoercionType().Text,
           (result: any) => {
-            if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
-              resolve(result.value || '')
-            } else {
-              resolve(`Error reading email body: ${result.error?.message || 'unknown error'}`)
-            }
+            resolve(resolveAsyncResult(result, (value) => value || ''))
           },
         )
       })
@@ -54,9 +120,9 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       }
       return new Promise<string>((resolve) => {
         mailbox.item.getSelectedDataAsync(
-          (window as any).Office.CoercionType.Text,
+          getOfficeCoercionType().Text,
           (result: any) => {
-            if (result.status === (window as any).Office.AsyncResultStatus.Succeeded && result.value?.data) {
+            if (result.status === getOfficeAsyncStatus()?.Succeeded && result.value?.data) {
               resolve(result.value.data)
             } else {
               resolve('')
@@ -90,13 +156,317 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       return new Promise<string>((resolve) => {
         mailbox.item.body.setAsync(
           text,
-          { coercionType: (window as any).Office.CoercionType.Text },
+          { coercionType: getOfficeCoercionType().Text },
           (result: any) => {
-            if (result.status === (window as any).Office.AsyncResultStatus.Succeeded) {
-              resolve('Successfully set email body.')
+            resolve(resolveAsyncResult(result, () => 'Successfully set email body.'))
+          },
+        )
+      })
+    },
+  },
+
+  insertTextAtCursor: {
+    name: 'insertTextAtCursor',
+    description: 'Insert plain text at the current cursor position in the email body (compose mode).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'The text to insert at the cursor position',
+        },
+      },
+      required: ['text'],
+    },
+    execute: async (args) => {
+      const { text } = args
+      const mailbox = getMailbox()
+      if (!mailbox?.item?.body?.setSelectedDataAsync) {
+        return 'Cannot insert text at cursor: compose mode is not available.'
+      }
+
+      return new Promise<string>((resolve) => {
+        mailbox.item.body.setSelectedDataAsync(
+          text,
+          { coercionType: getOfficeCoercionType().Text },
+          (result: any) => {
+            resolve(resolveAsyncResult(result, () => 'Successfully inserted text at cursor.'))
+          },
+        )
+      })
+    },
+  },
+
+  setEmailBodyHtml: {
+    name: 'setEmailBodyHtml',
+    description: 'Replace the full email body with HTML content (compose mode).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        html: {
+          type: 'string',
+          description: 'The HTML content to set as the whole email body',
+        },
+      },
+      required: ['html'],
+    },
+    execute: async (args) => {
+      const { html } = args
+      const mailbox = getMailbox()
+      if (!mailbox?.item?.body?.setAsync) {
+        return 'Cannot set HTML email body: compose mode is not available.'
+      }
+
+      return new Promise<string>((resolve) => {
+        mailbox.item.body.setAsync(
+          html,
+          { coercionType: getOfficeCoercionType().Html },
+          (result: any) => {
+            resolve(resolveAsyncResult(result, () => 'Successfully set HTML email body.'))
+          },
+        )
+      })
+    },
+  },
+
+  getEmailSubject: {
+    name: 'getEmailSubject',
+    description: 'Get the current email subject in read or compose mode.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      if (mailbox.item.subject && typeof mailbox.item.subject.getAsync === 'function') {
+        return new Promise<string>((resolve) => {
+          mailbox.item.subject.getAsync((result: any) => {
+            resolve(resolveAsyncResult(result, (value) => value || ''))
+          })
+        })
+      }
+
+      return mailbox.item.subject || ''
+    },
+  },
+
+  setEmailSubject: {
+    name: 'setEmailSubject',
+    description: 'Set the email subject in compose mode.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject: {
+          type: 'string',
+          description: 'The new email subject line',
+        },
+      },
+      required: ['subject'],
+    },
+    execute: async (args) => {
+      const { subject } = args
+      const mailbox = getMailbox()
+      if (!mailbox?.item?.subject?.setAsync) {
+        return 'Cannot set email subject: compose mode is not available.'
+      }
+
+      return new Promise<string>((resolve) => {
+        mailbox.item.subject.setAsync(subject, (result: any) => {
+          resolve(resolveAsyncResult(result, () => 'Successfully updated email subject.'))
+        })
+      })
+    },
+  },
+
+  getEmailRecipients: {
+    name: 'getEmailRecipients',
+    description: 'Get the current To, Cc, and Bcc recipients of the email.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      const item = mailbox.item
+
+      const getField = (field: RecipientField) => {
+        const fieldObject = item[field]
+        if (fieldObject && typeof fieldObject.getAsync === 'function') {
+          return new Promise<any[]>((resolve) => {
+            fieldObject.getAsync((result: any) => {
+              if (result.status === getOfficeAsyncStatus()?.Succeeded && Array.isArray(result.value)) {
+                resolve(result.value.map(normalizeRecipient))
+              } else {
+                resolve([])
+              }
+            })
+          })
+        }
+
+        if (Array.isArray(fieldObject)) {
+          return Promise.resolve(fieldObject.map(normalizeRecipient))
+        }
+
+        return Promise.resolve([])
+      }
+
+      const [to, cc, bcc] = await Promise.all([
+        getField('to'),
+        getField('cc'),
+        getField('bcc'),
+      ])
+
+      return JSON.stringify({ to, cc, bcc })
+    },
+  },
+
+  addRecipient: {
+    name: 'addRecipient',
+    description: 'Add recipient(s) to To, Cc, or Bcc in compose mode.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        field: {
+          type: 'string',
+          enum: ['to', 'cc', 'bcc'],
+          description: 'Recipient field to update (to, cc, bcc). Defaults to to.',
+        },
+        recipients: {
+          type: ['array', 'string', 'object'] as any,
+          description:
+            'Recipient(s) to add. Accepts email string, comma-separated string, object {displayName,emailAddress}, or array of these.',
+        },
+      },
+      required: ['recipients'],
+    },
+    execute: async (args) => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      const field = getRecipientField(args.field)
+      const recipients = normalizeRecipientsInput(args.recipients)
+      if (recipients.length === 0) {
+        return 'No valid recipients provided.'
+      }
+
+      const fieldObject = mailbox.item[field]
+      if (!fieldObject || typeof fieldObject.addAsync !== 'function') {
+        return `Cannot add recipients to ${field}: compose mode is not available.`
+      }
+
+      return new Promise<string>((resolve) => {
+        fieldObject.addAsync(recipients, (result: any) => {
+          resolve(resolveAsyncResult(result, () => `Successfully added ${recipients.length} recipient(s) to ${field}.`))
+        })
+      })
+    },
+  },
+
+  getEmailSender: {
+    name: 'getEmailSender',
+    description: 'Get sender information for the current email.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      const sender = mailbox.item.from || mailbox.item.sender
+      if (!sender) return ''
+
+      return JSON.stringify(normalizeRecipient(sender))
+    },
+  },
+
+  getEmailDate: {
+    name: 'getEmailDate',
+    description: 'Get creation date/time for the current email item (read mode).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      const value = mailbox.item.dateTimeCreated
+      if (!value) {
+        return 'Email creation date is not available in this context.'
+      }
+
+      const date = value instanceof Date ? value : new Date(value)
+      return Number.isNaN(date.getTime()) ? String(value) : date.toISOString()
+    },
+  },
+
+  getAttachments: {
+    name: 'getAttachments',
+    description: 'List attachments of the current email.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      const mailbox = getMailbox()
+      if (!mailbox?.item) return 'No email item available.'
+
+      if (typeof mailbox.item.getAttachmentsAsync === 'function') {
+        return new Promise<string>((resolve) => {
+          mailbox.item.getAttachmentsAsync((result: any) => {
+            if (result.status === getOfficeAsyncStatus()?.Succeeded && Array.isArray(result.value)) {
+              resolve(JSON.stringify(result.value))
             } else {
-              resolve(`Error setting email body: ${result.error?.message || 'unknown error'}`)
+              resolve(`Error listing attachments: ${result.error?.message || 'unknown error'}`)
             }
+          })
+        })
+      }
+
+      if (Array.isArray(mailbox.item.attachments)) {
+        return JSON.stringify(mailbox.item.attachments)
+      }
+
+      return 'Attachments are not available in this context.'
+    },
+  },
+
+  insertHtmlAtCursor: {
+    name: 'insertHtmlAtCursor',
+    description: 'Insert HTML content at the current cursor position in the email body (compose mode).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        html: {
+          type: 'string',
+          description: 'The HTML content to insert at the cursor position',
+        },
+      },
+      required: ['html'],
+    },
+    execute: async (args) => {
+      const { html } = args
+      const mailbox = getMailbox()
+      if (!mailbox?.item?.body?.setSelectedDataAsync) {
+        return 'Cannot insert HTML at cursor: compose mode is not available.'
+      }
+
+      return new Promise<string>((resolve) => {
+        mailbox.item.body.setSelectedDataAsync(
+          html,
+          { coercionType: getOfficeCoercionType().Html },
+          (result: any) => {
+            resolve(resolveAsyncResult(result, () => 'Successfully inserted HTML at cursor.'))
           },
         )
       })

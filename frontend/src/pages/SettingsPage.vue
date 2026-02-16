@@ -419,8 +419,9 @@ import { optionLists } from '@/utils/common'
 import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { isExcel, isPowerPoint } from '@/utils/hostDetection'
+import { isExcel, isOutlook, isPowerPoint } from '@/utils/hostDetection'
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { i18n } from '@/i18n'
@@ -468,28 +469,35 @@ const availableModels = ref<Record<string, ModelInfo>>({})
 // Host detection
 const hostIsExcel = isExcel()
 const hostIsPowerPoint = isPowerPoint()
+const hostIsOutlook = isOutlook()
 
 // Tools - switch based on host
-const appToolsList = hostIsExcel
-  ? getExcelToolDefinitions()
-  : hostIsPowerPoint
-    ? getPowerPointToolDefinitions()
-    : getWordToolDefinitions()
+const appToolsList = hostIsOutlook
+  ? getOutlookToolDefinitions()
+  : hostIsExcel
+    ? getExcelToolDefinitions()
+    : hostIsPowerPoint
+      ? getPowerPointToolDefinitions()
+      : getWordToolDefinitions()
 const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
 const enabledTools = ref<Set<string>>(new Set())
 
 
-const toolDescriptionKey = hostIsExcel
-  ? 'excelToolsDescription'
-  : hostIsPowerPoint
-    ? 'powerpointToolsDescription'
-    : 'wordToolsDescription'
+const toolDescriptionKey = hostIsOutlook
+  ? 'outlookToolsDescription'
+  : hostIsExcel
+    ? 'excelToolsDescription'
+    : hostIsPowerPoint
+      ? 'powerpointToolsDescription'
+      : 'wordToolsDescription'
 
-const toolTranslationPrefix = hostIsExcel
-  ? 'excelTool'
-  : hostIsPowerPoint
-    ? 'powerpointTool'
-    : 'wordTool'
+const toolTranslationPrefix = hostIsOutlook
+  ? 'outlookTool'
+  : hostIsExcel
+    ? 'excelTool'
+    : hostIsPowerPoint
+      ? 'powerpointTool'
+      : 'wordTool'
 
 // Prompt management
 const savedPrompts = ref<SavedPrompt[]>([])
