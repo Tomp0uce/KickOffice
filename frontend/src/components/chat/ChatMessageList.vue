@@ -1,5 +1,5 @@
 <template>
-  <div ref="containerEl" class="flex flex-1 flex-col gap-4 overflow-y-auto rounded-md border border-border-secondary bg-surface p-2 shadow-sm">
+  <div ref="containerEl" class="card flex flex-1 flex-col gap-4 overflow-y-auto">
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ liveAnnouncement }}</div>
     <div v-if="history.length === 0" class="flex h-full flex-col items-center justify-center gap-4 p-8 text-center text-accent">
       <Sparkles :size="32" />
