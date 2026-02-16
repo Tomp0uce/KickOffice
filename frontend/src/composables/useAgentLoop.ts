@@ -1,6 +1,6 @@
 import { nextTick, type Ref } from 'vue'
 
-import { type ChatMessage, chatStream, chatSync, generateImage } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, chatStream, chatSync, generateImage } from '@/api/backend'
 import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -153,7 +153,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     const tools = [...generalToolDefs, ...appToolDefs].map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema } }))
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 25
-    let currentMessages = [...messages]
+    let currentMessages: ChatRequestMessage[] = [...messages]
     history.value.push(createDisplayMessage('assistant', '⏳ Analyse de la demande...'))
     const lastIndex = history.value.length - 1
     let abortedByUser = false
@@ -177,7 +177,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       const choice = response.choices?.[0]
       if (!choice) break
       const assistantMsg = choice.message
-      currentMessages.push(assistantMsg)
+      currentMessages.push({ role: 'assistant', content: assistantMsg.content || '' })
       if (assistantMsg.content) history.value[lastIndex].content = assistantMsg.content
       if (!assistantMsg.tool_calls?.length) break
       for (const toolCall of assistantMsg.tool_calls) {
@@ -193,7 +193,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           abortedByUser = true
           break
         }
-        currentMessages.push({ role: 'tool' as any, tool_call_id: toolCall.id, content: result } as any)
+        currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: result })
       }
       if (abortedByUser) {
         break

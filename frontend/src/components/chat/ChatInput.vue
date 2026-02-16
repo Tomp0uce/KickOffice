@@ -24,6 +24,7 @@
         v-if="loading"
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-danger text-white"
         title="Stop"
+        aria-label="Stop"
         @click="$emit('stop')"
       >
         <Square :size="18" />
@@ -33,6 +34,7 @@
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50"
         title="Send"
         :disabled="!userInput.trim() || !backendOnline"
+        aria-label="Send"
         @click="$emit('send')"
       >
         <Send :size="18" />
