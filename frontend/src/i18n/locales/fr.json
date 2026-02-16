@@ -94,6 +94,8 @@
   "includeSelectionLabelExcel": "Inclure les cellules sélectionnées",
   "insertedToCell": "Inséré dans la cellule sélectionnée",
   "localLanguageLabel": "Langue de l'interface",
+  "darkModeLabel": "Mode sombre",
+  "darkModeDescription": "Utiliser un thème de couleurs plus sombre",
   "newChat": "Nouvelle conversation",
   "polish": "Réécrire",
   "prompts": "Prompts",

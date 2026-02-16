@@ -74,6 +74,21 @@
               </SingleSelect>
             </SettingCard>
 
+            <SettingCard>
+              <label class="flex cursor-pointer items-center justify-between gap-2">
+                <div class="flex flex-col">
+                  <span class="text-sm font-semibold text-main">{{ $t('darkModeLabel') || 'Dark mode' }}</span>
+                  <span class="text-xs text-secondary">{{ $t('darkModeDescription') || 'Use a darker color theme' }}</span>
+                </div>
+                <input
+                  v-model="darkMode"
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer accent-accent"
+                  :aria-label="$t('darkModeLabel') || 'Dark mode'"
+                >
+              </label>
+            </SettingCard>
+
             <SettingCard v-if="hostIsExcel">
               <SingleSelect
                 v-model="excelFormulaLanguage"
@@ -434,6 +449,7 @@ const currentTab = ref('general')
 // Settings
 const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
 const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
+const darkMode = useStorage(localStorageKey.darkMode, false)
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
 const AGENT_MAX_ITERATIONS_MIN = 1
 const AGENT_MAX_ITERATIONS_MAX = 100
@@ -559,6 +575,7 @@ watch(agentMaxIterations, (value) => {
     agentMaxIterations.value = sanitized
   }
 }, { immediate: true })
+
 
 // Prompt management
 function loadPrompts() {

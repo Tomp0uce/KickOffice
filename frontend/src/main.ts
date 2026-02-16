@@ -1,10 +1,12 @@
 import './index.css'
 
-import { createApp } from 'vue'
+import { useStorage } from '@vueuse/core'
+import { createApp, watch } from 'vue'
 
 import App from './App.vue'
 import { i18n } from './i18n'
 import router from './router'
+import { localStorageKey } from './utils/enum'
 import { detectOfficeHost } from './utils/hostDetection'
 
 window.Office.onReady(() => {
@@ -29,6 +31,12 @@ window.Office.onReady(() => {
       super(callback)
     }
   }
+
+  const darkMode = useStorage(localStorageKey.darkMode, false)
+  watch(darkMode, (value) => {
+    document.documentElement.classList.toggle('dark', value)
+  }, { immediate: true })
+
   app.config.errorHandler = (err, _instance, info) => {
     console.error('Vue Global Error:', err, info)
   }
