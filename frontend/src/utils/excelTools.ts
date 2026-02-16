@@ -5,6 +5,7 @@ export type ExcelToolName =
   | 'setCellValue'
   | 'getWorksheetData'
   | 'insertFormula'
+  | 'fillFormulaDown'
   | 'createChart'
   | 'formatRange'
   | 'sortRange'
@@ -168,6 +169,60 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         cell.format.font.bold = true
         await context.sync()
         return `Successfully inserted ${formulaLocale === 'fr' ? 'localized French' : 'English'} formula "${formula}" at ${address}`
+      })
+    },
+  },
+
+  fillFormulaDown: {
+    name: 'fillFormulaDown',
+    description:
+      'Insert an Excel formula into the first cell of a range and fill it down to all rows in that range. This is much more efficient than calling insertFormula repeatedly for each row. The formula should reference the first row and Excel will automatically adjust relative references for each subsequent row. For example, to apply "=A2*B2" from C2 to C100, use startCell="C2", endCell="C100", formula="=A2*B2".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        startCell: {
+          type: 'string',
+          description: 'The first cell address where the formula starts (e.g., "C2")',
+        },
+        endCell: {
+          type: 'string',
+          description: 'The last cell address where the formula should be filled to (e.g., "C100")',
+        },
+        formula: {
+          type: 'string',
+          description: 'The Excel formula for the first row (e.g., "=A2*B2"). Relative references will auto-adjust for each row.',
+        },
+      },
+      required: ['startCell', 'endCell', 'formula'],
+    },
+    execute: async (args) => {
+      const { startCell, endCell, formula } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const formulaLocale = getExcelFormulaLanguage()
+
+        // Set the formula in the first cell
+        const firstCell = sheet.getRange(startCell)
+        if (formulaLocale === 'fr') {
+          firstCell.formulasLocal = [[formula]]
+        } else {
+          firstCell.formulas = [[formula]]
+        }
+        await context.sync()
+
+        // Now select the full range and fill down from the first cell
+        const fullRange = sheet.getRange(`${startCell}:${endCell}`)
+        fullRange.load('rowCount')
+        await context.sync()
+
+        if (fullRange.rowCount > 1) {
+          // Use the first cell as source and fill down to the rest
+          const sourceRange = sheet.getRange(`${startCell}:${startCell}`)
+          sourceRange.autoFill(fullRange, Excel.AutoFillType.fillDefault)
+          await context.sync()
+        }
+
+        return `Successfully filled formula "${formula}" from ${startCell} to ${endCell}`
       })
     },
   },
