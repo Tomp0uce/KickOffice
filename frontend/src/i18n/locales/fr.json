@@ -97,6 +97,7 @@
   "darkModeLabel": "Mode sombre",
   "darkModeDescription": "Utiliser un thème de couleurs plus sombre",
   "newChat": "Nouvelle conversation",
+  "noModelResponse": "Le modèle a renvoyé une réponse vide. Réessayez ou consultez les logs du backend.",
   "polish": "Réécrire",
   "prompts": "Prompts",
   "recursionLimitExceeded": "L'agent a dépassé le nombre maximum d'itérations.",
