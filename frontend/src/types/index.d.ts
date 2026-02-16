@@ -33,6 +33,7 @@ interface ToolDefinition {
 
 type WordToolDefinition = ToolDefinition
 type ExcelToolDefinition = ToolDefinition
+type PowerPointToolDefinition = ToolDefinition
 type OutlookToolDefinition = ToolDefinition
 
-type OfficeHostType = 'Word' | 'Excel' | 'Unknown'
+type OfficeHostType = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook' | 'Unknown'

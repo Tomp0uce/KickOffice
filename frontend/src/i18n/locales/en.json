@@ -269,5 +269,22 @@
   "excelTool_getNamedRanges": "Get Named Ranges",
   "excelTool_getNamedRanges_desc": "List workbook named ranges.",
   "excelTool_setNamedRange": "Set Named Range",
-  "excelTool_setNamedRange_desc": "Create or update a named range."
+  "excelTool_setNamedRange_desc": "Create or update a named range.",
+  "powerpointToolsDescription": "Tools that AI agents can use to interact with your PowerPoint presentation.",
+  "powerpointTool_getSelectedText": "Get Selected Text",
+  "powerpointTool_getSelectedText_desc": "Get the currently selected text in PowerPoint.",
+  "powerpointTool_replaceSelectedText": "Replace Selected Text",
+  "powerpointTool_replaceSelectedText_desc": "Replace the currently selected text in PowerPoint.",
+  "powerpointTool_getSlideCount": "Get Slide Count",
+  "powerpointTool_getSlideCount_desc": "Get the total number of slides in the active presentation.",
+  "powerpointTool_getSlideContent": "Get Slide Content",
+  "powerpointTool_getSlideContent_desc": "Read all text content from a specific slide.",
+  "powerpointTool_addSlide": "Add Slide",
+  "powerpointTool_addSlide_desc": "Add a new slide to the presentation.",
+  "powerpointTool_setSlideNotes": "Set Slide Notes",
+  "powerpointTool_setSlideNotes_desc": "Set speaker notes for a specific slide (PowerPointApi 1.4+).",
+  "powerpointTool_insertTextBox": "Insert Text Box",
+  "powerpointTool_insertTextBox_desc": "Insert a text box into a slide with optional position and size.",
+  "powerpointTool_insertImage": "Insert Image",
+  "powerpointTool_insertImage_desc": "Insert a base64 image into a slide with optional position and size."
 }

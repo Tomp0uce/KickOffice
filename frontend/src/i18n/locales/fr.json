@@ -269,5 +269,22 @@
   "excelTool_getNamedRanges": "Lire les plages nommées",
   "excelTool_getNamedRanges_desc": "Lister les plages nommées du classeur.",
   "excelTool_setNamedRange": "Définir une plage nommée",
-  "excelTool_setNamedRange_desc": "Créer ou mettre à jour une plage nommée."
+  "excelTool_setNamedRange_desc": "Créer ou mettre à jour une plage nommée.",
+  "powerpointToolsDescription": "Outils que les agents IA peuvent utiliser pour interagir avec votre présentation PowerPoint.",
+  "powerpointTool_getSelectedText": "Lire le texte sélectionné",
+  "powerpointTool_getSelectedText_desc": "Obtenir le texte actuellement sélectionné dans PowerPoint.",
+  "powerpointTool_replaceSelectedText": "Remplacer la sélection",
+  "powerpointTool_replaceSelectedText_desc": "Remplacer le texte actuellement sélectionné dans PowerPoint.",
+  "powerpointTool_getSlideCount": "Compter les diapositives",
+  "powerpointTool_getSlideCount_desc": "Obtenir le nombre total de diapositives de la présentation active.",
+  "powerpointTool_getSlideContent": "Lire une diapositive",
+  "powerpointTool_getSlideContent_desc": "Lire tout le contenu textuel d’une diapositive spécifique.",
+  "powerpointTool_addSlide": "Ajouter une diapositive",
+  "powerpointTool_addSlide_desc": "Ajouter une nouvelle diapositive à la présentation.",
+  "powerpointTool_setSlideNotes": "Définir les notes",
+  "powerpointTool_setSlideNotes_desc": "Définir les notes orateur d’une diapositive (PowerPointApi 1.4+).",
+  "powerpointTool_insertTextBox": "Insérer une zone de texte",
+  "powerpointTool_insertTextBox_desc": "Insérer une zone de texte avec position et taille optionnelles.",
+  "powerpointTool_insertImage": "Insérer une image",
+  "powerpointTool_insertImage_desc": "Insérer une image base64 avec position et taille optionnelles."
 }

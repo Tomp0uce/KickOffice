@@ -1,20 +1,20 @@
 # KickOffice — Audit des Skills Agent Manquantes
 
-> Date: 2026-02-16
-> Objectif: Identifier toutes les skills manquantes pour que l'agent soit efficace dans les 4 outils Office
+> Date: 2026-02-16  
+> Objectif: Identifier les skills manquantes pour que l'agent soit efficace dans les 4 outils Office.
 
-## Etat actuel
+## État actuel
 
-| Application    | Tools existants | Tools manquants identifies |
+| Application    | Tools existants | Tools manquants identifiés |
 |----------------|-----------------|----------------------------|
-| **Word**       | 39 tools        | 0 manquant (lot W1-W15 livre) |
-| **Excel**      | 39 tools        | 0 manquant sur le lot E1-E18 |
-| **PowerPoint** | 0 tools (!)     | ~8 a creer                 |
+| **Word**       | 39 tools        | 0 manquant (lot W1-W15 livré) |
+| **Excel**      | 39 tools        | 0 manquant (lot E1-E18 livré) |
+| **PowerPoint** | 8 tools         | 0 manquant sur le lot P1-P8 |
 | **Outlook**    | 3 tools         | ~10 manquants              |
 
 ---
 
-## 1. WORD (wordTools.ts) — 39 existants, 0 manquant sur le lot prioritaire
+## 1. WORD (wordTools.ts) — 39 existants
 
 ### Existant
 - Texte: getSelectedText, getDocumentContent, insertText, replaceSelectedText, appendText, deleteText, selectText, findText, searchAndReplace
@@ -23,89 +23,59 @@
 - Navigation: insertBookmark, goToBookmark, insertContentControl
 - Image: insertImage
 
-### Lot Word integre (W1-W15)
-
-| ID  | Skill               | Statut | Note implementation |
-|-----|---------------------|--------|---------------------|
-| W1  | setParagraphFormat  | Livre  | Formatage paragraphe sur selection (`alignment`, `lineSpacing`, `spaceBefore/After`, `leftIndent`, `firstLineIndent`) |
-| W2  | insertHyperlink     | Livre  | Insertion de lien cliquable via `range.hyperlink` (+ `textToDisplay` optionnel) |
-| W3  | getDocumentHtml     | Livre  | Retourne le HTML complet via `body.getHtml()` |
-| W4  | modifyTableCell     | Livre  | Remplacement d'une cellule ciblee dans un tableau existant |
-| W5  | addTableRow         | Livre  | Ajout de lignes dans un tableau (`addRows`) |
-| W6  | addTableColumn      | Livre  | Ajout de colonnes dans un tableau (`addColumns`) |
-| W7  | deleteTableRowColumn| Livre  | Suppression de lignes/colonnes (`deleteRows` / `deleteColumns`) |
-| W8  | formatTableCell     | Livre  | Formatage de cellule (fond + police) |
-| W9  | insertHeaderFooter  | Livre  | Insertion d'en-tete/pied (`getHeader` / `getFooter`) |
-| W10 | insertFootnote      | Livre  | Insertion de note de bas de page (`insertFootnote`) |
-| W11 | addComment          | Livre  | Ajout de commentaire de relecture (`insertComment`) |
-| W12 | getComments         | Livre  | Lecture des commentaires (`getComments`) |
-| W13 | setPageSetup        | Livre  | Reglage marges/orientation/papier (`pageSetup`) |
-| W14 | getSpecificParagraph| Livre  | Lecture d'un paragraphe par index |
-| W15 | insertSectionBreak  | Livre  | Insertion de saut de section (`SectionNext`) |
+### Lot Word intégré (W1-W15)
+Statut: **Livré**.
 
 ---
 
-## 2. EXCEL (excelTools.ts) — 39 existants, 0 manquant sur le lot E1-E18
+## 2. EXCEL (excelTools.ts) — 39 existants
 
 ### Existant
 - Data: getSelectedCells, setCellValue, getWorksheetData, getCellFormula, getDataFromSheet, copyRange
 - Formules / validation: insertFormula, fillFormulaDown, addDataValidation, setNamedRange, getNamedRanges
-- Formatage: formatRange (wrap/align/font/borders avances), setCellNumberFormat, autoFitColumns, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
+- Formatage: formatRange, setCellNumberFormat, autoFitColumns, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
 - Structure: addWorksheet, renameWorksheet, activateWorksheet, deleteWorksheet, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, createTable
 - Charts: createChart
 - Filtres et volets: applyAutoFilter, removeAutoFilter, sortRange, freezePanes
 - Liens / commentaires / protection: addHyperlink, addCellComment, protectWorksheet
 - Utility: searchAndReplace, clearRange, getWorksheetInfo
 
-### Lot Excel integre (E1-E18)
-
-| ID  | Skill                  | Statut | Note implementation                                                                                 |
-|-----|------------------------|--------|------------------------------------------------------------------------------------------------------|
-| E1  | addDataValidation      | Livre  | Validation de donnees (listes, bornes numeriques, date, custom) via `range.dataValidation.rule`    |
-| E2  | createTable            | Livre  | Conversion d'une plage en table structuree (`sheet.tables.add`, `name`, `style`)                    |
-| E3  | copyRange              | Livre  | Copie valeurs/formules/format numerique entre plages                                                 |
-| E4  | renameWorksheet        | Livre  | Renommage de feuille existante (`sheet.name = ...`)                                                  |
-| E5  | deleteWorksheet        | Livre  | Suppression de feuille (`sheet.delete()`)                                                            |
-| E6  | activateWorksheet      | Livre  | Activation/navigation entre feuilles (`sheet.activate()`)                                            |
-| E7  | getDataFromSheet       | Livre  | Lecture de donnees d'une autre feuille sans activation                                               |
-| E8  | freezePanes            | Livre  | Figer/defiger volets (rows/columns/at/unfreeze)                                                      |
-| E9  | addHyperlink           | Livre  | Insertion de liens cliquables (`range.hyperlink`)                                                    |
-| E10 | addCellComment         | Livre  | Ajout de commentaires de cellule (`workbook.comments.add`)                                           |
-| E11 | wrapText (formatRange) | Livre  | `formatRange` etendu avec `wrapText`                                                                 |
-| E12 | verticalAlignment      | Livre  | `formatRange` etendu avec `verticalAlignment`                                                        |
-| E13 | fontName               | Livre  | `formatRange` etendu avec `fontName`                                                                 |
-| E14 | removeAutoFilter       | Livre  | Retrait des filtres de feuille (`sheet.autoFilter.remove()`)                                         |
-| E15 | protectWorksheet       | Livre  | Protection/deprotection de feuille (`sheet.protection.protect/unprotect`)                            |
-| E16 | customizeBorders       | Livre  | `formatRange` etendu avec style/couleur/epaisseur de bordure globale et par cote                    |
-| E17 | getNamedRanges         | Livre  | Lecture des plages nommees du classeur (`workbook.names.load(...)`)                                 |
-| E18 | setNamedRange          | Livre  | Creation/mise a jour d'une plage nommee (`workbook.names.add`)                                      |
+### Lot Excel intégré (E1-E18)
+Statut: **Livré**.
 
 ---
 
-## 3. POWERPOINT (powerpointTools.ts) — 0 tools, ~8 a creer
+## 3. POWERPOINT (powerpointTools.ts) — 8 existants
 
 ### Existant
-AUCUN tool agent. Seulement 3 fonctions helpers internes:
-- `getPowerPointSelection()` — lire le texte selectionne
-- `insertIntoPowerPoint()` — remplacer la selection
-- `normalizePowerPointListText()` — normaliser les listes markdown
+- Helpers internes:
+  - `getPowerPointSelection()`
+  - `insertIntoPowerPoint()`
+  - `normalizePowerPointListText()`
+- Outils agent livrés:
+  - `getSelectedText` (P1)
+  - `replaceSelectedText` (P2)
+  - `getSlideCount` (P3)
+  - `getSlideContent` (P4)
+  - `addSlide` (P5)
+  - `setSlideNotes` (P6)
+  - `insertTextBox` (P7)
+  - `insertImage` (P8)
 
-L'agent PowerPoint est en mode "prompt-only": il genere du texte, l'utilisateur doit inserer manuellement.
+### Lot PowerPoint (P1-P8)
 
-### A creer
+| ID  | Skill             | Statut | Note d'implémentation |
+|-----|-------------------|--------|-----------------------|
+| P1  | getSelectedText   | Livré  | Wrapper agent de `getPowerPointSelection()` |
+| P2  | replaceSelectedText | Livré | Wrapper agent de `insertIntoPowerPoint()` |
+| P3  | getSlideCount     | Livré  | `PowerPoint.run` + `presentation.slides.load('items')` |
+| P4  | getSlideContent   | Livré  | Lecture des `shapes` textuelles d'une slide donnée |
+| P5  | addSlide          | Livré  | `presentation.slides.add()` (+ layout optionnel) |
+| P6  | setSlideNotes     | Livré  | `slide.notesSlide` (PowerPointApi 1.4+), message d'erreur si indisponible |
+| P7  | insertTextBox     | Livré  | `slide.shapes.addTextBox(text)` avec position/taille |
+| P8  | insertImage       | Livré  | `slide.shapes.addImage(base64)` avec position/taille |
 
-| ID  | Skill                  | Cas d'usage bloquant                                                          | Implementation                                                                                 |
-|-----|------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| P1  | getSelectedText        | L'agent ne peut pas lire la selection (le helper existe mais pas le tool)     | Wrapper agent autour de `getPowerPointSelection()` existant                                     |
-| P2  | replaceSelectedText    | L'agent ne peut pas modifier la selection                                     | Wrapper agent autour de `insertIntoPowerPoint()` existant                                       |
-| P3  | getSlideCount          | L'agent ne sait pas combien de slides existent                                | `PowerPoint.run` -> `presentation.slides.load('items')` -> `items.length`                       |
-| P4  | getSlideContent        | Ne peut pas lire le contenu textuel d'une slide specifique                    | `PowerPoint.run` -> `slides.getItemAt(index)` -> `.shapes.load('items')` -> iterer textRange    |
-| P5  | addSlide               | Ne peut pas ajouter de slides                                                 | `PowerPoint.run` -> `presentation.slides.add()` avec option de layout                           |
-| P6  | setSlideNotes          | Ne peut pas ajouter les notes du presentateur                                 | `PowerPoint.run` -> slide.notesSlide (PowerPointApi 1.4+) ou Common API fallback               |
-| P7  | insertTextBox          | Ne peut pas ajouter de contenu sur un slide                                   | `PowerPoint.run` -> `slide.shapes.addTextBox(text)` avec position/taille                        |
-| P8  | insertImage            | Ne peut pas ajouter d'images sur les slides                                   | `PowerPoint.run` -> `slide.shapes.addImage(base64)` avec position/taille                        |
-
-> **Note:** L'API PowerPoint.js a des limitations historiques. Les requirement sets recents (PowerPointApi 1.2+, 1.3+, 1.4+) ajoutent des capacites reelles. Verifier la compatibilite avec les versions Office ciblees.
+> **Note compatibilité:** l'API PowerPoint.js dépend des requirement sets (`PowerPointApi 1.2+`, `1.3+`, `1.4+`). Un fallback explicite est renvoyé si le runtime ne supporte pas la capacité demandée.
 
 ---
 
@@ -113,55 +83,37 @@ L'agent PowerPoint est en mode "prompt-only": il genere du texte, l'utilisateur 
 
 ### Existant
 - getEmailBody — lire le corps entier
-- getSelectedText — lire la selection
-- setEmailBody — remplacer TOUT le corps (texte brut uniquement)
+- getSelectedText — lire la sélection
+- setEmailBody — remplacer tout le corps (texte brut)
 
 ### Manquant
-
-| ID  | Skill                  | Cas d'usage bloquant                                                          | Implementation                                                                                 |
-|-----|------------------------|-------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| O1  | insertTextAtCursor     | setEmailBody remplace TOUT. Impossible d'inserer au curseur.                  | `mailbox.item.body.setSelectedDataAsync(text, { coercionType: Text })`                          |
-| O2  | setEmailBodyHtml       | Seulement du texte brut. Pas de mails formates (gras, liens, listes).         | `mailbox.item.body.setAsync(html, { coercionType: Html })`                                      |
-| O3  | getEmailSubject        | L'agent ne connait pas le sujet. Comment rediger une reponse pertinente?      | `mailbox.item.subject.getAsync(callback)` (read) / `.subject` (compose)                         |
-| O4  | setEmailSubject        | Ne peut pas modifier le sujet en compose                                       | `mailbox.item.subject.setAsync(subject, callback)`                                               |
-| O5  | getEmailRecipients     | Ne connait pas les destinataires. Impossible de personnaliser.                 | `mailbox.item.to.getAsync()` / `.cc.getAsync()` (compose) ou `.to` / `.cc` (read)               |
-| O6  | addRecipient           | Ne peut pas ajouter de destinataires                                           | `mailbox.item.to.addAsync(recipients)` / `.cc.addAsync(...)` / `.bcc.addAsync(...)`              |
-| O7  | getEmailSender         | Ne connait pas l'expediteur. Contexte perdu pour les reponses.                 | `mailbox.item.from` (read) / `mailbox.item.sender`                                              |
-| O8  | getEmailDate           | Pas d'acces a la date de l'email                                               | `mailbox.item.dateTimeCreated` (read mode)                                                       |
-| O9  | getAttachments         | Ne peut pas lister les pieces jointes                                          | `mailbox.item.attachments` (read) ou `mailbox.item.getAttachmentsAsync()`                        |
-| O10 | insertHtmlAtCursor     | Inserer du contenu HTML formate au curseur                                     | `mailbox.item.body.setSelectedDataAsync(html, { coercionType: Html })`                           |
+- O1 insertTextAtCursor
+- O2 setEmailBodyHtml
+- O3 getEmailSubject
+- O4 setEmailSubject
+- O5 getEmailRecipients
+- O6 addRecipient
+- O7 getEmailSender
+- O8 getEmailDate
+- O9 getAttachments
+- O10 insertHtmlAtCursor
 
 ---
 
-## 5. PRIORITES D'IMPLEMENTATION
+## 5. Priorités d'implémentation
 
-### Priorite 0 — Termine (Word)
+### Priorité 0 — Terminé
+- ✅ Word lot W1-W15
+- ✅ Excel lot E1-E18
+- ✅ PowerPoint lot P1-P8
 
-- Lot Word **W1 a W15** integre dans `wordTools.ts` (39 tools Word disponibles).
+### Priorité 1 — Reste critique
+1. **O1** `insertTextAtCursor`
+2. **O2** `setEmailBodyHtml`
+3. **O3+O4** `getEmailSubject` / `setEmailSubject`
 
-### Priorite 1 — Impact immediat (quick wins + bloquants critiques)
+### Priorité 2 — Cas d'usage professionnels
+4. **O5+O6+O7** destinataires / expéditeur
 
-1. **P1+P2**: Wrapper les helpers PPT existants en tools agent
-2. ✅ **E11+E12+E13**: Etendre `formatRange` avec wrapText/verticalAlignment/fontName
-3. **O1**: `insertTextAtCursor` — arreter de tout ecraser
-4. **O2**: `setEmailBodyHtml` — mails formates
-5. **O3+O4**: get/set subject — contexte basique
-6. ✅ **E4+E5+E6**: rename/delete/activate worksheet
-7. ✅ **E1**: `addDataValidation` — listes deroulantes
-
-### Priorite 2 — Cas d'usage professionnels
-
-8. ✅ **E2**: `createTable` (ListObject Excel)
-9. ✅ **E3**: `copyRange`
-10. ✅ **E8**: `freezePanes`
-11. **P3+P4**: getSlideCount/getSlideContent
-12. **O5+O6+O7**: Recipients/Sender
-13. ✅ **E14**: `removeAutoFilter`
-
-### Priorite 3 — Features avancees
-
-14. **P5+P6+P7+P8**: Creation slides/shapes/images PPT
-15. ✅ **E9+E10**: Hyperlinks/Comments Excel
-16. ✅ **E15**: Protection feuilles
-17. ✅ **E16+E17+E18**: Borders avances / Named ranges
-18. **O8+O9+O10**: Date/Attachments/HTML insert
+### Priorité 3 — Features avancées
+5. **O8+O9+O10** date / pièces jointes / insertion HTML au curseur
