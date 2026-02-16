@@ -429,7 +429,7 @@ import CustomButton from '@/components/CustomButton.vue'
 import CustomInput from '@/components/CustomInput.vue'
 import SettingCard from '@/components/SettingCard.vue'
 import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt, excelBuiltInPrompt } from '@/utils/constant'
+import { buildInPrompt, excelBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { optionLists } from '@/utils/common'
 import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
@@ -520,10 +520,12 @@ const savedPrompts = ref<SavedPrompt[]>([])
 const editingPromptId = ref<string>('')
 const editingPrompt = ref<SavedPrompt>({ id: '', name: '', systemPrompt: '', userPrompt: '' })
 
-// Built-in prompts - switch between Word and Excel
+// Built-in prompts - switch between host apps
 type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
 type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
-type BuiltinPromptKey = WordBuiltinPromptKey | ExcelBuiltinPromptKey
+type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'shrink' | 'visual'
+type OutlookBuiltinPromptKey = 'reply' | 'formalize' | 'concise' | 'proofread' | 'extract'
+type BuiltinPromptKey = WordBuiltinPromptKey | ExcelBuiltinPromptKey | PowerPointBuiltinPromptKey | OutlookBuiltinPromptKey
 
 interface BuiltinPromptConfig {
   system: (language: string) => string
@@ -546,16 +548,52 @@ const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig
   explain: { ...excelBuiltInPrompt.explain },
 }
 
+const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPromptConfig> = {
+  bullets: { ...powerPointBuiltInPrompt.bullets },
+  speakerNotes: { ...powerPointBuiltInPrompt.speakerNotes },
+  punchify: { ...powerPointBuiltInPrompt.punchify },
+  shrink: { ...powerPointBuiltInPrompt.shrink },
+  visual: { ...powerPointBuiltInPrompt.visual },
+}
+
+const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptConfig> = {
+  reply: { ...outlookBuiltInPrompt.reply },
+  formalize: { ...outlookBuiltInPrompt.formalize },
+  concise: { ...outlookBuiltInPrompt.concise },
+  proofread: { ...outlookBuiltInPrompt.proofread },
+  extract: { ...outlookBuiltInPrompt.extract },
+}
+
+const selectedBuiltInPromptsData: Record<string, BuiltinPromptConfig> = hostIsOutlook
+  ? { ...outlookBuiltInPromptsData }
+  : hostIsExcel
+    ? { ...excelBuiltInPromptsData }
+    : hostIsPowerPoint
+      ? { ...powerPointBuiltInPromptsData }
+      : { ...wordBuiltInPromptsData }
+
+const selectedOriginalBuiltInPrompts: Record<string, BuiltinPromptConfig> = hostIsOutlook
+  ? { ...outlookBuiltInPrompt }
+  : hostIsExcel
+    ? { ...excelBuiltInPrompt }
+    : hostIsPowerPoint
+      ? { ...powerPointBuiltInPrompt }
+      : { ...buildInPrompt }
+
 const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(
-  hostIsExcel ? { ...excelBuiltInPromptsData } : { ...wordBuiltInPromptsData },
+  selectedBuiltInPromptsData,
 )
 
 const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('')
 const editingBuiltinPrompt = ref<{ system: string; user: string }>({ system: '', user: '' })
-const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = hostIsExcel
-  ? { ...excelBuiltInPrompt }
-  : { ...buildInPrompt }
-const builtInPromptsStorageKey = hostIsExcel ? 'customExcelBuiltInPrompts' : 'customBuiltInPrompts'
+const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = selectedOriginalBuiltInPrompts
+const builtInPromptsStorageKey = hostIsOutlook
+  ? 'customOutlookBuiltInPrompts'
+  : hostIsExcel
+    ? 'customExcelBuiltInPrompts'
+    : hostIsPowerPoint
+      ? 'customPowerPointBuiltInPrompts'
+      : 'customBuiltInPrompts'
 
 const tabs = [
   { id: 'general', label: 'general', defaultLabel: 'General', icon: Globe },
