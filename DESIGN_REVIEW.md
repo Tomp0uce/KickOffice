@@ -1,35 +1,76 @@
-# KickOffice - Design Review Complète
+# KickOffice - Design Review (Mise à jour)
 
-**Date**: 2026-02-15
+**Date initiale**: 2026-02-15
+**Dernière mise à jour**: 2026-02-16
 **Scope**: Architecture, Sécurité, Qualité du code, Documentation
-**Fichiers analysés**: Backend (server.js), Frontend (25 fichiers source), Documentation (README.md, agents.md, manifest.xml)
+**Fichiers analysés**: Backend (server.js — 448 lignes), Frontend (25+ fichiers source), Documentation (README.md, agents.md, manifests)
 
 ---
 
 ## Table des matières
 
 1. [Résumé exécutif](#résumé-exécutif)
-2. [Architecture globale](#architecture-globale)
-3. [Analyse du backend](#analyse-du-backend)
-4. [Analyse du frontend](#analyse-du-frontend)
-5. [Analyse de sécurité](#analyse-de-sécurité)
-6. [Audit de la documentation](#audit-de-la-documentation)
-7. [Liste des modifications par degré de gravité](#liste-des-modifications-par-degré-de-gravité)
+2. [Bilan des corrections effectuées](#bilan-des-corrections-effectuées)
+3. [Architecture globale](#architecture-globale)
+4. [Analyse du backend](#analyse-du-backend)
+5. [Analyse du frontend](#analyse-du-frontend)
+6. [Analyse de sécurité](#analyse-de-sécurité)
+7. [Audit de la documentation](#audit-de-la-documentation)
+8. [Liste des modifications restantes par degré de gravité](#liste-des-modifications-restantes-par-degré-de-gravité)
 
 ---
 
 ## Résumé exécutif
 
-KickOffice est un add-in Microsoft Office (Word, Excel, Outlook) alimenté par IA, construit avec Vue 3 / TypeScript (frontend) et Express.js (backend). L'architecture est saine dans son principe : le backend sert de proxy LLM sécurisé, les clés API ne sont jamais exposées côté client, et le CORS est correctement restreint.
+KickOffice est un add-in Microsoft Office (Word, Excel, PowerPoint, Outlook) alimenté par IA, construit avec Vue 3 / TypeScript (frontend) et Express.js (backend). L'architecture est saine dans son principe : le backend sert de proxy LLM sécurisé, les clés API ne sont jamais exposées côté client, et le CORS est correctement restreint.
 
-Cependant, l'audit révèle **plusieurs problèmes critiques et importants** qui doivent être traités avant toute mise en production :
+### Progression depuis la première review
+
+Depuis la review initiale (2026-02-15), **12 items sur 26 ont été corrigés** :
+
+| Gravité | Corrigés | Restants | Total initial |
+|---------|----------|----------|---------------|
+| **CRITIQUE** | 1 / 4 | 3 | 4 |
+| **HAUTE** | 4 / 8 | 4 | 8 |
+| **MOYENNE** | 4 / 8 | 4 | 8 |
+| **BASSE** | 3 / 6 | 3 | 6 |
+| **Total** | **12 / 26** | **14** | **26** |
+
+### État actuel des problèmes restants
 
 | Gravité | Nombre | Résumé |
 |---------|--------|--------|
-| **CRITIQUE** | 4 | Absence d'authentification, pas de rate limiting, fuite d'erreurs LLM, `setInterval` sans cleanup |
-| **HAUTE** | 8 | HomePage trop volumineuse, pas de validation d'input, pas de headers sécurité, duplication de code, documentation obsolète |
-| **MOYENNE** | 8 | Pas de retry API, `v-for` avec index comme key, accessibilité insuffisante, pas de gestion d'erreurs globale |
-| **BASSE** | 6 | Typage `any` résiduel, CSS verbose, pas de dark mode toggle, `cursor-po` typo |
+| **CRITIQUE** | 3 | Absence d'authentification, pas de rate limiting, fuite d'erreurs LLM |
+| **HAUTE** | 4 | Pas de headers sécurité, HomePage god component (1342 lignes), README obsolète, backend monolithique |
+| **MOYENNE** | 4 | Pas de error handler Vue global, accessibilité insuffisante, pas de logging, `as any` résiduels |
+| **BASSE** | 3 | Pas de dark mode toggle, CSS répétitives, documentation hostDetection |
+
+---
+
+## Bilan des corrections effectuées
+
+### ✅ Items complétés
+
+| ID | Item | Preuve dans le code |
+|----|------|---------------------|
+| **C4** | Cleanup `setInterval` | `HomePage.vue:1328-1341` — interval stocké dans `backendCheckInterval` ref, nettoyé dans `onUnmounted` via `clearInterval` |
+| **H2** | Validation inputs backend | `server.js:55-106` — fonctions `validateTemperature`, `validateMaxTokens`, `validateTools` + validation dans chaque endpoint |
+| **H4** | Extraire logique dupliquée | `savedPrompts.ts` — helper partagé `loadSavedPromptsFromStorage` ; `HomePage.vue:549-583` — fonction `getOfficeSelection()` unifiée |
+| **H6** | Aligner `.env.example` avec defaults | `.env.example` et `server.js` defaults sont maintenant cohérents (`gpt-5-nano`, `gpt-5-mini`, `gpt-5.2`, `gpt-image-1.5`) |
+| **H7** | Timeout sur requêtes fetch | Backend: `fetchWithTimeout` avec `AbortController` + timeouts par tier (`server.js:108-129`). Frontend: `fetchWithTimeoutAndRetry` avec timeout 45s (`backend.ts:48-75`) |
+| **H8** | Typer `ToolDefinition` | `types/index.d.ts:27-36` — type générique `ToolDefinition` avec alias `WordToolDefinition`, `ExcelToolDefinition`, `OutlookToolDefinition` |
+| **M1** | IDs uniques dans `v-for` | `HomePage.vue:275-280` — `DisplayMessage` a un `id: string` via `crypto.randomUUID()` ; template utilise `:key="item.key"` |
+| **M2** | Mémoïser `renderSegments` | `HomePage.vue:460-466` — `historyWithSegments` est un `computed` qui pré-calcule les segments |
+| **M5** | Supprimer watchers redondants | `SettingsPage.vue:524-534` — seuls 2 watchers restent : `localLanguage` (pour i18n) et `agentMaxIterations` (sanitization). Tous les watchers `localStorage.setItem` redondants ont été supprimés |
+| **M6** | Retry avec backoff (API client) | `backend.ts:8-75` — `fetchWithTimeoutAndRetry` avec 2 retries ciblés sur erreurs réseau/timeout, délais +10s/+30s |
+| **B1** | Corriger typo `cursor-po` | `HomePage.vue` — toutes les classes `cursor-pointer` sont correctes, pas de `cursor-po` résiduel |
+| **B2** | Réduire `any` types | `HomePage.vue:319-329` — interfaces `QuickAction`/`ExcelQuickAction` avec `icon: Component` ; `backend.ts:160-181` — `OpenAIChatCompletion` interface ; `officeOutlook.ts` — utilitaire typé |
+
+### ⚠️ Partiellement corrigé
+
+| ID | Item | État |
+|----|------|------|
+| **B6** | Réduire body parser | Réduit de 10MB à 4MB (`server.js:172`). L'objectif initial était 1MB mais 4MB est un compromis acceptable pour supporter les contextes de chat longs. **Considéré comme résolu.** |
 
 ---
 
@@ -39,173 +80,189 @@ Cependant, l'audit révèle **plusieurs problèmes critiques et importants** qui
 - **Séparation claire** : Frontend (Vue 3 + Vite, port 3002) / Backend (Express.js, port 3003) / LLM API externe
 - **Sécurité des secrets** : API keys stockées uniquement côté serveur dans `.env`
 - **Déploiement Docker** : Docker Compose fonctionnel avec health checks
-- **Support multi-hôte** : Word, Excel, Outlook avec détection automatique
-- **i18n** : Framework complet avec support de 13 langues (même si 2 sont complètes)
-- **Agent mode** : Boucle d'outils OpenAI function-calling bien implémentée
+- **Support multi-hôte** : Word, Excel, PowerPoint, Outlook avec détection automatique
+- **i18n** : Framework complet avec support de 13 langues de réponse (2 locales UI : en/fr)
+- **Agent mode** : Boucle d'outils OpenAI function-calling bien implémentée avec validation des tools côté backend
 - **Système de thème** : Variables CSS bien structurées avec support dark mode prêt
+- **Validation backend robuste** : Température, maxTokens, tools structure, taille prompt — tous validés
+- **Timeout et retry** : Les deux côtés (backend et frontend) ont des timeouts et une stratégie de retry
 
-### Points faibles
-- Backend monolithique en un seul fichier (293 lignes, pas de séparation de responsabilités)
-- Frontend avec composant HomePage.vue de 1159 lignes (god component)
-- Aucune authentification/autorisation sur aucun endpoint
-- Aucun rate limiting
+### Points faibles persistants
+- Backend monolithique en un seul fichier (448 lignes, a grossi depuis 293 lignes)
+- Frontend avec composant `HomePage.vue` de **1342 lignes** (a grossi depuis 1159 lignes — god component encore plus gros)
+- **Aucune authentification/autorisation** sur aucun endpoint
+- **Aucun rate limiting**
 - Pas de persistance de données (tout est en mémoire ou localStorage)
+- **Fuite d'erreurs LLM** toujours présente dans les 3 endpoints
 
 ---
 
 ## Analyse du backend
 
-### `backend/src/server.js` (293 lignes)
+### `backend/src/server.js` (448 lignes)
 
-**Structure** : Fichier unique contenant configuration, middleware, routes et démarrage serveur.
+**Structure** : Fichier unique contenant configuration, validation, helpers, middleware, routes et démarrage serveur.
 
-#### Problèmes identifiés
+#### Problèmes restants
 
-1. **Fuite d'informations sensibles dans les erreurs** (`server.js:150-152`, `220-222`, `270-272`)
+1. **Fuite d'informations sensibles dans les erreurs** (`server.js:254-257`, `349-352`, `421-424`)
    ```javascript
-   // Le texte d'erreur brut de l'API LLM est retransmis au client
+   // Le texte d'erreur brut de l'API LLM est toujours retransmis au client
    return res.status(response.status).json({
      error: `LLM API error: ${response.status}`,
      details: errorText,  // PROBLÈME : peut contenir des infos sensibles
    })
    ```
+   **Impact** : Présent dans les 3 endpoints (`/api/chat`, `/api/chat/sync`, `/api/image`).
 
-2. ~~**Pas de validation des paramètres** (`server.js:109`, `183`, `236`)~~ ✅
-   - ✅ Validation de `temperature` (0..2) et `maxTokens` (1..32768), avec rejet explicite pour les modèles `chatgpt-*` qui ne supportent pas ces paramètres.
-   - ✅ Limite de longueur sur `prompt` (`<= 4000` caractères).
-   - ✅ Validation stricte de `size`, `quality` et `n` pour `/api/image`.
-
-3. ~~**`buildChatBody` accepte n'importe quel tools array** (`server.js:69-72`)~~ ✅
-   - ✅ Ajout d'une validation de structure des `tools` (type `function`, `name`, `parameters`, etc.) et sanitization avant envoi au provider.
-
-4. ~~**Pas de timeout sur les requêtes fetch vers l'API LLM** (`server.js:137`, `208`, `252`)~~ ✅
-   - ✅ Ajout d'un `AbortController` avec timeout différencié : `nano` 60s, `standard` 120s, `reasoning` 300s, image 120s.
-
-5. ~~**Express 5 avec body parser 10MB** (`server.js:83`)~~ ✅
-   - ✅ Réduction de la limite JSON de `10mb` à `4mb`.
+#### Ce qui a été corrigé
+- ✅ Validation de `temperature` (0..2) et `maxTokens` (1..32768), avec rejet pour les modèles `chatgpt-*`
+- ✅ Validation stricte de structure des `tools` (type `function`, `name` regex, `parameters` objet, max 32)
+- ✅ Validation stricte de `size`, `quality`, `n` et `prompt` (≤4000 chars) pour `/api/image`
+- ✅ `AbortController` avec timeout différencié : nano 60s, standard 120s, reasoning 300s, image 180s
+- ✅ Limite JSON réduite de 10MB à 4MB
+- ✅ `.env.example` aligné avec les defaults de `server.js`
 
 ---
 
 ## Analyse du frontend
 
-### `HomePage.vue` - God Component (1159 lignes)
+### `HomePage.vue` — God Component (1342 lignes, +183 depuis la dernière review)
 
-Ce fichier combine :
-- UI de chat (template de 251 lignes)
-- Logique de gestion des messages
-- Agent loop
-- Quick actions
-- Intégration Office.js (Word, Excel, Outlook)
-- Gestion du presse-papiers
+Ce fichier combine toujours :
+- UI de chat (template de ~220 lignes)
+- Logique de gestion des messages et de l'historique
+- Agent loop complet avec exécution d'outils
+- Quick actions pour Word, Excel, PowerPoint, Outlook
+- Intégration Office.js (Word, Excel, PowerPoint, Outlook)
+- Gestion du presse-papiers et insertion dans le document
 - Health check polling
+- Prompts systèmes pour chaque host (Word agent, Excel agent, PowerPoint agent, Outlook agent)
+- Insertion d'images dans Word
 
-#### Problèmes spécifiques
+#### Problèmes corrigés
+- ✅ `setInterval` avec cleanup dans `onUnmounted`
+- ✅ `v-for` avec ID unique (`message.id` via `crypto.randomUUID`)
+- ✅ `renderSegments` mémoïsé dans un `computed` (`historyWithSegments`)
+- ✅ Code de sélection Office unifié dans `getOfficeSelection()`
+- ✅ `loadSavedPrompts` partagé via `savedPrompts.ts`
+- ✅ Interfaces typées pour `QuickAction` / `ExcelQuickAction` avec `icon: Component`
+- ✅ Utilitaire Outlook typé (`officeOutlook.ts`)
+- ✅ Typo CSS `cursor-po` → `cursor-pointer`
 
-1. ~~**`setInterval` sans cleanup** (`HomePage.vue:1157`)~~ ✅
-   - ✅ L'intervalle de health check est maintenant stocké puis nettoyé dans `onUnmounted` via `clearInterval`, évitant la fuite mémoire.
+#### Problèmes restants
 
-2. ~~**`v-for` avec index comme key** (`HomePage.vue:99-100`)~~ ✅
-   - ✅ Utilisation d'une clé stable par message (générée via `WeakMap`) pour éviter les re-renders inutiles liés aux index.
+1. **God component — taille critique** (1342 lignes)
+   - Le composant a encore grossi (+183 lignes) avec l'ajout du support PowerPoint et des prompts agents.
+   - Responsabilité unique violée : UI + logique de chat + agent loop + prompts + Office API + clipboard.
 
-3. ~~**`renderSegments()` appelé à chaque render** (`HomePage.vue:110`)~~ ✅
-   - ✅ Les segments sont désormais pré-calculés dans un `computed` (`historyWithSegments`) et réutilisés dans le template.
+2. **`as any` résiduels dans l'agent loop** (`HomePage.vue:1021-1024`)
+   ```typescript
+   currentMessages.push({
+     role: 'tool' as any,
+     tool_call_id: toolCall.id,
+     content: result,
+   } as any)
+   ```
+   Le type `ChatMessage` ne supporte pas le rôle `tool`. Il faudrait étendre l'interface.
 
-4. ~~**Duplication du code de sélection Office** (`HomePage.vue:706-728` et `922-950`)~~ ✅
-   - ✅ Extraction dans une fonction unique `getOfficeSelection(...)`, réutilisée par `sendMessage()` et `applyQuickAction()`.
+3. **`ChatSyncOptions.tools` est `any[]`** (`backend.ts:157`)
+   ```typescript
+   export interface ChatSyncOptions {
+     tools?: any[]  // devrait être typé
+   }
+   ```
 
-5. ~~**Duplication de `loadSavedPrompts`** (`HomePage.vue:448-457` vs `SettingsPage.vue:552-566`)~~ ✅
-   - ✅ Extraction de la logique de lecture des prompts sauvegardés dans un helper partagé (`savedPrompts.ts`) réutilisé par les deux composants.
+### `SettingsPage.vue` (717 lignes)
 
-6. ~~**Watchers manuels au lieu de `useStorage`** (`SettingsPage.vue:522-549`)~~ ✅
-   - ✅ Suppression des 7 watchers `localStorage.setItem(...)` redondants ; `useStorage` gère désormais seul la persistance.
+#### Problèmes corrigés
+- ✅ Watchers redondants supprimés — `useStorage` gère seul la persistance
+- ✅ Validation `agentMaxIterations` avec bornes (1..100) et normalisation entière
 
-7. ~~**Type `any` pour les icônes** (`HomePage.vue:357`, `369`, `381`)~~ ✅
-   - ✅ Remplacement des `any` par des interfaces `QuickAction` / `ExcelQuickAction` avec `icon: Component`.
+#### État satisfaisant
+- Structure claire avec onglets (General, Prompts, Built-in Prompts, Tools)
+- Gestion CRUD des prompts fonctionnelle
+- Détection de modifications sur les prompts built-in avec option de reset
 
-8. ~~**`chatSync` retourne `Promise<any>`** (`backend.ts:81`)~~ ✅
-   - ✅ Ajout d'une interface `OpenAIChatCompletion` et typage de `chatSync` en `Promise<OpenAIChatCompletion>`.
+### `backend.ts` — Client API (231 lignes)
 
-9. ~~**Cast dangereux avec `as any`** (`HomePage.vue:642`, `649`, `650`, `675`)~~ ✅
-   - ✅ Extraction de l'accès Outlook Office.js dans un utilitaire typé (`officeOutlook.ts`) et remplacement des 4 usages dans `HomePage.vue`.
+#### Problèmes corrigés
+- ✅ Timeout global (45s) avec `AbortController`
+- ✅ Retry avec backoff (2 retries : +10s, +30s) sur erreurs réseau/timeout
+- ✅ URL backend obligatoire via `VITE_BACKEND_URL` (plus de fallback hardcodé)
+- ✅ `chatSync` retourne `Promise<OpenAIChatCompletion>` (typé)
 
-10. ~~**Typo CSS** (`HomePage.vue:167`, `175`, `183`)~~ ✅
-    - ✅ Correction des classes erronées (`cursor-pointer`) et du sélecteur `placeholder:text-*` invalide.
+### `types/index.d.ts` — Définitions de types
 
-### `SettingsPage.vue` (737 lignes)
+#### Problèmes corrigés
+- ✅ Type générique `ToolDefinition` avec alias `WordToolDefinition`, `ExcelToolDefinition`, `OutlookToolDefinition`
 
-1. ~~**ExcelToolDefinitions typées avec `WordToolDefinition`** (`excelTools.ts:35`)~~ ✅
-   - ✅ Introduction d'un type générique `ToolDefinition` (avec alias dédiés Word/Excel/Outlook) et migration d'`excelTools.ts` vers `ExcelToolDefinition`.
+### `main.ts` — Point d'entrée
 
-2. ~~**Pas de validation pour `agentMaxIterations`** (`SettingsPage.vue:124-129`)~~ ✅
-   - ✅ Ajout d'une sanitation avec bornes (`1..100`) + normalisation entière via `watch(..., { immediate: true })`.
-
-### `backend.ts` - Client API
-
-1. ~~**Pas de timeout sur les requêtes fetch** (`backend.ts:33`, `84`, `105`)~~ ✅
-   - ✅ Ajout d'un timeout global côté frontend (`45s`) appliqué à toutes les requêtes API via un wrapper `fetchWithTimeoutAndRetry`.
-
-2. ~~**Pas de retry avec backoff**~~ ✅
-   - ✅ Ajout de 2 retries ciblés sur erreurs réseau/timeout, avec backoff fixe : +10s puis +30s.
-
-3. ~~**URL par défaut hardcodée** (`backend.ts:1`)~~ ✅
-   - ✅ Suppression de l'IP privée hardcodée ; `VITE_BACKEND_URL` est maintenant obligatoire via `.env` (et documenté dans `frontend/.env.example`).
+#### Problèmes restants
+1. **Pas de error handler Vue global**
+   ```typescript
+   // Pas de app.config.errorHandler configuré
+   ```
+2. **Fonction `debounce` locale utilise `any`** (`main.ts:13-23`)
+   - Pourrait utiliser `@vueuse/core` `useDebounceFn` ou typer proprement.
 
 ---
 
 ## Analyse de sécurité
 
-### CRITIQUE
+### CRITIQUE (inchangé)
 
-| # | Problème | Localisation | Impact |
-|---|----------|-------------|--------|
-| S1 | **Aucune authentification** | `server.js` (tout le fichier) | N'importe qui sur le réseau peut appeler les endpoints et consommer les crédits API LLM |
-| S2 | **Aucun rate limiting** | `server.js` (tout le fichier) | DoS possible, consommation illimitée de crédits API |
-| S3 | **Fuite d'erreurs LLM** | `server.js:150-152`, `220-222`, `270-272` | Les erreurs brutes de l'API LLM (potentiellement avec des détails d'infra) sont renvoyées au client |
+| # | Problème | Localisation | Impact | Statut |
+|---|----------|-------------|--------|--------|
+| S1 | **Aucune authentification** | `server.js` (tout le fichier) | N'importe qui sur le réseau peut appeler les endpoints et consommer les crédits API LLM | ❌ Non corrigé |
+| S2 | **Aucun rate limiting** | `server.js` (tout le fichier) | DoS possible, consommation illimitée de crédits API | ❌ Non corrigé |
+| S3 | **Fuite d'erreurs LLM** | `server.js:254-257`, `349-352`, `421-424` | Les erreurs brutes de l'API LLM sont renvoyées au client | ❌ Non corrigé |
 
 ### HAUTE
 
-| # | Problème | Localisation | Impact |
-|---|----------|-------------|--------|
-| S4 | **Pas de headers de sécurité** | `server.js` | Pas de `helmet.js` : manque X-Frame-Options, CSP, X-Content-Type-Options, etc. |
-| S5 | **Pas de validation d'input côté backend** | `server.js:109`, `183`, `236` | Temperature, maxTokens, prompt length non validés |
-| S6 | **Pas de logging/audit** | `server.js` | Impossible de tracer les abus ou incidents |
+| # | Problème | Localisation | Impact | Statut |
+|---|----------|-------------|--------|--------|
+| S4 | **Pas de headers de sécurité** | `server.js` | Pas de `helmet.js` : manque X-Frame-Options, CSP, X-Content-Type-Options | ❌ Non corrigé |
+| ~~S5~~ | ~~Pas de validation d'input côté backend~~ | `server.js` | ~~Non validés~~ | ✅ Corrigé |
+| S6 | **Pas de logging/audit** | `server.js` | Impossible de tracer les abus ou incidents | ❌ Non corrigé |
 
 ### OK (pas de problème trouvé)
 
-- **XSS** : Aucune utilisation de `v-html` ou `dangerouslySetInnerHTML` - Vue escape correctement
+- **XSS** : Aucune utilisation de `v-html` — Vue escape correctement
 - **CORS** : Correctement restreint à `FRONTEND_URL`
 - **Secrets** : Les clés API ne sont jamais exposées côté client
 - **Injection SQL/NoSQL** : N/A (pas de base de données)
+- **Validation d'input** : ✅ Température, maxTokens, tools, prompt length, image params tous validés
+- **Timeouts** : ✅ Toutes les requêtes fetch ont des timeouts avec AbortController
 
 ---
 
 ## Audit de la documentation
 
-### README.md vs Code - Divergences trouvées
+### README.md vs Code — Divergences actuelles
 
 | Élément | Documentation | Code réel | Statut |
 |---------|--------------|-----------|--------|
-| Word tools count | "23 Word tools" (ligne 175) | 24 tools (`WordToolName` dans `wordTools.ts:1-25`) | **OBSOLÈTE** - manque `applyTaggedFormatting` |
-| Excel tools count | "22 Excel tools" (ligne 176) | 24 tools (`ExcelToolName` dans `excelTools.ts:3-27`) | **OBSOLÈTE** - manque `applyConditionalFormatting`, `getConditionalFormattingRules` |
-| Variables d'env backend | 8 variables documentées (lignes 266-275) | 18+ variables dans le code (`server.js:13-39`) | **INCOMPLET** - manque `MODEL_*_LABEL`, `MODEL_*_MAX_TOKENS`, `MODEL_*_TEMPERATURE` (10 variables) |
-| Excel quick actions | Non documentées | 5 actions dans le code (`constant.ts`) : analyze, chart, formula, format, explain | **MANQUANT** |
-| Support des langues | "English + French" (lignes 207-208) | 13 langues dans `languageMap` (`constant.ts`) | **INCOMPLET** |
-| Locale du manifest | Non mentionnée | `DefaultLocale: fr-FR` (`manifest.xml:12`) | **MANQUANT** |
-| `.env.example` modèles | `gpt-5-nano`, `gpt-5-mini`, etc. | Defaults serveur : `gpt-4.1-nano`, `gpt-4.1`, `o3` | **INCOHÉRENT** |
-| Architecture diagram | Mentionne "PowerPoint" | PowerPoint non implémenté | **TROMPEUR** |
-| `hostDetection.ts` | Non documenté dans README | Fichier utilitaire clé | **MANQUANT** |
+| Word tools count | "23 Word tools" (ligne 203) | 24 tools dans `WordToolName` (`wordTools.ts:1-25`) | **OBSOLÈTE** — manque `applyTaggedFormatting` |
+| Excel tools count | "22 Excel tools" (ligne 204) | 25 tools dans `ExcelToolName` (`excelTools.ts:3-29`) | **OBSOLÈTE** — manque `fillFormulaDown`, `applyConditionalFormatting`, `getConditionalFormattingRules` |
+| Outlook tools | Non listés | 3 tools dans `OutlookToolName` (`outlookTools.ts:1-4`) : `getEmailBody`, `getSelectedText`, `setEmailBody` | **MANQUANT** |
+| PowerPoint | Mentionné dans l'architecture mais marqué comme non implémenté dans l'ancienne review | Maintenant implémenté : quick actions (bullets, speakerNotes, punchify, shrink, visual) + utilities (`powerpointTools.ts`) | **À METTRE À JOUR** |
+| Outlook quick actions | Non documentées | 5 actions : reply, formalize, concise, proofread, extract | **MANQUANT** |
+| Excel quick actions | Non documentées | 5 actions : clean, beautify, formula, transform, highlight | **MANQUANT** (nouvelles actions par rapport à l'ancienne review) |
+| PowerPoint quick actions | Non documentées | 5 actions : bullets, speakerNotes, punchify, shrink, visual | **MANQUANT** |
+| Support des langues | "English + French" | 13 langues de réponse dans `languageMap`, 2 locales UI (en/fr) | **INCOMPLET** |
+| `hostDetection.ts` | Non documenté dans README | Fichier utilitaire clé pour la détection Word/Excel/PPT/Outlook | **MANQUANT** |
 
-### Documentation correcte
-- Endpoints API (`/api/chat`, `/api/chat/sync`, `/api/image`, `/api/models`, `/health`)
-- Instructions de déploiement Docker
-- Quick actions Word et Outlook
-- Docker Compose configuration
-- Security model (API keys server-side, CORS)
-- Feature implementation checklist (sauf les divergences ci-dessus)
+### Divergences corrigées depuis la dernière review
+
+| Élément | Statut |
+|---------|--------|
+| `.env.example` vs defaults serveur | ✅ Maintenant cohérents |
 
 ---
 
-## Liste des modifications par degré de gravité
+## Liste des modifications restantes par degré de gravité
 
 ### CRITIQUE (à corriger immédiatement)
 
@@ -218,15 +275,13 @@ Ce fichier combine :
 **Effort** : Moyen
 
 **Guide d'implémentation** :
-1. Installer `jsonwebtoken` ou utiliser un système API key simple :
-   ```bash
-   npm install jsonwebtoken
-   ```
-2. Ajouter une variable `AUTH_SECRET` ou `ALLOWED_API_KEYS` dans `.env`
-3. Créer un middleware d'authentification :
+1. Ajouter une variable `ALLOWED_API_KEYS` dans `.env` (liste séparée par des virgules)
+2. Créer un middleware d'authentification :
    ```javascript
-   // middleware/auth.js
+   const ALLOWED_API_KEYS = (process.env.ALLOWED_API_KEYS || '').split(',').filter(Boolean)
+
    function requireAuth(req, res, next) {
+     if (ALLOWED_API_KEYS.length === 0) return next() // Pas de clés = pas d'auth (dev mode)
      const apiKey = req.headers['x-api-key']
      if (!apiKey || !ALLOWED_API_KEYS.includes(apiKey)) {
        return res.status(401).json({ error: 'Unauthorized' })
@@ -234,9 +289,9 @@ Ce fichier combine :
      next()
    }
    ```
-4. Appliquer le middleware sur `/api/chat`, `/api/chat/sync`, `/api/image`
-5. Garder `/health` et `/api/models` publics
-6. Côté frontend, ajouter le header `x-api-key` dans `backend.ts`
+3. Appliquer sur `/api/chat`, `/api/chat/sync`, `/api/image`
+4. Garder `/health` et `/api/models` publics
+5. Côté frontend (`backend.ts`), ajouter le header `x-api-key` dans `fetchWithTimeoutAndRetry`
 
 ---
 
@@ -247,35 +302,33 @@ Ce fichier combine :
 **Effort** : Faible
 
 **Guide d'implémentation** :
-1. Installer `express-rate-limit` :
-   ```bash
-   npm install express-rate-limit
-   ```
-2. Configurer par endpoint :
-   ```javascript
-   import rateLimit from 'express-rate-limit'
+```bash
+npm install express-rate-limit
+```
+```javascript
+import rateLimit from 'express-rate-limit'
 
-   const chatLimiter = rateLimit({
-     windowMs: 60 * 1000, // 1 minute
-     max: 20, // 20 requêtes/minute pour chat
-     message: { error: 'Too many requests, please try again later' },
-   })
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: 'Too many requests, please try again later' },
+})
 
-   const imageLimiter = rateLimit({
-     windowMs: 60 * 1000,
-     max: 5, // 5 images/minute
-     message: { error: 'Too many image requests' },
-   })
+const imageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { error: 'Too many image requests' },
+})
 
-   app.use('/api/chat', chatLimiter)
-   app.use('/api/image', imageLimiter)
-   ```
+app.use('/api/chat', chatLimiter)
+app.use('/api/image', imageLimiter)
+```
 
 ---
 
 #### C3. Ne pas transmettre les erreurs brutes de l'API LLM au client
 
-**Fichiers** : `backend/src/server.js:149-152`, `219-222`, `269-272`
+**Fichiers** : `backend/src/server.js:254-257`, `349-352`, `421-424`
 **Risque** : Fuite d'informations sur l'infrastructure (URLs internes, versions, clés partielles)
 **Effort** : Faible
 
@@ -292,44 +345,6 @@ return res.status(response.status).json({
 console.error(`LLM API error ${response.status}:`, errorText)
 return res.status(502).json({
   error: 'The AI service returned an error. Please try again later.',
-})
-```
-
----
-
-#### C4. Nettoyer le `setInterval` dans `HomePage.vue`
-
-**Fichier** : `frontend/src/pages/HomePage.vue:1152-1158`
-**Risque** : Fuite mémoire - le timer continue même après la destruction du composant
-**Effort** : Très faible
-
-**Guide d'implémentation** :
-```typescript
-// AVANT
-onBeforeMount(() => {
-  insertType.value = (localStorage.getItem(localStorageKey.insertType) as insertTypes) || 'replace'
-  loadSavedPrompts()
-  checkBackend()
-  setInterval(checkBackend, 30000)
-})
-
-// APRÈS
-import { onBeforeMount, onBeforeUnmount, ref } from 'vue'
-
-let healthCheckInterval: ReturnType<typeof setInterval> | null = null
-
-onBeforeMount(() => {
-  insertType.value = (localStorage.getItem(localStorageKey.insertType) as insertTypes) || 'replace'
-  loadSavedPrompts()
-  checkBackend()
-  healthCheckInterval = setInterval(checkBackend, 30000)
-})
-
-onBeforeUnmount(() => {
-  if (healthCheckInterval) {
-    clearInterval(healthCheckInterval)
-    healthCheckInterval = null
-  }
 })
 ```
 
@@ -359,92 +374,21 @@ app.use(helmet({
 
 ---
 
-#### H2. Valider les inputs côté backend
-
-**Fichier** : `backend/src/server.js`
-**Risque** : Abus de l'API, requêtes malformées
-**Effort** : Moyen
-
-**Guide d'implémentation** :
-Ajouter avant le proxy dans chaque endpoint :
-```javascript
-// Pour /api/chat et /api/chat/sync
-const temperature = req.body.temperature
-if (temperature !== undefined && (typeof temperature !== 'number' || temperature < 0 || temperature > 2)) {
-  return res.status(400).json({ error: 'temperature must be a number between 0 and 2' })
-}
-
-const maxTokens = req.body.maxTokens
-if (maxTokens !== undefined && (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 128000)) {
-  return res.status(400).json({ error: 'maxTokens must be an integer between 1 and 128000' })
-}
-
-// Pour /api/image
-if (prompt.length > 4000) {
-  return res.status(400).json({ error: 'prompt must be 4000 characters or less' })
-}
-
-const validSizes = ['256x256', '512x512', '1024x1024', '1024x1792', '1792x1024']
-if (!validSizes.includes(size)) {
-  return res.status(400).json({ error: `Invalid size. Must be one of: ${validSizes.join(', ')}` })
-}
-
-if (n < 1 || n > 4) {
-  return res.status(400).json({ error: 'n must be between 1 and 4' })
-}
-```
-
----
-
 #### H3. Découper `HomePage.vue` en sous-composants
 
-**Fichier** : `frontend/src/pages/HomePage.vue` (1159 lignes)
+**Fichier** : `frontend/src/pages/HomePage.vue` (1342 lignes — a grossi de 183 lignes depuis la dernière review)
 **Risque** : Maintenabilité, lisibilité, performance
 **Effort** : Élevé
 
 **Guide d'implémentation** :
-Extraire les sections suivantes en composants séparés :
-1. `ChatHeader.vue` - Header avec logo, boutons new chat et settings (lignes 5-38)
-2. `QuickActionsBar.vue` - Barre d'actions rapides avec sélecteur de prompt (lignes 41-67)
-3. `ChatMessageList.vue` - Container de messages avec empty state (lignes 70-160)
-4. `ChatMessage.vue` - Un message individuel avec boutons d'action (lignes 98-158)
-5. `ChatInput.vue` - Zone de saisie avec sélecteurs de mode et modèle (lignes 163-248)
-6. Extraire un composable `useChat.ts` pour la logique de chat (sendMessage, processChat, agent loop)
-7. Extraire un composable `useOfficeSelection.ts` pour le code de sélection Office dupliqué
-
----
-
-#### H4. Extraire la logique dupliquée dans des composables
-
-**Fichiers** : `HomePage.vue`, `SettingsPage.vue`, `constant.ts`
-**Risque** : Bugs de divergence, maintenabilité
-**Effort** : Moyen
-
-**Guide d'implémentation** :
-1. **Composable `usePrompts.ts`** :
-   ```typescript
-   export function usePrompts() {
-     const savedPrompts = ref<SavedPrompt[]>([])
-
-     function loadPrompts() { /* logique unifiée */ }
-     function savePrompts() { /* ... */ }
-     function addPrompt() { /* ... */ }
-     function deletePrompt(id: string) { /* ... */ }
-
-     return { savedPrompts, loadPrompts, savePrompts, addPrompt, deletePrompt }
-   }
-   ```
-
-2. **Composable `useOfficeContext.ts`** :
-   ```typescript
-   export function useOfficeContext() {
-     function getSelectedText(): Promise<string> { /* Word/Excel/Outlook */ }
-     function getMailBody(): Promise<string> { /* Outlook */ }
-     function getMailSelectedText(): Promise<string> { /* Outlook compose */ }
-
-     return { getSelectedText, getMailBody, getMailSelectedText }
-   }
-   ```
+Extraire les sections suivantes :
+1. `ChatHeader.vue` — Header avec logo, boutons new chat et settings (lignes 5-38)
+2. `QuickActionsBar.vue` — Barre d'actions rapides avec sélecteur de prompt (lignes 41-67)
+3. `ChatMessageList.vue` — Container de messages avec empty state (lignes 70-160)
+4. `ChatMessage.vue` — Un message individuel avec boutons d'action (lignes 98-158)
+5. `ChatInput.vue` — Zone de saisie avec sélecteurs de mode et modèle (lignes 163-217)
+6. Composable `useAgentLoop.ts` — La boucle agent + prompts système (lignes 653-1037)
+7. Composable `useOfficeInsert.ts` — L'insertion dans le document + clipboard (lignes 1199-1309)
 
 ---
 
@@ -454,174 +398,20 @@ Extraire les sections suivantes en composants séparés :
 **Risque** : Documentation trompeuse pour les développeurs et administrateurs
 **Effort** : Faible
 
-**Guide d'implémentation** :
-1. Ligne 175 : Changer "23 Word tools" en "24 Word tools", ajouter `applyTaggedFormatting` à la liste
-2. Ligne 176 : Changer "22 Excel tools" en "24 Excel tools", ajouter `applyConditionalFormatting` et `getConditionalFormattingRules`
-3. Ajouter une section "Quick Actions (Excel)" entre les sections Word et Outlook :
-   ```markdown
-   ### Frontend - Quick Actions (Excel)
-   - [x] Analyze (data analysis and insights)
-   - [x] Chart (chart creation suggestions)
-   - [x] Formula (formula assistance)
-   - [x] Format (formatting recommendations)
-   - [x] Explain (explain formulas/data)
-   ```
-4. Ajouter les variables d'environnement manquantes dans le tableau :
-   - `MODEL_NANO_LABEL`, `MODEL_NANO_MAX_TOKENS`, `MODEL_NANO_TEMPERATURE`
-   - Idem pour `STANDARD`, `REASONING`, `IMAGE_LABEL`
-5. Ligne 26 : Retirer "PowerPoint" du diagramme d'architecture (non implémenté)
-6. Ajouter mention de la locale par défaut du manifest (`fr-FR`)
-7. Section Internationalization : Mentionner les 13 langues du `languageMap`
-
----
-
-#### H6. Corriger l'incohérence `.env.example` vs defaults serveur
-
-**Fichier** : `backend/.env.example`
-**Risque** : Confusion pour les administrateurs qui copient le `.env.example`
-**Effort** : Très faible
-
-**Guide d'implémentation** :
-Aligner les noms de modèles dans `.env.example` avec les defaults de `server.js` :
-```env
-# Changer :
-MODEL_NANO=gpt-5-nano
-MODEL_STANDARD=gpt-5-mini
-MODEL_REASONING=gpt-5.2
-MODEL_IMAGE=gpt-image-1.5
-
-# En :
-MODEL_NANO=gpt-4.1-nano
-MODEL_STANDARD=gpt-4.1
-MODEL_REASONING=o3
-MODEL_IMAGE=gpt-image-1
-```
-Ou inversement mettre à jour les defaults dans `server.js` - l'important est la cohérence.
-
----
-
-#### H7. Ajouter un timeout sur les requêtes fetch
-
-**Fichiers** : `backend/src/server.js`, `frontend/src/api/backend.ts`
-**Risque** : Connexions pendantes indéfiniment, blocage du serveur
-**Effort** : Faible
-
-**Guide d'implémentation** :
-
-Backend (`server.js`) :
-```javascript
-const controller = new AbortController()
-const timeout = setTimeout(() => controller.abort(), 120000) // 2 minutes
-
-try {
-  const response = await fetch(`${LLM_API_BASE_URL}/chat/completions`, {
-    // ... existing options
-    signal: controller.signal,
-  })
-  // ...
-} finally {
-  clearTimeout(timeout)
-}
-```
-
-Frontend (`backend.ts`) :
-```typescript
-export async function fetchModels(): Promise<Record<string, ModelInfo>> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10000) // 10s
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/models`, { signal: controller.signal })
-    if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
-    return res.json()
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-```
-
----
-
-#### H8. Typer correctement `ExcelToolDefinition`
-
-**Fichier** : `frontend/src/utils/excelTools.ts:35`
-**Risque** : Confusion sémantique, maintenabilité
-**Effort** : Faible
-
-**Guide d'implémentation** :
-1. Dans `types/index.d.ts`, renommer `WordToolDefinition` en `ToolDefinition` (ou créer un alias) :
-   ```typescript
-   type ToolDefinition = {
-     name: string
-     description: string
-     inputSchema: ToolInputSchema
-     execute: (args: Record<string, any>) => Promise<string>
-   }
-
-   // Backward compatible aliases
-   type WordToolDefinition = ToolDefinition
-   type ExcelToolDefinition = ToolDefinition
-   ```
-2. Mettre à jour `excelTools.ts:35` :
-   ```typescript
-   const excelToolDefinitions: Record<ExcelToolName, ToolDefinition> = {
-   ```
+**Corrections nécessaires** :
+1. Ligne 203 : "23 Word tools" → **"24 Word tools"**, ajouter `applyTaggedFormatting` à la liste
+2. Ligne 204 : "22 Excel tools" → **"25 Excel tools"**, ajouter `fillFormulaDown`, `applyConditionalFormatting`, `getConditionalFormattingRules`
+3. Ajouter **"3 Outlook tools"** : `getEmailBody`, `getSelectedText`, `setEmailBody`
+4. Ajouter une section Quick Actions pour **Excel** (clean, beautify, formula, transform, highlight)
+5. Ajouter une section Quick Actions pour **PowerPoint** (bullets, speakerNotes, punchify, shrink, visual)
+6. Ajouter une section Quick Actions pour **Outlook** (reply, formalize, concise, proofread, extract)
+7. Confirmer le support PowerPoint dans le diagramme d'architecture (c'est maintenant implémenté)
+8. Mentionner les 13 langues de réponse et les 2 locales UI
+9. Documenter `hostDetection.ts` dans la section Project Structure
 
 ---
 
 ### MOYENNE (à planifier)
-
----
-
-#### M1. Utiliser des IDs uniques comme key dans `v-for` au lieu d'index
-
-**Fichier** : `frontend/src/pages/HomePage.vue:99-100`
-**Risque** : Re-renders inutiles, état DOM incorrect lors d'ajouts/suppressions
-**Effort** : Faible
-
-**Guide d'implémentation** :
-1. Ajouter un `id` unique à chaque message :
-   ```typescript
-   interface DisplayMessage {
-     id: string  // Ajouter
-     role: 'user' | 'assistant' | 'system'
-     content: string
-     imageSrc?: string
-   }
-   ```
-2. Générer l'id à la création :
-   ```typescript
-   history.value.push({
-     id: crypto.randomUUID(),
-     role: 'user',
-     content: fullMessage
-   })
-   ```
-3. Utiliser dans le template :
-   ```vue
-   <div v-for="msg in history" :key="msg.id">
-   ```
-
----
-
-#### M2. Mémoïser `renderSegments()` dans le template
-
-**Fichier** : `frontend/src/pages/HomePage.vue:110`
-**Risque** : Performance - parsing regex à chaque render pour chaque message
-**Effort** : Faible
-
-**Guide d'implémentation** :
-Utiliser un `computed` ou un `Map` de cache :
-```typescript
-const segmentsCache = new Map<string, RenderSegment[]>()
-
-function renderSegments(content: string): RenderSegment[] {
-  if (segmentsCache.has(content)) return segmentsCache.get(content)!
-  const segments = splitThinkSegments(content)
-  segmentsCache.set(content, segments)
-  return segments
-}
-```
-Ou mieux : déplacer `renderSegments` dans un composant `ChatMessage.vue` et utiliser un `computed` local.
 
 ---
 
@@ -637,11 +427,6 @@ const app = createApp(App)
 
 app.config.errorHandler = (err, instance, info) => {
   console.error('Vue Global Error:', err, info)
-  // Optionnel: afficher un toast d'erreur
-}
-
-app.config.warnHandler = (msg, instance, trace) => {
-  console.warn('Vue Warning:', msg, trace)
 }
 ```
 
@@ -654,82 +439,16 @@ app.config.warnHandler = (msg, instance, trace) => {
 **Effort** : Moyen
 
 **Guide d'implémentation** :
-1. Ajouter `aria-label` sur tous les boutons sans texte visible :
-   ```vue
-   <CustomButton :icon="Plus" text="" :aria-label="t('newChat')" />
-   ```
-2. Ajouter `aria-live="polite"` sur le container de messages :
-   ```vue
-   <div ref="messagesContainer" aria-live="polite" role="log">
-   ```
+1. Ajouter `aria-label` sur tous les boutons sans texte visible (New Chat, Settings, Stop, Send, Copy, Replace, Append)
+2. Ajouter `aria-live="polite"` sur le container de messages
 3. Ajouter `role="status"` sur l'indicateur de statut backend
 4. Ajouter `aria-expanded` sur les détails collapsibles (think tags)
-5. Ajouter `aria-label` sur les modes (ask/agent/image) :
-   ```vue
-   <button :aria-label="t('askMode')" :aria-pressed="mode === 'ask'">
-   ```
-
----
-
-#### M5. Supprimer les watchers redondants dans `SettingsPage.vue`
-
-**Fichier** : `frontend/src/pages/SettingsPage.vue:522-549`
-**Risque** : Duplication de logique, incohérence potentielle avec `useStorage`
-**Effort** : Faible
-
-**Guide d'implémentation** :
-`useStorage` persiste déjà dans localStorage. Les watchers qui font `localStorage.setItem` sont redondants sauf pour `localLanguage` (qui doit aussi mettre à jour `i18n.global.locale`).
-
-Supprimer les watchers pour :
-- `replyLanguage` (ligne 527-529)
-- `agentMaxIterations` (ligne 531-533)
-- `userGender` (ligne 535-537)
-- `userFirstName` (ligne 539-541)
-- `userLastName` (ligne 543-545)
-- `excelFormulaLanguage` (ligne 547-549)
-
-Garder uniquement :
-```typescript
-watch(localLanguage, (val) => {
-  i18n.global.locale.value = val as 'en' | 'fr'
-})
-```
-
----
-
-#### M6. Ajouter du retry avec backoff sur les appels API frontend
-
-**Fichier** : `frontend/src/api/backend.ts`
-**Risque** : Échec sur erreurs réseau transitoires
-**Effort** : Moyen
-
-**Guide d'implémentation** :
-```typescript
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  retries = 3,
-  backoff = 1000
-): Promise<Response> {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const res = await fetch(url, options)
-      if (res.ok || res.status < 500) return res
-    } catch (err) {
-      if (i === retries) throw err
-    }
-    await new Promise(r => setTimeout(r, backoff * Math.pow(2, i)))
-  }
-  throw new Error('Max retries exceeded')
-}
-```
-Appliquer sur `healthCheck()`, `fetchModels()`, et les appels non-streaming.
 
 ---
 
 #### M7. Séparer le backend en modules
 
-**Fichier** : `backend/src/server.js`
+**Fichier** : `backend/src/server.js` (448 lignes — a grossi de 155 lignes depuis la dernière review)
 **Risque** : Maintenabilité à mesure que le code grandit
 **Effort** : Moyen
 
@@ -741,14 +460,14 @@ backend/src/
 │   └── models.js          # Configuration des modèles
 ├── middleware/
 │   ├── auth.js            # Authentication (C1)
-│   └── validate.js        # Input validation (H2)
+│   └── validate.js        # Input validation (existant à extraire)
 ├── routes/
 │   ├── health.js          # GET /health
 │   ├── models.js          # GET /api/models
 │   ├── chat.js            # POST /api/chat, /api/chat/sync
 │   └── image.js           # POST /api/image
-└── services/
-    └── llm.js             # Proxy vers l'API LLM
+└── utils/
+    └── fetchWithTimeout.js # Helper fetch avec timeout
 ```
 
 ---
@@ -765,8 +484,6 @@ npm install morgan
 ```
 ```javascript
 import morgan from 'morgan'
-app.use(morgan('combined'))
-// Ou en format personnalisé:
 app.use(morgan(':method :url :status :response-time ms'))
 ```
 
@@ -776,80 +493,31 @@ app.use(morgan(':method :url :status :response-time ms'))
 
 ---
 
-#### B1. Corriger la typo CSS `cursor-po`
+#### B3. Ajouter un toggle dark mode dans l'UI
 
-**Fichier** : `frontend/src/pages/HomePage.vue:167`, `175`, `183`
-**Effort** : Très faible
+**Fichier** : `frontend/src/pages/SettingsPage.vue`
+**Détail** : Les variables CSS dark mode existent dans `index.css:162-187` mais il n'y a aucun toggle pour l'activer.
 
-```vue
-<!-- AVANT -->
-class="cursor-po flex h-7 w-7 ..."
-
-<!-- APRÈS -->
-class="cursor-pointer flex h-7 w-7 ..."
+**Guide d'implémentation** :
+```typescript
+const darkMode = useStorage(localStorageKey.darkMode, false)
+watch(darkMode, (val) => {
+  document.documentElement.classList.toggle('dark', val)
+}, { immediate: true })
 ```
 
 ---
 
-#### B2. Réduire l'utilisation de `any` dans les types
-
-**Fichiers** : `HomePage.vue`, `backend.ts`, `types/index.d.ts`
-**Effort** : Faible
-
-1. Typer les icônes :
-   ```typescript
-   import type { Component } from 'vue'
-   interface QuickAction { key: string; label: string; icon: Component }
-   ```
-2. Typer `chatSync` return :
-   ```typescript
-   interface ChatCompletionResponse {
-     choices: Array<{
-       message: {
-         role: string
-         content: string | null
-         tool_calls?: Array<{
-           id: string
-           function: { name: string; arguments: string }
-         }>
-       }
-     }>
-   }
-   export async function chatSync(options: ChatSyncOptions): Promise<ChatCompletionResponse>
-   ```
-
----
-
-#### B3. Ajouter un toggle dark mode dans l'UI
-
-**Fichier** : `frontend/src/pages/SettingsPage.vue`
-**Détail** : Les variables CSS dark mode existent déjà dans `index.css:162-187` mais il n'y a aucun toggle pour l'activer
-
-**Guide d'implémentation** :
-1. Ajouter dans `SettingsPage.vue` un toggle :
-   ```typescript
-   const darkMode = useStorage(localStorageKey.darkMode, false)
-   watch(darkMode, (val) => {
-     document.documentElement.classList.toggle('dark', val)
-   })
-   ```
-2. Ajouter un `SettingCard` avec un checkbox dans la section General
-
----
-
-#### B4. Extraire les classes CSS répétées dans des composants Tailwind
+#### B4. Extraire les classes CSS répétées dans des utilities Tailwind
 
 **Fichier** : `frontend/src/index.css`
 **Effort** : Faible
 
-Les classes comme `rounded-md border border-border-secondary bg-surface p-2 shadow-sm` sont répétées 10+ fois. Créer des utilities :
+Les patterns comme `rounded-md border border-border-secondary bg-surface p-2 shadow-sm` sont répétés dans de nombreux composants. Créer des utilities :
 ```css
 @layer components {
   .card {
     @apply rounded-md border border-border-secondary bg-surface p-2 shadow-sm;
-  }
-  .card-header {
-    @apply rounded-md border border-border-secondary p-1 shadow-sm;
   }
 }
 ```
@@ -861,57 +529,37 @@ Les classes comme `rounded-md border border-border-secondary bg-surface p-2 shad
 **Fichier** : `README.md`
 **Effort** : Très faible
 
-Ajouter dans la section Project Structure :
-```
-│   ├── utils/
-│   │   ├── hostDetection.ts  # Office host detection (Word/Excel/Outlook)
-```
-Et mentionner le mécanisme de détection dans la section architecture.
+Ajouter dans la section Project Structure et mentionner le mécanisme de détection dans la section architecture.
 
 ---
 
-#### B6. Réduire la limite du body parser à 1MB
+## Tableau récapitulatif complet
 
-**Fichier** : `backend/src/server.js:83`
-**Détail** : 10MB est excessif pour un proxy de chat textuel
-
-```javascript
-// AVANT
-app.use(express.json({ limit: '10mb' }))
-
-// APRÈS
-app.use(express.json({ limit: '1mb' }))
-```
-
----
-
-## Résumé des actions par priorité
-
-| Priorité | ID | Action | Fichier(s) | Effort |
-|----------|-----|--------|-----------|--------|
-| CRITIQUE | C1 | Ajouter authentification backend | `server.js` | Moyen |
-| CRITIQUE | C2 | Ajouter rate limiting | `server.js` | Faible |
-| CRITIQUE | C3 | Masquer erreurs LLM brutes | `server.js` | Faible |
-| CRITIQUE | C4 | ~~Cleanup `setInterval`~~ ✅ (interval stocké + `clearInterval` au unmount) | `HomePage.vue` | Très faible |
-| HAUTE | H1 | Headers sécurité (helmet) | `server.js` | Faible |
-| HAUTE | H2 | Validation inputs backend | `server.js` | Moyen |
-| HAUTE | H3 | Découper `HomePage.vue` | `HomePage.vue` + nouveaux fichiers | Élevé |
-| HAUTE | H4 | ~~Extraire logique dupliquée en composables~~ ✅ (sélection Office mutualisée via helper) | `HomePage.vue`, `SettingsPage.vue` | Moyen |
-| HAUTE | H5 | Mettre à jour README.md | `README.md` | Faible |
-| HAUTE | H6 | Aligner `.env.example` avec defaults | `.env.example` | Très faible |
-| HAUTE | H7 | Timeout sur requêtes fetch | `server.js`, `backend.ts` | Faible |
-| HAUTE | H8 | ~~Renommer `WordToolDefinition` → `ToolDefinition`~~ ✅ (type générique + alias Word/Excel/Outlook) | `types/index.d.ts`, `excelTools.ts` | Faible |
-| MOYENNE | M1 | ~~IDs uniques dans `v-for`~~ ✅ (clé stable par message) | `HomePage.vue` | Faible |
-| MOYENNE | M2 | ~~Mémoïser `renderSegments`~~ ✅ (`computed` `historyWithSegments`) | `HomePage.vue` | Faible |
-| MOYENNE | M3 | Error handler Vue global | `main.ts` | Faible |
-| MOYENNE | M4 | Accessibilité (ARIA) | Multiple fichiers | Moyen |
-| MOYENNE | M5 | ~~Supprimer watchers redondants~~ ✅ (`useStorage` seul pour la persistance) | `SettingsPage.vue` | Faible |
-| MOYENNE | M6 | Retry avec backoff (API client) | `backend.ts` | Moyen |
-| MOYENNE | M7 | Séparer backend en modules | `server.js` → multiple | Moyen |
-| MOYENNE | M8 | Request logging (morgan) | `server.js` | Faible |
-| BASSE | B1 | ~~Corriger typo `cursor-po`~~ ✅ (classes + placeholder corrigés) | `HomePage.vue` | Très faible |
-| BASSE | B2 | ~~Réduire `any` types~~ ✅ (icônes + `chatSync` typés) | Multiple | Faible |
-| BASSE | B3 | Toggle dark mode | `SettingsPage.vue` | Faible |
-| BASSE | B4 | Extraire CSS répétées | `index.css` | Faible |
-| BASSE | B5 | Documenter `hostDetection.ts` | `README.md` | Très faible |
-| BASSE | B6 | Réduire body parser à 1MB | `server.js` | Très faible |
+| Priorité | ID | Action | Statut |
+|----------|-----|--------|--------|
+| CRITIQUE | C1 | Ajouter authentification backend | ❌ À faire |
+| CRITIQUE | C2 | Ajouter rate limiting | ❌ À faire |
+| CRITIQUE | C3 | Masquer erreurs LLM brutes | ❌ À faire |
+| ~~CRITIQUE~~ | ~~C4~~ | ~~Cleanup `setInterval`~~ | ✅ Fait |
+| HAUTE | H1 | Headers sécurité (helmet) | ❌ À faire |
+| ~~HAUTE~~ | ~~H2~~ | ~~Validation inputs backend~~ | ✅ Fait |
+| HAUTE | H3 | Découper `HomePage.vue` (1342 lignes) | ❌ À faire |
+| ~~HAUTE~~ | ~~H4~~ | ~~Extraire logique dupliquée~~ | ✅ Fait |
+| HAUTE | H5 | Mettre à jour README.md | ❌ À faire |
+| ~~HAUTE~~ | ~~H6~~ | ~~Aligner `.env.example` avec defaults~~ | ✅ Fait |
+| ~~HAUTE~~ | ~~H7~~ | ~~Timeout sur requêtes fetch~~ | ✅ Fait |
+| ~~HAUTE~~ | ~~H8~~ | ~~Renommer `ToolDefinition` type~~ | ✅ Fait |
+| ~~MOYENNE~~ | ~~M1~~ | ~~IDs uniques dans `v-for`~~ | ✅ Fait |
+| ~~MOYENNE~~ | ~~M2~~ | ~~Mémoïser `renderSegments`~~ | ✅ Fait |
+| MOYENNE | M3 | Error handler Vue global | ❌ À faire |
+| MOYENNE | M4 | Accessibilité (ARIA) | ❌ À faire |
+| ~~MOYENNE~~ | ~~M5~~ | ~~Supprimer watchers redondants~~ | ✅ Fait |
+| ~~MOYENNE~~ | ~~M6~~ | ~~Retry avec backoff (API client)~~ | ✅ Fait |
+| MOYENNE | M7 | Séparer backend en modules | ❌ À faire |
+| MOYENNE | M8 | Request logging (morgan) | ❌ À faire |
+| ~~BASSE~~ | ~~B1~~ | ~~Corriger typo `cursor-po`~~ | ✅ Fait |
+| ~~BASSE~~ | ~~B2~~ | ~~Réduire `any` types~~ | ✅ Fait (quelques `as any` résiduels dans l'agent loop) |
+| BASSE | B3 | Toggle dark mode | ❌ À faire |
+| BASSE | B4 | Extraire CSS répétées | ❌ À faire |
+| BASSE | B5 | Documenter `hostDetection.ts` | ❌ À faire |
+| ~~BASSE~~ | ~~B6~~ | ~~Réduire body parser~~ | ✅ Fait (4MB) |
