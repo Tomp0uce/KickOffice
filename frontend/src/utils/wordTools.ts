@@ -23,6 +23,21 @@ export type WordToolName =
   | 'insertContentControl'
   | 'findText'
   | 'applyTaggedFormatting'
+  | 'setParagraphFormat'
+  | 'insertHyperlink'
+  | 'getDocumentHtml'
+  | 'modifyTableCell'
+  | 'addTableRow'
+  | 'addTableColumn'
+  | 'deleteTableRowColumn'
+  | 'formatTableCell'
+  | 'insertHeaderFooter'
+  | 'insertFootnote'
+  | 'addComment'
+  | 'getComments'
+  | 'setPageSetup'
+  | 'getSpecificParagraph'
+  | 'insertSectionBreak'
 
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
@@ -994,6 +1009,537 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         }
 
         return `Converted ${replacedCount} tagged occurrence(s) using <${tagName}>...</${tagName}>.`
+      })
+    },
+  },
+
+  setParagraphFormat: {
+    name: 'setParagraphFormat',
+    description:
+      'Set paragraph formatting on the current selection (alignment, spacing before/after, line spacing, and indentation).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        alignment: {
+          type: 'string',
+          description: 'Paragraph alignment: Left, Centered, Right, or Justified.',
+          enum: ['Left', 'Centered', 'Right', 'Justified'],
+        },
+        lineSpacing: {
+          type: 'number',
+          description: 'Line spacing value in points.',
+        },
+        spaceBefore: {
+          type: 'number',
+          description: 'Paragraph spacing before in points.',
+        },
+        spaceAfter: {
+          type: 'number',
+          description: 'Paragraph spacing after in points.',
+        },
+        leftIndent: {
+          type: 'number',
+          description: 'Left indent in points.',
+        },
+        firstLineIndent: {
+          type: 'number',
+          description: 'First line indent in points.',
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } = args
+      return Word.run(async context => {
+        const selection = context.document.getSelection()
+        const paragraphs = selection.paragraphs
+        paragraphs.load('items')
+        await context.sync()
+
+        if (paragraphs.items.length === 0) {
+          return 'Error: No paragraph found in the current selection.'
+        }
+
+        for (const paragraph of paragraphs.items) {
+          if (alignment !== undefined) paragraph.alignment = alignment as Word.Alignment
+          if (lineSpacing !== undefined) paragraph.lineSpacing = lineSpacing
+          if (spaceBefore !== undefined) paragraph.spaceBefore = spaceBefore
+          if (spaceAfter !== undefined) paragraph.spaceAfter = spaceAfter
+          if (leftIndent !== undefined) paragraph.leftIndent = leftIndent
+          if (firstLineIndent !== undefined) paragraph.firstLineIndent = firstLineIndent
+        }
+
+        await context.sync()
+        return `Successfully formatted ${paragraphs.items.length} paragraph(s)`
+      })
+    },
+  },
+
+  insertHyperlink: {
+    name: 'insertHyperlink',
+    description: 'Insert a clickable hyperlink at the current selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'URL address of the hyperlink.',
+        },
+        textToDisplay: {
+          type: 'string',
+          description: 'Optional display text for the hyperlink. If omitted, uses the current selection.',
+        },
+      },
+      required: ['address'],
+    },
+    execute: async args => {
+      const { address, textToDisplay } = args
+      return Word.run(async context => {
+        const range = context.document.getSelection()
+        const linkRange = typeof textToDisplay === 'string' ? range.insertText(textToDisplay, 'Replace') : range
+        linkRange.hyperlink = address
+        await context.sync()
+        return 'Successfully inserted hyperlink'
+      })
+    },
+  },
+
+  getDocumentHtml: {
+    name: 'getDocumentHtml',
+    description: 'Get the full document body as HTML to preserve structure and rich formatting context.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      return Word.run(async context => {
+        const htmlResult = context.document.body.getHtml()
+        await context.sync()
+        return htmlResult.value || ''
+      })
+    },
+  },
+
+  modifyTableCell: {
+    name: 'modifyTableCell',
+    description: 'Replace content of a specific table cell in an existing table.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        row: { type: 'number', description: 'Zero-based row index.' },
+        column: { type: 'number', description: 'Zero-based column index.' },
+        text: { type: 'string', description: 'Text to set in the table cell.' },
+        tableIndex: { type: 'number', description: 'Zero-based table index (default: 0).' },
+      },
+      required: ['row', 'column', 'text'],
+    },
+    execute: async args => {
+      const { row, column, text, tableIndex = 0 } = args
+      return Word.run(async context => {
+        const tables = context.document.body.tables
+        tables.load('items')
+        await context.sync()
+
+        if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
+          return 'Error: Table not found at the requested index.'
+        }
+
+        const targetTable = tables.items[tableIndex]
+        const cell = targetTable.getCell(row, column)
+        cell.body.insertText(text, 'Replace')
+        await context.sync()
+        return `Successfully updated table ${tableIndex}, cell (${row}, ${column})`
+      })
+    },
+  },
+
+  addTableRow: {
+    name: 'addTableRow',
+    description: 'Add row(s) to an existing table.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tableIndex: { type: 'number', description: 'Zero-based table index (default: 0).' },
+        location: {
+          type: 'string',
+          description: 'Insert location relative to the current selection in the table.',
+          enum: ['Before', 'After'],
+        },
+        count: { type: 'number', description: 'Number of rows to add.' },
+        values: {
+          type: 'array',
+          description: 'Optional row values as a 2D array.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const { tableIndex = 0, location = 'After', count = 1, values } = args
+      return Word.run(async context => {
+        const tables = context.document.body.tables
+        tables.load('items')
+        await context.sync()
+
+        if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
+          return 'Error: Table not found at the requested index.'
+        }
+
+        const targetTable = tables.items[tableIndex] as any
+        targetTable.addRows(location, count, values)
+        await context.sync()
+        return `Successfully added ${count} row(s) to table ${tableIndex}`
+      })
+    },
+  },
+
+  addTableColumn: {
+    name: 'addTableColumn',
+    description: 'Add column(s) to an existing table.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tableIndex: { type: 'number', description: 'Zero-based table index (default: 0).' },
+        location: {
+          type: 'string',
+          description: 'Insert location relative to the current selection in the table.',
+          enum: ['Before', 'After'],
+        },
+        count: { type: 'number', description: 'Number of columns to add.' },
+        values: {
+          type: 'array',
+          description: 'Optional column values as a 2D array.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const { tableIndex = 0, location = 'After', count = 1, values } = args
+      return Word.run(async context => {
+        const tables = context.document.body.tables
+        tables.load('items')
+        await context.sync()
+
+        if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
+          return 'Error: Table not found at the requested index.'
+        }
+
+        const targetTable = tables.items[tableIndex] as any
+        targetTable.addColumns(location, count, values)
+        await context.sync()
+        return `Successfully added ${count} column(s) to table ${tableIndex}`
+      })
+    },
+  },
+
+  deleteTableRowColumn: {
+    name: 'deleteTableRowColumn',
+    description: 'Delete row(s) or column(s) from an existing table.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tableIndex: { type: 'number', description: 'Zero-based table index (default: 0).' },
+        target: {
+          type: 'string',
+          description: 'Whether to delete rows or columns.',
+          enum: ['row', 'column'],
+        },
+        index: { type: 'number', description: 'Zero-based row or column index.' },
+        count: { type: 'number', description: 'Number of rows or columns to delete.' },
+      },
+      required: ['target', 'index'],
+    },
+    execute: async args => {
+      const { tableIndex = 0, target, index, count = 1 } = args
+      return Word.run(async context => {
+        const tables = context.document.body.tables
+        tables.load('items')
+        await context.sync()
+
+        if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
+          return 'Error: Table not found at the requested index.'
+        }
+
+        const targetTable = tables.items[tableIndex] as any
+        if (target === 'row') {
+          targetTable.deleteRows(index, count)
+          await context.sync()
+          return `Successfully deleted ${count} row(s) starting at index ${index}`
+        }
+
+        targetTable.deleteColumns(index, count)
+        await context.sync()
+        return `Successfully deleted ${count} column(s) starting at index ${index}`
+      })
+    },
+  },
+
+  formatTableCell: {
+    name: 'formatTableCell',
+    description: 'Apply formatting to a specific table cell (background and font style).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tableIndex: { type: 'number', description: 'Zero-based table index (default: 0).' },
+        row: { type: 'number', description: 'Zero-based row index.' },
+        column: { type: 'number', description: 'Zero-based column index.' },
+        shadingColor: { type: 'string', description: 'Cell background color (hex or color name).' },
+        fontName: { type: 'string', description: 'Font family to apply.' },
+        fontSize: { type: 'number', description: 'Font size in points.' },
+        fontColor: { type: 'string', description: 'Font color (hex or color name).' },
+        bold: { type: 'boolean', description: 'Whether font is bold.' },
+        italic: { type: 'boolean', description: 'Whether font is italic.' },
+      },
+      required: ['row', 'column'],
+    },
+    execute: async args => {
+      const { tableIndex = 0, row, column, shadingColor, fontName, fontSize, fontColor, bold, italic } = args
+      return Word.run(async context => {
+        const tables = context.document.body.tables
+        tables.load('items')
+        await context.sync()
+
+        if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
+          return 'Error: Table not found at the requested index.'
+        }
+
+        const cell = tables.items[tableIndex].getCell(row, column) as any
+        if (shadingColor !== undefined) cell.shadingColor = shadingColor
+
+        const cellBody = cell.body
+        if (fontName !== undefined) cellBody.font.name = fontName
+        if (fontSize !== undefined) cellBody.font.size = fontSize
+        if (fontColor !== undefined) cellBody.font.color = fontColor
+        if (bold !== undefined) cellBody.font.bold = bold
+        if (italic !== undefined) cellBody.font.italic = italic
+
+        await context.sync()
+        return `Successfully formatted table ${tableIndex}, cell (${row}, ${column})`
+      })
+    },
+  },
+
+  insertHeaderFooter: {
+    name: 'insertHeaderFooter',
+    description: 'Insert text into the document header or footer of the first section.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: {
+          type: 'string',
+          description: 'Where to insert text.',
+          enum: ['header', 'footer'],
+        },
+        type: {
+          type: 'string',
+          description: 'Header/footer type: Primary, FirstPage, or EvenPages.',
+          enum: ['Primary', 'FirstPage', 'EvenPages'],
+        },
+        text: {
+          type: 'string',
+          description: 'Text to insert into header/footer.',
+        },
+      },
+      required: ['target', 'text'],
+    },
+    execute: async args => {
+      const { target, type = 'Primary', text } = args
+      return Word.run(async context => {
+        const section = context.document.sections.getFirst() as any
+        const container = target === 'header' ? section.getHeader(type) : section.getFooter(type)
+        container.insertText(text, 'Replace')
+        await context.sync()
+        return `Successfully inserted text into ${target} (${type})`
+      })
+    },
+  },
+
+  insertFootnote: {
+    name: 'insertFootnote',
+    description: 'Insert a footnote at the current selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Footnote content.' },
+      },
+      required: ['text'],
+    },
+    execute: async args => {
+      const { text } = args
+      return Word.run(async context => {
+        const range = context.document.getSelection() as any
+        range.insertFootnote(text)
+        await context.sync()
+        return 'Successfully inserted footnote'
+      })
+    },
+  },
+
+  addComment: {
+    name: 'addComment',
+    description: 'Add a review comment to the current selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Comment text.' },
+      },
+      required: ['text'],
+    },
+    execute: async args => {
+      const { text } = args
+      return Word.run(async context => {
+        const range = context.document.getSelection() as any
+        range.insertComment(text)
+        await context.sync()
+        return 'Successfully added comment'
+      })
+    },
+  },
+
+  getComments: {
+    name: 'getComments',
+    description: 'Get comments from the document body with author and content.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      return Word.run(async context => {
+        const body = context.document.body as any
+        const comments = body.getComments()
+        comments.load('items/content,items/authorName')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            count: comments.items.length,
+            comments: comments.items.map((comment: any) => ({
+              authorName: comment.authorName || '',
+              content: comment.content || '',
+            })),
+          },
+          null,
+          2,
+        )
+      })
+    },
+  },
+
+  setPageSetup: {
+    name: 'setPageSetup',
+    description: 'Configure page setup on the first section (margins, orientation, paper size).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        topMargin: { type: 'number', description: 'Top margin in points.' },
+        bottomMargin: { type: 'number', description: 'Bottom margin in points.' },
+        leftMargin: { type: 'number', description: 'Left margin in points.' },
+        rightMargin: { type: 'number', description: 'Right margin in points.' },
+        orientation: {
+          type: 'string',
+          description: 'Page orientation: Portrait or Landscape.',
+          enum: ['Portrait', 'Landscape'],
+        },
+        paperSize: {
+          type: 'string',
+          description: 'Paper size (for example Letter, A4, Legal).',
+          enum: ['Letter', 'A4', 'Legal'],
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } = args
+      return Word.run(async context => {
+        const section = context.document.sections.getFirst() as any
+        const pageSetup = section.pageSetup
+
+        if (topMargin !== undefined) pageSetup.topMargin = topMargin
+        if (bottomMargin !== undefined) pageSetup.bottomMargin = bottomMargin
+        if (leftMargin !== undefined) pageSetup.leftMargin = leftMargin
+        if (rightMargin !== undefined) pageSetup.rightMargin = rightMargin
+        if (orientation !== undefined) pageSetup.orientation = orientation
+        if (paperSize !== undefined) pageSetup.paperSize = paperSize
+
+        await context.sync()
+        return 'Successfully updated page setup'
+      })
+    },
+  },
+
+  getSpecificParagraph: {
+    name: 'getSpecificParagraph',
+    description: 'Get a paragraph by index without reading all document content.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        index: {
+          type: 'number',
+          description: 'Zero-based paragraph index.',
+        },
+      },
+      required: ['index'],
+    },
+    execute: async args => {
+      const { index } = args
+      return Word.run(async context => {
+        const paragraphs = context.document.body.paragraphs
+        paragraphs.load('items')
+        await context.sync()
+
+        if (index < 0 || index >= paragraphs.items.length) {
+          return `Error: Paragraph index out of bounds. Range is 0 to ${Math.max(paragraphs.items.length - 1, 0)}.`
+        }
+
+        const paragraph = paragraphs.items[index]
+        paragraph.load('text,style,font/name,font/size,font/bold,font/italic,font/underline,font/color')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            index,
+            text: paragraph.text || '',
+            style: paragraph.style,
+            font: {
+              name: paragraph.font.name,
+              size: paragraph.font.size,
+              bold: paragraph.font.bold,
+              italic: paragraph.font.italic,
+              underline: paragraph.font.underline,
+              color: paragraph.font.color,
+            },
+          },
+          null,
+          2,
+        )
+      })
+    },
+  },
+
+  insertSectionBreak: {
+    name: 'insertSectionBreak',
+    description: 'Insert a section break at the current selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        location: {
+          type: 'string',
+          description: 'Where to insert section break: Before or After current selection.',
+          enum: ['Before', 'After'],
+        },
+      },
+      required: [],
+    },
+    execute: async args => {
+      const { location = 'After' } = args
+      return Word.run(async context => {
+        const range = context.document.getSelection() as any
+        range.insertBreak('SectionNext', location)
+        await context.sync()
+        return `Successfully inserted section break ${location.toLowerCase()} selection`
       })
     },
   },

@@ -202,7 +202,7 @@ KickOffice/
 - [x] OpenAI function-calling format for tool definitions
 - [x] Tool execution status display in chat
 - [x] Max iterations limit (configurable)
-- [x] 24 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting
+- [x] 39 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak
 - [x] 25 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
 - [x] 3 Outlook tools: getEmailBody, getSelectedText, setEmailBody
 - [x] 2 General tools: getCurrentDate, calculateMath

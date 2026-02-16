@@ -7,14 +7,14 @@
 
 | Application    | Tools existants | Tools manquants identifies |
 |----------------|-----------------|----------------------------|
-| **Word**       | 24 tools        | ~15 manquants              |
+| **Word**       | 39 tools        | 0 manquant (lot W1-W15 livre) |
 | **Excel**      | 25 tools        | ~18 manquants              |
 | **PowerPoint** | 0 tools (!)     | ~8 a creer                 |
 | **Outlook**    | 3 tools         | ~10 manquants              |
 
 ---
 
-## 1. WORD (wordTools.ts) — 24 existants, ~15 manquants
+## 1. WORD (wordTools.ts) — 39 existants, 0 manquant sur le lot prioritaire
 
 ### Existant
 - Texte: getSelectedText, getDocumentContent, insertText, replaceSelectedText, appendText, deleteText, selectText, findText, searchAndReplace
@@ -23,25 +23,25 @@
 - Navigation: insertBookmark, goToBookmark, insertContentControl
 - Image: insertImage
 
-### Manquant
+### Lot Word integre (W1-W15)
 
-| ID  | Skill                  | Cas d'usage bloquant                                                            | Implementation                                                                                                        |
-|-----|------------------------|---------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
-| W1  | setParagraphFormat      | Centrer un titre, changer l'interligne, gerer les indentations                  | `selection.paragraphs` -> `.alignment`, `.lineSpacing`, `.spaceAfter`, `.spaceBefore`, `.leftIndent`, `.firstLineIndent` |
-| W2  | insertHyperlink         | Inserer un lien cliquable dans un document                                      | `range.hyperlink = { address, textToDisplay }`                                                                         |
-| W3  | getDocumentHtml         | Comprendre la structure reelle (titres, listes, gras...) pour analyser fidele   | `body.getHtml()` -> retourner le HTML                                                                                  |
-| W4  | modifyTableCell         | Modifier une cellule d'un tableau existant                                      | `body.tables.getFirst().getCell(row, col).body.insertText(...)`                                                        |
-| W5  | addTableRow             | Ajouter des lignes a un tableau existant                                        | `table.addRows(location, count, values)`                                                                               |
-| W6  | addTableColumn          | Ajouter des colonnes a un tableau existant                                      | `table.addColumns(location, count, values)`                                                                            |
-| W7  | deleteTableRowColumn    | Supprimer lignes/colonnes d'un tableau existant                                 | `table.deleteRows(index, count)` / `table.deleteColumns(index, count)`                                                 |
-| W8  | formatTableCell         | Mettre en forme les cellules de tableau (fond, bordures)                        | `table.getCell(r,c)` -> `.shadingColor`, `.body.font.*`                                                                |
-| W9  | insertHeaderFooter      | Creer en-tete/pied de page pour documents pro                                  | `document.sections.getFirst().getHeader(type)` / `.getFooter(type)` -> `.insertText(...)`                              |
-| W10 | insertFootnote          | Notes de bas de page (academique/juridique)                                     | `range.insertFootnote(text)` (WordApi 1.5+)                                                                           |
-| W11 | addComment              | Ajouter des commentaires de relecture                                           | `range.insertComment(text)` (WordApi 1.4+)                                                                            |
-| W12 | getComments             | Lire les commentaires existants                                                 | `body.getComments()` -> `.load('items/content,items/authorName')`                                                      |
-| W13 | setPageSetup            | Changer marges, orientation, taille de page                                     | `document.sections.getFirst().pageSetup.topMargin`, `.orientation`, `.paperSize`                                       |
-| W14 | getSpecificParagraph    | Lire/cibler un paragraphe par index sans tout relire                            | `body.paragraphs.load('items')` -> `.items[index].load('text,style,font/*')`                                           |
-| W15 | insertSectionBreak      | Changer orientation/marges en cours de document                                 | `range.insertBreak('SectionNext', location)`                                                                           |
+| ID  | Skill               | Statut | Note implementation |
+|-----|---------------------|--------|---------------------|
+| W1  | setParagraphFormat  | Livre  | Formatage paragraphe sur selection (`alignment`, `lineSpacing`, `spaceBefore/After`, `leftIndent`, `firstLineIndent`) |
+| W2  | insertHyperlink     | Livre  | Insertion de lien cliquable via `range.hyperlink` (+ `textToDisplay` optionnel) |
+| W3  | getDocumentHtml     | Livre  | Retourne le HTML complet via `body.getHtml()` |
+| W4  | modifyTableCell     | Livre  | Remplacement d'une cellule ciblee dans un tableau existant |
+| W5  | addTableRow         | Livre  | Ajout de lignes dans un tableau (`addRows`) |
+| W6  | addTableColumn      | Livre  | Ajout de colonnes dans un tableau (`addColumns`) |
+| W7  | deleteTableRowColumn| Livre  | Suppression de lignes/colonnes (`deleteRows` / `deleteColumns`) |
+| W8  | formatTableCell     | Livre  | Formatage de cellule (fond + police) |
+| W9  | insertHeaderFooter  | Livre  | Insertion d'en-tete/pied (`getHeader` / `getFooter`) |
+| W10 | insertFootnote      | Livre  | Insertion de note de bas de page (`insertFootnote`) |
+| W11 | addComment          | Livre  | Ajout de commentaire de relecture (`insertComment`) |
+| W12 | getComments         | Livre  | Lecture des commentaires (`getComments`) |
+| W13 | setPageSetup        | Livre  | Reglage marges/orientation/papier (`pageSetup`) |
+| W14 | getSpecificParagraph| Livre  | Lecture d'un paragraphe par index |
+| W15 | insertSectionBreak  | Livre  | Insertion de saut de section (`SectionNext`) |
 
 ---
 
@@ -134,37 +134,33 @@ L'agent PowerPoint est en mode "prompt-only": il genere du texte, l'utilisateur 
 
 ## 5. PRIORITES D'IMPLEMENTATION
 
+### Priorite 0 — Termine (Word)
+
+- Lot Word **W1 a W15** integre dans `wordTools.ts` (39 tools Word disponibles).
+
 ### Priorite 1 — Impact immediat (quick wins + bloquants critiques)
 
 1. **P1+P2**: Wrapper les helpers PPT existants en tools agent
-2. **W1**: `setParagraphFormat` — centrer un titre est basique
-3. **E11+E12+E13**: Etendre `formatRange` avec wrapText/verticalAlignment/fontName
-4. **O1**: `insertTextAtCursor` — arreter de tout ecraser
-5. **O2**: `setEmailBodyHtml` — mails formates
-6. **O3+O4**: get/set subject — contexte basique
-7. **E4+E5+E6**: rename/delete/activate worksheet
-8. **W2**: `insertHyperlink`
-9. **W4**: `modifyTableCell`
-10. **E1**: `addDataValidation` — listes deroulantes
+2. **E11+E12+E13**: Etendre `formatRange` avec wrapText/verticalAlignment/fontName
+3. **O1**: `insertTextAtCursor` — arreter de tout ecraser
+4. **O2**: `setEmailBodyHtml` — mails formates
+5. **O3+O4**: get/set subject — contexte basique
+6. **E4+E5+E6**: rename/delete/activate worksheet
+7. **E1**: `addDataValidation` — listes deroulantes
 
 ### Priorite 2 — Cas d'usage professionnels
 
-11. **W8**: Headers/Footers
-12. **W3**: `getDocumentHtml` — lecture structuree
-13. **W5+W6+W7+W8**: Manipulation complete des tables Word
-14. **E2**: `createTable` (ListObject Excel)
-15. **E3**: `copyRange`
-16. **E8**: `freezePanes`
-17. **P3+P4**: getSlideCount/getSlideContent
-18. **O5+O6+O7**: Recipients/Sender
-19. **E14**: `removeAutoFilter`
+8. **E2**: `createTable` (ListObject Excel)
+9. **E3**: `copyRange`
+10. **E8**: `freezePanes`
+11. **P3+P4**: getSlideCount/getSlideContent
+12. **O5+O6+O7**: Recipients/Sender
+13. **E14**: `removeAutoFilter`
 
 ### Priorite 3 — Features avancees
 
-20. **P5+P6+P7+P8**: Creation slides/shapes/images PPT
-21. **W10+W11+W12**: Footnotes/Comments Word
-22. **W13**: Page setup
-23. **E9+E10**: Hyperlinks/Comments Excel
-24. **E15**: Protection feuilles
-25. **E16+E17+E18**: Borders avances / Named ranges
-26. **O8+O9+O10**: Date/Attachments/HTML insert
+14. **P5+P6+P7+P8**: Creation slides/shapes/images PPT
+15. **E9+E10**: Hyperlinks/Comments Excel
+16. **E15**: Protection feuilles
+17. **E16+E17+E18**: Borders avances / Named ranges
+18. **O8+O9+O10**: Date/Attachments/HTML insert
