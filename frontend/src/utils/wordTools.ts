@@ -1,3 +1,5 @@
+import { executeOfficeAction } from './officeAction'
+
 export type WordToolName =
   | 'getSelectedText'
   | 'getDocumentContent'
@@ -39,6 +41,9 @@ export type WordToolName =
   | 'getSpecificParagraph'
   | 'insertSectionBreak'
 
+const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
+  executeOfficeAction(() => Word.run(action))
+
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
     name: 'getSelectedText',
@@ -51,7 +56,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
@@ -70,7 +75,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         body.load('text')
         await context.sync()
@@ -100,7 +105,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { text, location = 'End' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.insertText(text, location as Word.InsertLocation)
         await context.sync()
@@ -129,7 +134,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { newText, preserveFormatting = true } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
         await context.sync()
@@ -175,7 +180,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { text } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         body.insertText(text, 'End')
         await context.sync()
@@ -221,7 +226,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { text, location = 'After', style } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         let paragraph
         if (location === 'Start' || location === 'End') {
           const body = context.document.body
@@ -276,7 +281,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { bold, italic, underline, fontSize, fontColor, highlightColor } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
@@ -326,7 +331,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         const searchResults = body.search(searchText, {
           matchCase,
@@ -355,7 +360,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         body.load(['text'])
 
@@ -410,7 +415,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { rows, columns, data } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
 
         // Create table data
@@ -451,7 +456,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { items, listType } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         let insertionPoint = range
 
@@ -491,7 +496,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { direction = 'After' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
@@ -521,7 +526,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.font.bold = false
         range.font.italic = false
@@ -549,7 +554,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { fontName } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.font.name = fontName
         await context.sync()
@@ -575,7 +580,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { location = 'After' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         // insertBreak only supports Before and After for page breaks
         const insertLoc = location === 'Start' || location === 'Before' ? 'Before' : 'After'
@@ -596,7 +601,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         range.load([
           'text',
@@ -647,7 +652,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { scope } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         if (scope === 'All') {
           const body = context.document.body
           body.select()
@@ -688,7 +693,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { imageUrl, width, height, location = 'After' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         const image = range.insertInlinePictureFromBase64(imageUrl, location as Word.InsertLocation)
 
@@ -711,7 +716,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load(['items'])
         await context.sync()
@@ -759,7 +764,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { name } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
 
         const bookmarkName = name.replace(/\s+/g, '_')
@@ -791,7 +796,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { name } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const bookmarkName = name.replace(/\s+/g, '_')
         const contentControls = context.document.contentControls
         contentControls.load(['items'])
@@ -839,7 +844,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { title, tag, appearance = 'BoundingBox' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         const contentControl = range.insertContentControl()
         contentControl.title = title
@@ -876,7 +881,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { searchText, matchCase = false, matchWholeWord = false } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         const searchResults = body.search(searchText, {
           matchCase,
@@ -974,7 +979,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       const subscript = args.subscript !== undefined ? Boolean(args.subscript) : undefined
       const superscript = args.superscript !== undefined ? Boolean(args.superscript) : undefined
 
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body
         body.load('text')
         await context.sync()
@@ -1075,7 +1080,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const selection = context.document.getSelection()
         const paragraphs = selection.paragraphs
         paragraphs.load('items')
@@ -1120,7 +1125,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { address, textToDisplay } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection()
         const linkRange = typeof textToDisplay === 'string' ? range.insertText(textToDisplay, 'Replace') : range
         linkRange.hyperlink = address
@@ -1140,7 +1145,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const htmlResult = context.document.body.getHtml()
         await context.sync()
         return htmlResult.value || ''
@@ -1164,7 +1169,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { row, column, text, tableIndex = 0 } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1206,7 +1211,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1247,7 +1252,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1284,7 +1289,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { tableIndex = 0, target, index, count = 1 } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1328,7 +1333,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { tableIndex = 0, row, column, shadingColor, fontName, fontSize, fontColor, bold, italic } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1379,7 +1384,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { target, type = 'Primary', text } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const section = context.document.sections.getFirst() as any
         const container = target === 'header' ? section.getHeader(type) : section.getFooter(type)
         container.insertText(text, 'Replace')
@@ -1402,7 +1407,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { text } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection() as any
         range.insertFootnote(text)
         await context.sync()
@@ -1424,7 +1429,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { text } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection() as any
         range.insertComment(text)
         await context.sync()
@@ -1443,7 +1448,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       required: [],
     },
     execute: async () => {
-      return Word.run(async context => {
+      return runWord(async context => {
         const body = context.document.body as any
         const comments = body.getComments()
         comments.load('items/content,items/authorName')
@@ -1490,7 +1495,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const section = context.document.sections.getFirst() as any
         const pageSetup = section.pageSetup
 
@@ -1523,7 +1528,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { index } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const paragraphs = context.document.body.paragraphs
         paragraphs.load('items')
         await context.sync()
@@ -1574,7 +1579,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
     },
     execute: async args => {
       const { location = 'After' } = args
-      return Word.run(async context => {
+      return runWord(async context => {
         const range = context.document.getSelection() as any
         range.insertBreak('SectionNext', location)
         await context.sync()

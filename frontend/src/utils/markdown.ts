@@ -1,8 +1,6 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 
-type MarkdownItRendererRule = NonNullable<MarkdownIt.Renderer['rules']['link_open']>
-
 const markdownParser = new MarkdownIt({
   breaks: true,
   html: false,
@@ -10,10 +8,10 @@ const markdownParser = new MarkdownIt({
   typographer: true,
 })
 
-const defaultLinkRender: MarkdownItRendererRule = markdownParser.renderer.rules.link_open
-  ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+const defaultLinkRender = markdownParser.renderer.rules.link_open
+  ?? ((tokens: any[], idx: number, options: any, _env: any, self: any) => self.renderToken(tokens, idx, options))
 
-markdownParser.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+markdownParser.renderer.rules.link_open = (tokens: any[], idx: number, options: any, env: any, self: any) => {
   const token = tokens[idx]
 
   token.attrSet('target', '_blank')

@@ -180,7 +180,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     const allToolDefs = [...generalToolDefs, ...appToolDefs]
     const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
-    const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema } }))
+    const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 25
     let currentMessages: ChatRequestMessage[] = [...messages]
@@ -332,12 +332,20 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   async function applyQuickAction(actionKey: string) {
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
-    const selectedQuickAction = hostIsExcel ? excelQuickActions.value.find(a => a.key === actionKey) : hostIsPowerPoint ? powerPointQuickActions.find(a => a.key === actionKey) : quickActions.value.find(a => a.key === actionKey)
-    if (hostIsExcel && selectedQuickAction?.mode === 'draft') {
-      userInput.value = selectedQuickAction.prefix || ''
+    const selectedQuickAction = hostIsExcel
+      ? excelQuickActions.value.find(a => a.key === actionKey)
+      : hostIsPowerPoint
+        ? powerPointQuickActions.find(a => a.key === actionKey)
+        : quickActions.value.find(a => a.key === actionKey)
+
+    const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
+    const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
+
+    if (selectedExcelQuickAction?.mode === 'draft') {
+      userInput.value = selectedExcelQuickAction.prefix || ''
       adjustTextareaHeight(); await nextTick(); inputTextarea.value?.focus(); return
     }
-    if (hostIsPowerPoint && (selectedQuickAction as PowerPointQuickAction)?.mode === 'draft') {
+    if (selectedPowerPointQuickAction?.mode === 'draft') {
       userInput.value = t('pptVisualPrefix')
       adjustTextareaHeight(); await nextTick(); inputTextarea.value?.focus(); return
     }
@@ -350,8 +358,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     if (hostIsOutlook) action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt]
     else if (hostIsPowerPoint) action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt]
     else if (hostIsExcel) {
-      if (selectedQuickAction?.mode === 'immediate' && selectedQuickAction.systemPrompt) {
-        systemMsg = selectedQuickAction.systemPrompt
+      if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
+        systemMsg = selectedExcelQuickAction.systemPrompt
         userMsg = `Selection:\n${selectedText}`
       } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
     } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
