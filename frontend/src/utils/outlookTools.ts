@@ -1,3 +1,5 @@
+import { executeOfficeAction } from './officeAction'
+
 export type OutlookToolName =
   | 'getEmailBody'
   | 'getSelectedText'
@@ -27,6 +29,25 @@ function getOfficeAsyncStatus(): any {
 
 function getOfficeCoercionType(): any {
   return (window as any).Office?.CoercionType
+}
+
+const runOutlook = <T>(action: () => Promise<T>): Promise<T> =>
+  executeOfficeAction(action)
+
+type OutlookToolTemplate = Omit<OutlookToolDefinition, 'execute'> & {
+  executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>
+}
+
+function createOutlookTools(definitions: Record<OutlookToolName, OutlookToolTemplate>): Record<OutlookToolName, OutlookToolDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([name, definition]) => [
+      name,
+      {
+        ...definition,
+        execute: async (args: Record<string, any> = {}) => runOutlook(() => definition.executeOutlook(getMailbox(), args)),
+      },
+    ]),
+  ) as unknown as Record<OutlookToolName, OutlookToolDefinition>
 }
 
 function resolveAsyncResult(result: any, onSuccess: (value: any) => string): string {
@@ -79,7 +100,7 @@ function getRecipientField(field: unknown): RecipientField {
   return 'to'
 }
 
-const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
+const outlookToolDefinitions = createOutlookTools({
   getEmailBody: {
     name: 'getEmailBody',
     category: 'read',
@@ -90,8 +111,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
       return new Promise<string>((resolve) => {
         mailbox.item.body.getAsync(
@@ -114,8 +134,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return ''
       if (typeof mailbox.item.getSelectedDataAsync !== 'function') {
         return 'Selection reading is not available in this context.'
@@ -150,9 +169,8 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async (args) => {
+    executeOutlook: async (mailbox, args) => {
       const { text } = args
-      const mailbox = getMailbox()
       if (!mailbox?.item?.body?.setAsync) {
         return 'Cannot set email body: compose mode is not available.'
       }
@@ -182,9 +200,8 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async (args) => {
+    executeOutlook: async (mailbox, args) => {
       const { text } = args
-      const mailbox = getMailbox()
       if (!mailbox?.item?.body?.setSelectedDataAsync) {
         return 'Cannot insert text at cursor: compose mode is not available.'
       }
@@ -215,9 +232,8 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['html'],
     },
-    execute: async (args) => {
+    executeOutlook: async (mailbox, args) => {
       const { html } = args
-      const mailbox = getMailbox()
       if (!mailbox?.item?.body?.setAsync) {
         return 'Cannot set HTML email body: compose mode is not available.'
       }
@@ -243,8 +259,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
 
       if (mailbox.item.subject && typeof mailbox.item.subject.getAsync === 'function') {
@@ -273,9 +288,8 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['subject'],
     },
-    execute: async (args) => {
+    executeOutlook: async (mailbox, args) => {
       const { subject } = args
-      const mailbox = getMailbox()
       if (!mailbox?.item?.subject?.setAsync) {
         return 'Cannot set email subject: compose mode is not available.'
       }
@@ -297,8 +311,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
 
       const item = mailbox.item
@@ -354,8 +367,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['recipients'],
     },
-    execute: async (args) => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox, args) => {
       if (!mailbox?.item) return 'No email item available.'
 
       const field = getRecipientField(args.field)
@@ -386,8 +398,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
 
       const sender = mailbox.item.from || mailbox.item.sender
@@ -406,8 +417,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
 
       const value = mailbox.item.dateTimeCreated
@@ -429,8 +439,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      const mailbox = getMailbox()
+    executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
 
       if (typeof mailbox.item.getAttachmentsAsync === 'function') {
@@ -467,9 +476,8 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       },
       required: ['html'],
     },
-    execute: async (args) => {
+    executeOutlook: async (mailbox, args) => {
       const { html } = args
-      const mailbox = getMailbox()
       if (!mailbox?.item?.body?.setSelectedDataAsync) {
         return 'Cannot insert HTML at cursor: compose mode is not available.'
       }
@@ -485,7 +493,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
       })
     },
   },
-}
+})
 
 export function getOutlookToolDefinitions(): OutlookToolDefinition[] {
   return Object.values(outlookToolDefinitions)

@@ -44,7 +44,23 @@ export type WordToolName =
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
 
-const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
+type WordToolTemplate = Omit<WordToolDefinition, 'execute'> & {
+  executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
+}
+
+function createWordTools(definitions: Record<WordToolName, WordToolTemplate>): Record<WordToolName, WordToolDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([name, definition]) => [
+      name,
+      {
+        ...definition,
+        execute: async (args: Record<string, any> = {}) => runWord(context => definition.executeWord(context, args)),
+      },
+    ]),
+  ) as unknown as Record<WordToolName, WordToolDefinition>
+}
+
+const wordToolDefinitions = createWordTools({
   getSelectedText: {
     name: 'getSelectedText',
     category: 'read',
@@ -55,13 +71,11 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
-        const range = context.document.getSelection()
-        range.load('text')
-        await context.sync()
-        return range.text || ''
-      })
+    executeWord: async context => {
+      const range = context.document.getSelection()
+      range.load('text')
+      await context.sync()
+      return range.text || ''
     },
   },
 
@@ -74,13 +88,11 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
-        const body = context.document.body
-        body.load('text')
-        await context.sync()
-        return body.text || ''
-      })
+    executeWord: async context => {
+      const body = context.document.body
+      body.load('text')
+      await context.sync()
+      return body.text || ''
     },
   },
 
@@ -103,14 +115,12 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { text, location = 'End' } = args
-      return runWord(async context => {
-        const range = context.document.getSelection()
-        range.insertText(text, location as Word.InsertLocation)
-        await context.sync()
-        return `Successfully inserted text at ${location}`
-      })
+      const range = context.document.getSelection()
+      range.insertText(text, location as Word.InsertLocation)
+      await context.sync()
+      return `Successfully inserted text at ${location}`
     },
   },
 
@@ -132,35 +142,33 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['newText'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { newText, preserveFormatting = true } = args
-      return runWord(async context => {
-        const range = context.document.getSelection()
-        range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
-        await context.sync()
+      const range = context.document.getSelection()
+      range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
+      await context.sync()
 
-        if (!range.text || range.text.length === 0) {
-          return 'Error: No text selected. Select text in the document, then try again.'
-        }
+      if (!range.text || range.text.length === 0) {
+        return 'Error: No text selected. Select text in the document, then try again.'
+      }
 
-        const insertedRange = range.insertText(newText, 'Replace')
+      const insertedRange = range.insertText(newText, 'Replace')
 
-        if (preserveFormatting) {
-          insertedRange.styleBuiltIn = range.styleBuiltIn
-          insertedRange.font.name = range.font.name
-          insertedRange.font.size = range.font.size
-          insertedRange.font.bold = range.font.bold
-          insertedRange.font.italic = range.font.italic
-          insertedRange.font.underline = range.font.underline
-          insertedRange.font.color = range.font.color
-          insertedRange.font.highlightColor = range.font.highlightColor
-        }
+      if (preserveFormatting) {
+        insertedRange.styleBuiltIn = range.styleBuiltIn
+        insertedRange.font.name = range.font.name
+        insertedRange.font.size = range.font.size
+        insertedRange.font.bold = range.font.bold
+        insertedRange.font.italic = range.font.italic
+        insertedRange.font.underline = range.font.underline
+        insertedRange.font.color = range.font.color
+        insertedRange.font.highlightColor = range.font.highlightColor
+      }
 
-        await context.sync()
-        return preserveFormatting
-          ? 'Successfully replaced selected text while preserving formatting'
-          : 'Successfully replaced selected text'
-      })
+      await context.sync()
+      return preserveFormatting
+        ? 'Successfully replaced selected text while preserving formatting'
+        : 'Successfully replaced selected text'
     },
   },
 
@@ -178,14 +186,12 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { text } = args
-      return runWord(async context => {
-        const body = context.document.body
-        body.insertText(text, 'End')
-        await context.sync()
-        return 'Successfully appended text to document'
-      })
+      const body = context.document.body
+      body.insertText(text, 'End')
+      await context.sync()
+      return 'Successfully appended text to document'
     },
   },
 
@@ -224,23 +230,21 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { text, location = 'After', style } = args
-      return runWord(async context => {
-        let paragraph
-        if (location === 'Start' || location === 'End') {
-          const body = context.document.body
-          paragraph = body.insertParagraph(text, location)
-        } else {
-          const range = context.document.getSelection()
-          paragraph = range.insertParagraph(text, location as 'After' | 'Before')
-        }
-        if (style) {
-          paragraph.styleBuiltIn = style as Word.BuiltInStyleName
-        }
-        await context.sync()
-        return `Successfully inserted paragraph at ${location}`
-      })
+      let paragraph
+      if (location === 'Start' || location === 'End') {
+        const body = context.document.body
+        paragraph = body.insertParagraph(text, location)
+      } else {
+        const range = context.document.getSelection()
+        paragraph = range.insertParagraph(text, location as 'After' | 'Before')
+      }
+      if (style) {
+        paragraph.styleBuiltIn = style as Word.BuiltInStyleName
+      }
+      await context.sync()
+      return `Successfully inserted paragraph at ${location}`
     },
   },
 
@@ -279,9 +283,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { bold, italic, underline, fontSize, fontColor, highlightColor } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
@@ -299,8 +303,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return 'Successfully applied formatting'
-      })
-    },
+      },
   },
 
   searchAndReplace: {
@@ -329,9 +332,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['searchText', 'replaceText'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args
-      return runWord(async context => {
+      
         const body = context.document.body
         const searchResults = body.search(searchText, {
           matchCase,
@@ -346,8 +349,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         }
         await context.sync()
         return `Replaced ${count} occurrence(s) of "${searchText}" with "${replaceText}"`
-      })
-    },
+      },
   },
 
   getDocumentProperties: {
@@ -359,8 +361,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const body = context.document.body
         body.load(['text'])
 
@@ -383,8 +385,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   insertTable: {
@@ -413,9 +414,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['rows', 'columns'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { rows, columns, data } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
 
         // Create table data
@@ -430,8 +431,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully inserted ${rows}x${columns} table`
-      })
-    },
+      },
   },
 
   insertList: {
@@ -454,9 +454,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['items', 'listType'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { items, listType } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         let insertionPoint = range
 
@@ -474,8 +474,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully inserted ${listType} list with ${items.length} items`
-      })
-    },
+      },
   },
 
   deleteText: {
@@ -494,9 +493,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { direction = 'After' } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
@@ -512,8 +511,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         }
         await context.sync()
         return 'Successfully deleted text'
-      })
-    },
+      },
   },
 
   clearFormatting: {
@@ -525,8 +523,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const range = context.document.getSelection()
         range.font.bold = false
         range.font.italic = false
@@ -534,8 +532,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         range.styleBuiltIn = 'Normal'
         await context.sync()
         return 'Successfully cleared formatting'
-      })
-    },
+      },
   },
 
   setFontName: {
@@ -552,15 +549,14 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['fontName'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { fontName } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         range.font.name = fontName
         await context.sync()
         return `Successfully set font to ${fontName}`
-      })
-    },
+      },
   },
 
   insertPageBreak: {
@@ -578,17 +574,16 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { location = 'After' } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         // insertBreak only supports Before and After for page breaks
         const insertLoc = location === 'Start' || location === 'Before' ? 'Before' : 'After'
         range.insertBreak('Page', insertLoc)
         await context.sync()
         return `Successfully inserted page break ${location.toLowerCase()}`
-      })
-    },
+      },
   },
 
   getRangeInfo: {
@@ -600,8 +595,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const range = context.document.getSelection()
         range.load([
           'text',
@@ -631,8 +626,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   selectText: {
@@ -650,9 +644,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['scope'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { scope } = args
-      return runWord(async context => {
+      
         if (scope === 'All') {
           const body = context.document.body
           body.select()
@@ -660,8 +654,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           return 'Successfully selected all text'
         }
         return 'Invalid scope'
-      })
-    },
+      },
   },
 
   insertImage: {
@@ -691,9 +684,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['imageUrl'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { imageUrl, width, height, location = 'After' } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         const image = range.insertInlinePictureFromBase64(imageUrl, location as Word.InsertLocation)
 
@@ -702,8 +695,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully inserted image at ${location}`
-      })
-    },
+      },
   },
 
   getTableInfo: {
@@ -715,8 +707,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const tables = context.document.body.tables
         tables.load(['items'])
         await context.sync()
@@ -744,8 +736,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   insertBookmark: {
@@ -762,9 +753,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['name'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { name } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
 
         const bookmarkName = name.replace(/\s+/g, '_')
@@ -776,8 +767,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully inserted bookmark: ${bookmarkName}`
-      })
-    },
+      },
   },
 
   goToBookmark: {
@@ -794,9 +784,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['name'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { name } = args
-      return runWord(async context => {
+      
         const bookmarkName = name.replace(/\s+/g, '_')
         const contentControls = context.document.contentControls
         contentControls.load(['items'])
@@ -814,8 +804,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         }
 
         return `Bookmark not found: ${bookmarkName}`
-      })
-    },
+      },
   },
 
   insertContentControl: {
@@ -842,9 +831,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['title'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { title, tag, appearance = 'BoundingBox' } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         const contentControl = range.insertContentControl()
         contentControl.title = title
@@ -853,8 +842,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully inserted content control: ${title}`
-      })
-    },
+      },
   },
 
   findText: {
@@ -879,9 +867,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['searchText'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { searchText, matchCase = false, matchWholeWord = false } = args
-      return runWord(async context => {
+      
         const body = context.document.body
         const searchResults = body.search(searchText, {
           matchCase,
@@ -900,8 +888,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   applyTaggedFormatting: {
@@ -964,7 +951,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'format'
       const fontName = typeof args.fontName === 'string' && args.fontName.trim() ? args.fontName.trim() : undefined
       const fontSize = typeof args.fontSize === 'number' ? args.fontSize : undefined
@@ -979,7 +966,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       const subscript = args.subscript !== undefined ? Boolean(args.subscript) : undefined
       const superscript = args.superscript !== undefined ? Boolean(args.superscript) : undefined
 
-      return runWord(async context => {
+      
         const body = context.document.body
         body.load('text')
         await context.sync()
@@ -1038,8 +1025,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         }
 
         return `Converted ${replacedCount} tagged occurrence(s) using <${tagName}>...</${tagName}>.`
-      })
-    },
+      },
   },
 
   setParagraphFormat: {
@@ -1078,9 +1064,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } = args
-      return runWord(async context => {
+      
         const selection = context.document.getSelection()
         const paragraphs = selection.paragraphs
         paragraphs.load('items')
@@ -1101,8 +1087,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully formatted ${paragraphs.items.length} paragraph(s)`
-      })
-    },
+      },
   },
 
   insertHyperlink: {
@@ -1123,16 +1108,15 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['address'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { address, textToDisplay } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection()
         const linkRange = typeof textToDisplay === 'string' ? range.insertText(textToDisplay, 'Replace') : range
         linkRange.hyperlink = address
         await context.sync()
         return 'Successfully inserted hyperlink'
-      })
-    },
+      },
   },
 
   getDocumentHtml: {
@@ -1144,13 +1128,12 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const htmlResult = context.document.body.getHtml()
         await context.sync()
         return htmlResult.value || ''
-      })
-    },
+      },
   },
 
   modifyTableCell: {
@@ -1167,9 +1150,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['row', 'column', 'text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { row, column, text, tableIndex = 0 } = args
-      return runWord(async context => {
+      
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1183,8 +1166,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         cell.body.insertText(text, 'Replace')
         await context.sync()
         return `Successfully updated table ${tableIndex}, cell (${row}, ${column})`
-      })
-    },
+      },
   },
 
   addTableRow: {
@@ -1209,9 +1191,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
-      return runWord(async context => {
+      
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1224,8 +1206,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         targetTable.addRows(location, count, values)
         await context.sync()
         return `Successfully added ${count} row(s) to table ${tableIndex}`
-      })
-    },
+      },
   },
 
   addTableColumn: {
@@ -1250,9 +1231,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
-      return runWord(async context => {
+      
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1265,8 +1246,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         targetTable.addColumns(location, count, values)
         await context.sync()
         return `Successfully added ${count} column(s) to table ${tableIndex}`
-      })
-    },
+      },
   },
 
   deleteTableRowColumn: {
@@ -1287,9 +1267,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['target', 'index'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { tableIndex = 0, target, index, count = 1 } = args
-      return runWord(async context => {
+      
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1308,8 +1288,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
         targetTable.deleteColumns(index, count)
         await context.sync()
         return `Successfully deleted ${count} column(s) starting at index ${index}`
-      })
-    },
+      },
   },
 
   formatTableCell: {
@@ -1331,9 +1310,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['row', 'column'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { tableIndex = 0, row, column, shadingColor, fontName, fontSize, fontColor, bold, italic } = args
-      return runWord(async context => {
+      
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
@@ -1354,8 +1333,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return `Successfully formatted table ${tableIndex}, cell (${row}, ${column})`
-      })
-    },
+      },
   },
 
   insertHeaderFooter: {
@@ -1382,16 +1360,15 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['target', 'text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { target, type = 'Primary', text } = args
-      return runWord(async context => {
+      
         const section = context.document.sections.getFirst() as any
         const container = target === 'header' ? section.getHeader(type) : section.getFooter(type)
         container.insertText(text, 'Replace')
         await context.sync()
         return `Successfully inserted text into ${target} (${type})`
-      })
-    },
+      },
   },
 
   insertFootnote: {
@@ -1405,15 +1382,14 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { text } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection() as any
         range.insertFootnote(text)
         await context.sync()
         return 'Successfully inserted footnote'
-      })
-    },
+      },
   },
 
   addComment: {
@@ -1427,15 +1403,14 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['text'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { text } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection() as any
         range.insertComment(text)
         await context.sync()
         return 'Successfully added comment'
-      })
-    },
+      },
   },
 
   getComments: {
@@ -1447,8 +1422,8 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runWord(async context => {
+    executeWord: async (context) => {
+      
         const body = context.document.body as any
         const comments = body.getComments()
         comments.load('items/content,items/authorName')
@@ -1465,8 +1440,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   setPageSetup: {
@@ -1493,9 +1467,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } = args
-      return runWord(async context => {
+      
         const section = context.document.sections.getFirst() as any
         const pageSetup = section.pageSetup
 
@@ -1508,8 +1482,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
         await context.sync()
         return 'Successfully updated page setup'
-      })
-    },
+      },
   },
 
   getSpecificParagraph: {
@@ -1526,9 +1499,9 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: ['index'],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { index } = args
-      return runWord(async context => {
+      
         const paragraphs = context.document.body.paragraphs
         paragraphs.load('items')
         await context.sync()
@@ -1558,8 +1531,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   insertSectionBreak: {
@@ -1577,17 +1549,16 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
       },
       required: [],
     },
-    execute: async args => {
+    executeWord: async (context, args) => {
       const { location = 'After' } = args
-      return runWord(async context => {
+      
         const range = context.document.getSelection() as any
         range.insertBreak('SectionNext', location)
         await context.sync()
         return `Successfully inserted section break ${location.toLowerCase()} selection`
-      })
-    },
+      },
   },
-}
+})
 
 export function getWordToolDefinitions(): WordToolDefinition[] {
   return Object.values(wordToolDefinitions)
