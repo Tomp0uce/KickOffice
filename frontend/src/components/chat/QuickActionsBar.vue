@@ -10,6 +10,7 @@
       :icon-size="16"
       class="shrink-0! bg-surface! p-1.5!"
       :disabled="loading"
+      :aria-label="action.label"
       @click="$emit('apply-action', action.key)"
     />
     <SingleSelect

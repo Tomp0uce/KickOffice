@@ -37,8 +37,8 @@ window.Office.onReady(() => {
     document.documentElement.classList.toggle('dark', value)
   }, { immediate: true })
 
-  app.config.errorHandler = (err, _instance, info) => {
-    console.error('Vue Global Error:', err, info)
+  app.config.errorHandler = (err, instance, info) => {
+    console.error('Vue Global Error:', err, instance, info)
   }
 
   app.use(i18n)

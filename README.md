@@ -40,14 +40,13 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 
 ## Model Tiers
 
-Models are configured **server-side only** (in `backend/.env`). Users cannot add or modify models. Four tiers:
+Models are configured **server-side only** (in `backend/.env`). Users cannot add or modify models. Three tiers:
 
 | Tier | Purpose | Default Model | Use Case |
 |------|---------|---------------|----------|
-| `nano` | Basic tasks | `gpt-4.1-nano` | Quick answers, simple formatting |
-| `standard` | Normal tasks | `gpt-4.1` | Chat, writing, analysis |
-| `reasoning` | Complex tasks | `o3` | Multi-step reasoning, planning |
-| `image` | Image generation | `gpt-image-1` | Generate images |
+| `standard` | Normal tasks | `gpt-5.2` | Chat, writing, analysis |
+| `reasoning` | Complex tasks | `gpt-5.2` (`reasoning_effort=high`) | Multi-step reasoning, planning |
+| `image` | Image generation | `gpt-image-1.5` | Generate images |
 
 ---
 
@@ -182,7 +181,7 @@ KickOffice/
 - [x] IP-based rate limiting on `/api/chat*` and `/api/image`
 - [x] HTTP security headers via Helmet middleware (CSP and COEP disabled for Office add-in compatibility)
 - [x] Health check endpoint (`GET /health`)
-- [x] Model configuration via `.env` (4 tiers: nano, standard, reasoning, image)
+- [x] Model configuration via `.env` (3 tiers: standard, reasoning, image)
 - [x] Models endpoint (`GET /api/models`) - exposes labels only, no secrets
 - [x] Centralized backend error-response logging for all 4xx/5xx API responses
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
@@ -278,8 +277,8 @@ KickOffice/
 - [x] No user-configurable API endpoints or models
 - [ ] HTTPS/TLS configuration (needed for production and Office add-in requirement)
 - [ ] Authentication / user login system
-- [ ] Rate limiting on backend
-- [ ] Request logging / audit trail
+- [x] Rate limiting on backend
+- [x] Request logging / audit trail
 
 ### Frontend - Outlook Support
 - [x] Outlook host detection (`isOutlook()`)
@@ -349,10 +348,11 @@ npm run dev            # Starts on port 3002 with HMR
 | `CHAT_RATE_LIMIT_MAX` | Max requests per IP during chat window | `20` |
 | `IMAGE_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/image` (milliseconds) | `60000` |
 | `IMAGE_RATE_LIMIT_MAX` | Max requests per IP during image window | `5` |
-| `MODEL_NANO` | Model ID for basic tasks | `gpt-4.1-nano` |
-| `MODEL_STANDARD` | Model ID for standard tasks | `gpt-4.1` |
-| `MODEL_REASONING` | Model ID for complex tasks | `o3` |
-| `MODEL_IMAGE` | Model ID for image generation | `gpt-image-1` |
+| `MODEL_STANDARD` | Model ID for standard tasks | `gpt-5.2` |
+| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`none` to disable) | `none` |
+| `MODEL_REASONING` | Model ID for complex tasks | `gpt-5.2` |
+| `MODEL_REASONING_EFFORT` | Reasoning effort for reasoning model | `high` |
+| `MODEL_IMAGE` | Model ID for image generation | `gpt-image-1.5` |
 
 #### Frontend (`frontend/.env`)
 | Variable | Description | Default |
@@ -402,7 +402,7 @@ Added or extended for KickOffice:
 - Backend Express proxy server (API keys never reach the client)
 - Docker deployment for Synology NAS (PUID/PGID, health check, multi-stage frontend build)
 - Extended from Word-only to Word + Excel + PowerPoint + Outlook
-- Model tier system (nano / standard / reasoning / image), configured server-side only
+- Model tier system (standard / reasoning / image), configured server-side only
 - French translations added to the i18n locale files
 - Image generation support
 
