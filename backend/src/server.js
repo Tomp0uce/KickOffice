@@ -164,6 +164,19 @@ function buildChatBody({ modelConfig, messages, temperature, maxTokens, stream, 
   return body
 }
 
+function logAndRespond(res, status, errorObj, context = 'API') {
+  if (status >= 400) {
+    const message = typeof errorObj?.error === 'string' ? errorObj.error : 'Unhandled error'
+    const logPrefix = `[${context}] ${status} ${message}`
+    if (status >= 500) {
+      console.error(logPrefix)
+    } else {
+      console.warn(logPrefix)
+    }
+  }
+  return res.status(status).json(errorObj)
+}
+
 // --- Middleware ---
 app.use(cors({
   origin: FRONTEND_URL,
@@ -199,36 +212,36 @@ app.post('/api/chat', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens } = req.body
 
   if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'messages array is required' })
+    return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat')
   }
 
   const modelConfig = models[modelTier]
   if (!modelConfig) {
-    return res.status(400).json({ error: `Unknown model tier: ${modelTier}` })
+    return logAndRespond(res, 400, { error: `Unknown model tier: ${modelTier}` }, 'POST /api/chat')
   }
 
   if (modelConfig.type === 'image') {
-    return res.status(400).json({ error: 'Use /api/image for image generation' })
+    return logAndRespond(res, 400, { error: 'Use /api/image for image generation' }, 'POST /api/chat')
   }
 
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
-    return res.status(400).json({ error: parsedTemperature.error })
+    return logAndRespond(res, 400, { error: parsedTemperature.error }, 'POST /api/chat')
   }
 
   const parsedMaxTokens = validateMaxTokens(maxTokens)
   if (parsedMaxTokens.error) {
-    return res.status(400).json({ error: parsedMaxTokens.error })
+    return logAndRespond(res, 400, { error: parsedMaxTokens.error }, 'POST /api/chat')
   }
 
   if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
-    return res.status(400).json({
+    return logAndRespond(res, 400, {
       error: 'temperature and maxTokens are not supported for ChatGPT models',
-    })
+    }, 'POST /api/chat')
   }
 
   if (!LLM_API_KEY) {
-    return res.status(500).json({ error: 'LLM API key not configured on server' })
+    return logAndRespond(res, 500, { error: 'LLM API key not configured on server' }, 'POST /api/chat')
   }
 
   try {
@@ -252,10 +265,10 @@ app.post('/api/chat', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`LLM API error ${response.status}:`, errorText)
-      return res.status(response.status).json({
+      return logAndRespond(res, response.status, {
         error: `LLM API error: ${response.status}`,
         details: errorText,
-      })
+      }, 'POST /api/chat')
     }
 
     // Stream the response
@@ -280,10 +293,10 @@ app.post('/api/chat', async (req, res) => {
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      return res.status(504).json({ error: 'LLM API request timeout' })
+      return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat')
     }
     console.error('Chat proxy error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat')
   }
 })
 
@@ -292,37 +305,37 @@ app.post('/api/chat/sync', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
 
   if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'messages array is required' })
+    return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat/sync')
   }
 
   const modelConfig = models[modelTier]
   if (!modelConfig || modelConfig.type === 'image') {
-    return res.status(400).json({ error: `Invalid model tier for chat: ${modelTier}` })
+    return logAndRespond(res, 400, { error: `Invalid model tier for chat: ${modelTier}` }, 'POST /api/chat/sync')
   }
 
   if (!LLM_API_KEY) {
-    return res.status(500).json({ error: 'LLM API key not configured on server' })
+    return logAndRespond(res, 500, { error: 'LLM API key not configured on server' }, 'POST /api/chat/sync')
   }
 
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
-    return res.status(400).json({ error: parsedTemperature.error })
+    return logAndRespond(res, 400, { error: parsedTemperature.error }, 'POST /api/chat/sync')
   }
 
   const parsedMaxTokens = validateMaxTokens(maxTokens)
   if (parsedMaxTokens.error) {
-    return res.status(400).json({ error: parsedMaxTokens.error })
+    return logAndRespond(res, 400, { error: parsedMaxTokens.error }, 'POST /api/chat/sync')
   }
 
   if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
-    return res.status(400).json({
+    return logAndRespond(res, 400, {
       error: 'temperature and maxTokens are not supported for ChatGPT models',
-    })
+    }, 'POST /api/chat/sync')
   }
 
   const parsedTools = validateTools(tools)
   if (parsedTools.error) {
-    return res.status(400).json({ error: parsedTools.error })
+    return logAndRespond(res, 400, { error: parsedTools.error }, 'POST /api/chat/sync')
   }
 
   try {
@@ -347,20 +360,20 @@ app.post('/api/chat/sync', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`LLM API error ${response.status}:`, errorText)
-      return res.status(response.status).json({
+      return logAndRespond(res, response.status, {
         error: `LLM API error: ${response.status}`,
         details: errorText,
-      })
+      }, 'POST /api/chat/sync')
     }
 
     const data = await response.json()
     res.json(data)
   } catch (error) {
     if (error.name === 'AbortError') {
-      return res.status(504).json({ error: 'LLM API request timeout' })
+      return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
     console.error('Chat sync proxy error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })
 
@@ -373,31 +386,31 @@ app.post('/api/image', async (req, res) => {
   const maxPromptLength = 4000
 
   if (!prompt) {
-    return res.status(400).json({ error: 'prompt is required' })
+    return logAndRespond(res, 400, { error: 'prompt is required' }, 'POST /api/image')
   }
   if (typeof prompt !== 'string') {
-    return res.status(400).json({ error: 'prompt must be a string' })
+    return logAndRespond(res, 400, { error: 'prompt must be a string' }, 'POST /api/image')
   }
   if (prompt.length > maxPromptLength) {
-    return res.status(400).json({ error: `prompt must be <= ${maxPromptLength} characters` })
+    return logAndRespond(res, 400, { error: `prompt must be <= ${maxPromptLength} characters` }, 'POST /api/image')
   }
   if (typeof size !== 'string' || !allowedSizes.has(size)) {
-    return res.status(400).json({ error: `size must be one of: ${[...allowedSizes].join(', ')}` })
+    return logAndRespond(res, 400, { error: `size must be one of: ${[...allowedSizes].join(', ')}` }, 'POST /api/image')
   }
   if (typeof quality !== 'string' || !allowedQualities.has(quality)) {
-    return res.status(400).json({ error: `quality must be one of: ${[...allowedQualities].join(', ')}` })
+    return logAndRespond(res, 400, { error: `quality must be one of: ${[...allowedQualities].join(', ')}` }, 'POST /api/image')
   }
   if (!Number.isInteger(n) || n < 1 || n > 4) {
-    return res.status(400).json({ error: 'n must be an integer between 1 and 4' })
+    return logAndRespond(res, 400, { error: 'n must be an integer between 1 and 4' }, 'POST /api/image')
   }
 
   const imageModel = models.image
   if (!imageModel) {
-    return res.status(500).json({ error: 'Image model not configured' })
+    return logAndRespond(res, 500, { error: 'Image model not configured' }, 'POST /api/image')
   }
 
   if (!LLM_API_KEY) {
-    return res.status(500).json({ error: 'LLM API key not configured on server' })
+    return logAndRespond(res, 500, { error: 'LLM API key not configured on server' }, 'POST /api/image')
   }
 
   try {
@@ -419,20 +432,20 @@ app.post('/api/image', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`Image API error ${response.status}:`, errorText)
-      return res.status(response.status).json({
+      return logAndRespond(res, response.status, {
         error: `Image API error: ${response.status}`,
         details: errorText,
-      })
+      }, 'POST /api/image')
     }
 
     const data = await response.json()
     res.json(data)
   } catch (error) {
     if (error.name === 'AbortError') {
-      return res.status(504).json({ error: 'Image API request timeout' })
+      return logAndRespond(res, 504, { error: 'Image API request timeout' }, 'POST /api/image')
     }
     console.error('Image proxy error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/image')
   }
 })
 

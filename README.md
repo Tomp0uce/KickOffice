@@ -29,6 +29,7 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 
 - **Frontend**: Vue 3 task pane add-in loaded inside Office apps. Handles UI, chat, agent tool execution (Word API calls run locally in the browser).
 - **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming), `/api/chat/sync` (agent mode with tools), `/api/image`, `/api/models`, and `/health`.
+  - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
 - **LLM API**: Any OpenAI-compatible endpoint. For testing: OpenAI API directly. For production: Azure-hosted LiteLLM proxy with dedicated endpoints.
 
 ---
@@ -177,6 +178,7 @@ KickOffice/
 - [x] Health check endpoint (`GET /health`)
 - [x] Model configuration via `.env` (4 tiers: nano, standard, reasoning, image)
 - [x] Models endpoint (`GET /api/models`) - exposes labels only, no secrets
+- [x] Centralized backend error-response logging for all 4xx/5xx API responses
 - [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
 - [x] Backend Dockerfile with health check
 - [x] Frontend Dockerfile (multi-stage build + nginx)
