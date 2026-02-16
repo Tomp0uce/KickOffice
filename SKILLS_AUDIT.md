@@ -8,7 +8,7 @@
 | Application    | Tools existants | Tools manquants identifies |
 |----------------|-----------------|----------------------------|
 | **Word**       | 39 tools        | 0 manquant (lot W1-W15 livre) |
-| **Excel**      | 25 tools        | ~18 manquants              |
+| **Excel**      | 39 tools        | 0 manquant sur le lot E1-E18 |
 | **PowerPoint** | 0 tools (!)     | ~8 a creer                 |
 | **Outlook**    | 3 tools         | ~10 manquants              |
 
@@ -45,39 +45,40 @@
 
 ---
 
-## 2. EXCEL (excelTools.ts) — 25 existants, ~18 manquants
+## 2. EXCEL (excelTools.ts) — 39 existants, 0 manquant sur le lot E1-E18
 
 ### Existant
-- Data: getSelectedCells, setCellValue, getWorksheetData, getCellFormula
-- Formules: insertFormula, fillFormulaDown
-- Formatage: formatRange, setCellNumberFormat, autoFitColumns, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
-- Structure: insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, addWorksheet
+- Data: getSelectedCells, setCellValue, getWorksheetData, getCellFormula, getDataFromSheet, copyRange
+- Formules / validation: insertFormula, fillFormulaDown, addDataValidation, setNamedRange, getNamedRanges
+- Formatage: formatRange (wrap/align/font/borders avances), setCellNumberFormat, autoFitColumns, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
+- Structure: addWorksheet, renameWorksheet, activateWorksheet, deleteWorksheet, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, createTable
 - Charts: createChart
-- Filtres: applyAutoFilter, sortRange
+- Filtres et volets: applyAutoFilter, removeAutoFilter, sortRange, freezePanes
+- Liens / commentaires / protection: addHyperlink, addCellComment, protectWorksheet
 - Utility: searchAndReplace, clearRange, getWorksheetInfo
 
-### Manquant
+### Lot Excel integre (E1-E18)
 
-| ID  | Skill                  | Cas d'usage bloquant                                                           | Implementation                                                                                 |
-|-----|------------------------|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
-| E1  | addDataValidation      | Creer des listes deroulantes ou regles de validation                           | `range.dataValidation.rule = { list: { source: "A,B,C" } }`                                    |
-| E2  | createTable            | Convertir une plage en Table Excel structuree (ListObject)                     | `sheet.tables.add(range, hasHeaders)` -> `.name = ...` -> `.style = "TableStyleMedium2"`        |
-| E3  | copyRange              | Copier une plage vers un autre emplacement                                     | `sourceRange.load('values,formulas,numberFormat')` -> `destRange.values = ...`                  |
-| E4  | renameWorksheet        | Renommer une feuille existante                                                 | `sheet.name = newName`                                                                          |
-| E5  | deleteWorksheet        | Supprimer une feuille                                                          | `sheet.delete()`                                                                                |
-| E6  | activateWorksheet      | Naviguer entre les feuilles                                                    | `workbook.worksheets.getItem(name).activate()`                                                  |
-| E7  | getDataFromSheet       | Lire les donnees d'une autre feuille sans la basculer                          | `workbook.worksheets.getItem(name).getUsedRange().load('values')`                               |
-| E8  | freezePanes            | Figer les volets (en-tetes visibles)                                           | `sheet.freezePanes.freezeRows(count)` / `.freezeColumns(count)` / `.freezeAt(range)`            |
-| E9  | addHyperlink           | Liens cliquables dans les cellules                                             | `range.hyperlink = { address, textToDisplay }`                                                   |
-| E10 | addCellComment         | Commentaires/notes aux cellules                                                | `workbook.comments.add(range, text)` (ExcelApi 1.10+)                                           |
-| E11 | wrapText (formatRange) | Retour a la ligne dans les cellules                                            | Ajouter `wrapText: boolean` dans formatRange -> `range.format.wrapText = true`                   |
-| E12 | verticalAlignment (formatRange) | Alignement vertical (top/center/bottom)                               | Ajouter `verticalAlignment` dans formatRange -> `range.format.verticalAlignment = ...`           |
-| E13 | fontName (formatRange) | Changer la police dans Excel                                                   | Ajouter `fontName: string` dans formatRange -> `range.format.font.name = fontName`               |
-| E14 | removeAutoFilter       | Retirer les filtres appliques                                                  | `sheet.autoFilter.remove()`                                                                      |
-| E15 | protectWorksheet       | Proteger/deproteger une feuille                                                | `sheet.protection.protect(options)` / `.unprotect(password)`                                     |
-| E16 | customizeBorders       | Controle du style, epaisseur, couleur des bordures par cote                    | Etendre formatRange avec borderStyle/borderColor/borderWeight per-side                           |
-| E17 | getNamedRanges         | Lire les plages nommees                                                        | `workbook.names.load('items/name,items/value')`                                                  |
-| E18 | setNamedRange          | Creer des plages nommees pour formules complexes                               | `workbook.names.add(name, range)`                                                                |
+| ID  | Skill                  | Statut | Note implementation                                                                                 |
+|-----|------------------------|--------|------------------------------------------------------------------------------------------------------|
+| E1  | addDataValidation      | Livre  | Validation de donnees (listes, bornes numeriques, date, custom) via `range.dataValidation.rule`    |
+| E2  | createTable            | Livre  | Conversion d'une plage en table structuree (`sheet.tables.add`, `name`, `style`)                    |
+| E3  | copyRange              | Livre  | Copie valeurs/formules/format numerique entre plages                                                 |
+| E4  | renameWorksheet        | Livre  | Renommage de feuille existante (`sheet.name = ...`)                                                  |
+| E5  | deleteWorksheet        | Livre  | Suppression de feuille (`sheet.delete()`)                                                            |
+| E6  | activateWorksheet      | Livre  | Activation/navigation entre feuilles (`sheet.activate()`)                                            |
+| E7  | getDataFromSheet       | Livre  | Lecture de donnees d'une autre feuille sans activation                                               |
+| E8  | freezePanes            | Livre  | Figer/defiger volets (rows/columns/at/unfreeze)                                                      |
+| E9  | addHyperlink           | Livre  | Insertion de liens cliquables (`range.hyperlink`)                                                    |
+| E10 | addCellComment         | Livre  | Ajout de commentaires de cellule (`workbook.comments.add`)                                           |
+| E11 | wrapText (formatRange) | Livre  | `formatRange` etendu avec `wrapText`                                                                 |
+| E12 | verticalAlignment      | Livre  | `formatRange` etendu avec `verticalAlignment`                                                        |
+| E13 | fontName               | Livre  | `formatRange` etendu avec `fontName`                                                                 |
+| E14 | removeAutoFilter       | Livre  | Retrait des filtres de feuille (`sheet.autoFilter.remove()`)                                         |
+| E15 | protectWorksheet       | Livre  | Protection/deprotection de feuille (`sheet.protection.protect/unprotect`)                            |
+| E16 | customizeBorders       | Livre  | `formatRange` etendu avec style/couleur/epaisseur de bordure globale et par cote                    |
+| E17 | getNamedRanges         | Livre  | Lecture des plages nommees du classeur (`workbook.names.load(...)`)                                 |
+| E18 | setNamedRange          | Livre  | Creation/mise a jour d'une plage nommee (`workbook.names.add`)                                      |
 
 ---
 
@@ -141,26 +142,26 @@ L'agent PowerPoint est en mode "prompt-only": il genere du texte, l'utilisateur 
 ### Priorite 1 — Impact immediat (quick wins + bloquants critiques)
 
 1. **P1+P2**: Wrapper les helpers PPT existants en tools agent
-2. **E11+E12+E13**: Etendre `formatRange` avec wrapText/verticalAlignment/fontName
+2. ✅ **E11+E12+E13**: Etendre `formatRange` avec wrapText/verticalAlignment/fontName
 3. **O1**: `insertTextAtCursor` — arreter de tout ecraser
 4. **O2**: `setEmailBodyHtml` — mails formates
 5. **O3+O4**: get/set subject — contexte basique
-6. **E4+E5+E6**: rename/delete/activate worksheet
-7. **E1**: `addDataValidation` — listes deroulantes
+6. ✅ **E4+E5+E6**: rename/delete/activate worksheet
+7. ✅ **E1**: `addDataValidation` — listes deroulantes
 
 ### Priorite 2 — Cas d'usage professionnels
 
-8. **E2**: `createTable` (ListObject Excel)
-9. **E3**: `copyRange`
-10. **E8**: `freezePanes`
+8. ✅ **E2**: `createTable` (ListObject Excel)
+9. ✅ **E3**: `copyRange`
+10. ✅ **E8**: `freezePanes`
 11. **P3+P4**: getSlideCount/getSlideContent
 12. **O5+O6+O7**: Recipients/Sender
-13. **E14**: `removeAutoFilter`
+13. ✅ **E14**: `removeAutoFilter`
 
 ### Priorite 3 — Features avancees
 
 14. **P5+P6+P7+P8**: Creation slides/shapes/images PPT
-15. **E9+E10**: Hyperlinks/Comments Excel
-16. **E15**: Protection feuilles
-17. **E16+E17+E18**: Borders avances / Named ranges
+15. ✅ **E9+E10**: Hyperlinks/Comments Excel
+16. ✅ **E15**: Protection feuilles
+17. ✅ **E16+E17+E18**: Borders avances / Named ranges
 18. **O8+O9+O10**: Date/Attachments/HTML insert
