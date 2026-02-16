@@ -8,6 +8,7 @@ import { message as messageUtil } from '@/utils/message'
 import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { getPowerPointSelection, getPowerPointToolDefinitions } from '@/utils/powerpointTools'
+import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickAction } from '@/types/chat'
@@ -228,7 +229,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
 
 
-  async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
+async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? getPowerPointToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
     const generalToolDefs = getGeneralToolDefinitions()
     const allToolDefs = [...generalToolDefs, ...appToolDefs]
@@ -250,9 +251,11 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
       iteration++
       currentAction.value = t('agentAnalyzing')
+      const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
+      const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response
       try {
-        response = await chatSync({ messages: currentMessages, modelTier, tools, abortSignal: abortController.value?.signal })
+        response = await chatSync({ messages: contextSafeMessages, modelTier, tools, abortSignal: abortController.value?.signal })
       } catch (err: any) {
         if (err.name === 'AbortError' || abortController.value?.signal.aborted) {
           abortedByUser = true
