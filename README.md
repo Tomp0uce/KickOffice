@@ -22,8 +22,8 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
         │                              │
         │  Office.js API               │  Health check
         ▼                              │  Model config
-   Word / Excel / PowerPoint /            │  API key storage
-   PowerPoint                          ▼
+   Word / Excel /                      │  API key storage
+   PowerPoint / Outlook                ▼
                                   .env file
 ```
 
@@ -123,7 +123,20 @@ KickOffice/
 │   ├── .env.example          # Model config + API keys (copy to .env)
 │   ├── package.json
 │   └── src/
-│       └── server.js         # Express server: proxy, health, models
+│       ├── server.js         # Express entry point: middleware setup, route mounting (80 lines)
+│       ├── config/
+│       │   ├── env.js        # Environment variable loading (PORT, FRONTEND_URL, rate limits)
+│       │   └── models.js     # Model tier config, buildChatBody(), isGpt5Model(), isChatGptModel()
+│       ├── middleware/
+│       │   ├── auth.js       # ensureLlmApiKey — checks API key is configured server-side
+│       │   └── validate.js   # validateTemperature, validateMaxTokens, validateTools, validateImagePayload
+│       ├── routes/
+│       │   ├── chat.js       # POST /api/chat (streaming), POST /api/chat/sync (agent tool loop)
+│       │   ├── health.js     # GET /health
+│       │   ├── image.js      # POST /api/image
+│       │   └── models.js     # GET /api/models
+│       └── utils/
+│           └── http.js       # fetchWithTimeout, logAndRespond
 ├── frontend/
 │   ├── Dockerfile            # Multi-stage: build + nginx
 │   ├── nginx.conf
@@ -131,38 +144,60 @@ KickOffice/
 │   ├── vite.config.js
 │   ├── index.html
 │   └── src/
-│       ├── main.ts           # Office.js init + Vue app mount
+│       ├── main.ts           # Office.js init + Vue app mount + dark mode
 │       ├── App.vue
 │       ├── api/
-│       │   ├── backend.ts    # HTTP client for backend API
-│       │   └── common.ts     # Word document insertion helpers
-│       ├── components/       # Reusable UI components
+│       │   ├── backend.ts    # HTTP client (fetch with timeout/retry, SSE parsing)
+│       │   └── common.ts     # Word document insertion helpers (replace/append)
+│       ├── components/
+│       │   ├── chat/
+│       │   │   ├── ChatHeader.vue       # New Chat / Settings buttons
+│       │   │   ├── ChatInput.vue        # Text input, model selector, checkboxes
+│       │   │   ├── ChatMessageList.vue  # Message history display + action buttons
+│       │   │   ├── MarkdownRenderer.vue # Markdown + <think> tag rendering
+│       │   │   └── QuickActionsBar.vue  # Quick action buttons (per host)
+│       │   ├── CustomButton.vue
+│       │   ├── CustomInput.vue
+│       │   ├── Message.vue              # Toast notifications
+│       │   ├── SettingCard.vue
+│       │   ├── SettingSection.vue
+│       │   └── SingleSelect.vue
+│       ├── composables/
+│       │   ├── useAgentLoop.ts    # Agent execution + tool calling + system prompt building
+│       │   ├── useImageActions.ts # Image generation, insertion (Word/PPT), clipboard
+│       │   └── useOfficeInsert.ts # Unified document insertion for all hosts
 │       ├── i18n/
 │       │   └── locales/
-│       │       ├── en.json
-│       │       └── fr.json
+│       │       ├── en.json   # English UI strings (200+ keys)
+│       │       └── fr.json   # French UI strings
 │       ├── pages/
-│       │   ├── HomePage.vue      # Main chat + agent + image + quick actions (Word/Excel/PowerPoint/Outlook)
-│       │   └── SettingsPage.vue  # Settings (language, prompts, tools)
+│       │   ├── HomePage.vue      # Orchestration: chat + agent + image + quick actions (265 lines)
+│       │   └── SettingsPage.vue  # Settings: language, profile, prompts, tools, models
 │       ├── router/
 │       ├── types/
+│       │   └── chat.ts           # DisplayMessage, QuickAction, RenderSegment
 │       └── utils/
-│           ├── constant.ts       # Built-in prompts (Word, Excel, PowerPoint, Outlook)
-│           ├── enum.ts           # localStorage keys
-│           ├── generalTools.ts   # Date + Math tools (for agent)
-│           ├── excelTools.ts     # Excel API tools (for agent)
-│           ├── hostDetection.ts  # Host detection helpers (isWord, isExcel, isPowerPoint, isOutlook)
-│           ├── outlookTools.ts   # Outlook API tools (for agent)
-│           ├── powerpointTools.ts # PowerPoint helpers + agent tools (selection/slides/content)
-│           ├── wordFormatter.ts  # Markdown-to-Word formatting
-│           ├── wordTools.ts      # Word API tools (for agent)
-│           ├── common.ts         # Option lists
-│           └── message.ts        # Toast notifications
+│           ├── constant.ts           # Built-in prompts (Word, Excel, PowerPoint, Outlook)
+│           ├── enum.ts               # localStorage keys
+│           ├── generalTools.ts       # 2 general tools: getCurrentDate, calculateMath
+│           ├── excelTools.ts         # 39 Excel API tools (for agent)
+│           ├── hostDetection.ts      # isWord, isExcel, isPowerPoint, isOutlook
+│           ├── outlookTools.ts       # 13 Outlook API tools (for agent)
+│           ├── powerpointTools.ts    # 8 PowerPoint tools (slides, shapes, notes)
+│           ├── wordFormatter.ts      # Markdown-to-Word conversion engine
+│           ├── wordTools.ts          # 39 Word API tools (for agent)
+│           ├── officeAction.ts       # Office.js error handling wrapper
+│           ├── officeOutlook.ts      # Outlook-specific API helpers
+│           ├── savedPrompts.ts       # Custom prompt management (localStorage)
+│           ├── tokenManager.ts       # Message token optimization
+│           ├── markdown.ts           # Markdown parsing helpers
+│           ├── common.ts             # Shared option lists
+│           └── message.ts            # Toast notification helpers
 ├── manifests-templates/
 │   ├── manifest-office.template.xml    # TaskPaneApp template (Word/Excel/PowerPoint)
 │   └── manifest-outlook.template.xml   # MailApp template (Outlook)
 ├── scripts/
-│   └── generate-manifests.js           # Node.js script: templates → manifests
+│   └── generate-manifests.js           # Node.js script: templates → manifests (URL substitution)
 ├── .env.example              # Root env vars: SERVER_IP, ports (copy to .env)
 ├── docker-compose.yml
 ├── manifest-office.xml       # Generated at docker-compose up (do not edit by hand)
@@ -294,13 +329,26 @@ KickOffice/
 - [x] Outlook-specific standard and agent prompts
 - [x] `ReadWriteMailbox` permission
 
+### Known Open Issues
+
+See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full details and root-cause analysis.
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| **CRITICAL** | Chat in Word broken — `reasoning_effort: 'none'` sent with tools causes empty model responses | ❌ TODO |
+| HIGH | Agent loop exits silently on empty model response (no user-visible error) | ❌ TODO |
+| HIGH | Tool enable/disable toggles in Settings have no effect (dead code) | ❌ TODO |
+| MEDIUM | Hardcoded French strings in `useAgentLoop.ts` (should use i18n `t()`) | ❌ TODO |
+| MEDIUM | Missing global Vue error handler | ❌ TODO |
+| MEDIUM | Accessibility (ARIA attributes) incomplete | ❌ TODO |
+| MEDIUM | Built-in prompts editor missing for PowerPoint and Outlook | ❌ TODO |
+
 ### Not Yet Implemented
 - [ ] Conversation history persistence (currently in-memory only, lost on page reload)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)
 - [ ] Azure deployment configuration (production server)
 - [ ] LiteLLM integration configuration (production LLM endpoints)
-- [ ] Custom logo/branding assets (user mentioned they have a logo - needs to replace placeholder icons)
 - [ ] Web search capability (disabled for now, could be re-enabled via backend proxy)
 - [ ] Chat export (save conversation to file)
 - [ ] Token usage tracking / cost monitoring
@@ -349,7 +397,7 @@ npm run dev            # Starts on port 3002 with HMR
 | `IMAGE_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/image` (milliseconds) | `60000` |
 | `IMAGE_RATE_LIMIT_MAX` | Max requests per IP during image window | `5` |
 | `MODEL_STANDARD` | Model ID for standard tasks | `gpt-5.2` |
-| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`none` to disable) | `none` |
+| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`low`, `medium`, `high`; omit to use API default) | (omitted) |
 | `MODEL_REASONING` | Model ID for complex tasks | `gpt-5.2` |
 | `MODEL_REASONING_EFFORT` | Reasoning effort for reasoning model | `high` |
 | `MODEL_IMAGE` | Model ID for image generation | `gpt-image-1.5` |
