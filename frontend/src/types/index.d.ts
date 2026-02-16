@@ -24,8 +24,11 @@ interface ToolProperty {
   default?: any
 }
 
+type ToolCategory = 'read' | 'write' | 'format'
+
 interface ToolDefinition {
   name: string
+  category: ToolCategory
   description: string
   inputSchema: ToolInputSchema
   execute: (args: Record<string, any>) => Promise<string>

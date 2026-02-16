@@ -36,6 +36,10 @@
         </div>
       </div>
     </div>
+    <div v-if="currentAction" class="mt-auto flex items-center gap-2 px-2 pb-1 text-xs text-secondary" role="status" aria-live="polite" aria-atomic="true">
+      <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
+      <span>{{ currentAction }}</span>
+    </div>
   </div>
 </template>
 
@@ -50,6 +54,7 @@ import type { DisplayMessage, RenderSegment } from '@/types/chat'
 const props = defineProps<{
   history: DisplayMessage[]
   historyWithSegments: Array<{ key: string, message: DisplayMessage, segments: RenderSegment[] }>
+  currentAction: string
   backendOnline: boolean
   emptyTitle: string
   emptySubtitle: string

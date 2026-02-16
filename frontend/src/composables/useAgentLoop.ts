@@ -1,4 +1,4 @@
-import { nextTick, type Ref } from 'vue'
+import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, chatStream, chatSync, generateImage } from '@/api/backend'
 import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
@@ -76,6 +76,14 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     adjustTextareaHeight,
     scrollToBottom,
   } = options
+
+  const currentAction = ref('')
+
+  const getActionLabelForCategory = (category: ToolCategory) => {
+    if (category === 'read') return t('agentActionReading')
+    if (category === 'format') return t('agentActionFormatting')
+    return t('agentActionRunning')
+  }
 
   const excelFormulaLanguageInstruction = () => excelFormulaLanguage.value === 'fr'
     ? 'Excel interface locale: French. Use localized French function names and separators when providing formulas, and prefer localized formula tool behavior.'
@@ -176,8 +184,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 25
     let currentMessages: ChatRequestMessage[] = [...messages]
-    const analyzingPlaceholder = t('agentAnalyzing')
-    history.value.push(createDisplayMessage('assistant', analyzingPlaceholder))
+    currentAction.value = t('agentAnalyzing')
+    history.value.push(createDisplayMessage('assistant', ''))
     const lastIndex = history.value.length - 1
     let abortedByUser = false
     while (iteration < maxIter) {
@@ -187,6 +195,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       }
 
       iteration++
+      currentAction.value = t('agentAnalyzing')
       let response
       try {
         response = await chatSync({ messages: currentMessages, modelTier, tools, abortSignal: abortController.value?.signal })
@@ -209,7 +218,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       const assistantMsg = choice.message
       currentMessages.push({ role: 'assistant', content: assistantMsg.content || '' })
       if (assistantMsg.content) history.value[lastIndex].content = assistantMsg.content
-      if (!assistantMsg.tool_calls?.length) break
+      if (!assistantMsg.tool_calls?.length) {
+        currentAction.value = ''
+        break
+      }
       for (const toolCall of assistantMsg.tool_calls) {
         const toolName = toolCall.function.name
         let toolArgs: Record<string, any> = {}
@@ -217,7 +229,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         let result = ''
         const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {
+          currentAction.value = getActionLabelForCategory(toolDef.category)
+          await scrollToBottom()
           try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
+          currentAction.value = ''
         }
         if (abortController.value?.signal.aborted) {
           abortedByUser = true
@@ -228,19 +243,22 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (abortedByUser) {
         break
       }
+      currentAction.value = t('agentAnalyzing')
     }
 
     if (abortedByUser) {
+      currentAction.value = ''
       history.value.push(createDisplayMessage('system', t('agentStoppedByUser')))
       return
     }
 
     const assistantContent = history.value[lastIndex]?.content?.trim() || ''
-    if (!assistantContent || assistantContent === analyzingPlaceholder) {
+    if (!assistantContent) {
       history.value[lastIndex].content = t('noModelResponse')
     }
 
     if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))
+    currentAction.value = ''
   }
 
   async function processChat(userMessage: string) {
@@ -306,6 +324,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         messageUtil.error(t('failedToResponse'))
       }
     } finally {
+      currentAction.value = ''
       loading.value = false
       abortController.value = null
     }
@@ -359,5 +378,5 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     })
   }
 
-  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection }
+  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction }
 }

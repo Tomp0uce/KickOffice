@@ -12,6 +12,7 @@ export interface GeneralToolDefinition {
 const generalToolDefinitions: GeneralToolDefinition[] = [
   {
     name: 'getCurrentDate',
+    category: 'read',
     description:
       'Returns the current date and time. Useful for adding timestamps, dates to documents, or understanding temporal context.',
     inputSchema: {
@@ -59,6 +60,7 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
   },
   {
     name: 'calculateMath',
+    category: 'write',
     description:
       'Evaluates mathematical expressions safely. Supports basic arithmetic (+, -, *, /), parentheses, and common math functions.',
     inputSchema: {
