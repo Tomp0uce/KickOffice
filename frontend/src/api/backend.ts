@@ -6,6 +6,7 @@ if (!BACKEND_URL) {
 
 const REQUEST_TIMEOUT_MS = 45_000
 const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
+const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -52,6 +53,11 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
     const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS, init.signal ?? undefined)
 
     try {
+      console.info(`${VERBOSE_CHAT_LOG_TAG} fetch attempt`, {
+        url,
+        attempt,
+        method: init.method || 'GET',
+      })
       return await fetch(url, {
         ...init,
         signal,
@@ -62,6 +68,12 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
       }
 
       const shouldRetry = attempt < RETRY_DELAYS_MS.length && isRetryableError(error)
+      console.warn(`${VERBOSE_CHAT_LOG_TAG} fetch failed`, {
+        url,
+        attempt,
+        shouldRetry,
+        error,
+      })
       if (!shouldRetry) {
         throw error
       }
@@ -205,6 +217,13 @@ export interface OpenAIChatCompletion {
 export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatCompletion> {
   const { messages, modelTier, tools, abortSignal } = options
 
+  console.info(`${VERBOSE_CHAT_LOG_TAG} chatSync request`, {
+    modelTier,
+    messageCount: messages.length,
+    toolCount: tools?.length || 0,
+    lastMessageRole: messages[messages.length - 1]?.role,
+  })
+
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -214,10 +233,22 @@ export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatComp
 
   if (!res.ok) {
     const err = await res.text()
+    console.error(`${VERBOSE_CHAT_LOG_TAG} chatSync non-ok response`, { status: res.status, err })
     throw new Error(`Chat sync API error ${res.status}: ${err}`)
   }
 
-  return res.json()
+  const json = await res.json()
+  console.info(`${VERBOSE_CHAT_LOG_TAG} chatSync response`, {
+    id: json?.id,
+    model: json?.model,
+    choiceCount: json?.choices?.length || 0,
+    hasFirstChoice: !!json?.choices?.[0],
+    finishReason: json?.choices?.[0]?.finish_reason ?? null,
+    hasContent: !!json?.choices?.[0]?.message?.content,
+    toolCallCount: json?.choices?.[0]?.message?.tool_calls?.length || 0,
+  })
+
+  return json
 }
 
 export interface ImageGenerateOptions {

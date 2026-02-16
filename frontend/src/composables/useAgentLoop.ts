@@ -15,6 +15,7 @@ import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickActi
 
 const ENABLED_TOOLS_STORAGE_KEY = 'enabledTools'
 const ENABLED_TOOLS_STORAGE_VERSION = 1
+const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
 
 interface EnabledToolsStorageState {
   version: number
@@ -242,6 +243,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
     const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
+    console.info(`${VERBOSE_CHAT_LOG_TAG} runAgentLoop start`, {
+      host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
+      modelTier,
+      inputMessageCount: messages.length,
+      enabledToolCount: enabledToolDefs.length,
+      firstEnabledTools: enabledToolDefs.slice(0, 10).map(tool => tool.name),
+    })
     let iteration = 0
     const maxIter = Math.min(Number(agentMaxIterations.value) || 10, 10)
     let currentMessages: ChatRequestMessage[] = [...messages]
@@ -278,9 +286,20 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         throw err
       }
       const choice = response.choices?.[0]
+      console.info(`${VERBOSE_CHAT_LOG_TAG} runAgentLoop iteration response`, {
+        iteration,
+        hasChoice: !!choice,
+        choiceCount: response.choices?.length || 0,
+      })
       if (!choice) break
       const assistantMsg = choice.message
       currentMessages.push({ role: 'assistant', content: assistantMsg.content || '' })
+      console.info(`${VERBOSE_CHAT_LOG_TAG} assistant message`, {
+        iteration,
+        hasContent: !!assistantMsg.content,
+        contentLength: assistantMsg.content?.length || 0,
+        toolCallCount: assistantMsg.tool_calls?.length || 0,
+      })
       if (assistantMsg.content) history.value[lastIndex].content = assistantMsg.content
       if (!assistantMsg.tool_calls?.length) {
         currentAction.value = ''
@@ -290,6 +309,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const toolName = toolCall.function.name
         let toolArgs: Record<string, any> = {}
         try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}
+        console.info(`${VERBOSE_CHAT_LOG_TAG} tool call`, { iteration, toolName, toolArgs })
         let result = ''
         const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {
@@ -324,6 +344,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     const assistantContent = history.value[lastIndex]?.content?.trim() || ''
     if (!assistantContent) {
+      console.warn(`${VERBOSE_CHAT_LOG_TAG} empty assistant content after loop`, {
+        iteration,
+        maxIter,
+      })
       history.value[lastIndex].content = t('noModelResponse')
     }
 
@@ -367,6 +391,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     loading.value = true
     abortController.value = new AbortController()
     history.value.push(createDisplayMessage('user', userMessage))
+    console.info(`${VERBOSE_CHAT_LOG_TAG} sendMessage`, {
+      host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
+      userMessageLength: userMessage.length,
+      useSelectedText: useSelectedText.value,
+      selectedModelTier: selectedModelTier.value,
+      historyLength: history.value.length,
+    })
     await scrollToBottom()
 
     try {
@@ -387,6 +418,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
       const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
       const fullMessage = selectedText ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]` : userMessage
+      console.info(`${VERBOSE_CHAT_LOG_TAG} sendMessage payload`, {
+        selectedTextLength: selectedText.length,
+        fullMessageLength: fullMessage.length,
+      })
       await processChat(fullMessage)
     } catch (error: any) {
       if (error.name !== 'AbortError') {

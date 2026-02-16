@@ -243,35 +243,29 @@ class WordFormatter {
   }
 
   static async insertPlainResult(result: string, insertType: Ref): Promise<void> {
-    const paragraph = result.replace(/\n+/g, '\n').replace(/\r+/g, '\n').split('\n')
+    const normalizedResult = result.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+    if (!normalizedResult.trim()) return
 
     switch (insertType.value) {
       case 'replace':
         await Word.run(async context => {
           const range = context.document.getSelection()
-          range.insertText(paragraph[0], 'Replace')
-          for (let i = paragraph.length - 1; i > 0; i--) {
-            range.insertParagraph(paragraph[i], 'After')
-          }
+          range.insertText(normalizedResult, 'Replace')
           await context.sync()
         })
         break
       case 'append':
         await Word.run(async context => {
           const range = context.document.getSelection()
-          range.insertText(paragraph[0], 'End')
-          for (let i = paragraph.length - 1; i > 0; i--) {
-            range.insertParagraph(paragraph[i], 'After')
-          }
+          range.insertText(normalizedResult, 'End')
           await context.sync()
         })
         break
       case 'newLine':
         await Word.run(async context => {
           const range = context.document.getSelection()
-          for (let i = paragraph.length - 1; i >= 0; i--) {
-            range.insertParagraph(paragraph[i], 'After')
-          }
+          range.insertParagraph(normalizedResult, 'After')
           await context.sync()
         })
         break
