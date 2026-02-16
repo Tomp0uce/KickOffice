@@ -48,7 +48,6 @@
         :stop-label="t('stop')"
         @submit="sendMessage"
         @stop="stopGeneration"
-        @input="adjustTextareaHeight"
       />
     </div>
   </div>
@@ -57,7 +56,7 @@
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
 import { BookOpen, Brush, Briefcase, CheckCheck, CheckCircle, Eraser, Eye, FileCheck, FunctionSquare, Globe, Image, ListTodo, Mail, MessageSquare, Minus, Scissors, Sparkle, Wand2, Zap } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeMount, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onBeforeMount, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
@@ -148,6 +147,11 @@ function adjustTextareaHeight() {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
   }
 }
+
+
+watch(userInput, () => {
+  adjustTextareaHeight()
+})
 
 async function scrollToBottom() {
   await nextTick()

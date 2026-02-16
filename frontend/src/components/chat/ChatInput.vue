@@ -57,6 +57,8 @@
 import { Send, Square } from 'lucide-vue-next'
 import { ref } from 'vue'
 
+const KICKOFFICE_DEBUG_TAG = '[KICKOFFICE_DEBUG]'
+
 const props = defineProps<{
   availableModels: Record<string, ModelInfo>
   selectedModelTier: string
@@ -84,31 +86,24 @@ const emit = defineEmits<{
   (e: 'input'): void
 }>()
 
-
 const handleModelTierChange = (event: Event) => {
   emit('update:selectedModelTier', (event.target as HTMLSelectElement).value)
 }
 
 const handleInput = (event: Event) => {
   const val = (event.target as HTMLTextAreaElement).value
-  console.log('[CRITICAL_DEBUG] ChatInput: Input detected via @input. Value:', val)
   emit('update:modelValue', val)
   emit('input')
 }
 
 const triggerSubmit = () => {
-  console.log('[CRITICAL_DEBUG] ChatInput: triggerSubmit called.')
-  console.log('[CRITICAL_DEBUG] ChatInput: Current props.modelValue is:', props.modelValue)
-
+  console.log(`${KICKOFFICE_DEBUG_TAG} ChatInput: triggerSubmit called.`)
   if (!props.modelValue || !props.modelValue.trim()) {
-    console.warn('[CRITICAL_DEBUG] ChatInput: Value is empty, aborting emit.')
     return
   }
 
   emit('submit', props.modelValue)
-  console.log('[CRITICAL_DEBUG] ChatInput: EMIT "submit" sent with payload:', props.modelValue)
 }
-
 
 const handleStop = () => {
   emit('stop')
