@@ -147,6 +147,8 @@ KickOffice/
 │           ├── enum.ts           # localStorage keys
 │           ├── generalTools.ts   # Date + Math tools (for agent)
 │           ├── excelTools.ts     # Excel API tools (for agent)
+│           ├── hostDetection.ts  # Host detection helpers (isWord, isExcel, isPowerPoint, isOutlook)
+│           ├── outlookTools.ts   # Outlook API tools (for agent)
 │           ├── powerpointTools.ts # PowerPoint Common API helpers
 │           ├── wordFormatter.ts  # Markdown-to-Word formatting
 │           ├── wordTools.ts      # Word API tools (for agent)
@@ -200,8 +202,9 @@ KickOffice/
 - [x] OpenAI function-calling format for tool definitions
 - [x] Tool execution status display in chat
 - [x] Max iterations limit (configurable)
-- [x] 23 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText
-- [x] 22 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight
+- [x] 24 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting
+- [x] 25 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
+- [x] 3 Outlook tools: getEmailBody, getSelectedText, setEmailBody
 - [x] 2 General tools: getCurrentDate, calculateMath
 
 ### Frontend - Quick Actions (Word)
@@ -211,6 +214,13 @@ KickOffice/
 - [x] Summary
 - [x] Grammar check
 - [x] Customizable built-in prompts (editable in settings)
+
+### Frontend - Quick Actions (Excel)
+- [x] Clean (normalize whitespace, trim, remove duplicates)
+- [x] Beautify (format cell content for readability)
+- [x] Formula (generate an Excel formula from a natural-language description)
+- [x] Transform (restructure or transpose data in the selection)
+- [x] Highlight (suggest conditional formatting rules for the selection)
 
 ### Frontend - Quick Actions (Outlook)
 - [x] Smart Reply (pre-fills prompt, user completes intent, sends with email context)
@@ -247,8 +257,8 @@ KickOffice/
 
 ### Internationalization
 - [x] i18n framework (vue-i18n)
-- [x] English translations (complete)
-- [x] French translations (complete)
+- [x] 2 UI locales: English, French
+- [x] 13 reply languages selectable by the user: English, Spanish, French, German, Italian, Portuguese, Simplified Chinese, Japanese, Korean, Dutch, Polish, Arabic, Russian
 
 ### Security
 - [x] API keys stored server-side only (never sent to client)

@@ -31,19 +31,19 @@ Depuis la review initiale (2026-02-15), **12 items sur 26 ont été corrigés** 
 | Gravité | Corrigés | Restants | Total initial |
 |---------|----------|----------|---------------|
 | **CRITIQUE** | 1 / 4 | 3 | 4 |
-| **HAUTE** | 4 / 8 | 4 | 8 |
+| **HAUTE** | 5 / 8 | 3 | 8 |
 | **MOYENNE** | 4 / 8 | 4 | 8 |
-| **BASSE** | 3 / 6 | 3 | 6 |
-| **Total** | **12 / 26** | **14** | **26** |
+| **BASSE** | 4 / 6 | 2 | 6 |
+| **Total** | **14 / 26** | **12** | **26** |
 
 ### État actuel des problèmes restants
 
 | Gravité | Nombre | Résumé |
 |---------|--------|--------|
 | **CRITIQUE** | 3 | Absence d'authentification, pas de rate limiting, fuite d'erreurs LLM |
-| **HAUTE** | 4 | Pas de headers sécurité, HomePage god component (1342 lignes), README obsolète, backend monolithique |
+| **HAUTE** | 3 | Pas de headers sécurité, HomePage god component (1342 lignes), backend monolithique |
 | **MOYENNE** | 4 | Pas de error handler Vue global, accessibilité insuffisante, pas de logging, `as any` résiduels |
-| **BASSE** | 3 | Pas de dark mode toggle, CSS répétitives, documentation hostDetection |
+| **BASSE** | 2 | Pas de dark mode toggle, CSS répétitives |
 
 ---
 
@@ -545,7 +545,7 @@ Ajouter dans la section Project Structure et mentionner le mécanisme de détect
 | ~~HAUTE~~ | ~~H2~~ | ~~Validation inputs backend~~ | ✅ Fait |
 | HAUTE | H3 | Découper `HomePage.vue` (1342 lignes) | ❌ À faire |
 | ~~HAUTE~~ | ~~H4~~ | ~~Extraire logique dupliquée~~ | ✅ Fait |
-| HAUTE | H5 | Mettre à jour README.md | ❌ À faire |
+| ~~HAUTE~~ | ~~H5~~ | ~~Mettre à jour README.md~~ | ✅ Fait |
 | ~~HAUTE~~ | ~~H6~~ | ~~Aligner `.env.example` avec defaults~~ | ✅ Fait |
 | ~~HAUTE~~ | ~~H7~~ | ~~Timeout sur requêtes fetch~~ | ✅ Fait |
 | ~~HAUTE~~ | ~~H8~~ | ~~Renommer `ToolDefinition` type~~ | ✅ Fait |
@@ -561,5 +561,5 @@ Ajouter dans la section Project Structure et mentionner le mécanisme de détect
 | ~~BASSE~~ | ~~B2~~ | ~~Réduire `any` types~~ | ✅ Fait (quelques `as any` résiduels dans l'agent loop) |
 | BASSE | B3 | Toggle dark mode | ❌ À faire |
 | BASSE | B4 | Extraire CSS répétées | ❌ À faire |
-| BASSE | B5 | Documenter `hostDetection.ts` | ❌ À faire |
+| ~~BASSE~~ | ~~B5~~ | ~~Documenter `hostDetection.ts`~~ | ✅ Fait |
 | ~~BASSE~~ | ~~B6~~ | ~~Réduire body parser~~ | ✅ Fait (4MB) |
