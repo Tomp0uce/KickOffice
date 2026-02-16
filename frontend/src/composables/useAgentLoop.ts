@@ -156,9 +156,24 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     let currentMessages = [...messages]
     history.value.push(createDisplayMessage('assistant', '⏳ Analyse de la demande...'))
     const lastIndex = history.value.length - 1
+    let abortedByUser = false
     while (iteration < maxIter) {
+      if (abortController.value?.signal.aborted) {
+        abortedByUser = true
+        break
+      }
+
       iteration++
-      const response = await chatSync({ messages: currentMessages, modelTier: selectedModelTier.value, tools })
+      let response
+      try {
+        response = await chatSync({ messages: currentMessages, modelTier: selectedModelTier.value, tools, abortSignal: abortController.value?.signal })
+      } catch (err: any) {
+        if (err.name === 'AbortError' || abortController.value?.signal.aborted) {
+          abortedByUser = true
+          break
+        }
+        throw err
+      }
       const choice = response.choices?.[0]
       if (!choice) break
       const assistantMsg = choice.message
@@ -174,9 +189,22 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         if (toolDef) {
           try { result = await toolDef.execute(toolArgs) } catch (err: any) { result = `Error: ${err.message}` }
         }
+        if (abortController.value?.signal.aborted) {
+          abortedByUser = true
+          break
+        }
         currentMessages.push({ role: 'tool' as any, tool_call_id: toolCall.id, content: result } as any)
       }
+      if (abortedByUser) {
+        break
+      }
     }
+
+    if (abortedByUser) {
+      history.value.push(createDisplayMessage('system', "🛑 Processus arrêté par l'utilisateur."))
+      return
+    }
+
     if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))
   }
 

@@ -155,6 +155,7 @@ export interface ChatSyncOptions {
   messages: ChatMessage[]
   modelTier: ModelTier
   tools?: any[]
+  abortSignal?: AbortSignal
 }
 
 export interface OpenAIChatCompletion {
@@ -181,12 +182,13 @@ export interface OpenAIChatCompletion {
 }
 
 export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatCompletion> {
-  const { messages, modelTier, tools } = options
+  const { messages, modelTier, tools, abortSignal } = options
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, modelTier, tools }),
+    signal: abortSignal,
   })
 
   if (!res.ok) {
