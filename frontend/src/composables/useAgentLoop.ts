@@ -380,13 +380,55 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     await runAgentLoop(messages, modelTier)
   }
 
-  async function sendMessage() {
-    if (!userInput.value.trim() || loading.value) return
-    if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
+  async function sendMessage(payload?: string | Event | unknown) {
+    console.group('[CRITICAL_DEBUG] sendMessage execution')
+    console.log('[CRITICAL_DEBUG] Raw payload received:', payload)
+    console.log('[CRITICAL_DEBUG] Type of payload:', typeof payload)
+    console.log('[CRITICAL_DEBUG] Current global userInput.value:', userInput.value)
 
-    const userMessage = userInput.value.trim()
-    userInput.value = ''
-    adjustTextareaHeight()
+    let textToSend = ''
+
+    if (typeof payload === 'string') {
+      console.log('[CRITICAL_DEBUG] Source: Direct String argument')
+      textToSend = payload
+    } else if (userInput.value && typeof userInput.value === 'string') {
+      console.log('[CRITICAL_DEBUG] Source: Fallback to userInput.value')
+      textToSend = userInput.value
+    } else {
+      console.error('[CRITICAL_DEBUG] FAILURE: Could not find any text to send in payload or global ref.')
+    }
+
+    textToSend = textToSend?.trim() || ''
+    console.log('[CRITICAL_DEBUG] Final text to process:', textToSend)
+
+    if (!textToSend) {
+      console.error('[CRITICAL_DEBUG] ABORTING: Text is empty.')
+      console.groupEnd()
+      return
+    }
+
+    if (loading.value) {
+      console.warn('[CRITICAL_DEBUG] ABORTING: Already loading.')
+      console.groupEnd()
+      return
+    }
+
+    if (!backendOnline.value) {
+      console.warn('[CRITICAL_DEBUG] ABORTING: Backend offline.')
+      console.groupEnd()
+      return messageUtil.error(t('backendOffline'))
+    }
+
+    if (userInput.value.trim() === textToSend) {
+      console.log('[CRITICAL_DEBUG] Clearing userInput ref')
+      userInput.value = ''
+      adjustTextareaHeight()
+    }
+
+    console.log('[CRITICAL_DEBUG] Calling processChat...')
+    console.groupEnd()
+
+    const userMessage = textToSend
 
     loading.value = true
     abortController.value = new AbortController()

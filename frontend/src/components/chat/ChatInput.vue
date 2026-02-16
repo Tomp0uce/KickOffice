@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between gap-2 overflow-hidden">
       <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         <label :id="modelTierLabelId" :for="modelTierSelectId" class="shrink-0 text-xs font-medium text-secondary">{{ taskTypeLabel }}</label>
-        <select :id="modelTierSelectId" :value="selectedModelTier" :aria-labelledby="modelTierLabelId" class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none" @change="$emit('update:selectedModelTier', ($event.target as HTMLSelectElement).value)">
+        <select :id="modelTierSelectId" :value="selectedModelTier" :aria-labelledby="modelTierLabelId" class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none" @change="handleModelTierChange">
           <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
             {{ info.label }}
           </option>
@@ -17,15 +17,15 @@
         class="placeholder:text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
         :placeholder="inputPlaceholder"
         rows="1"
-        @keydown.enter.exact.prevent="$emit('submit')"
-        @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value); $emit('input')"
+        @keydown.enter.exact.prevent="triggerSubmit()"
+        @input="handleInput"
       />
       <button
         v-if="loading"
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-danger text-white"
         :title="stopLabel"
         :aria-label="stopLabel"
-        @click="$emit('stop')"
+        @click="handleStop"
       >
         <Square :size="18" />
       </button>
@@ -35,18 +35,18 @@
         :title="sendLabel"
         :disabled="!modelValue.trim() || !backendOnline"
         :aria-label="sendLabel"
-        @click="$emit('submit')"
+        @click="triggerSubmit()"
       >
         <Send :size="18" />
       </button>
     </div>
     <div class="flex justify-center gap-3 px-1">
       <label v-if="showWordFormatting" :for="wordFormattingCheckboxId" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
-        <input :id="wordFormattingCheckboxId" :checked="useWordFormatting" :aria-label="useWordFormattingLabel" type="checkbox" @change="$emit('update:useWordFormatting', ($event.target as HTMLInputElement).checked)" />
+        <input :id="wordFormattingCheckboxId" :checked="useWordFormatting" :aria-label="useWordFormattingLabel" type="checkbox" @change="handleWordFormattingChange" />
         <span>{{ useWordFormattingLabel }}</span>
       </label>
       <label :for="selectedTextCheckboxId" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
-        <input :id="selectedTextCheckboxId" :checked="useSelectedText" :aria-label="includeSelectionLabel" type="checkbox" @change="$emit('update:useSelectedText', ($event.target as HTMLInputElement).checked)" />
+        <input :id="selectedTextCheckboxId" :checked="useSelectedText" :aria-label="includeSelectionLabel" type="checkbox" @change="handleSelectedTextChange" />
         <span>{{ includeSelectionLabel }}</span>
       </label>
     </div>
@@ -57,7 +57,7 @@
 import { Send, Square } from 'lucide-vue-next'
 import { ref } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   availableModels: Record<string, ModelInfo>
   selectedModelTier: string
   modelValue: string
@@ -74,15 +74,53 @@ defineProps<{
   stopLabel: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update:selectedModelTier', value: string): void
   (e: 'update:modelValue', value: string): void
   (e: 'update:useWordFormatting', value: boolean): void
   (e: 'update:useSelectedText', value: boolean): void
-  (e: 'submit'): void
+  (e: 'submit', value: string): void
   (e: 'stop'): void
   (e: 'input'): void
 }>()
+
+
+const handleModelTierChange = (event: Event) => {
+  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value)
+}
+
+const handleInput = (event: Event) => {
+  const val = (event.target as HTMLTextAreaElement).value
+  console.log('[CRITICAL_DEBUG] ChatInput: Input detected via @input. Value:', val)
+  emit('update:modelValue', val)
+  emit('input')
+}
+
+const triggerSubmit = () => {
+  console.log('[CRITICAL_DEBUG] ChatInput: triggerSubmit called.')
+  console.log('[CRITICAL_DEBUG] ChatInput: Current props.modelValue is:', props.modelValue)
+
+  if (!props.modelValue || !props.modelValue.trim()) {
+    console.warn('[CRITICAL_DEBUG] ChatInput: Value is empty, aborting emit.')
+    return
+  }
+
+  emit('submit', props.modelValue)
+  console.log('[CRITICAL_DEBUG] ChatInput: EMIT "submit" sent with payload:', props.modelValue)
+}
+
+
+const handleStop = () => {
+  emit('stop')
+}
+
+const handleWordFormattingChange = (event: Event) => {
+  emit('update:useWordFormatting', (event.target as HTMLInputElement).checked)
+}
+
+const handleSelectedTextChange = (event: Event) => {
+  emit('update:useSelectedText', (event.target as HTMLInputElement).checked)
+}
 
 const textareaEl = ref<HTMLTextAreaElement>()
 const modelTierSelectId = 'chat-model-tier-select'
