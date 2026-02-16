@@ -2,7 +2,7 @@ type IStringKeyMap = Record<string, any>
 
 type insertTypes = 'replace' | 'append' | 'newLine' | 'NoAction'
 
-type ModelTier = 'nano' | 'standard' | 'reasoning' | 'image'
+type ModelTier = 'standard' | 'reasoning' | 'image'
 
 interface ModelInfo {
   id: string
