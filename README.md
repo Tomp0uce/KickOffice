@@ -29,6 +29,7 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 
 - **Frontend**: Vue 3 task pane add-in loaded inside Office apps. Handles UI, chat, agent tool execution (Word API calls run locally in the browser).
 - **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming), `/api/chat/sync` (agent mode with tools), `/api/image`, `/api/models`, and `/health`.
+  - IP-based rate limiting is enabled for `/api/chat*` and `/api/image` to reduce DoS risk and control API credit consumption.
   - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
   - Request logging uses Morgan middleware for consistent HTTP access logs across endpoints.
   - Upstream AI provider error payloads are kept in server logs only; client responses use a generic `502` error message to avoid leaking infrastructure details.
@@ -177,6 +178,7 @@ KickOffice/
 - [x] Backend Express server with CORS and JSON parsing
 - [x] LLM API proxy (streaming + synchronous)
 - [x] Image generation proxy endpoint
+- [x] IP-based rate limiting on `/api/chat*` and `/api/image`
 - [x] Health check endpoint (`GET /health`)
 - [x] Model configuration via `.env` (4 tiers: nano, standard, reasoning, image)
 - [x] Models endpoint (`GET /api/models`) - exposes labels only, no secrets
@@ -341,6 +343,10 @@ npm run dev            # Starts on port 3002 with HMR
 | `LLM_API_BASE_URL` | OpenAI-compatible API base URL | `https://api.openai.com/v1` |
 | `LLM_API_KEY` | API key for LLM provider | (required) |
 | `MAX_TOOLS` | Max number of tools accepted by `/api/chat/sync` | `128` |
+| `CHAT_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/chat*` (milliseconds) | `60000` |
+| `CHAT_RATE_LIMIT_MAX` | Max requests per IP during chat window | `20` |
+| `IMAGE_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/image` (milliseconds) | `60000` |
+| `IMAGE_RATE_LIMIT_MAX` | Max requests per IP during image window | `5` |
 | `MODEL_NANO` | Model ID for basic tasks | `gpt-4.1-nano` |
 | `MODEL_STANDARD` | Model ID for standard tasks | `gpt-4.1` |
 | `MODEL_REASONING` | Model ID for complex tasks | `o3` |
