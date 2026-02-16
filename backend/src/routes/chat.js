@@ -1,10 +1,14 @@
 import { Router } from 'express'
 
-import { buildChatBody, isChatGptModel, LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
+import { buildChatBody, isChatGptModel, isGpt5Model, LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
 import { validateMaxTokens, validateTemperature, validateTools } from '../middleware/validate.js'
 import { fetchWithTimeout, logAndRespond } from '../utils/http.js'
 
 const chatRouter = Router()
+
+function requiresReasoningSafeParams(modelConfig) {
+  return isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort !== 'none'
+}
 
 function getChatTimeoutMs(modelTier) {
   if (modelTier === 'reasoning') return 300_000
@@ -43,6 +47,12 @@ chatRouter.post('/', async (req, res) => {
     }, 'POST /api/chat')
   }
 
+  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
+    return logAndRespond(res, 400, {
+      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
+    }, 'POST /api/chat')
+  }
+
   try {
     const body = buildChatBody({
       modelTier,
@@ -64,7 +74,7 @@ chatRouter.post('/', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`LLM API error ${response.status}:`, errorText)
+      console.error('LLM API error on /api/chat', { status: response.status, modelTier, errorText })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat')
@@ -110,6 +120,12 @@ chatRouter.post('/sync', async (req, res) => {
     return logAndRespond(res, 400, { error: `Invalid model tier for chat: ${modelTier}` }, 'POST /api/chat/sync')
   }
 
+  console.info('POST /api/chat/sync incoming', {
+    modelTier,
+    messageCount: messages.length,
+    toolCount: Array.isArray(tools) ? tools.length : 0,
+  })
+
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
     return logAndRespond(res, 400, { error: parsedTemperature.error }, 'POST /api/chat/sync')
@@ -123,6 +139,12 @@ chatRouter.post('/sync', async (req, res) => {
   if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
     return logAndRespond(res, 400, {
       error: 'temperature and maxTokens are not supported for ChatGPT models',
+    }, 'POST /api/chat/sync')
+  }
+
+  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
+    return logAndRespond(res, 400, {
+      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
     }, 'POST /api/chat/sync')
   }
 
@@ -153,7 +175,7 @@ chatRouter.post('/sync', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`LLM API error ${response.status}:`, errorText)
+      console.error('LLM API error on /api/chat/sync', { status: response.status, modelTier, errorText })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat/sync')
@@ -165,7 +187,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (error.name === 'AbortError') {
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
-    console.error('Chat sync proxy error:', error)
+    console.error('Chat sync proxy error', { modelTier, error })
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })

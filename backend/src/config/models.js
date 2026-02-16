@@ -8,6 +8,7 @@ const models = {
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
     maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '4096', 10),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
+    reasoningEffort: process.env.MODEL_STANDARD_REASONING_EFFORT || 'none',
     type: 'chat',
   },
   reasoning: {
@@ -48,6 +49,8 @@ function getPublicModels() {
 function buildChatBody({ modelTier, modelConfig, messages, temperature, maxTokens, stream, tools }) {
   const modelId = modelConfig.id
   const supportsLegacyParams = !isChatGptModel(modelId)
+  const reasoningEffort = isGpt5Model(modelId) ? (modelConfig.reasoningEffort || 'none') : undefined
+  const canUseSamplingParams = !isGpt5Model(modelId) || reasoningEffort === 'none'
   const body = {
     model: modelId,
     messages,
@@ -67,7 +70,7 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
 
   if (supportsLegacyParams) {
     const resolvedTemperature = temperature ?? modelConfig.temperature
-    if (!isGpt5Model(modelId) && Number.isFinite(resolvedTemperature)) {
+    if (canUseSamplingParams && Number.isFinite(resolvedTemperature)) {
       body.temperature = resolvedTemperature
     }
   }
@@ -77,8 +80,8 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
     body.tool_choice = 'auto'
   }
 
-  if (modelTier === 'reasoning' && isGpt5Model(modelId)) {
-    body.reasoning_effort = modelConfig.reasoningEffort
+  if (modelTier !== 'image' && isGpt5Model(modelId) && reasoningEffort && reasoningEffort !== 'none') {
+    body.reasoning_effort = reasoningEffort
   }
 
   return body
@@ -88,6 +91,7 @@ export {
   buildChatBody,
   getPublicModels,
   isChatGptModel,
+  isGpt5Model,
   LLM_API_BASE_URL,
   LLM_API_KEY,
   models,

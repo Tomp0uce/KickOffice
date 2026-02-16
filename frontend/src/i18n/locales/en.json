@@ -97,6 +97,8 @@
   "imageInsertWordOnly": "For images, direct insertion is available in Word. The image was copied to the clipboard.",
   "insertedToCell": "Inserted into selected cell",
   "localLanguageLabel": "UI Language",
+  "darkModeLabel": "Dark Mode",
+  "darkModeDescription": "Use a darker color theme",
   "newChat": "New Chat",
   "polish": "Polish",
   "prompts": "Prompts",

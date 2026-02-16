@@ -147,7 +147,13 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     })
   }
 
-  async function runAgentLoop(messages: ChatMessage[]) {
+  const resolveChatModelTier = (): ModelTier => (
+    selectedModelInfo.value?.type === 'image' ? firstChatModelTier.value : selectedModelTier.value
+  )
+
+
+
+  async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? getPowerPointToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
     const generalToolDefs = getGeneralToolDefinitions()
     const tools = [...generalToolDefs, ...appToolDefs].map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema } }))
@@ -166,12 +172,19 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       iteration++
       let response
       try {
-        response = await chatSync({ messages: currentMessages, modelTier: selectedModelTier.value, tools, abortSignal: abortController.value?.signal })
+        response = await chatSync({ messages: currentMessages, modelTier, tools, abortSignal: abortController.value?.signal })
       } catch (err: any) {
         if (err.name === 'AbortError' || abortController.value?.signal.aborted) {
           abortedByUser = true
           break
         }
+        console.error('[AgentLoop] chatSync failed', {
+          host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
+          modelTier,
+          iteration,
+          messageCount: currentMessages.length,
+          error: err,
+        })
         throw err
       }
       const choice = response.choices?.[0]
@@ -187,7 +200,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         let result = ''
         const toolDef = [...generalToolDefs, ...appToolDefs].find(tool => tool.name === toolName)
         if (toolDef) {
-          try { result = await toolDef.execute(toolArgs) } catch (err: any) { result = `Error: ${err.message}` }
+          try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
         }
         if (abortController.value?.signal.aborted) {
           abortedByUser = true
@@ -227,7 +240,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       return
     }
     const systemPrompt = customSystemPrompt.value || agentPrompt(replyLanguage.value || 'Français')
-    await runAgentLoop(buildChatMessages(systemPrompt))
+    const messages = buildChatMessages(systemPrompt)
+    const modelTier = resolveChatModelTier()
+
+    await runAgentLoop(messages, modelTier)
   }
 
   async function sendMessage() {
@@ -251,7 +267,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     try {
       await processChat(fullMessage)
     } catch (error: any) {
-      if (error.name !== 'AbortError') messageUtil.error(t('failedToResponse'))
+      if (error.name !== 'AbortError') {
+        console.error('[AgentLoop] sendMessage failed', error)
+        messageUtil.error(t('failedToResponse'))
+      }
     } finally {
       loading.value = false
       abortController.value = null
@@ -295,7 +314,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     history.value.push(createDisplayMessage('assistant', ''))
     await chatStream({
       messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-      modelTier: selectedModelInfo.value?.type === 'image' ? firstChatModelTier.value : selectedModelTier.value,
+      modelTier: resolveChatModelTier(),
       onStream: async (text: string) => {
         const message = history.value[history.value.length - 1]
         message.role = 'assistant'

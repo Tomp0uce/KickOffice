@@ -17,14 +17,20 @@ export const languageMap: IStringKeyMap = {
 export const buildInPrompt = {
   translate: {
     system: (language: string) =>
-      `You are an expert polyglot translator. Your task is to provide professional, context-aware translations into ${language}.
+      `You are an expert polyglot translator focused on French-English bilingual translation.
       Maintain formatting, keep the original tone, and ensure the output is idiomatic and elegant.`,
     user: (text: string, language: string) =>
-      `Task: Translate the following text into ${language}.
+      `Task: Translate the following text with automatic French-English direction detection.
       Constraints:
-      1. Provide a natural-sounding translation suitable for native speakers.
-      2. If the text is technical, use appropriate terminology.
-      3. OUTPUT ONLY the translated text. Do not include "Here is the translation" or any explanations.
+      1. If the source text is mostly French, translate it to natural English.
+      2. If the source text is mostly English, translate it to natural French.
+      3. If the source text is mixed, choose the dominant language and translate to the other (French <-> English).
+      4. Ignore requested output language preferences and always apply this bilingual rule.
+      5. Preserve formatting, numbers, and names.
+      6. If no translation is needed, return the original text unchanged.
+      7. OUTPUT ONLY the translated text. Do not include explanations.
+
+      Optional user language setting (for context only): ${language}
 
       Text: ${text}`,
   },
