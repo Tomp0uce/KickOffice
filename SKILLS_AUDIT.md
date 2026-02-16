@@ -10,7 +10,7 @@
 | **Word**       | 39 tools        | 0 manquant (lot W1-W15 livré) |
 | **Excel**      | 39 tools        | 0 manquant (lot E1-E18 livré) |
 | **PowerPoint** | 8 tools         | 0 manquant sur le lot P1-P8 |
-| **Outlook**    | 3 tools         | ~10 manquants              |
+| **Outlook**    | 13 tools        | 0 manquant (lot O1-O10 livré) |
 
 ---
 
@@ -79,24 +79,37 @@ Statut: **Livré**.
 
 ---
 
-## 4. OUTLOOK (outlookTools.ts) — 3 existants, ~10 manquants
+## 4. OUTLOOK (outlookTools.ts) — 13 existants
 
 ### Existant
 - getEmailBody — lire le corps entier
 - getSelectedText — lire la sélection
 - setEmailBody — remplacer tout le corps (texte brut)
+- insertTextAtCursor — insérer du texte brut au curseur
+- setEmailBodyHtml — remplacer tout le corps en HTML
+- getEmailSubject — lire l'objet du mail
+- setEmailSubject — modifier l'objet en mode compose
+- getEmailRecipients — lire To/Cc/Bcc
+- addRecipient — ajouter un destinataire To/Cc/Bcc
+- getEmailSender — lire l'expéditeur
+- getEmailDate — lire la date de création du mail
+- getAttachments — lister les pièces jointes
+- insertHtmlAtCursor — insérer du HTML formaté au curseur
 
-### Manquant
-- O1 insertTextAtCursor
-- O2 setEmailBodyHtml
-- O3 getEmailSubject
-- O4 setEmailSubject
-- O5 getEmailRecipients
-- O6 addRecipient
-- O7 getEmailSender
-- O8 getEmailDate
-- O9 getAttachments
-- O10 insertHtmlAtCursor
+### Lot Outlook intégré (O1-O10)
+
+| ID  | Skill              | Statut | Note d'implémentation |
+|-----|--------------------|--------|-----------------------|
+| O1  | insertTextAtCursor | Livré  | `mailbox.item.body.setSelectedDataAsync(text, { coercionType: Text })` |
+| O2  | setEmailBodyHtml   | Livré  | `mailbox.item.body.setAsync(html, { coercionType: Html })` |
+| O3  | getEmailSubject    | Livré  | `mailbox.item.subject.getAsync(...)` avec fallback `.subject` |
+| O4  | setEmailSubject    | Livré  | `mailbox.item.subject.setAsync(subject, callback)` |
+| O5  | getEmailRecipients | Livré  | `to/cc/bcc.getAsync()` + fallback lecture directe |
+| O6  | addRecipient       | Livré  | `to/cc/bcc.addAsync(...)` avec normalisation des entrées |
+| O7  | getEmailSender     | Livré  | `mailbox.item.from` / `mailbox.item.sender` |
+| O8  | getEmailDate       | Livré  | `mailbox.item.dateTimeCreated` |
+| O9  | getAttachments     | Livré  | `mailbox.item.getAttachmentsAsync()` + fallback `.attachments` |
+| O10 | insertHtmlAtCursor | Livré  | `mailbox.item.body.setSelectedDataAsync(html, { coercionType: Html })` |
 
 ---
 
@@ -108,12 +121,10 @@ Statut: **Livré**.
 - ✅ PowerPoint lot P1-P8
 
 ### Priorité 1 — Reste critique
-1. **O1** `insertTextAtCursor`
-2. **O2** `setEmailBodyHtml`
-3. **O3+O4** `getEmailSubject` / `setEmailSubject`
+✅ Aucun blocage critique restant sur Outlook dans ce lot.
 
 ### Priorité 2 — Cas d'usage professionnels
-4. **O5+O6+O7** destinataires / expéditeur
+✅ Couvert (destinataires / expéditeur).
 
 ### Priorité 3 — Features avancées
-5. **O8+O9+O10** date / pièces jointes / insertion HTML au curseur
+✅ Couvert (date / pièces jointes / insertion HTML au curseur).

@@ -205,7 +205,7 @@ KickOffice/
 - [x] 39 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak
 - [x] 39 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules
 - [x] 8 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage
-- [x] 3 Outlook tools: getEmailBody, getSelectedText, setEmailBody
+- [x] 13 Outlook tools: getEmailBody, getSelectedText, setEmailBody, insertTextAtCursor, setEmailBodyHtml, getEmailSubject, setEmailSubject, getEmailRecipients, addRecipient, getEmailSender, getEmailDate, getAttachments, insertHtmlAtCursor
 - [x] 2 General tools: getCurrentDate, calculateMath
 
 ### Frontend - Quick Actions (Word)
@@ -279,6 +279,11 @@ KickOffice/
 - [x] Asynchronous email body retrieval (`body.getAsync`)
 - [x] Selected text retrieval in compose mode (`getSelectedDataAsync`)
 - [x] Email body insertion in compose mode (`body.setAsync`)
+- [x] Subject read/update (`subject.getAsync` / `subject.setAsync`)
+- [x] Recipient read/update (`to/cc/bcc.getAsync` / `addAsync`)
+- [x] Sender/date/attachments access (`from|sender`, `dateTimeCreated`, `attachments|getAttachmentsAsync`)
+- [x] Cursor insertion for plain text + HTML (`body.setSelectedDataAsync`)
+- [x] Full HTML body replacement (`body.setAsync` with `CoercionType.Html`)
 - [x] Outlook-specific standard and agent prompts
 - [x] `ReadWriteMailbox` permission
 
