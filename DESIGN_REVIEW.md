@@ -29,14 +29,14 @@ KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Ou
 
 | Severity | Count | Summary |
 |----------|-------|---------|
-| **CRITICAL** | 6 | Chat broken in Word/Excel, images inserted as base64 text, silent errors, security (auth, rate limit, error leakage) |
+| **CRITICAL** | 5 | Images inserted as base64 text, silent errors, security (auth, rate limit, error leakage) |
 | **HIGH** | 5 | Wrong model tiers, missing security headers, god component, monolithic backend, agent loop without abort |
 | **MEDIUM** | 5 | Fragile SSE parser, missing Vue error handler, accessibility, request logging, residual `as any` |
 | **LOW** | 3 | Dark mode toggle, repeated CSS, outdated README |
 
 ### Previously Completed Fixes
 
-14 out of 26 initial items were fixed in the first iteration. This document does not revisit them and focuses on remaining issues + newly discovered ones.
+15 out of 26 initial items were fixed in the first iteration. This document does not revisit them and focuses on remaining issues + newly discovered ones.
 
 ---
 
@@ -45,7 +45,8 @@ KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Ou
 | Old ID | Item | Evidence |
 |--------|------|----------|
 | C4 | Cleanup `setInterval` | `HomePage.vue:1338-1342` — `onUnmounted` + `clearInterval` |
-| H2 | Backend input validation | `server.js:55-106` — `validateTemperature`, `validateMaxTokens`, `validateTools` |
+| H2 | Backend input validation | `server.js:56-107` — `validateTemperature`, `validateMaxTokens`, `validateTools` |
+| C1 | Raise tools limit for Word/Excel chat | `server.js:9,74` — configurable `MAX_TOOLS` (default 128) |
 | H4 | Extract duplicated logic | `savedPrompts.ts`, unified `getOfficeSelection()` |
 | H6 | Align `.env.example` with defaults | Consistent between `.env.example` and `server.js` |
 | H7 | Fetch request timeouts | Backend: `fetchWithTimeout` + AbortController. Frontend: `fetchWithTimeoutAndRetry` |
@@ -76,7 +77,6 @@ KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Ou
 
 ### Weaknesses
 
-- **Blocking bug**: Word/Excel chat broken by 32-tool limit in the backend
 - **Functional bug**: Image insertion inserts base64 text instead of actual images
 - **Silent errors**: Backend 400 errors are never logged — impossible to diagnose
 - **Security**: No authentication, no rate limiting
@@ -93,7 +93,7 @@ KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Ou
 
 ---
 
-#### C1. Chat broken in Word and Excel — 32-tool limit exceeded
+#### C1. Chat broken in Word and Excel — 32-tool limit exceeded ✅ FIXED (2026-02-16)
 
 **Symptom**: Chat shows a "response error" in the UI under Word and Excel, but no error appears in the backend logs. Chat works in PowerPoint. Quick actions (buttons) still work.
 
@@ -113,15 +113,18 @@ The backend returns a 400 error, which is properly caught by the frontend (`back
 **Why quick actions still work**: They use `chatStream()` which calls `/api/chat` (streaming) **without tools**. Only normal chat goes through `chatSync()` → `/api/chat/sync` with tools.
 
 **Files**: `server.js:73`, `HomePage.vue:940-948` (tool construction)
-**Impact**: Chat completely broken for Word and Excel (the 2 primary hosts)
+**Impact**: Chat was completely broken for Word and Excel (the 2 primary hosts).
 
-**Proposed fix**:
-1. Increase the limit in `validateTools()` from 32 to 128 (or make it configurable via env):
+**Resolution implemented**:
+1. Added a configurable backend limit:
    ```javascript
    const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
    if (tools.length > MAX_TOOLS) return { error: `tools supports at most ${MAX_TOOLS} entries` }
    ```
-2. Alternatively, consider dynamically sending only relevant tools rather than all host tools. This would also reduce payload size and token costs.
+2. Default limit is now **128**, which covers Word/Excel tool sets with margin.
+3. Added `MAX_TOOLS` to `backend/.env.example` and backend environment documentation in `README.md`.
+
+**Follow-up (optional)**: Dynamically send only relevant tools to reduce payload size and token usage.
 
 ---
 
@@ -519,7 +522,7 @@ watch(darkMode, (val) => {
 
 | Priority | ID | Action | Status |
 |----------|-----|--------|--------|
-| **CRITICAL** | **C1** | **Chat broken Word/Excel — 32 tools limit** | ❌ TODO |
+| **CRITICAL** | **C1** | **Chat broken Word/Excel — 32 tools limit** | ✅ FIXED |
 | **CRITICAL** | **C2** | **Image buttons insert base64 text** | ❌ TODO |
 | **CRITICAL** | **C3** | **400 errors not logged in backend** | ❌ TODO |
 | **CRITICAL** | **C4** | **LLM error leakage to client** | ❌ TODO |

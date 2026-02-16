@@ -336,6 +336,7 @@ npm run dev            # Starts on port 3002 with HMR
 | `FRONTEND_URL` | Allowed CORS origin | `http://192.168.50.10:3002` |
 | `LLM_API_BASE_URL` | OpenAI-compatible API base URL | `https://api.openai.com/v1` |
 | `LLM_API_KEY` | API key for LLM provider | (required) |
+| `MAX_TOOLS` | Max number of tools accepted by `/api/chat/sync` | `128` |
 | `MODEL_NANO` | Model ID for basic tasks | `gpt-4.1-nano` |
 | `MODEL_STANDARD` | Model ID for standard tasks | `gpt-4.1` |
 | `MODEL_REASONING` | Model ID for complex tasks | `o3` |
