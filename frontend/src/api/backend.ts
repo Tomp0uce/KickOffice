@@ -94,6 +94,14 @@ export interface ChatMessage {
   content: string
 }
 
+export interface ToolChatMessage {
+  role: 'tool'
+  tool_call_id: string
+  content: string
+}
+
+export type ChatRequestMessage = ChatMessage | ToolChatMessage
+
 export interface ChatStreamOptions {
   messages: ChatMessage[]
   modelTier: ModelTier
@@ -120,17 +128,20 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let fullContent = ''
+  let buffer = ''
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
 
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const data = line.slice(6)
+      const trimmedLine = line.trim()
+      if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue
+      const data = trimmedLine.slice(6)
       if (data === '[DONE]') return
 
       try {
@@ -152,10 +163,20 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 }
 
 export interface ChatSyncOptions {
-  messages: ChatMessage[]
+  messages: ChatRequestMessage[]
   modelTier: ModelTier
-  tools?: any[]
+  tools?: ToolDefinition[]
   abortSignal?: AbortSignal
+}
+
+export interface ToolDefinition {
+  type: 'function'
+  function: {
+    name: string
+    description?: string
+    parameters: Record<string, unknown>
+    strict?: boolean
+  }
 }
 
 export interface OpenAIChatCompletion {

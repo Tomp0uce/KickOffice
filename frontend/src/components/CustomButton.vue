@@ -4,6 +4,7 @@
     class="group flex min-w-fit cursor-pointer items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-fast ease-apple not-disabled:hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
     :class="classVar"
     :title="title || undefined"
+    :aria-label="ariaLabel || title || undefined"
     :data-active="active"
     @click="emit('click')"
   >
@@ -36,6 +37,7 @@ const {
   title = '',
   iconClass = '',
   textClass = '',
+  ariaLabel = '',
 } = defineProps<{
   text: string
   icon?: any
@@ -46,6 +48,7 @@ const {
   title?: string
   iconClass?: string
   textClass?: string
+  ariaLabel?: string
 }>()
 
 const textClassVar = computed(() => {

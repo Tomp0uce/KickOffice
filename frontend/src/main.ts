@@ -29,6 +29,10 @@ window.Office.onReady(() => {
       super(callback)
     }
   }
+  app.config.errorHandler = (err, _instance, info) => {
+    console.error('Vue Global Error:', err, info)
+  }
+
   app.use(i18n)
   app.use(router)
   app.mount('#app')
