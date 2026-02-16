@@ -80,7 +80,7 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
     body.tool_choice = 'auto'
   }
 
-  if (modelTier !== 'image' && isGpt5Model(modelId)) {
+  if (modelTier !== 'image' && isGpt5Model(modelId) && reasoningEffort && reasoningEffort !== 'none') {
     body.reasoning_effort = reasoningEffort
   }
 
