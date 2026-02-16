@@ -266,7 +266,7 @@ import { message as messageUtil } from '@/utils/message'
 import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
-import { getPowerPointSelection, insertIntoPowerPoint } from '@/utils/powerpointTools'
+import { getPowerPointSelection, getPowerPointToolDefinitions, insertIntoPowerPoint } from '@/utils/powerpointTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 
 const router = useRouter()
@@ -733,6 +733,7 @@ You are a PowerPoint presentation expert. Your goal is to help users create clea
 - Generate speaker notes (conversational, with transition cues).
 - Shorten or restructure content for better visual flow.
 - Suggest image prompts for slide visuals.
+- Use available PowerPoint tools to read selection, update text, inspect slides, add slides, add notes, and insert text boxes or images.
 
 # Guidelines
 1. **Slide-first mindset**: Always think in terms of what looks good on a slide.
@@ -932,7 +933,7 @@ async function processChat(userMessage: string) {
 }
 
 async function runAgentLoop(messages: ChatMessage[], _systemPrompt: string) {
-  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? [] : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+  const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? getPowerPointToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
   const generalToolDefs = getGeneralToolDefinitions()
 
   // Build OpenAI-format tool definitions

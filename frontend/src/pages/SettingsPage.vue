@@ -357,7 +357,7 @@
               </div>
               <div class="rounded-md border border-border-secondary p-1 shadow-sm">
                 <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
-                  {{ t(hostIsExcel ? 'excelToolsDescription' : 'wordToolsDescription') }}
+                  {{ t(toolDescriptionKey) }}
                 </p>
               </div>
               <div class="flex flex-col gap-2">
@@ -375,10 +375,10 @@
                   />
                   <div class="flex flex-col" @click="toggleTool(tool.name)">
                     <label :for="'tool-' + tool.name" class="text-xs font-semibold text-secondary">
-                      {{ $t(`${hostIsExcel ? 'excelTool' : 'wordTool'}_${tool.name}`) }}
+                      {{ $t(`${toolTranslationPrefix}_${tool.name}`) }}
                     </label>
                     <span class="text-xs text-secondary/90">
-                      {{ $t(`${hostIsExcel ? 'excelTool' : 'wordTool'}_${tool.name}_desc`) }}
+                      {{ $t(`${toolTranslationPrefix}_${tool.name}_desc`) }}
                     </span>
                   </div>
                 </div>
@@ -419,8 +419,9 @@ import { optionLists } from '@/utils/common'
 import { localStorageKey } from '@/utils/enum'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { isExcel } from '@/utils/hostDetection'
+import { isExcel, isPowerPoint } from '@/utils/hostDetection'
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { i18n } from '@/i18n'
 
@@ -466,11 +467,29 @@ const availableModels = ref<Record<string, ModelInfo>>({})
 
 // Host detection
 const hostIsExcel = isExcel()
+const hostIsPowerPoint = isPowerPoint()
 
 // Tools - switch based on host
-const appToolsList = hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+const appToolsList = hostIsExcel
+  ? getExcelToolDefinitions()
+  : hostIsPowerPoint
+    ? getPowerPointToolDefinitions()
+    : getWordToolDefinitions()
 const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
 const enabledTools = ref<Set<string>>(new Set())
+
+
+const toolDescriptionKey = hostIsExcel
+  ? 'excelToolsDescription'
+  : hostIsPowerPoint
+    ? 'powerpointToolsDescription'
+    : 'wordToolsDescription'
+
+const toolTranslationPrefix = hostIsExcel
+  ? 'excelTool'
+  : hostIsPowerPoint
+    ? 'powerpointTool'
+    : 'wordTool'
 
 // Prompt management
 const savedPrompts = ref<SavedPrompt[]>([])
