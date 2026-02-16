@@ -317,5 +317,7 @@
   "outlookTool_getAttachments": "Get Attachments",
   "outlookTool_getAttachments_desc": "List attachments from the current email.",
   "outlookTool_insertHtmlAtCursor": "Insert HTML at Cursor",
-  "outlookTool_insertHtmlAtCursor_desc": "Insert formatted HTML at the current cursor position."
+  "outlookTool_insertHtmlAtCursor_desc": "Insert formatted HTML at the current cursor position.",
+  "imageClipboardNotSupported": "Unable to copy the image: clipboard image writing is not supported in this environment.",
+  "imageInsertExcelNotSupported": "Image insertion is not supported in Excel add-ins. Please use Word or PowerPoint."
 }

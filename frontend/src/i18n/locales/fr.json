@@ -317,5 +317,7 @@
   "outlookTool_getAttachments": "Lister les pièces jointes",
   "outlookTool_getAttachments_desc": "Lister les pièces jointes de l’email courant.",
   "outlookTool_insertHtmlAtCursor": "Insérer du HTML au curseur",
-  "outlookTool_insertHtmlAtCursor_desc": "Insérer du HTML formaté à la position courante du curseur."
+  "outlookTool_insertHtmlAtCursor_desc": "Insérer du HTML formaté à la position courante du curseur.",
+  "imageClipboardNotSupported": "Impossible de copier l'image : l'écriture d'image dans le presse-papiers n'est pas prise en charge dans cet environnement.",
+  "imageInsertExcelNotSupported": "L'insertion d'image n'est pas prise en charge dans les compléments Excel. Utilisez Word ou PowerPoint."
 }

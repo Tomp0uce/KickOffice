@@ -496,10 +496,10 @@ async function copyImageToClipboard(imageSrc: string, fallback = false) {
       return
     }
   } catch (err) {
-    console.warn('Image clipboard write failed, trying URL text fallback:', err)
+    console.warn('Image clipboard write failed:', err)
   }
 
-  await copyToClipboard(imageSrc, fallback)
+  messageUtil.error(t('imageClipboardNotSupported'))
 }
 
 async function copyMessageToClipboard(message: DisplayMessage, fallback = false) {
@@ -512,16 +512,47 @@ async function copyMessageToClipboard(message: DisplayMessage, fallback = false)
 
 async function insertImageToWord(imageSrc: string, type: insertTypes) {
   const base64Payload = imageSrc.includes(',') ? imageSrc.split(',')[1] : imageSrc
+  if (!base64Payload.trim()) {
+    throw new Error('Image base64 payload is empty')
+  }
+
   await Word.run(async (ctx) => {
     const range = ctx.document.getSelection()
-    if (type === 'replace') {
-      range.insertInlinePictureFromBase64(base64Payload, 'Replace')
-    } else if (type === 'append') {
-      range.insertInlinePictureFromBase64(base64Payload, 'After')
-    } else {
-      range.insertInlinePictureFromBase64(base64Payload, 'After')
+    try {
+      if (type === 'replace') {
+        range.insertInlinePictureFromBase64(base64Payload, 'Replace')
+      } else if (type === 'append') {
+        range.insertInlinePictureFromBase64(base64Payload, 'After')
+      } else {
+        range.insertInlinePictureFromBase64(base64Payload, 'After')
+      }
+    } catch (err) {
+      console.error('Word insertInlinePictureFromBase64 failed:', err)
+      throw err
     }
+
     await ctx.sync()
+  })
+}
+
+async function insertImageToPowerPoint(imageSrc: string, type: insertTypes) {
+  const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim()
+  if (!base64Payload) {
+    throw new Error('Image base64 payload is empty')
+  }
+
+  await PowerPoint.run(async (context: any) => {
+    const slides = context.presentation.getSelectedSlides()
+    slides.load('items')
+    await context.sync()
+
+    if (!slides.items.length) {
+      throw new Error('No PowerPoint slide selected')
+    }
+
+    const targetSlide = type === 'append' ? slides.items[slides.items.length - 1] : slides.items[0]
+    targetSlide.shapes.addImage(base64Payload)
+    await context.sync()
   })
 }
 
@@ -532,9 +563,25 @@ async function insertMessageToDocument(message: DisplayMessage, type: insertType
         await insertImageToWord(message.imageSrc, type)
         messageUtil.success(t('inserted'))
       } catch (err) {
-        console.warn('Image insertion failed, copying image to clipboard:', err)
+        console.warn('Word image insertion failed, trying clipboard:', err)
         await copyImageToClipboard(message.imageSrc, true)
       }
+      return
+    }
+
+    if (hostIsPowerPoint) {
+      try {
+        await insertImageToPowerPoint(message.imageSrc, type)
+        messageUtil.success(t('insertedToSlide'))
+      } catch (err) {
+        console.warn('PowerPoint image insertion failed, trying clipboard:', err)
+        await copyImageToClipboard(message.imageSrc, true)
+      }
+      return
+    }
+
+    if (hostIsExcel) {
+      messageUtil.info(t('imageInsertExcelNotSupported'))
       return
     }
 
