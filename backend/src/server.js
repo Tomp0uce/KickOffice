@@ -18,15 +18,8 @@ const IMAGE_RATE_LIMIT_WINDOW_MS = parseInt(process.env.IMAGE_RATE_LIMIT_WINDOW_
 const IMAGE_RATE_LIMIT_MAX = parseInt(process.env.IMAGE_RATE_LIMIT_MAX || '5', 10)
 
 const models = {
-  nano: {
-    id: process.env.MODEL_NANO || 'gpt-5-nano',
-    label: process.env.MODEL_NANO_LABEL || 'Nano (rapide)',
-    maxTokens: parseInt(process.env.MODEL_NANO_MAX_TOKENS || '4096', 10),
-    temperature: parseFloat(process.env.MODEL_NANO_TEMPERATURE || '0.7'),
-    type: 'chat',
-  },
   standard: {
-    id: process.env.MODEL_STANDARD || 'gpt-5-mini',
+    id: process.env.MODEL_STANDARD || 'gpt-5.2',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
     maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '4096', 10),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
@@ -37,6 +30,7 @@ const models = {
     label: process.env.MODEL_REASONING_LABEL || 'Raisonnement',
     maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '8192', 10),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
+    reasoningEffort: process.env.MODEL_REASONING_EFFORT || 'high',
     type: 'chat',
   },
   image: {
@@ -113,7 +107,6 @@ function validateTools(tools) {
 }
 
 function getChatTimeoutMs(modelTier) {
-  if (modelTier === 'nano') return 60_000
   if (modelTier === 'reasoning') return 300_000
   return 120_000
 }
@@ -135,7 +128,7 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   }
 }
 
-function buildChatBody({ modelConfig, messages, temperature, maxTokens, stream, tools }) {
+function buildChatBody({ modelTier, modelConfig, messages, temperature, maxTokens, stream, tools }) {
   const modelId = modelConfig.id
   const supportsLegacyParams = !isChatGptModel(modelId)
   const body = {
@@ -165,6 +158,10 @@ function buildChatBody({ modelConfig, messages, temperature, maxTokens, stream, 
   if (tools && tools.length > 0) {
     body.tools = tools
     body.tool_choice = 'auto'
+  }
+
+  if (modelTier === 'reasoning' && isGpt5Model(modelId)) {
+    body.reasoning_effort = modelConfig.reasoningEffort
   }
 
   return body
@@ -271,6 +268,7 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const body = buildChatBody({
+      modelTier,
       modelConfig,
       messages,
       temperature,
@@ -364,6 +362,7 @@ app.post('/api/chat/sync', async (req, res) => {
 
   try {
     const body = buildChatBody({
+      modelTier,
       modelConfig,
       messages,
       temperature,
