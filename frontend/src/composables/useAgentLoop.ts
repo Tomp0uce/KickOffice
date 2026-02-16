@@ -160,7 +160,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 25
     let currentMessages: ChatRequestMessage[] = [...messages]
-    history.value.push(createDisplayMessage('assistant', '⏳ Analyse de la demande...'))
+    const analyzingPlaceholder = '⏳ Analyse de la demande...'
+    history.value.push(createDisplayMessage('assistant', analyzingPlaceholder))
     const lastIndex = history.value.length - 1
     let abortedByUser = false
     while (iteration < maxIter) {
@@ -216,6 +217,11 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     if (abortedByUser) {
       history.value.push(createDisplayMessage('system', "🛑 Processus arrêté par l'utilisateur."))
       return
+    }
+
+    const assistantContent = history.value[lastIndex]?.content?.trim() || ''
+    if (!assistantContent || assistantContent === analyzingPlaceholder) {
+      history.value[lastIndex].content = t('noModelResponse')
     }
 
     if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))

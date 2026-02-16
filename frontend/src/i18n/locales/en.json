@@ -100,6 +100,7 @@
   "darkModeLabel": "Dark Mode",
   "darkModeDescription": "Use a darker color theme",
   "newChat": "New Chat",
+  "noModelResponse": "The model returned an empty response. Try again or check the backend logs.",
   "polish": "Polish",
   "prompts": "Prompts",
   "recursionLimitExceeded": "Agent exceeded the maximum number of iterations.",
