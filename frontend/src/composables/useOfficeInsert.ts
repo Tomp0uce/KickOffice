@@ -2,8 +2,10 @@ import type { Ref } from 'vue'
 
 import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
-import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
+import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { insertIntoPowerPoint } from '@/utils/powerpointTools'
+
+const VERBOSE_INSERT_LOG_TAG = '[KO-VERBOSE-INSERT][REMOVE_ME]'
 
 interface UseOfficeInsertOptions {
   hostIsOutlook: boolean
@@ -36,6 +38,22 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     insertImageToPowerPoint,
   } = options
 
+  function normalizeInsertionContent(rawContent: string): string {
+    return rawContent
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim()
+  }
+
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
   async function copyToClipboard(text: string, fallback = false) {
     if (!text.trim()) return
     const notifySuccess = () => messageUtil.success(t(fallback ? 'copiedFallback' : 'copied'))
@@ -62,14 +80,24 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
   }
 
   async function insertToDocument(content: string, type: insertTypes) {
-    if (!content.trim()) return
+    const normalizedContent = normalizeInsertionContent(content)
+    if (!normalizedContent) return
+
+    console.info(`${VERBOSE_INSERT_LOG_TAG} insertToDocument`, {
+      host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
+      type,
+      contentLength: normalizedContent.length,
+      lineCount: normalizedContent.split('\n').length,
+    })
+
     if (hostIsOutlook) {
       try {
         const mailbox = getOutlookMailbox()
         const item = mailbox?.item
         if (item?.body?.setAsync) {
+          const htmlBody = `<div>${escapeHtml(normalizedContent).replace(/\n/g, '<br>')}</div>`
           await new Promise<void>((resolve, reject) => {
-            item.body.setAsync(content, { coercionType: getOfficeTextCoercionType() }, (result: OfficeAsyncResult) => {
+            item.body.setAsync(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
               else reject(new Error(result.error?.message || 'setAsync failed'))
             })
@@ -86,10 +114,10 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
 
     if (hostIsPowerPoint) {
       try {
-        await insertIntoPowerPoint(content)
+        await insertIntoPowerPoint(normalizedContent)
         messageUtil.success(t('insertedToSlide'))
       } catch {
-        await copyToClipboard(content, true)
+        await copyToClipboard(normalizedContent, true)
       }
       return
     }
@@ -98,23 +126,24 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       try {
         await Excel.run(async (ctx) => {
           const range = ctx.workbook.getSelectedRange()
-          range.values = [[content]]
+          range.values = [[normalizedContent]]
+          range.format.wrapText = true
           await ctx.sync()
         })
         messageUtil.success(t('insertedToCell'))
       } catch {
-        await copyToClipboard(content, true)
+        await copyToClipboard(normalizedContent, true)
       }
       return
     }
 
     try {
       insertType.value = type
-      if (useWordFormatting.value) await insertFormattedResult(content, insertType)
-      else await insertResult(content, insertType)
+      if (useWordFormatting.value) await insertFormattedResult(normalizedContent, insertType)
+      else await insertResult(normalizedContent, insertType)
       messageUtil.success(t('inserted'))
     } catch {
-      await copyToClipboard(content, true)
+      await copyToClipboard(normalizedContent, true)
     }
   }
 

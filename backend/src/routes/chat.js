@@ -5,6 +5,7 @@ import { validateMaxTokens, validateTemperature, validateTools } from '../middle
 import { fetchWithTimeout, logAndRespond } from '../utils/http.js'
 
 const chatRouter = Router()
+const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
 
 function requiresReasoningSafeParams(modelConfig) {
   return isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort !== 'none'
@@ -17,6 +18,12 @@ function getChatTimeoutMs(modelTier) {
 
 chatRouter.post('/', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens } = req.body
+  console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat incoming`, {
+    modelTier,
+    messageCount: Array.isArray(messages) ? messages.length : 0,
+    hasTemperature: temperature !== undefined,
+    hasMaxTokens: maxTokens !== undefined,
+  })
 
   if (!messages || !Array.isArray(messages)) {
     return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat')
@@ -61,6 +68,15 @@ chatRouter.post('/', async (req, res) => {
       temperature,
       maxTokens,
       stream: true,
+    })
+
+    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat upstream payload`, {
+      model: body.model,
+      stream: body.stream,
+      messageCount: body.messages?.length || 0,
+      hasReasoningEffort: Object.prototype.hasOwnProperty.call(body, 'reasoning_effort'),
+      hasTemperature: Object.prototype.hasOwnProperty.call(body, 'temperature'),
+      hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
     })
 
     const response = await fetchWithTimeout(`${LLM_API_BASE_URL}/chat/completions`, {
@@ -110,6 +126,13 @@ chatRouter.post('/', async (req, res) => {
 
 chatRouter.post('/sync', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
+  console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync incoming`, {
+    modelTier,
+    messageCount: Array.isArray(messages) ? messages.length : 0,
+    toolCount: Array.isArray(tools) ? tools.length : 0,
+    hasTemperature: temperature !== undefined,
+    hasMaxTokens: maxTokens !== undefined,
+  })
 
   if (!messages || !Array.isArray(messages)) {
     return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat/sync')
@@ -119,12 +142,6 @@ chatRouter.post('/sync', async (req, res) => {
   if (!modelConfig || modelConfig.type === 'image') {
     return logAndRespond(res, 400, { error: `Invalid model tier for chat: ${modelTier}` }, 'POST /api/chat/sync')
   }
-
-  console.info('POST /api/chat/sync incoming', {
-    modelTier,
-    messageCount: messages.length,
-    toolCount: Array.isArray(tools) ? tools.length : 0,
-  })
 
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
@@ -164,6 +181,16 @@ chatRouter.post('/sync', async (req, res) => {
       tools: parsedTools.value,
     })
 
+    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync upstream payload`, {
+      model: body.model,
+      stream: body.stream,
+      messageCount: body.messages?.length || 0,
+      toolCount: body.tools?.length || 0,
+      hasReasoningEffort: Object.prototype.hasOwnProperty.call(body, 'reasoning_effort'),
+      hasTemperature: Object.prototype.hasOwnProperty.call(body, 'temperature'),
+      hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
+    })
+
     const response = await fetchWithTimeout(`${LLM_API_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -182,6 +209,15 @@ chatRouter.post('/sync', async (req, res) => {
     }
 
     const data = await response.json()
+    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync upstream response`, {
+      id: data?.id,
+      model: data?.model,
+      choiceCount: data?.choices?.length || 0,
+      hasFirstChoice: !!data?.choices?.[0],
+      finishReason: data?.choices?.[0]?.finish_reason ?? null,
+      hasContent: !!data?.choices?.[0]?.message?.content,
+      toolCallCount: data?.choices?.[0]?.message?.tool_calls?.length || 0,
+    })
     res.json(data)
   } catch (error) {
     if (error.name === 'AbortError') {

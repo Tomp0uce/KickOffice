@@ -33,6 +33,7 @@ interface OfficeRuntime {
   }
   CoercionType: {
     Text: string
+    Html?: string
   }
   AsyncResultStatus: {
     Succeeded: string
@@ -51,11 +52,16 @@ function getOfficeTextCoercionType(): string {
   return getOfficeRuntime()?.CoercionType.Text ?? 'text'
 }
 
+function getOfficeHtmlCoercionType(): string {
+  return getOfficeRuntime()?.CoercionType.Html ?? 'html'
+}
+
 function isOfficeAsyncSucceeded(status: string): boolean {
   return status === getOfficeRuntime()?.AsyncResultStatus.Succeeded
 }
 
 export {
+  getOfficeHtmlCoercionType,
   getOfficeTextCoercionType,
   getOutlookMailbox,
   isOfficeAsyncSucceeded,
