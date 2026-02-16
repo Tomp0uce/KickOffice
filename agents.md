@@ -48,7 +48,7 @@ Any contract change should update both backend and frontend in the same change s
 
 ## 6) Backend Editing Guidelines
 - Keep proxy logic provider-agnostic for OpenAI-compatible endpoints.
-- Maintain clear error forwarding (`status` + `details`) for easier debugging.
+- Log upstream provider errors on the server, but return sanitized client-facing messages (no raw upstream `details`).
 - Do not leak API keys or environment secrets in logs or responses.
 
 ## 7) Documentation Guidelines
