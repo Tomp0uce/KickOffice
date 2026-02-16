@@ -89,10 +89,16 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   const currentAction = ref('')
 
-  const getActionLabelForCategory = (category: ToolCategory) => {
-    if (category === 'read') return t('agentActionReading')
-    if (category === 'format') return t('agentActionFormatting')
-    return t('agentActionRunning')
+  const getActionLabelForCategory = (category?: ToolCategory) => {
+    switch (category) {
+      case 'read':
+        return t('agentActionReading')
+      case 'format':
+        return t('agentActionFormatting')
+      case 'write':
+      default:
+        return t('agentActionRunning')
+    }
   }
 
   const excelFormulaLanguageInstruction = () => excelFormulaLanguage.value === 'fr'
@@ -237,8 +243,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
     const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
     let iteration = 0
-    const maxIter = Number(agentMaxIterations.value) || 25
+    const maxIter = Math.min(Number(agentMaxIterations.value) || 10, 10)
     let currentMessages: ChatRequestMessage[] = [...messages]
+    let lastToolSignature: string | null = null
     currentAction.value = t('agentAnalyzing')
     history.value.push(createDisplayMessage('assistant', ''))
     const lastIndex = history.value.length - 1
@@ -286,10 +293,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         let result = ''
         const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {
-          currentAction.value = getActionLabelForCategory(toolDef.category)
-          await scrollToBottom()
-          try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
-          currentAction.value = ''
+          const currentSignature = `${toolName}${JSON.stringify(toolArgs)}`
+          if (currentSignature === lastToolSignature) {
+            result = 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.'
+          } else {
+            currentAction.value = getActionLabelForCategory(toolDef.category)
+            await scrollToBottom()
+            try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
+            currentAction.value = ''
+            lastToolSignature = currentSignature
+          }
         }
         if (abortController.value?.signal.aborted) {
           abortedByUser = true
