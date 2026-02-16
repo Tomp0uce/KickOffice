@@ -160,6 +160,13 @@
               </div>
             </SettingCard>
 
+            <SettingCard>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-semibold text-secondary">{{ $t('appVersion') }}</span>
+                <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{ appVersion }}</span>
+              </div>
+            </SettingCard>
+
             <!-- Available models (read-only) -->
             <SettingCard v-if="Object.keys(availableModels).length > 0">
               <div class="flex flex-col gap-2">
@@ -443,6 +450,7 @@ import { i18n } from '@/i18n'
 
 const { t } = useI18n()
 const router = useRouter()
+const appVersion = __APP_VERSION__
 
 const currentTab = ref('general')
 

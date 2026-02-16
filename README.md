@@ -377,12 +377,21 @@ npm run dev            # Starts on port 3002 with HMR
 
 ### Environment Variables
 
+For deterministic versioning in deployments, set `APP_VERSION` before `docker compose up --build` (typically in CI), for example:
+
+```bash
+export APP_VERSION="$(node -p "require('./frontend/package.json').version")+$(git rev-parse --short HEAD)"
+docker compose up -d --build
+```
+
+
 #### Root (`.env`)
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SERVER_IP` | Host machine IP address | `192.168.50.10` |
 | `FRONTEND_PORT` | Published port for the frontend | `3002` |
 | `BACKEND_PORT` | Published port for the backend | `3003` |
+| `APP_VERSION` | Frontend version shown in Settings (passed as Docker build arg). Set by CI on deploy, e.g. `1.0.0+<short_sha>` | (empty, auto-fallback) |
 
 #### Backend (`backend/.env`)
 | Variable | Description | Default |
