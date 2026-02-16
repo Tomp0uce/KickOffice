@@ -14,6 +14,29 @@ declare const PowerPoint: any
 const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => PowerPoint.run(action) as Promise<T>)
 
+
+type PowerPointToolTemplate = Omit<PowerPointToolDefinition, 'execute'> & {
+  executePowerPoint?: (context: any, args: Record<string, any>) => Promise<string>
+  executeCommon?: (args: Record<string, any>) => Promise<string>
+}
+
+function createPowerPointTools(definitions: Record<PowerPointToolName, PowerPointToolTemplate>): Record<PowerPointToolName, PowerPointToolDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([name, definition]) => [
+      name,
+      {
+        ...definition,
+        execute: async (args: Record<string, any> = {}) => {
+          if (definition.executePowerPoint) {
+            return runPowerPoint(context => definition.executePowerPoint!(context, args))
+          }
+          return executeOfficeAction(() => definition.executeCommon!(args))
+        },
+      },
+    ]),
+  ) as unknown as Record<PowerPointToolName, PowerPointToolDefinition>
+}
+
 export type PowerPointToolName =
   | 'getSelectedText'
   | 'replaceSelectedText'
@@ -142,7 +165,7 @@ function ensurePowerPointRunAvailable() {
   }
 }
 
-const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefinition> = {
+const powerpointToolDefinitions = createPowerPointTools({
   getSelectedText: {
     name: 'getSelectedText',
     category: 'read',
@@ -152,9 +175,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return getPowerPointSelection()
-    },
+    executeCommon: async () => getPowerPointSelection(),
   },
 
   replaceSelectedText: {
@@ -171,7 +192,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: ['newText'],
     },
-    execute: async args => {
+    executeCommon: async args => {
       const { newText } = args
       if (!newText || typeof newText !== 'string') {
         return 'Error: newText is required and must be a string.'
@@ -190,15 +211,14 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       properties: {},
       required: [],
     },
-    execute: async () => {
+    executePowerPoint: async (context: any) => {
       ensurePowerPointRunAvailable()
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
         return String(slides.items.length)
-      })
-    },
+      },
   },
 
   getSlideContent: {
@@ -215,14 +235,14 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: ['slideNumber'],
     },
-    execute: async args => {
+    executePowerPoint: async (context: any, args) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
         return 'Error: slideNumber must be a number greater than or equal to 1.'
       }
 
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -262,8 +282,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
           .filter(Boolean)
 
         return lines.join('\n')
-      })
-    },
+      },
   },
 
   addSlide: {
@@ -280,9 +299,9 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: [],
     },
-    execute: async args => {
+    executePowerPoint: async (context: any, args) => {
       ensurePowerPointRunAvailable()
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         const layout = typeof args.layout === 'string' && args.layout.trim().length > 0
           ? args.layout.trim()
@@ -298,8 +317,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return layout
           ? `Successfully added a slide with layout "${layout}".`
           : 'Successfully added a slide.'
-      })
-    },
+      },
   },
 
   setSlideNotes: {
@@ -320,7 +338,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: ['slideNumber', 'notesText'],
     },
-    execute: async args => {
+    executePowerPoint: async (context: any, args) => {
       ensurePowerPointRunAvailable()
 
       if (!isPowerPointApiSupported('1.4')) {
@@ -333,7 +351,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return 'Error: slideNumber must be a number greater than or equal to 1.'
       }
 
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -357,8 +375,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         await context.sync()
 
         return `Successfully updated notes for slide ${slideNumber}.`
-      })
-    },
+      },
   },
 
   insertTextBox: {
@@ -383,7 +400,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: ['slideNumber', 'text'],
     },
-    execute: async args => {
+    executePowerPoint: async (context: any, args) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
@@ -395,7 +412,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         return 'Error: text is required.'
       }
 
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -414,8 +431,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         await context.sync()
 
         return `Successfully inserted a text box on slide ${slideNumber}.`
-      })
-    },
+      },
   },
 
   insertImage: {
@@ -440,7 +456,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       },
       required: ['slideNumber', 'base64Image'],
     },
-    execute: async args => {
+    executePowerPoint: async (context: any, args) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
@@ -453,7 +469,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
       }
       const base64Image = base64ImageRaw.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '')
 
-      return runPowerPoint(async (context: any) => {
+      
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
@@ -472,10 +488,9 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
         await context.sync()
 
         return `Successfully inserted an image on slide ${slideNumber}.`
-      })
-    },
+      },
   },
-}
+})
 
 export function getPowerPointToolDefinitions(): PowerPointToolDefinition[] {
   return Object.values(powerpointToolDefinitions)

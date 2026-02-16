@@ -4,6 +4,22 @@ import { localStorageKey } from './enum'
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
 
+type ExcelToolTemplate = Omit<ExcelToolDefinition, 'execute'> & {
+  executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>
+}
+
+function createExcelTools(definitions: Record<ExcelToolName, ExcelToolTemplate>): Record<ExcelToolName, ExcelToolDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([name, definition]) => [
+      name,
+      {
+        ...definition,
+        execute: async (args: Record<string, any> = {}) => runExcel(context => definition.executeExcel(context, args)),
+      },
+    ]),
+  ) as unknown as Record<ExcelToolName, ExcelToolDefinition>
+}
+
 export type ExcelToolName =
   | 'getSelectedCells'
   | 'setCellValue'
@@ -51,7 +67,7 @@ function getExcelFormulaLanguage(): 'en' | 'fr' {
   return configured === 'fr' ? 'fr' : 'en'
 }
 
-const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
+const excelToolDefinitions = createExcelTools({
   getSelectedCells: {
     name: 'getSelectedCells',
     category: 'read',
@@ -62,8 +78,8 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runExcel(async (context) => {
+    executeExcel: async (context) => {
+      
         const range = context.workbook.getSelectedRange()
         range.load('values, address, rowCount, columnCount')
         await context.sync()
@@ -77,8 +93,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   setCellValue: {
@@ -100,9 +115,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['address', 'value'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, value } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(address)
 
@@ -122,8 +137,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully set value at ${address}`
-      })
-    },
+      },
   },
 
   getWorksheetData: {
@@ -136,8 +150,8 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runExcel(async (context) => {
+    executeExcel: async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const usedRange = sheet.getUsedRange()
         usedRange.load('values, address, rowCount, columnCount')
@@ -152,8 +166,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   addDataValidation: {
@@ -193,7 +206,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const {
         address,
         validationType = 'list',
@@ -203,7 +216,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         formula2,
       } = args
 
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
 
@@ -246,8 +259,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully applied ${validationType} data validation${address ? ` on ${address}` : ' on selection'}`
-      })
-    },
+      },
   },
 
   createTable: {
@@ -277,9 +289,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, hasHeaders = true, tableName, style = 'TableStyleMedium2' } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
         const table = sheet.tables.add(range, hasHeaders)
@@ -290,8 +302,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         table.load('name')
         await context.sync()
         return `Successfully created table "${table.name}"${address ? ` from ${address}` : ' from selection'}`
-      })
-    },
+      },
   },
 
   copyRange: {
@@ -313,9 +324,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['sourceAddress', 'destinationAddress'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { sourceAddress, destinationAddress } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const sourceRange = sheet.getRange(sourceAddress)
         sourceRange.load('values, formulas, numberFormat, rowCount, columnCount')
@@ -328,8 +339,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully copied ${sourceAddress} to ${destinationAddress}`
-      })
-    },
+      },
   },
 
   insertFormula: {
@@ -351,9 +361,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['address', 'formula'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, formula } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const cell = sheet.getRange(address)
         const formulaLocale = getExcelFormulaLanguage()
@@ -367,8 +377,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         cell.format.font.bold = true
         await context.sync()
         return `Successfully inserted ${formulaLocale === 'fr' ? 'localized French' : 'English'} formula "${formula}" at ${address}`
-      })
-    },
+      },
   },
 
   fillFormulaDown: {
@@ -394,9 +403,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['startCell', 'endCell', 'formula'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { startCell, endCell, formula } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const formulaLocale = getExcelFormulaLanguage()
 
@@ -422,8 +431,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         }
 
         return `Successfully filled formula "${formula}" from ${startCell} to ${endCell}`
-      })
-    },
+      },
   },
 
   createChart: {
@@ -456,9 +464,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['chartType'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { chartType, title } = args
-      return runExcel(async (context) => {
+      
         const range = context.workbook.getSelectedRange()
         range.load('address')
         await context.sync()
@@ -488,8 +496,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully created ${chartType} chart${title ? ` with title "${title}"` : ''}`
-      })
-    },
+      },
   },
 
   formatRange: {
@@ -581,7 +588,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const {
         address,
         fillColor,
@@ -598,7 +605,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         borderColor,
         borderWeight,
       } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
 
@@ -702,8 +709,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully applied formatting${address ? ` to ${address}` : ' to selection'}`
-      })
-    },
+      },
   },
 
   sortRange: {
@@ -728,9 +734,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { columnIndex = 0, ascending = true, hasHeaders = true } = args
-      return runExcel(async (context) => {
+      
         const range = context.workbook.getSelectedRange()
         range.load('values, rowCount, columnCount')
         await context.sync()
@@ -751,8 +757,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         range.values = [...headers, ...values]
         await context.sync()
         return `Successfully sorted data by column ${columnIndex} (${ascending ? 'ascending' : 'descending'})`
-      })
-    },
+      },
   },
 
   applyAutoFilter: {
@@ -764,8 +769,8 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runExcel(async (context) => {
+    executeExcel: async (context) => {
+      
         const range = context.workbook.getSelectedRange()
         range.load('address')
         await context.sync()
@@ -784,8 +789,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           await context.sync()
           return 'Applied header formatting (auto filter API not available in this context)'
         }
-      })
-    },
+      },
   },
 
   removeAutoFilter: {
@@ -802,17 +806,16 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { sheetName } = args
-      return runExcel(async (context) => {
+      
         const sheet = sheetName
           ? context.workbook.worksheets.getItem(sheetName)
           : context.workbook.worksheets.getActiveWorksheet()
         sheet.autoFilter.remove()
         await context.sync()
         return `Successfully removed auto filter from worksheet "${sheetName ?? 'active'}"`
-      })
-    },
+      },
   },
 
   getWorksheetInfo: {
@@ -824,8 +827,8 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runExcel(async (context) => {
+    executeExcel: async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         sheet.load('name, id, position')
         const usedRange = sheet.getUsedRangeOrNullObject()
@@ -854,8 +857,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   renameWorksheet: {
@@ -876,15 +878,14 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['currentName', 'newName'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { currentName, newName } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getItem(currentName)
         sheet.name = newName
         await context.sync()
         return `Successfully renamed worksheet "${currentName}" to "${newName}"`
-      })
-    },
+      },
   },
 
   deleteWorksheet: {
@@ -901,15 +902,14 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['name'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { name } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getItem(name)
         sheet.delete()
         await context.sync()
         return `Successfully deleted worksheet "${name}"`
-      })
-    },
+      },
   },
 
   activateWorksheet: {
@@ -926,15 +926,14 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['name'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { name } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getItem(name)
         sheet.activate()
         await context.sync()
         return `Successfully activated worksheet "${name}"`
-      })
-    },
+      },
   },
 
   getDataFromSheet: {
@@ -955,9 +954,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['name'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { name, address } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getItem(name)
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
         range.load('address, values, rowCount, columnCount')
@@ -974,8 +973,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   freezePanes: {
@@ -1001,9 +999,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['mode'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { mode, count = 1, address } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
 
         if (mode === 'rows') {
@@ -1021,8 +1019,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully applied freeze panes mode "${mode}"`
-      })
-    },
+      },
   },
 
   addHyperlink: {
@@ -1051,9 +1048,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['address', 'hyperlinkAddress'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, hyperlinkAddress, textToDisplay, screenTip } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(address)
         range.hyperlink = {
@@ -1064,8 +1061,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully added hyperlink to ${address}`
-      })
-    },
+      },
   },
 
   addCellComment: {
@@ -1086,15 +1082,14 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['address', 'text'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, text } = args
-      return runExcel(async (context) => {
+      
         const comments = context.workbook.comments
         comments.add(address, text)
         await context.sync()
         return `Successfully added comment to ${address}`
-      })
-    },
+      },
   },
 
   insertRow: {
@@ -1115,16 +1110,15 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['rowIndex'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { rowIndex, count = 1 } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
         range.insert(Excel.InsertShiftDirection.down)
         await context.sync()
         return `Successfully inserted ${count} row(s) at position ${rowIndex}`
-      })
-    },
+      },
   },
 
   insertColumn: {
@@ -1145,17 +1139,16 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['columnLetter'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { columnLetter, count = 1 } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const endCol = String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)
         const range = sheet.getRange(`${columnLetter}:${endCol}`)
         range.insert(Excel.InsertShiftDirection.right)
         await context.sync()
         return `Successfully inserted ${count} column(s) at position ${columnLetter}`
-      })
-    },
+      },
   },
 
   deleteRow: {
@@ -1176,16 +1169,15 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['rowIndex'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { rowIndex, count = 1 } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
         range.delete(Excel.DeleteShiftDirection.up)
         await context.sync()
         return `Successfully deleted ${count} row(s) at position ${rowIndex}`
-      })
-    },
+      },
   },
 
   deleteColumn: {
@@ -1206,17 +1198,16 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['columnLetter'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { columnLetter, count = 1 } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const endCol = String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)
         const range = sheet.getRange(`${columnLetter}:${endCol}`)
         range.delete(Excel.DeleteShiftDirection.left)
         await context.sync()
         return `Successfully deleted ${count} column(s) at position ${columnLetter}`
-      })
-    },
+      },
   },
 
   mergeCells: {
@@ -1237,9 +1228,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, merge = true } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
 
@@ -1250,8 +1241,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         }
         await context.sync()
         return `Successfully ${merge ? 'merged' : 'unmerged'} cells${address ? ` at ${address}` : ''}`
-      })
-    },
+      },
   },
 
   setCellNumberFormat: {
@@ -1274,16 +1264,15 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['format'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, format } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
         range.numberFormat = range.values.map((row: any[]) => row.map(() => format))
         await context.sync()
         return `Successfully set number format "${format}"${address ? ` for ${address}` : ' for selection'}`
-      })
-    },
+      },
   },
 
   clearRange: {
@@ -1305,9 +1294,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address, clearType = 'all' } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
 
@@ -1324,8 +1313,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully cleared ${clearType}${address ? ` from ${address}` : ' from selection'}`
-      })
-    },
+      },
   },
 
   getCellFormula: {
@@ -1342,9 +1330,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
         range.load('formulas, formulasLocal, values, address')
@@ -1360,8 +1348,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   searchAndReplace: {
@@ -1382,9 +1369,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['searchText'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { searchText, replaceText } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const usedRange = sheet.getUsedRange()
         usedRange.load('values, rowCount, columnCount')
@@ -1411,8 +1398,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         }
 
         return `Found ${matchCount} occurrence(s) of "${searchText}"`
-      })
-    },
+      },
   },
 
   autoFitColumns: {
@@ -1429,17 +1415,16 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
         range.format.autofitColumns()
         range.format.autofitRows()
         await context.sync()
         return `Successfully auto-fitted columns and rows${address ? ` for ${address}` : ''}`
-      })
-    },
+      },
   },
 
   addWorksheet: {
@@ -1456,16 +1441,15 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { name } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.add(name || undefined)
         sheet.activate()
         sheet.load('name')
         await context.sync()
         return `Successfully created and activated worksheet "${sheet.name}"`
-      })
-    },
+      },
   },
 
   setColumnWidth: {
@@ -1486,9 +1470,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['columnLetter', 'width'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { columnLetter, width } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const colRange = columnLetter.includes(':')
           ? sheet.getRange(columnLetter)
@@ -1496,8 +1480,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         colRange.format.columnWidth = width
         await context.sync()
         return `Successfully set column ${columnLetter} width to ${width}`
-      })
-    },
+      },
   },
 
 
@@ -1519,16 +1502,15 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['rowIndex', 'height'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { rowIndex, height } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const rowRange = sheet.getRange(`${rowIndex}:${rowIndex}`)
         rowRange.format.rowHeight = height
         await context.sync()
         return `Successfully set row ${rowIndex} height to ${height}`
-      })
-    },
+      },
   },
 
   protectWorksheet: {
@@ -1566,7 +1548,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['action'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const {
         sheetName,
         action,
@@ -1576,7 +1558,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         allowInsertRows = false,
       } = args
 
-      return runExcel(async (context) => {
+      
         const sheet = sheetName
           ? context.workbook.worksheets.getItem(sheetName)
           : context.workbook.worksheets.getActiveWorksheet()
@@ -1594,8 +1576,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully ${action === 'protect' ? 'protected' : 'unprotected'} worksheet "${sheetName ?? 'active'}"`
-      })
-    },
+      },
   },
 
   getNamedRanges: {
@@ -1607,8 +1588,8 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       properties: {},
       required: [],
     },
-    execute: async () => {
-      return runExcel(async (context) => {
+    executeExcel: async (context) => {
+      
         const names = context.workbook.names
         names.load('items/name,items/formula,items/value')
         await context.sync()
@@ -1625,8 +1606,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
 
   setNamedRange: {
@@ -1647,14 +1627,13 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['name', 'rangeAddress'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { name, rangeAddress } = args
-      return runExcel(async (context) => {
+      
         context.workbook.names.add(name, rangeAddress)
         await context.sync()
         return `Successfully set named range "${name}" = ${rangeAddress}`
-      })
-    },
+      },
   },
 
 
@@ -1741,7 +1720,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: ['address', 'ruleType'],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const {
         address,
         ruleType,
@@ -1762,7 +1741,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         stopIfTrue,
       } = args
 
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = sheet.getRange(address)
         const conditionalFormats: any = targetRange.conditionalFormats
@@ -1857,8 +1836,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
         await context.sync()
         return `Successfully applied ${ruleType} conditional formatting on ${address}`
-      })
-    },
+      },
   },
 
   getConditionalFormattingRules: {
@@ -1876,9 +1854,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
       },
       required: [],
     },
-    execute: async (args) => {
+    executeExcel: async (context, args) => {
       const { address } = args
-      return runExcel(async (context) => {
+      
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
         targetRange.load('address,isNullObject')
@@ -1905,10 +1883,9 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
-      })
-    },
+      },
   },
-}
+})
 
 export function getExcelToolDefinitions(): ExcelToolDefinition[] {
   return Object.values(excelToolDefinitions)

@@ -5,7 +5,7 @@ if (!BACKEND_URL) {
 }
 
 const REQUEST_TIMEOUT_MS = 45_000
-const RETRY_DELAYS_MS = [10_000, 30_000] as const
+const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
