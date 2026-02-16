@@ -74,7 +74,7 @@ chatRouter.post('/', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`LLM API error ${response.status}:`, errorText)
+      console.error('LLM API error on /api/chat', { status: response.status, modelTier, errorText })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat')
@@ -119,6 +119,12 @@ chatRouter.post('/sync', async (req, res) => {
   if (!modelConfig || modelConfig.type === 'image') {
     return logAndRespond(res, 400, { error: `Invalid model tier for chat: ${modelTier}` }, 'POST /api/chat/sync')
   }
+
+  console.info('POST /api/chat/sync incoming', {
+    modelTier,
+    messageCount: messages.length,
+    toolCount: Array.isArray(tools) ? tools.length : 0,
+  })
 
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
@@ -169,7 +175,7 @@ chatRouter.post('/sync', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`LLM API error ${response.status}:`, errorText)
+      console.error('LLM API error on /api/chat/sync', { status: response.status, modelTier, errorText })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat/sync')
@@ -181,7 +187,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (error.name === 'AbortError') {
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
-    console.error('Chat sync proxy error:', error)
+    console.error('Chat sync proxy error', { modelTier, error })
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })
