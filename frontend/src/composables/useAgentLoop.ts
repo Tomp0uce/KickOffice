@@ -271,22 +271,34 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   async function sendMessage() {
     if (!userInput.value.trim() || loading.value) return
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
+
     const userMessage = userInput.value.trim()
     userInput.value = ''
     adjustTextareaHeight()
 
-    let selectedText = ''
-    if (useSelectedText.value) {
-      try { selectedText = await getOfficeSelection() } catch {}
-    }
-    const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-    const fullMessage = selectedText ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]` : userMessage
-    history.value.push(createDisplayMessage('user', fullMessage))
-    await scrollToBottom()
-
     loading.value = true
     abortController.value = new AbortController()
+    history.value.push(createDisplayMessage('user', userMessage))
+    await scrollToBottom()
+
     try {
+      let selectedText = ''
+      if (useSelectedText.value) {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null
+        try {
+          const timeoutPromise = new Promise<string>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
+          })
+          selectedText = await Promise.race([getOfficeSelection(), timeoutPromise])
+        } catch (error) {
+          console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId)
+        }
+      }
+
+      const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
+      const fullMessage = selectedText ? `${userMessage}\n\n[${selectionLabel}: "${selectedText}"]` : userMessage
       await processChat(fullMessage)
     } catch (error: any) {
       if (error.name !== 'AbortError') {
