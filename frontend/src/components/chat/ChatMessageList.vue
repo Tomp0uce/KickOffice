@@ -13,9 +13,9 @@
 
     <div v-for="item in historyWithSegments" :key="item.key" class="group flex items-end gap-4 [.user]:flex-row-reverse" :class="item.message.role === 'assistant' ? 'assistant' : 'user'">
       <div class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left">
-        <div class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word whitespace-pre-wrap text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10">
+        <div class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10">
           <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
-            <span v-if="segment.type === 'text'">{{ segment.text.trim() }}</span>
+            <MarkdownRenderer v-if="segment.type === 'text'" :content="segment.text" />
             <details
               v-else
               class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary"
@@ -44,6 +44,7 @@ import { Copy, FileText, Plus, Sparkles } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 
 import CustomButton from '@/components/CustomButton.vue'
+import MarkdownRenderer from '@/components/chat/MarkdownRenderer.vue'
 import type { DisplayMessage, RenderSegment } from '@/types/chat'
 
 const props = defineProps<{
