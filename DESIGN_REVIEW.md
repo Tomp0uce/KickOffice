@@ -1,153 +1,153 @@
 # KickOffice - Design Review
 
-**Date initiale**: 2026-02-15
-**Dernière mise à jour**: 2026-02-16
-**Scope**: Architecture, Sécurité, Qualité du code, Bugs fonctionnels, Documentation
-**Fichiers analysés**: Backend (`server.js` — 448 lignes), Frontend (25+ fichiers source), Documentation (README.md, agents.md, manifests)
+**Initial date**: 2026-02-15
+**Last updated**: 2026-02-16
+**Scope**: Architecture, Security, Code Quality, Functional Bugs, Documentation
+**Files analyzed**: Backend (`server.js` — 448 lines), Frontend (25+ source files), Documentation (README.md, agents.md, manifests)
 
 ---
 
-## Table des matières
+## Table of Contents
 
-1. [Résumé exécutif](#résumé-exécutif)
-2. [Bilan des corrections déjà effectuées](#bilan-des-corrections-déjà-effectuées)
-3. [Architecture globale](#architecture-globale)
-4. [Liste des issues par criticité](#liste-des-issues-par-criticité)
-   - [CRITIQUE — Bloquant / Impact immédiat](#critique--bloquant--impact-immédiat)
-   - [HAUTE — À corriger rapidement](#haute--à-corriger-rapidement)
-   - [MOYENNE — À planifier](#moyenne--à-planifier)
-   - [BASSE — Améliorations](#basse--améliorations)
-5. [Tableau récapitulatif](#tableau-récapitulatif)
-
----
-
-## Résumé exécutif
-
-KickOffice est un add-in Microsoft Office (Word, Excel, PowerPoint, Outlook) alimenté par IA, construit avec Vue 3 / TypeScript (frontend) et Express.js (backend). L'architecture est saine dans son principe : le backend sert de proxy LLM sécurisé, les clés API ne sont jamais exposées côté client, et le CORS est correctement restreint.
-
-### État actuel
-
-| Gravité | Nombre | Résumé |
-|---------|--------|--------|
-| **CRITIQUE** | 6 | Chat cassé Word/Excel, images insérées en base64, erreurs masquées, sécurité (auth, rate limit, fuite erreurs) |
-| **HAUTE** | 5 | Mauvais tiers de modèles, headers sécurité, god component, backend monolithique, agent loop sans abort |
-| **MOYENNE** | 5 | SSE parser fragile, error handler Vue, accessibilité, request logging, `as any` résiduels |
-| **BASSE** | 3 | Dark mode toggle, CSS répétitives, README obsolète |
-
-### Corrections déjà effectuées (review précédente)
-
-14 items sur 26 initiaux ont été corrigés lors de la première itération. Ce document ne revient pas dessus et se concentre sur les issues restantes + nouvelles issues découvertes.
+1. [Executive Summary](#executive-summary)
+2. [Previously Completed Fixes](#previously-completed-fixes)
+3. [Overall Architecture](#overall-architecture)
+4. [Issues by Severity](#issues-by-severity)
+   - [CRITICAL — Blocking / Immediate Impact](#critical--blocking--immediate-impact)
+   - [HIGH — Fix Soon](#high--fix-soon)
+   - [MEDIUM — Plan for Later](#medium--plan-for-later)
+   - [LOW — Nice to Have](#low--nice-to-have)
+5. [Summary Table](#summary-table)
 
 ---
 
-## Bilan des corrections déjà effectuées
+## Executive Summary
 
-| ID ancien | Item | Preuve |
-|-----------|------|--------|
+KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Outlook), built with Vue 3 / TypeScript (frontend) and Express.js (backend). The architecture is fundamentally sound: the backend acts as a secure LLM proxy, API keys are never exposed client-side, and CORS is properly restricted.
+
+### Current State
+
+| Severity | Count | Summary |
+|----------|-------|---------|
+| **CRITICAL** | 6 | Chat broken in Word/Excel, images inserted as base64 text, silent errors, security (auth, rate limit, error leakage) |
+| **HIGH** | 5 | Wrong model tiers, missing security headers, god component, monolithic backend, agent loop without abort |
+| **MEDIUM** | 5 | Fragile SSE parser, missing Vue error handler, accessibility, request logging, residual `as any` |
+| **LOW** | 3 | Dark mode toggle, repeated CSS, outdated README |
+
+### Previously Completed Fixes
+
+14 out of 26 initial items were fixed in the first iteration. This document does not revisit them and focuses on remaining issues + newly discovered ones.
+
+---
+
+## Previously Completed Fixes
+
+| Old ID | Item | Evidence |
+|--------|------|----------|
 | C4 | Cleanup `setInterval` | `HomePage.vue:1338-1342` — `onUnmounted` + `clearInterval` |
-| H2 | Validation inputs backend | `server.js:55-106` — `validateTemperature`, `validateMaxTokens`, `validateTools` |
-| H4 | Extraire logique dupliquée | `savedPrompts.ts`, `getOfficeSelection()` unifiée |
-| H6 | Aligner `.env.example` avec defaults | Cohérent entre `.env.example` et `server.js` |
-| H7 | Timeout sur requêtes fetch | Backend: `fetchWithTimeout` + AbortController. Frontend: `fetchWithTimeoutAndRetry` |
-| H8 | Typer `ToolDefinition` | `types/index.d.ts:27-36` — type générique avec alias |
-| M1 | IDs uniques dans `v-for` | `crypto.randomUUID()` dans `createDisplayMessage` |
-| M2 | Mémoïser `renderSegments` | `historyWithSegments` computed |
-| M5 | Supprimer watchers redondants | `useStorage` gère la persistance |
-| M6 | Retry avec backoff | `backend.ts:8-75` — 2 retries +10s/+30s |
-| B1 | Corriger typo `cursor-po` | Toutes classes correctes |
-| B2 | Réduire `any` types | Interfaces `QuickAction`, `OpenAIChatCompletion` |
-| B5 | Documenter `hostDetection.ts` | Ajouté dans README |
-| B6 | Réduire body parser | 4MB (`server.js:172`) |
+| H2 | Backend input validation | `server.js:55-106` — `validateTemperature`, `validateMaxTokens`, `validateTools` |
+| H4 | Extract duplicated logic | `savedPrompts.ts`, unified `getOfficeSelection()` |
+| H6 | Align `.env.example` with defaults | Consistent between `.env.example` and `server.js` |
+| H7 | Fetch request timeouts | Backend: `fetchWithTimeout` + AbortController. Frontend: `fetchWithTimeoutAndRetry` |
+| H8 | Type `ToolDefinition` | `types/index.d.ts:27-36` — generic type with alias |
+| M1 | Unique IDs in `v-for` | `crypto.randomUUID()` in `createDisplayMessage` |
+| M2 | Memoize `renderSegments` | `historyWithSegments` computed |
+| M5 | Remove redundant watchers | `useStorage` handles persistence |
+| M6 | Retry with backoff | `backend.ts:8-75` — 2 retries +10s/+30s |
+| B1 | Fix `cursor-po` typo | All classes correct |
+| B2 | Reduce `any` types | Interfaces `QuickAction`, `OpenAIChatCompletion` |
+| B5 | Document `hostDetection.ts` | Added in README |
+| B6 | Reduce body parser limit | 4MB (`server.js:172`) |
 
 ---
 
-## Architecture globale
+## Overall Architecture
 
-### Points forts
+### Strengths
 
-- **Séparation claire** : Frontend (Vue 3 + Vite, port 3002) / Backend (Express.js, port 3003) / LLM API externe
-- **Sécurité des secrets** : API keys uniquement côté serveur dans `.env`
-- **Déploiement Docker** : Docker Compose fonctionnel avec health checks
-- **Support multi-hôte** : Word (37 tools), Excel (39 tools), PowerPoint (8 tools), Outlook (13 tools)
-- **i18n** : 13 langues de réponse, 2 locales UI (en/fr)
-- **Agent mode** : Boucle d'outils OpenAI function-calling avec validation côté backend
-- **Validation backend robuste** : Température, maxTokens, tools, prompt length
-- **Timeout et retry** : Les deux côtés ont des timeouts et une stratégie de retry
+- **Clear separation**: Frontend (Vue 3 + Vite, port 3002) / Backend (Express.js, port 3003) / External LLM API
+- **Secret protection**: API keys only on server side in `.env`
+- **Docker deployment**: Working Docker Compose with health checks
+- **Multi-host support**: Word (37 tools), Excel (39 tools), PowerPoint (8 tools), Outlook (13 tools)
+- **i18n**: 13 response languages, 2 UI locales (en/fr)
+- **Agent mode**: OpenAI function-calling tool loop with backend validation
+- **Robust backend validation**: Temperature, maxTokens, tools, prompt length
+- **Timeout and retry**: Both sides have timeouts and a retry strategy
 
-### Points faibles
+### Weaknesses
 
-- **Bug bloquant** : Chat Word/Excel cassé par la limite de 32 tools dans le backend
-- **Bug fonctionnel** : Insertion d'images insère du texte base64 au lieu d'images
-- **Erreurs silencieuses** : Les erreurs 400 du backend ne sont pas loguées → diagnostic impossible
-- **Sécurité** : Aucune authentification, aucun rate limiting
-- **Maintenabilité** : `HomePage.vue` = 1344 lignes (god component), `server.js` = 448 lignes (monolithique)
-- **Modèles mal tiérés** : gpt-5.2 (raisonnement) est plus rapide que nano/standard → configuration contre-intuitive
-
----
-
-## Liste des issues par criticité
+- **Blocking bug**: Word/Excel chat broken by 32-tool limit in the backend
+- **Functional bug**: Image insertion inserts base64 text instead of actual images
+- **Silent errors**: Backend 400 errors are never logged — impossible to diagnose
+- **Security**: No authentication, no rate limiting
+- **Maintainability**: `HomePage.vue` = 1344 lines (god component), `server.js` = 448 lines (monolithic)
+- **Misconfigured models**: gpt-5.2 (reasoning tier) is much faster than nano/standard — counter-intuitive setup
 
 ---
 
-### CRITIQUE — Bloquant / Impact immédiat
+## Issues by Severity
 
 ---
 
-#### C1. Chat cassé sous Word et Excel — limite de 32 tools dépassée
+### CRITICAL — Blocking / Immediate Impact
 
-**Symptôme** : Le chat envoie une "erreur de réponse" dans l'interface sous Word et Excel, mais aucune erreur n'apparaît dans les logs du backend. Le chat fonctionne sous PowerPoint. Les quick actions (boutons) fonctionnent.
+---
 
-**Cause racine** : La validation backend `validateTools()` (`server.js:73`) rejette les requêtes avec plus de 32 tools :
+#### C1. Chat broken in Word and Excel — 32-tool limit exceeded
+
+**Symptom**: Chat shows a "response error" in the UI under Word and Excel, but no error appears in the backend logs. Chat works in PowerPoint. Quick actions (buttons) still work.
+
+**Root cause**: Backend `validateTools()` (`server.js:73`) rejects requests with more than 32 tools:
 ```javascript
 if (tools.length > 32) return { error: 'tools supports at most 32 entries' }
 ```
 
-Mais les tools envoyés par le frontend sont :
-- **Word** : 37 tools + 2 general = **39 tools** → ❌ rejeté (> 32)
-- **Excel** : 39 tools + 2 general = **41 tools** → ❌ rejeté (> 32)
-- **PowerPoint** : 8 tools + 2 general = **10 tools** → ✅ accepté
-- **Outlook** : 13 tools + 2 general = **15 tools** → ✅ accepté
+But tools sent by the frontend are:
+- **Word**: 37 tools + 2 general = **39 tools** → ❌ rejected (> 32)
+- **Excel**: 39 tools + 2 general = **41 tools** → ❌ rejected (> 32)
+- **PowerPoint**: 8 tools + 2 general = **10 tools** → ✅ accepted
+- **Outlook**: 13 tools + 2 general = **15 tools** → ✅ accepted
 
-Le backend renvoie une erreur 400, qui est bien capturée par le frontend (`backend.ts:192-194`) et affichée comme "erreur de réponse". Mais côté backend, cette erreur 400 n'est pas loguée (pas de `console.error`), d'où l'absence d'erreur dans les logs.
+The backend returns a 400 error, which is properly caught by the frontend (`backend.ts:192-194`) and displayed as "response error". But on the backend side, this 400 error is not logged (no `console.error`), hence no error in the logs.
 
-**Pourquoi les quick actions marchent** : Elles utilisent `chatStream()` qui appelle `/api/chat` (streaming) **sans tools**. Seul le chat normal passe par `chatSync()` → `/api/chat/sync` avec tools.
+**Why quick actions still work**: They use `chatStream()` which calls `/api/chat` (streaming) **without tools**. Only normal chat goes through `chatSync()` → `/api/chat/sync` with tools.
 
-**Fichiers** : `server.js:73`, `HomePage.vue:940-948` (construction des tools)
-**Impact** : Chat complètement cassé pour Word et Excel (les 2 hôtes principaux)
+**Files**: `server.js:73`, `HomePage.vue:940-948` (tool construction)
+**Impact**: Chat completely broken for Word and Excel (the 2 primary hosts)
 
-**Implémentation proposée** :
-1. Augmenter la limite dans `validateTools()` de 32 à 128 (ou la rendre configurable via env) :
+**Proposed fix**:
+1. Increase the limit in `validateTools()` from 32 to 128 (or make it configurable via env):
    ```javascript
    const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
    if (tools.length > MAX_TOOLS) return { error: `tools supports at most ${MAX_TOOLS} entries` }
    ```
-2. Alternativement, considérer un envoi dynamique des tools pertinents plutôt que l'envoi systématique de tous les tools du host. Cela réduirait aussi la taille du payload et le coût en tokens.
+2. Alternatively, consider dynamically sending only relevant tools rather than all host tools. This would also reduce payload size and token costs.
 
 ---
 
-#### C2. Boutons image (copier/remplacer/ajouter) insèrent du texte base64 au lieu d'images
+#### C2. Image buttons (copy/replace/append) insert base64 text instead of images
 
-**Symptôme** : Après génération d'une image, les boutons "Remplacer", "Ajouter", "Copier" insèrent la chaîne de données base64 brute au lieu de l'image elle-même, ce qui plante Word/PowerPoint.
+**Symptom**: After generating an image, the "Replace", "Append", "Copy" buttons insert the raw base64 data string instead of the image itself, crashing Word/PowerPoint.
 
-**Cause racine** : Chaîne de fallback défaillante dans `insertMessageToDocument()` (`HomePage.vue:528-547`).
+**Root cause**: Broken fallback chain in `insertMessageToDocument()` (`HomePage.vue:528-547`).
 
-Pour **Word** (`insertImageToWord`, ligne 513-526) :
-- La fonction utilise `insertInlinePictureFromBase64()` qui devrait fonctionner.
-- **Mais** si elle échoue (ex : contexte Word pas prêt, range invalide), le fallback appelle `copyImageToClipboard()`.
-- `copyImageToClipboard()` tente `ClipboardItem` (souvent bloqué dans l'iframe Office WebView), puis tombe en fallback sur `copyToClipboard(imageSrc)` qui copie la **chaîne data URL complète** (texte de plusieurs Mo) dans le presse-papiers.
+For **Word** (`insertImageToWord`, line 513-526):
+- The function uses `insertInlinePictureFromBase64()` which should work.
+- **But** if it fails (e.g., Word context not ready, invalid range), the fallback calls `copyImageToClipboard()`.
+- `copyImageToClipboard()` tries `ClipboardItem` (often blocked in the Office WebView iframe), then falls back to `copyToClipboard(imageSrc)` which copies the **full data URL string** (multi-MB text) to clipboard.
 
-Pour **PowerPoint** et **Excel** :
-- Pas de chemin d'insertion d'image direct — le code tombe directement sur `copyImageToClipboard()` → même problème de fallback texte.
-- Pourtant, PowerPoint dispose d'une API `shapes.addImage(base64)` (déjà implémentée dans `powerpointTools.ts:409-464`), mais elle n'est pas utilisée par les boutons de l'UI.
+For **PowerPoint** and **Excel**:
+- No direct image insertion path — the code falls directly to `copyImageToClipboard()` → same text fallback problem.
+- However, PowerPoint has an `shapes.addImage(base64)` API (already implemented in `powerpointTools.ts:409-464`), but it's not used by the UI buttons.
 
-**Fichiers** : `HomePage.vue:487-547`
-**Impact** : Les boutons d'action sur les images sont cassés pour tous les hôtes
+**Files**: `HomePage.vue:487-547`
+**Impact**: Image action buttons are broken for all hosts
 
-**Implémentation proposée** :
-1. **Word** : Ajouter un try-catch plus fin dans `insertImageToWord()` avec un log d'erreur explicite. Vérifier que le `base64Payload` extrait est valide (longueur > 0).
-2. **PowerPoint** : Ajouter une fonction `insertImageToPowerPoint()` qui utilise `PowerPoint.run()` + `slide.shapes.addImage(base64)` (l'API existe déjà dans les tools).
-3. **Excel** : L'insertion d'image n'est pas supportée par l'API Excel JavaScript. Documenter cette limitation et afficher un message clair.
-4. **Fallback clipboard** : Ne JAMAIS copier la data URL brute comme texte. Si le `ClipboardItem` échoue, afficher un message d'erreur explicite au lieu de copier la chaîne base64 :
+**Proposed fix**:
+1. **Word**: Add more granular try-catch in `insertImageToWord()` with explicit error logging. Verify extracted `base64Payload` is valid (length > 0).
+2. **PowerPoint**: Add an `insertImageToPowerPoint()` function that uses `PowerPoint.run()` + `slide.shapes.addImage(base64)` (the API already exists in the tools).
+3. **Excel**: Image insertion is not supported by the Excel JavaScript API. Document this limitation and show a clear message.
+4. **Clipboard fallback**: NEVER copy the raw data URL as text. If `ClipboardItem` fails, show an explicit error message instead of copying the base64 string:
    ```typescript
    async function copyImageToClipboard(imageSrc: string, fallback = false) {
      try {
@@ -161,26 +161,26 @@ Pour **PowerPoint** et **Excel** :
      } catch (err) {
        console.warn('Image clipboard write failed:', err)
      }
-     // Ne PAS tomber sur copyToClipboard(imageSrc) qui copie du texte base64
+     // Do NOT fall through to copyToClipboard(imageSrc) which copies base64 text
      messageUtil.error(t('imageClipboardNotSupported'))
    }
    ```
 
 ---
 
-#### C3. Erreurs backend non loguées (erreurs 400 silencieuses)
+#### C3. Backend errors not logged (silent 400 errors)
 
-**Symptôme** : Quand le backend rejette une requête (validation tools, température, etc.), l'erreur 400 est renvoyée au client mais **jamais loguée** côté serveur. Le diagnostic des bugs est impossible sans logs.
+**Symptom**: When the backend rejects a request (tools validation, temperature, etc.), the 400 error is sent to the client but **never logged** server-side. Bug diagnosis is impossible without logs.
 
-**Cause racine** : Les réponses de validation retournent directement `res.status(400).json({ error })` sans `console.error` ni `console.warn`. Seules les erreurs 500 et les erreurs LLM sont loguées.
+**Root cause**: Validation responses return `res.status(400).json({ error })` directly without `console.error` or `console.warn`. Only 500 errors and LLM errors are logged.
 
-**Fichiers** : `server.js` — toutes les lignes `return res.status(400).json(...)` (environ 15 occurrences)
-**Impact** : Impossible de diagnostiquer les problèmes sans accès au frontend (le bug C1 en est la preuve directe)
+**Files**: `server.js` — all `return res.status(400).json(...)` lines (~15 occurrences)
+**Impact**: Impossible to diagnose problems without frontend access (bug C1 is direct proof)
 
-**Implémentation proposée** :
-Ajouter un logging systématique avant chaque réponse d'erreur :
+**Proposed fix**:
+Add systematic logging before each error response:
 ```javascript
-// Créer un helper de logging
+// Create a logging helper
 function logAndRespond(res, status, errorObj) {
   if (status >= 400) {
     console.warn(`[${status}] ${errorObj.error}`)
@@ -188,26 +188,26 @@ function logAndRespond(res, status, errorObj) {
   return res.status(status).json(errorObj)
 }
 ```
-Ou mieux : installer `morgan` pour logger toutes les requêtes (voir M5) et ajouter un middleware de logging des erreurs.
+Or better: install `morgan` to log all requests (see M5) and add an error logging middleware.
 
 ---
 
-#### C4. Fuite d'informations sensibles dans les erreurs LLM
+#### C4. Sensitive information leakage in LLM errors
 
-**Symptôme** : Les erreurs brutes de l'API LLM sont retransmises au client avec le champ `details`.
+**Symptom**: Raw LLM API errors are forwarded to the client via the `details` field.
 
-**Fichiers** : `server.js:254-257`, `349-352`, `421-424`
+**Files**: `server.js:254-257`, `349-352`, `421-424`
 ```javascript
 return res.status(response.status).json({
   error: `LLM API error: ${response.status}`,
-  details: errorText,  // Peut contenir des URLs internes, versions, clés partielles
+  details: errorText,  // May contain internal URLs, versions, partial keys
 })
 ```
-**Impact** : Fuite d'informations sur l'infrastructure. Présent dans les 3 endpoints.
+**Impact**: Infrastructure information leakage. Present in all 3 endpoints.
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```javascript
-// Remplacer dans les 3 endpoints :
+// Replace in all 3 endpoints:
 console.error(`LLM API error ${response.status}:`, errorText)
 return res.status(502).json({
   error: 'The AI service returned an error. Please try again later.',
@@ -216,26 +216,26 @@ return res.status(502).json({
 
 ---
 
-#### C5. Aucune authentification sur le backend
+#### C5. No authentication on the backend
 
-**Fichier** : `server.js` (tout le fichier)
-**Impact** : N'importe qui sur le réseau peut appeler les endpoints et consommer les crédits API LLM
+**File**: `server.js` (entire file)
+**Impact**: Anyone on the network can call the endpoints and consume LLM API credits
 
-**Implémentation proposée** :
-1. Variable `ALLOWED_API_KEYS` dans `.env` (liste séparée par virgules)
-2. Middleware `requireAuth` vérifiant le header `x-api-key`
-3. Appliquer sur `/api/chat`, `/api/chat/sync`, `/api/image`
-4. Garder `/health` et `/api/models` publics
-5. Frontend : ajouter le header `x-api-key` dans `fetchWithTimeoutAndRetry` via une variable `VITE_API_KEY`
+**Proposed fix**:
+1. `ALLOWED_API_KEYS` variable in `.env` (comma-separated list)
+2. `requireAuth` middleware checking the `x-api-key` header
+3. Apply to `/api/chat`, `/api/chat/sync`, `/api/image`
+4. Keep `/health` and `/api/models` public
+5. Frontend: add the `x-api-key` header in `fetchWithTimeoutAndRetry` via a `VITE_API_KEY` variable
 
 ---
 
-#### C6. Aucun rate limiting
+#### C6. No rate limiting
 
-**Fichier** : `server.js`
-**Impact** : DoS possible, consommation illimitée de crédits API
+**File**: `server.js`
+**Impact**: DoS possible, unlimited API credit consumption
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```bash
 npm install express-rate-limit
 ```
@@ -249,135 +249,135 @@ app.use('/api/image', imageLimiter)
 
 ---
 
-### HAUTE — À corriger rapidement
+### HIGH — Fix Soon
 
 ---
 
-#### H1. Configuration des tiers de modèles inadaptée
+#### H1. Model tier configuration is wrong
 
-**Symptôme** : GPT-5.2 (tier `reasoning`) est beaucoup plus rapide que les modèles `nano` (gpt-5-nano) et `standard` (gpt-5-mini). L'utilisateur doit manuellement sélectionner "Raisonnement" pour obtenir la meilleure performance, ce qui est contre-intuitif.
+**Symptom**: GPT-5.2 (tier `reasoning`) is much faster than the `nano` (gpt-5-nano) and `standard` (gpt-5-mini) models. Users must manually select "Reasoning" to get the best performance, which is counter-intuitive.
 
-**Fichiers** : `server.js:13-40`, `backend/.env.example`
-**Impact** : UX dégradée, l'utilisateur doit connaître les internals pour choisir le bon modèle
+**Files**: `server.js:13-40`, `backend/.env.example`
+**Impact**: Degraded UX, users must know internals to choose the right model
 
-**Configuration actuelle** :
-| Tier | Modèle | Usage attendu |
-|------|--------|--------------|
-| nano | gpt-5-nano | Rapide, basique |
-| standard | gpt-5-mini | Chat normal |
-| reasoning | gpt-5.2 | Complexe → mais en fait le plus rapide |
-| image | gpt-image-1.5 | Génération d'images |
+**Current configuration**:
+| Tier | Model | Intended use |
+|------|-------|-------------|
+| nano | gpt-5-nano | Fast, basic |
+| standard | gpt-5-mini | Normal chat |
+| reasoning | gpt-5.2 | Complex → but actually the fastest |
+| image | gpt-image-1.5 | Image generation |
 
-**Implémentation proposée** — Reconfigurer en 3 tiers (supprimer nano) :
-| Tier | Modèle | Label | Usage |
-|------|--------|-------|-------|
-| standard | gpt-5.2 | Standard | Chat normal + agent (rapide et performant) |
-| reasoning | gpt-5.2 (reasoning mode) | Raisonnement | Tâches complexes nécessitant un raisonnement approfondi |
-| image | gpt-image-1.5 | Image | Génération d'images |
+**Proposed fix** — Reconfigure to 3 tiers (remove nano):
+| Tier | Model | Label | Usage |
+|------|-------|-------|-------|
+| standard | gpt-5.2 | Standard | Normal chat + agent (fast and performant) |
+| reasoning | gpt-5.2 (reasoning mode) | Reasoning | Complex tasks requiring deep reasoning |
+| image | gpt-image-1.5 | Image | Image generation |
 
-Modifications :
-1. `server.js` : Supprimer le tier `nano`, déplacer `gpt-5.2` en `standard`
-2. `.env.example` : Mettre à jour les modèles par défaut
-3. Frontend `SettingsPage.vue` / `HomePage.vue` : Le sélecteur de modèle n'affichera que 3 options au lieu de 4
-4. `getChatTimeoutMs()` : Ajuster les timeouts en conséquence
+Changes:
+1. `server.js`: Remove `nano` tier, move `gpt-5.2` to `standard`
+2. `.env.example`: Update default models
+3. Frontend `SettingsPage.vue` / `HomePage.vue`: Model selector shows 3 options instead of 4
+4. `getChatTimeoutMs()`: Adjust timeouts accordingly
 
-**Note** : Vérifier si gpt-5.2 supporte le mode reasoning (paramètre `reasoning_effort` ou similaire) et adapter `buildChatBody()` en conséquence.
+**Note**: Check whether gpt-5.2 supports a reasoning mode (e.g., `reasoning_effort` parameter) and adapt `buildChatBody()` accordingly.
 
 ---
 
-#### H2. Headers de sécurité HTTP manquants
+#### H2. Missing HTTP security headers
 
-**Fichier** : `server.js`
-**Impact** : Vulnérabilités clickjacking, MIME sniffing, etc.
+**File**: `server.js`
+**Impact**: Clickjacking, MIME sniffing vulnerabilities, etc.
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```bash
 npm install helmet
 ```
 ```javascript
 import helmet from 'helmet'
 app.use(helmet({
-  contentSecurityPolicy: false, // Office add-in a ses propres CSP
+  contentSecurityPolicy: false, // Office add-in has its own CSP
   crossOriginEmbedderPolicy: false,
 }))
 ```
 
 ---
 
-#### H3. `HomePage.vue` — god component (1344 lignes)
+#### H3. `HomePage.vue` — god component (1344 lines)
 
-**Fichier** : `frontend/src/pages/HomePage.vue`
-**Impact** : Maintenabilité, lisibilité, testabilité, performance
+**File**: `frontend/src/pages/HomePage.vue`
+**Impact**: Maintainability, readability, testability, performance
 
-Le composant combine : UI chat, agent loop, quick actions, Office API (4 hôtes), clipboard, health check polling, prompts systèmes pour chaque hôte, insertion d'images.
+The component combines: chat UI, agent loop, quick actions, Office API (4 hosts), clipboard, health check polling, system prompts for each host, image insertion.
 
-**Implémentation proposée** — Extraire en 7 morceaux :
-1. `ChatHeader.vue` — Header avec logo, boutons new chat et settings (lignes 5-38)
-2. `QuickActionsBar.vue` — Barre d'actions rapides avec sélecteur de prompt (lignes 41-67)
-3. `ChatMessageList.vue` — Container de messages avec empty state (lignes 70-160)
-4. `ChatInput.vue` — Zone de saisie avec sélecteurs de mode et modèle (lignes 163-217)
-5. Composable `useAgentLoop.ts` — La boucle agent + prompts système (lignes 653-1039)
-6. Composable `useOfficeInsert.ts` — L'insertion dans le document + clipboard (lignes 1199-1311)
-7. Composable `useImageActions.ts` — Génération et insertion d'images (lignes 487-547)
+**Proposed fix** — Extract into 7 pieces:
+1. `ChatHeader.vue` — Header with logo, new chat and settings buttons (lines 5-38)
+2. `QuickActionsBar.vue` — Quick actions bar with prompt selector (lines 41-67)
+3. `ChatMessageList.vue` — Message container with empty state (lines 70-160)
+4. `ChatInput.vue` — Input area with mode and model selectors (lines 163-217)
+5. Composable `useAgentLoop.ts` — Agent loop + system prompts (lines 653-1039)
+6. Composable `useOfficeInsert.ts` — Document insertion + clipboard (lines 1199-1311)
+7. Composable `useImageActions.ts` — Image generation and insertion (lines 487-547)
 
 ---
 
-#### H4. Backend monolithique (448 lignes dans 1 fichier)
+#### H4. Monolithic backend (448 lines in 1 file)
 
-**Fichier** : `backend/src/server.js`
-**Impact** : Maintenabilité à mesure que le code grandit
+**File**: `backend/src/server.js`
+**Impact**: Maintainability as the code grows
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```
 backend/src/
-├── server.js              # Point d'entrée, middleware setup
+├── server.js              # Entry point, middleware setup
 ├── config/
-│   └── models.js          # Configuration des modèles
+│   └── models.js          # Model configuration
 ├── middleware/
 │   ├── auth.js            # Authentication (C5)
-│   └── validate.js        # Input validation (existant à extraire)
+│   └── validate.js        # Input validation (extract existing)
 ├── routes/
 │   ├── health.js          # GET /health
 │   ├── models.js          # GET /api/models
 │   ├── chat.js            # POST /api/chat, /api/chat/sync
 │   └── image.js           # POST /api/image
 └── utils/
-    └── fetchWithTimeout.js # Helper fetch avec timeout
+    └── fetchWithTimeout.js # Fetch helper with timeout
 ```
 
 ---
 
-#### H5. Agent loop sans support d'annulation (abort)
+#### H5. Agent loop without abort support
 
-**Symptôme** : Quand l'utilisateur clique "Stop" pendant le chat en mode agent, le `abortController` est déclenché mais la requête `chatSync()` en cours n'est pas interrompue car `chatSync` ne reçoit pas le signal d'abort.
+**Symptom**: When the user clicks "Stop" during agent-mode chat, the `abortController` is triggered but the in-flight `chatSync()` request is not interrupted because `chatSync` doesn't receive the abort signal.
 
-**Fichiers** :
-- `backend.ts:183-198` : `chatSync()` ne passe pas de `signal` à `fetchWithTimeoutAndRetry()`
-- `HomePage.vue:958-965` : La boucle `while` ne vérifie pas `abortController.value?.signal.aborted` entre les itérations
+**Files**:
+- `backend.ts:183-198`: `chatSync()` doesn't pass a `signal` to `fetchWithTimeoutAndRetry()`
+- `HomePage.vue:958-965`: The `while` loop doesn't check `abortController.value?.signal.aborted` between iterations
 
-**Impact** : Le bouton "Stop" ne fonctionne pas pendant le mode agent. La requête continue en arrière-plan et les résultats sont ignorés quand ils arrivent, gaspillant des tokens LLM.
+**Impact**: The "Stop" button doesn't work during agent mode. The request continues in the background and results are ignored when they arrive, wasting LLM tokens.
 
-**Implémentation proposée** :
-1. Ajouter un champ `abortSignal` optionnel à `ChatSyncOptions` et le passer à `fetchWithTimeoutAndRetry()`
-2. Dans `runAgentLoop`, passer `abortController.value?.signal` à `chatSync()`
-3. Ajouter une vérification `if (abortController.value?.signal.aborted) break` au début de chaque itération de la boucle
-
----
-
-### MOYENNE — À planifier
+**Proposed fix**:
+1. Add an optional `abortSignal` field to `ChatSyncOptions` and pass it to `fetchWithTimeoutAndRetry()`
+2. In `runAgentLoop`, pass `abortController.value?.signal` to `chatSync()`
+3. Add a check `if (abortController.value?.signal.aborted) break` at the start of each loop iteration
 
 ---
 
-#### M1. Parser SSE fragile (split de chunks)
+### MEDIUM — Plan for Later
 
-**Symptôme potentiel** : Réponses tronquées ou erreurs JSON aléatoires pendant le streaming.
+---
 
-**Fichier** : `backend.ts:124-151`
+#### M1. Fragile SSE parser (chunk splitting)
 
-Le parser SSE split par `\n` mais ne gère pas le cas où une ligne `data: {...}` est coupée entre deux chunks TCP. Si un chunk se termine au milieu d'une ligne JSON, le `JSON.parse()` échoue silencieusement (le catch est vide).
+**Potential symptom**: Truncated responses or random JSON errors during streaming.
 
-**Implémentation proposée** :
-Maintenir un buffer résiduel entre les chunks :
+**File**: `backend.ts:124-151`
+
+The SSE parser splits by `\n` but doesn't handle the case where a `data: {...}` line is split across two TCP chunks. If a chunk ends in the middle of a JSON line, `JSON.parse()` fails silently (the catch is empty).
+
+**Proposed fix**:
+Maintain a residual buffer between chunks:
 ```typescript
 let buffer = ''
 while (true) {
@@ -385,47 +385,47 @@ while (true) {
   if (done) break
   buffer += decoder.decode(value, { stream: true })
   const lines = buffer.split('\n')
-  buffer = lines.pop() || '' // Garder la dernière ligne incomplète
+  buffer = lines.pop() || '' // Keep the last incomplete line
   for (const line of lines) {
     if (!line.startsWith('data: ')) continue
-    // ... parse comme avant
+    // ... parse as before
   }
 }
 ```
 
 ---
 
-#### M2. Error handler Vue global manquant
+#### M2. Missing global Vue error handler
 
-**Fichier** : `frontend/src/main.ts`
-**Impact** : Erreurs non capturées provoquent un crash silencieux
+**File**: `frontend/src/main.ts`
+**Impact**: Uncaught errors cause silent crashes
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```typescript
 app.config.errorHandler = (err, instance, info) => {
   console.error('Vue Global Error:', err, info)
-  // Optionnel : afficher un toast
+  // Optional: show a toast
 }
 ```
 
 ---
 
-#### M3. Accessibilité insuffisante (a11y)
+#### M3. Insufficient accessibility (a11y)
 
-**Fichiers** : `HomePage.vue`, composants
-**Impact** : Non-conformité WCAG, exclusion d'utilisateurs
+**Files**: `HomePage.vue`, components
+**Impact**: WCAG non-compliance, user exclusion
 
-**Implémentation proposée** :
-1. `aria-label` sur tous les boutons sans texte (New Chat, Settings, Stop, Send, Copy, Replace, Append)
-2. `aria-live="polite"` sur le container de messages
-3. `role="status"` sur l'indicateur backend online/offline
-4. `aria-expanded` sur les `<details>` (think tags)
+**Proposed fix**:
+1. `aria-label` on all text-less buttons (New Chat, Settings, Stop, Send, Copy, Replace, Append)
+2. `aria-live="polite"` on the messages container
+3. `role="status"` on the backend online/offline indicator
+4. `aria-expanded` on `<details>` elements (think tags)
 
 ---
 
-#### M4. `as any` résiduels dans l'agent loop
+#### M4. Residual `as any` in the agent loop
 
-**Fichier** : `HomePage.vue:1022-1026`
+**File**: `HomePage.vue:1022-1026`
 ```typescript
 currentMessages.push({
   role: 'tool' as any,
@@ -434,28 +434,28 @@ currentMessages.push({
 } as any)
 ```
 
-**Fichier** : `backend.ts:157`
+**File**: `backend.ts:157`
 ```typescript
 tools?: any[]
 ```
 
-**Implémentation proposée** :
-1. Étendre `ChatMessage` pour supporter le rôle `tool` :
+**Proposed fix**:
+1. Extend `ChatMessage` to support the `tool` role:
    ```typescript
    export type ChatMessage =
      | { role: 'system' | 'user' | 'assistant'; content: string }
      | { role: 'tool'; tool_call_id: string; content: string }
    ```
-2. Typer `tools` dans `ChatSyncOptions` avec le type `ToolDefinition[]` existant.
+2. Type `tools` in `ChatSyncOptions` with the existing `ToolDefinition[]` type.
 
 ---
 
-#### M5. Request logging manquant
+#### M5. Missing request logging
 
-**Fichier** : `server.js`
-**Impact** : Impossible de diagnostiquer ou auditer les requêtes
+**File**: `server.js`
+**Impact**: Impossible to diagnose or audit requests
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```bash
 npm install morgan
 ```
@@ -466,16 +466,16 @@ app.use(morgan(':method :url :status :response-time ms'))
 
 ---
 
-### BASSE — Améliorations
+### LOW — Nice to Have
 
 ---
 
-#### B1. Pas de toggle dark mode dans l'UI
+#### B1. No dark mode toggle in the UI
 
-**Fichier** : `frontend/src/pages/SettingsPage.vue`
-**Détail** : Les variables CSS dark mode existent dans `index.css:162-187` mais il n'y a aucun toggle pour l'activer.
+**File**: `frontend/src/pages/SettingsPage.vue`
+**Detail**: Dark mode CSS variables exist in `index.css:162-187` but there's no toggle to activate them.
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```typescript
 const darkMode = useStorage(localStorageKey.darkMode, false)
 watch(darkMode, (val) => {
@@ -485,12 +485,12 @@ watch(darkMode, (val) => {
 
 ---
 
-#### B2. Classes CSS répétitives
+#### B2. Repeated CSS classes
 
-**Fichier** : `frontend/src/index.css`
-**Détail** : Les patterns comme `rounded-md border border-border-secondary bg-surface p-2 shadow-sm` sont répétés.
+**File**: `frontend/src/index.css`
+**Detail**: Patterns like `rounded-md border border-border-secondary bg-surface p-2 shadow-sm` are repeated across components.
 
-**Implémentation proposée** :
+**Proposed fix**:
 ```css
 @layer components {
   .card { @apply rounded-md border border-border-secondary bg-surface p-2 shadow-sm; }
@@ -499,53 +499,53 @@ watch(darkMode, (val) => {
 
 ---
 
-#### B3. README.md obsolète
+#### B3. Outdated README.md
 
-**Fichier** : `README.md`
-**Détail** : Plusieurs informations ne correspondent plus au code.
+**File**: `README.md`
+**Detail**: Several pieces of information no longer match the code.
 
-**Corrections nécessaires** :
+**Required corrections**:
 1. "23 Word tools" → **37 Word tools**
 2. "22 Excel tools" → **39 Excel tools**
-3. Ajouter **8 PowerPoint tools** et **13 Outlook tools**
-4. Ajouter les Quick Actions pour Excel, PowerPoint, Outlook
-5. Confirmer le support PowerPoint (marqué comme non implémenté mais l'est maintenant)
-6. Mentionner les 13 langues de réponse
-7. Documenter la configuration des 4 tiers de modèles (bientôt 3)
+3. Add **8 PowerPoint tools** and **13 Outlook tools**
+4. Add Quick Actions for Excel, PowerPoint, Outlook
+5. Confirm PowerPoint support (marked as not implemented but it is now)
+6. Mention the 13 response languages
+7. Document the 4 model tiers configuration (soon to be 3)
 
 ---
 
-## Tableau récapitulatif
+## Summary Table
 
-| Priorité | ID | Action | Statut |
+| Priority | ID | Action | Status |
 |----------|-----|--------|--------|
-| **CRITIQUE** | **C1** | **Chat cassé Word/Excel — limite 32 tools** | ❌ À faire |
-| **CRITIQUE** | **C2** | **Boutons image insèrent base64 texte** | ❌ À faire |
-| **CRITIQUE** | **C3** | **Erreurs 400 non loguées dans backend** | ❌ À faire |
-| **CRITIQUE** | **C4** | **Fuite d'erreurs LLM au client** | ❌ À faire |
-| **CRITIQUE** | **C5** | **Aucune authentification backend** | ❌ À faire |
-| **CRITIQUE** | **C6** | **Aucun rate limiting** | ❌ À faire |
-| HAUTE | H1 | Configuration des tiers de modèles inadaptée | ❌ À faire |
-| HAUTE | H2 | Headers sécurité HTTP (helmet) | ❌ À faire |
-| HAUTE | H3 | `HomePage.vue` god component (1344 lignes) | ❌ À faire |
-| HAUTE | H4 | Backend monolithique (448 lignes) | ❌ À faire |
-| HAUTE | H5 | Agent loop sans support abort | ❌ À faire |
-| MOYENNE | M1 | Parser SSE fragile (split chunks) | ❌ À faire |
-| MOYENNE | M2 | Error handler Vue global | ❌ À faire |
-| MOYENNE | M3 | Accessibilité (ARIA) | ❌ À faire |
-| MOYENNE | M4 | `as any` résiduels dans agent loop | ❌ À faire |
-| MOYENNE | M5 | Request logging (morgan) | ❌ À faire |
-| BASSE | B1 | Toggle dark mode | ❌ À faire |
-| BASSE | B2 | Extraire CSS répétées | ❌ À faire |
-| BASSE | B3 | README.md obsolète | ❌ À faire |
+| **CRITICAL** | **C1** | **Chat broken Word/Excel — 32 tools limit** | ❌ TODO |
+| **CRITICAL** | **C2** | **Image buttons insert base64 text** | ❌ TODO |
+| **CRITICAL** | **C3** | **400 errors not logged in backend** | ❌ TODO |
+| **CRITICAL** | **C4** | **LLM error leakage to client** | ❌ TODO |
+| **CRITICAL** | **C5** | **No backend authentication** | ❌ TODO |
+| **CRITICAL** | **C6** | **No rate limiting** | ❌ TODO |
+| HIGH | H1 | Model tier configuration is wrong | ❌ TODO |
+| HIGH | H2 | Missing HTTP security headers (helmet) | ❌ TODO |
+| HIGH | H3 | `HomePage.vue` god component (1344 lines) | ❌ TODO |
+| HIGH | H4 | Monolithic backend (448 lines) | ❌ TODO |
+| HIGH | H5 | Agent loop without abort support | ❌ TODO |
+| MEDIUM | M1 | Fragile SSE parser (chunk splitting) | ❌ TODO |
+| MEDIUM | M2 | Missing global Vue error handler | ❌ TODO |
+| MEDIUM | M3 | Accessibility (ARIA) | ❌ TODO |
+| MEDIUM | M4 | Residual `as any` in agent loop | ❌ TODO |
+| MEDIUM | M5 | Request logging (morgan) | ❌ TODO |
+| LOW | B1 | Dark mode toggle | ❌ TODO |
+| LOW | B2 | Extract repeated CSS | ❌ TODO |
+| LOW | B3 | Outdated README.md | ❌ TODO |
 
 ---
 
-## Sécurité — Points OK (pas de problème trouvé)
+## Security — OK Points (no issues found)
 
-- **XSS** : Aucune utilisation de `v-html` — Vue escape correctement
-- **CORS** : Correctement restreint à `FRONTEND_URL`
-- **Secrets** : Les clés API ne sont jamais exposées côté client
-- **Injection SQL/NoSQL** : N/A (pas de base de données)
-- **Validation d'input** : Température, maxTokens, tools structure, prompt length, image params tous validés
-- **Timeouts** : Toutes les requêtes fetch ont des timeouts avec AbortController
+- **XSS**: No `v-html` usage — Vue escapes correctly
+- **CORS**: Properly restricted to `FRONTEND_URL`
+- **Secrets**: API keys never exposed client-side
+- **SQL/NoSQL Injection**: N/A (no database)
+- **Input validation**: Temperature, maxTokens, tools structure, prompt length, image params all validated
+- **Timeouts**: All fetch requests have timeouts with AbortController

@@ -52,11 +52,12 @@ Any contract change should update both backend and frontend in the same change s
 - Do not leak API keys or environment secrets in logs or responses.
 
 ## 7) Documentation Guidelines
-When updating `README.md`:
-- Prefer **incremental updates** to existing sections.
-- Only modify outdated statements.
-- Keep deployment and environment variable sections accurate.
-- Reflect implemented capabilities without speculative roadmap edits.
+- **Language**: All documentation files (`.md`) must be written in **English**, not French. This includes `README.md`, `DESIGN_REVIEW.md`, `SKILLS_AUDIT.md`, `agents.md`, and any future documentation files.
+- When updating `README.md`:
+  - Prefer **incremental updates** to existing sections.
+  - Only modify outdated statements.
+  - Keep deployment and environment variable sections accurate.
+  - Reflect implemented capabilities without speculative roadmap edits.
 
 ## 8) PowerPoint Agent
 - **Persona**: Expert in visual communication and public speaking.
