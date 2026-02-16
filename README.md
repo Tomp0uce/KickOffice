@@ -203,7 +203,7 @@ KickOffice/
 - [x] Tool execution status display in chat
 - [x] Max iterations limit (configurable)
 - [x] 39 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak
-- [x] 25 Excel tools: getSelectedCells, setCellValue, getWorksheetData, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, getWorksheetInfo, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, applyConditionalFormatting, getConditionalFormattingRules
+- [x] 39 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules
 - [x] 3 Outlook tools: getEmailBody, getSelectedText, setEmailBody
 - [x] 2 General tools: getCurrentDate, calculateMath
 
@@ -392,7 +392,7 @@ Added or extended for KickOffice:
 The following was directly reused or adapted from excel-ai-assistant:
 
 - **Tool definition schema** — the `{ name, description, inputSchema, execute }` pattern (originally a LangChain tool format) was adapted to the OpenAI function-calling JSON schema format and applied to all tool sets (Word, Excel, general)
-- **Excel tool set** (`excelTools.ts`) — tool names, descriptions, and parameter schemas for Excel operations (getSelectedCells, setCellValue, getWorksheetData, insertFormula, createChart, formatRange, sortRange, applyAutoFilter, etc.) were derived from excel-ai-assistant's tool catalogue; implementations were rewritten using `Excel.run()` directly
+- **Excel tool set** (`excelTools.ts`) — tool names, descriptions, and parameter schemas for Excel operations (data validation, tables, worksheet navigation, freeze panes, hyperlinks/comments, worksheet protection, named ranges, conditional formatting, etc.) were derived from excel-ai-assistant's tool catalogue and extended for advanced spreadsheet workflows; implementations were rewritten using `Excel.run()` directly
 - **Agent loop pattern** — the core loop (send tools to LLM → detect `tool_calls` in response → execute locally → feed result back → repeat) was adapted from excel-ai-assistant's LangChain agent to a custom TypeScript implementation
 - **Formula language localization** — concept of detecting the user's configured formula language (`getExcelFormulaLanguage()`, fr/en) to match locale-specific function names
 

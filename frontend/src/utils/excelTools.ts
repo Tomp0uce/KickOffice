@@ -4,13 +4,24 @@ export type ExcelToolName =
   | 'getSelectedCells'
   | 'setCellValue'
   | 'getWorksheetData'
+  | 'addDataValidation'
+  | 'createTable'
+  | 'copyRange'
   | 'insertFormula'
   | 'fillFormulaDown'
   | 'createChart'
   | 'formatRange'
   | 'sortRange'
   | 'applyAutoFilter'
+  | 'removeAutoFilter'
   | 'getWorksheetInfo'
+  | 'renameWorksheet'
+  | 'deleteWorksheet'
+  | 'activateWorksheet'
+  | 'getDataFromSheet'
+  | 'freezePanes'
+  | 'addHyperlink'
+  | 'addCellComment'
   | 'insertRow'
   | 'insertColumn'
   | 'deleteRow'
@@ -24,6 +35,9 @@ export type ExcelToolName =
   | 'addWorksheet'
   | 'setColumnWidth'
   | 'setRowHeight'
+  | 'protectWorksheet'
+  | 'getNamedRanges'
+  | 'setNamedRange'
   | 'applyConditionalFormatting'
   | 'getConditionalFormattingRules'
 
@@ -131,6 +145,179 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
+      })
+    },
+  },
+
+  addDataValidation: {
+    name: 'addDataValidation',
+    description:
+      'Apply data validation rules to a range (dropdown list, number/date limits, text length, or custom formula).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Target range address (e.g., "A2:A100"). Uses selection if omitted.',
+        },
+        validationType: {
+          type: 'string',
+          description: 'Validation type to apply.',
+          enum: ['list', 'wholeNumber', 'decimal', 'date', 'textLength', 'custom'],
+        },
+        listSource: {
+          type: 'string',
+          description: 'For list validation, comma-separated values or a range reference (e.g., "A,B,C" or "=$F$1:$F$10").',
+        },
+        operator: {
+          type: 'string',
+          description: 'Comparison operator for number/date/textLength validations.',
+          enum: ['between', 'notBetween', 'equalTo', 'notEqualTo', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'],
+        },
+        formula1: {
+          type: 'string',
+          description: 'Primary formula/value for validation rule.',
+        },
+        formula2: {
+          type: 'string',
+          description: 'Secondary formula/value for between/notBetween.',
+        },
+      },
+      required: [],
+    },
+    execute: async (args) => {
+      const {
+        address,
+        validationType = 'list',
+        listSource = 'A,B,C',
+        operator = 'between',
+        formula1 = '0',
+        formula2,
+      } = args
+
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
+
+        const operatorMap: Record<string, any> = {
+          between: Excel.DataValidationOperator.between,
+          notBetween: Excel.DataValidationOperator.notBetween,
+          equalTo: Excel.DataValidationOperator.equalTo,
+          notEqualTo: Excel.DataValidationOperator.notEqualTo,
+          greaterThan: Excel.DataValidationOperator.greaterThan,
+          greaterThanOrEqual: Excel.DataValidationOperator.greaterThanOrEqualTo,
+          lessThan: Excel.DataValidationOperator.lessThan,
+          lessThanOrEqual: Excel.DataValidationOperator.lessThanOrEqualTo,
+        }
+
+        if (validationType === 'list') {
+          range.dataValidation.rule = { list: { inCellDropDown: true, source: listSource } }
+        } else if (validationType === 'custom') {
+          range.dataValidation.rule = { custom: { formula: formula1 } }
+        } else {
+          const validationBody = {
+            formula1,
+            ...(formula2 ? { formula2 } : {}),
+            operator: operatorMap[operator] ?? Excel.DataValidationOperator.between,
+          }
+
+          const rule: Record<string, any> = {}
+          if (validationType === 'wholeNumber') rule.wholeNumber = validationBody
+          if (validationType === 'decimal') rule.decimal = validationBody
+          if (validationType === 'date') rule.date = validationBody
+          if (validationType === 'textLength') rule.textLength = validationBody
+          range.dataValidation.rule = rule
+        }
+
+        range.dataValidation.errorAlert = {
+          title: 'Invalid value',
+          message: 'The entered value does not match data validation rules.',
+          style: Excel.DataValidationAlertStyle.stop,
+          showAlert: true,
+        }
+
+        await context.sync()
+        return `Successfully applied ${validationType} data validation${address ? ` on ${address}` : ' on selection'}`
+      })
+    },
+  },
+
+  createTable: {
+    name: 'createTable',
+    description:
+      'Convert a range to an Excel structured table (ListObject), with optional table name and style.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Range address to convert into a table (e.g., "A1:D20"). Uses selection if omitted.',
+        },
+        hasHeaders: {
+          type: 'boolean',
+          description: 'Whether the first row contains headers. Default: true.',
+        },
+        tableName: {
+          type: 'string',
+          description: 'Optional table name (must be unique).',
+        },
+        style: {
+          type: 'string',
+          description: 'Optional table style name (e.g., "TableStyleMedium2").',
+        },
+      },
+      required: [],
+    },
+    execute: async (args) => {
+      const { address, hasHeaders = true, tableName, style = 'TableStyleMedium2' } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
+        const table = sheet.tables.add(range, hasHeaders)
+
+        if (tableName) table.name = tableName
+        if (style) table.style = style
+
+        table.load('name')
+        await context.sync()
+        return `Successfully created table "${table.name}"${address ? ` from ${address}` : ' from selection'}`
+      })
+    },
+  },
+
+  copyRange: {
+    name: 'copyRange',
+    description:
+      'Copy values, formulas, and number formats from a source range to a destination range.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceAddress: {
+          type: 'string',
+          description: 'Source range address (e.g., "A1:C20").',
+        },
+        destinationAddress: {
+          type: 'string',
+          description: 'Top-left destination address or destination range (e.g., "E1").',
+        },
+      },
+      required: ['sourceAddress', 'destinationAddress'],
+    },
+    execute: async (args) => {
+      const { sourceAddress, destinationAddress } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const sourceRange = sheet.getRange(sourceAddress)
+        sourceRange.load('values, formulas, numberFormat, rowCount, columnCount')
+        await context.sync()
+
+        const destinationRange = sheet.getRange(destinationAddress).getResizedRange(sourceRange.rowCount - 1, sourceRange.columnCount - 1)
+        destinationRange.values = sourceRange.values
+        destinationRange.formulas = sourceRange.formulas
+        destinationRange.numberFormat = sourceRange.numberFormat
+
+        await context.sync()
+        return `Successfully copied ${sourceAddress} to ${destinationAddress}`
       })
     },
   },
@@ -332,11 +519,71 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           description: 'Horizontal alignment',
           enum: ['Left', 'Center', 'Right'],
         },
+        verticalAlignment: {
+          type: 'string',
+          description: 'Vertical alignment',
+          enum: ['Top', 'Center', 'Bottom', 'Justify', 'Distributed'],
+        },
+        wrapText: {
+          type: 'boolean',
+          description: 'Wrap text within cells',
+        },
+        fontName: {
+          type: 'string',
+          description: 'Font family name (e.g., "Calibri", "Arial")',
+        },
+        borderStyle: {
+          type: 'string',
+          description: 'Default border style to apply to all borders.',
+          enum: ['continuous', 'dash', 'dashDot', 'dashDotDot', 'dot', 'double', 'none', 'slantDashDot'],
+        },
+        borderColor: {
+          type: 'string',
+          description: 'Default border color (hex).',
+        },
+        borderWeight: {
+          type: 'string',
+          description: 'Default border weight to apply to all borders.',
+          enum: ['hairline', 'thin', 'medium', 'thick'],
+        },
+        borderTopStyle: { type: 'string' },
+        borderBottomStyle: { type: 'string' },
+        borderLeftStyle: { type: 'string' },
+        borderRightStyle: { type: 'string' },
+        borderInsideHorizontalStyle: { type: 'string' },
+        borderInsideVerticalStyle: { type: 'string' },
+        borderTopColor: { type: 'string' },
+        borderBottomColor: { type: 'string' },
+        borderLeftColor: { type: 'string' },
+        borderRightColor: { type: 'string' },
+        borderInsideHorizontalColor: { type: 'string' },
+        borderInsideVerticalColor: { type: 'string' },
+        borderTopWeight: { type: 'string' },
+        borderBottomWeight: { type: 'string' },
+        borderLeftWeight: { type: 'string' },
+        borderRightWeight: { type: 'string' },
+        borderInsideHorizontalWeight: { type: 'string' },
+        borderInsideVerticalWeight: { type: 'string' },
       },
       required: [],
     },
     execute: async (args) => {
-      const { address, fillColor, fontColor, bold, italic, fontSize, borders, horizontalAlignment } = args
+      const {
+        address,
+        fillColor,
+        fontColor,
+        bold,
+        italic,
+        fontSize,
+        borders,
+        horizontalAlignment,
+        verticalAlignment,
+        wrapText,
+        fontName,
+        borderStyle,
+        borderColor,
+        borderWeight,
+      } = args
       return Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
@@ -346,9 +593,79 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         if (bold !== undefined) range.format.font.bold = bold
         if (italic !== undefined) range.format.font.italic = italic
         if (fontSize) range.format.font.size = fontSize
+        if (fontName) range.format.font.name = fontName
+        if (wrapText !== undefined) range.format.wrapText = wrapText
         if (horizontalAlignment) {
           range.format.horizontalAlignment = horizontalAlignment as Excel.HorizontalAlignment
         }
+        if (verticalAlignment) {
+          range.format.verticalAlignment = verticalAlignment as Excel.VerticalAlignment
+        }
+
+        const borderStyleMap: Record<string, any> = {
+          continuous: Excel.BorderLineStyle.continuous,
+          dash: Excel.BorderLineStyle.dash,
+          dashDot: Excel.BorderLineStyle.dashDot,
+          dashDotDot: Excel.BorderLineStyle.dashDotDot,
+          dot: Excel.BorderLineStyle.dot,
+          double: Excel.BorderLineStyle.double,
+          none: Excel.BorderLineStyle.none,
+          slantDashDot: Excel.BorderLineStyle.slantDashDot,
+        }
+
+        const borderWeightMap: Record<string, any> = {
+          hairline: Excel.BorderWeight.hairline,
+          thin: Excel.BorderWeight.thin,
+          medium: Excel.BorderWeight.medium,
+          thick: Excel.BorderWeight.thick,
+        }
+
+        const setBorder = (borderIndex: Excel.BorderIndex, overrides: { style?: string; color?: string; weight?: string }) => {
+          try {
+            const border = range.format.borders.getItem(borderIndex)
+            const styleToApply = overrides.style ?? borderStyle
+            const colorToApply = overrides.color ?? borderColor
+            const weightToApply = overrides.weight ?? borderWeight
+
+            if (styleToApply) border.style = borderStyleMap[styleToApply] ?? Excel.BorderLineStyle.continuous
+            if (colorToApply) border.color = colorToApply
+            if (weightToApply) border.weight = borderWeightMap[weightToApply] ?? Excel.BorderWeight.thin
+          } catch {
+            // Some border types may not apply to single cells
+          }
+        }
+
+        setBorder(Excel.BorderIndex.edgeTop, {
+          style: args.borderTopStyle,
+          color: args.borderTopColor,
+          weight: args.borderTopWeight,
+        })
+        setBorder(Excel.BorderIndex.edgeBottom, {
+          style: args.borderBottomStyle,
+          color: args.borderBottomColor,
+          weight: args.borderBottomWeight,
+        })
+        setBorder(Excel.BorderIndex.edgeLeft, {
+          style: args.borderLeftStyle,
+          color: args.borderLeftColor,
+          weight: args.borderLeftWeight,
+        })
+        setBorder(Excel.BorderIndex.edgeRight, {
+          style: args.borderRightStyle,
+          color: args.borderRightColor,
+          weight: args.borderRightWeight,
+        })
+        setBorder(Excel.BorderIndex.insideHorizontal, {
+          style: args.borderInsideHorizontalStyle,
+          color: args.borderInsideHorizontalColor,
+          weight: args.borderInsideHorizontalWeight,
+        })
+        setBorder(Excel.BorderIndex.insideVertical, {
+          style: args.borderInsideVerticalStyle,
+          color: args.borderInsideVerticalColor,
+          weight: args.borderInsideVerticalWeight,
+        })
+
         if (borders) {
           const borderItems = [
             Excel.BorderIndex.edgeTop,
@@ -456,6 +773,32 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
     },
   },
 
+  removeAutoFilter: {
+    name: 'removeAutoFilter',
+    description: 'Remove auto filter from a worksheet.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sheetName: {
+          type: 'string',
+          description: 'Optional worksheet name. Uses active worksheet if omitted.',
+        },
+      },
+      required: [],
+    },
+    execute: async (args) => {
+      const { sheetName } = args
+      return Excel.run(async (context) => {
+        const sheet = sheetName
+          ? context.workbook.worksheets.getItem(sheetName)
+          : context.workbook.worksheets.getActiveWorksheet()
+        sheet.autoFilter.remove()
+        await context.sync()
+        return `Successfully removed auto filter from worksheet "${sheetName ?? 'active'}"`
+      })
+    },
+  },
+
   getWorksheetInfo: {
     name: 'getWorksheetInfo',
     description: 'Get information about the active worksheet including name, used range dimensions, and worksheet count.',
@@ -494,6 +837,238 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
           null,
           2,
         )
+      })
+    },
+  },
+
+  renameWorksheet: {
+    name: 'renameWorksheet',
+    description: 'Rename an existing worksheet.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        currentName: {
+          type: 'string',
+          description: 'Current worksheet name.',
+        },
+        newName: {
+          type: 'string',
+          description: 'New worksheet name.',
+        },
+      },
+      required: ['currentName', 'newName'],
+    },
+    execute: async (args) => {
+      const { currentName, newName } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(currentName)
+        sheet.name = newName
+        await context.sync()
+        return `Successfully renamed worksheet "${currentName}" to "${newName}"`
+      })
+    },
+  },
+
+  deleteWorksheet: {
+    name: 'deleteWorksheet',
+    description: 'Delete a worksheet by name.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Worksheet name to delete.',
+        },
+      },
+      required: ['name'],
+    },
+    execute: async (args) => {
+      const { name } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(name)
+        sheet.delete()
+        await context.sync()
+        return `Successfully deleted worksheet "${name}"`
+      })
+    },
+  },
+
+  activateWorksheet: {
+    name: 'activateWorksheet',
+    description: 'Activate a worksheet by name.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Worksheet name to activate.',
+        },
+      },
+      required: ['name'],
+    },
+    execute: async (args) => {
+      const { name } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(name)
+        sheet.activate()
+        await context.sync()
+        return `Successfully activated worksheet "${name}"`
+      })
+    },
+  },
+
+  getDataFromSheet: {
+    name: 'getDataFromSheet',
+    description: 'Read data from another worksheet without activating it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Worksheet name to read from.',
+        },
+        address: {
+          type: 'string',
+          description: 'Optional range address. Uses used range if omitted.',
+        },
+      },
+      required: ['name'],
+    },
+    execute: async (args) => {
+      const { name, address } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getItem(name)
+        const range = address ? sheet.getRange(address) : sheet.getUsedRange()
+        range.load('address, values, rowCount, columnCount')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            worksheet: name,
+            address: range.address,
+            rowCount: range.rowCount,
+            columnCount: range.columnCount,
+            values: range.values,
+          },
+          null,
+          2,
+        )
+      })
+    },
+  },
+
+  freezePanes: {
+    name: 'freezePanes',
+    description: 'Freeze or unfreeze worksheet panes by rows, columns, or anchor cell.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          description: 'Freeze mode to apply.',
+          enum: ['rows', 'columns', 'at', 'unfreeze'],
+        },
+        count: {
+          type: 'number',
+          description: 'Row or column count for rows/columns mode.',
+        },
+        address: {
+          type: 'string',
+          description: 'Anchor range address for mode="at" (e.g., "C3").',
+        },
+      },
+      required: ['mode'],
+    },
+    execute: async (args) => {
+      const { mode, count = 1, address } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+
+        if (mode === 'rows') {
+          sheet.freezePanes.freezeRows(count)
+        } else if (mode === 'columns') {
+          sheet.freezePanes.freezeColumns(count)
+        } else if (mode === 'at') {
+          if (!address) {
+            throw new Error('address is required when mode is "at"')
+          }
+          sheet.freezePanes.freezeAt(sheet.getRange(address))
+        } else {
+          sheet.freezePanes.unfreeze()
+        }
+
+        await context.sync()
+        return `Successfully applied freeze panes mode "${mode}"`
+      })
+    },
+  },
+
+  addHyperlink: {
+    name: 'addHyperlink',
+    description: 'Add a clickable hyperlink to a cell or range.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Target cell/range address (e.g., "A1").',
+        },
+        hyperlinkAddress: {
+          type: 'string',
+          description: 'Hyperlink URL or mailto value.',
+        },
+        textToDisplay: {
+          type: 'string',
+          description: 'Optional displayed text.',
+        },
+        screenTip: {
+          type: 'string',
+          description: 'Optional tooltip text.',
+        },
+      },
+      required: ['address', 'hyperlinkAddress'],
+    },
+    execute: async (args) => {
+      const { address, hyperlinkAddress, textToDisplay, screenTip } = args
+      return Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        const range = sheet.getRange(address)
+        range.hyperlink = {
+          address: hyperlinkAddress,
+          ...(textToDisplay ? { textToDisplay } : {}),
+          ...(screenTip ? { screenTip } : {}),
+        }
+
+        await context.sync()
+        return `Successfully added hyperlink to ${address}`
+      })
+    },
+  },
+
+  addCellComment: {
+    name: 'addCellComment',
+    description: 'Add a comment (note) to a cell range.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Target cell/range address (e.g., "B2").',
+        },
+        text: {
+          type: 'string',
+          description: 'Comment text.',
+        },
+      },
+      required: ['address', 'text'],
+    },
+    execute: async (args) => {
+      const { address, text } = args
+      return Excel.run(async (context) => {
+        const comments = context.workbook.comments
+        comments.add(address, text)
+        await context.sync()
+        return `Successfully added comment to ${address}`
       })
     },
   },
@@ -915,6 +1490,129 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
         rowRange.format.rowHeight = height
         await context.sync()
         return `Successfully set row ${rowIndex} height to ${height}`
+      })
+    },
+  },
+
+  protectWorksheet: {
+    name: 'protectWorksheet',
+    description: 'Protect or unprotect a worksheet with optional password and permissions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sheetName: {
+          type: 'string',
+          description: 'Optional worksheet name. Uses active worksheet if omitted.',
+        },
+        action: {
+          type: 'string',
+          description: 'Protection action.',
+          enum: ['protect', 'unprotect'],
+        },
+        password: {
+          type: 'string',
+          description: 'Optional password.',
+        },
+        allowAutoFilter: {
+          type: 'boolean',
+          description: 'Allow users to use auto filters while protected.',
+        },
+        allowFormatCells: {
+          type: 'boolean',
+          description: 'Allow users to format cells while protected.',
+        },
+        allowInsertRows: {
+          type: 'boolean',
+          description: 'Allow users to insert rows while protected.',
+        },
+      },
+      required: ['action'],
+    },
+    execute: async (args) => {
+      const {
+        sheetName,
+        action,
+        password,
+        allowAutoFilter = false,
+        allowFormatCells = false,
+        allowInsertRows = false,
+      } = args
+
+      return Excel.run(async (context) => {
+        const sheet = sheetName
+          ? context.workbook.worksheets.getItem(sheetName)
+          : context.workbook.worksheets.getActiveWorksheet()
+
+        if (action === 'protect') {
+          sheet.protection.protect({
+            allowAutoFilter,
+            allowFormatCells,
+            allowInsertRows,
+            selectionMode: Excel.ProtectionSelectionMode.normal,
+          }, password)
+        } else {
+          sheet.protection.unprotect(password)
+        }
+
+        await context.sync()
+        return `Successfully ${action === 'protect' ? 'protected' : 'unprotected'} worksheet "${sheetName ?? 'active'}"`
+      })
+    },
+  },
+
+  getNamedRanges: {
+    name: 'getNamedRanges',
+    description: 'List workbook named ranges and their formulas/references.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      return Excel.run(async (context) => {
+        const names = context.workbook.names
+        names.load('items/name,items/formula,items/value')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            totalNamedRanges: names.items.length,
+            items: names.items.map((item: any) => ({
+              name: item.name,
+              formula: item.formula,
+              value: item.value,
+            })),
+          },
+          null,
+          2,
+        )
+      })
+    },
+  },
+
+  setNamedRange: {
+    name: 'setNamedRange',
+    description: 'Create or update a workbook named range.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Named range identifier.',
+        },
+        rangeAddress: {
+          type: 'string',
+          description: 'Range formula/address reference (e.g., "=Sheet1!$A$1:$B$10").',
+        },
+      },
+      required: ['name', 'rangeAddress'],
+    },
+    execute: async (args) => {
+      const { name, rangeAddress } = args
+      return Excel.run(async (context) => {
+        context.workbook.names.add(name, rangeAddress)
+        await context.sync()
+        return `Successfully set named range "${name}" = ${rangeAddress}`
       })
     },
   },
