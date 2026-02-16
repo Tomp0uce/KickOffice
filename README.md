@@ -32,6 +32,7 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
   - IP-based rate limiting is enabled for `/api/chat*` and `/api/image` to reduce DoS risk and control API credit consumption.
   - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
   - Request logging uses Morgan middleware for consistent HTTP access logs across endpoints.
+  - HTTP security headers are enforced with Helmet (HSTS, X-Frame-Options, X-Content-Type-Options, etc.), with CSP and COEP disabled for Office add-in compatibility.
   - Upstream AI provider error payloads are kept in server logs only; client responses use a generic `502` error message to avoid leaking infrastructure details.
 - **LLM API**: Any OpenAI-compatible endpoint. For testing: OpenAI API directly. For production: Azure-hosted LiteLLM proxy with dedicated endpoints.
 
@@ -179,6 +180,7 @@ KickOffice/
 - [x] LLM API proxy (streaming + synchronous)
 - [x] Image generation proxy endpoint
 - [x] IP-based rate limiting on `/api/chat*` and `/api/image`
+- [x] HTTP security headers via Helmet middleware (CSP and COEP disabled for Office add-in compatibility)
 - [x] Health check endpoint (`GET /health`)
 - [x] Model configuration via `.env` (4 tiers: nano, standard, reasoning, image)
 - [x] Models endpoint (`GET /api/models`) - exposes labels only, no secrets

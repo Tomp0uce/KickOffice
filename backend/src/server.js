@@ -2,6 +2,7 @@ import cors from 'cors'
 import 'dotenv/config'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
+import helmet from 'helmet'
 import morgan from 'morgan'
 
 const app = express()
@@ -201,6 +202,10 @@ app.use(cors({
   origin: FRONTEND_URL,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+}))
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
 }))
 app.use(express.json({ limit: '4mb' }))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
