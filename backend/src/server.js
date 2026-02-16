@@ -1,6 +1,7 @@
 import cors from 'cors'
 import 'dotenv/config'
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import morgan from 'morgan'
 
 const app = express()
@@ -11,6 +12,10 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3002'
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://api.openai.com/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
 const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
+const CHAT_RATE_LIMIT_WINDOW_MS = parseInt(process.env.CHAT_RATE_LIMIT_WINDOW_MS || '60000', 10)
+const CHAT_RATE_LIMIT_MAX = parseInt(process.env.CHAT_RATE_LIMIT_MAX || '20', 10)
+const IMAGE_RATE_LIMIT_WINDOW_MS = parseInt(process.env.IMAGE_RATE_LIMIT_WINDOW_MS || '60000', 10)
+const IMAGE_RATE_LIMIT_MAX = parseInt(process.env.IMAGE_RATE_LIMIT_MAX || '5', 10)
 
 const models = {
   nano: {
@@ -178,6 +183,22 @@ function logAndRespond(res, status, errorObj, context = 'API') {
   return res.status(status).json(errorObj)
 }
 
+const chatLimiter = rateLimit({
+  windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
+  max: CHAT_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many chat requests, please try again later.' },
+})
+
+const imageLimiter = rateLimit({
+  windowMs: IMAGE_RATE_LIMIT_WINDOW_MS,
+  max: IMAGE_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many image requests, please try again later.' },
+})
+
 // --- Middleware ---
 app.use(cors({
   origin: FRONTEND_URL,
@@ -186,6 +207,8 @@ app.use(cors({
 }))
 app.use(express.json({ limit: '4mb' }))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
+app.use('/api/chat', chatLimiter)
+app.use('/api/image', imageLimiter)
 
 // --- Health Check ---
 app.get('/health', (_req, res) => {
