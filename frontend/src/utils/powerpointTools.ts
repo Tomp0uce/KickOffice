@@ -140,6 +140,7 @@ function ensurePowerPointRunAvailable() {
 const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefinition> = {
   getSelectedText: {
     name: 'getSelectedText',
+    category: 'read',
     description: 'Get the currently selected text in PowerPoint.',
     inputSchema: {
       type: 'object',
@@ -153,6 +154,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   replaceSelectedText: {
     name: 'replaceSelectedText',
+    category: 'write',
     description: 'Replace the currently selected PowerPoint text with new text.',
     inputSchema: {
       type: 'object',
@@ -176,6 +178,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   getSlideCount: {
     name: 'getSlideCount',
+    category: 'read',
     description: 'Get the total number of slides in the active PowerPoint presentation.',
     inputSchema: {
       type: 'object',
@@ -195,6 +198,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   getSlideContent: {
     name: 'getSlideContent',
+    category: 'read',
     description: 'Read all text content from a specific slide (1-based index).',
     inputSchema: {
       type: 'object',
@@ -259,6 +263,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   addSlide: {
     name: 'addSlide',
+    category: 'write',
     description: 'Add a new slide to the presentation. Optionally pass a layout when supported.',
     inputSchema: {
       type: 'object',
@@ -294,6 +299,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   setSlideNotes: {
     name: 'setSlideNotes',
+    category: 'write',
     description: 'Set speaker notes for a given slide (requires PowerPointApi 1.4+).',
     inputSchema: {
       type: 'object',
@@ -352,6 +358,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   insertTextBox: {
     name: 'insertTextBox',
+    category: 'write',
     description: 'Insert a text box into a specific slide with optional position and size.',
     inputSchema: {
       type: 'object',
@@ -408,6 +415,7 @@ const powerpointToolDefinitions: Record<PowerPointToolName, PowerPointToolDefini
 
   insertImage: {
     name: 'insertImage',
+    category: 'write',
     description: 'Insert a base64 image into a specific slide with optional position and size.',
     inputSchema: {
       type: 'object',

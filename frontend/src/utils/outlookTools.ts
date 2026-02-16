@@ -82,6 +82,7 @@ function getRecipientField(field: unknown): RecipientField {
 const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
   getEmailBody: {
     name: 'getEmailBody',
+    category: 'read',
     description:
       'Get the full body text of the current email. Works in both read and compose mode.',
     inputSchema: {
@@ -105,6 +106,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getSelectedText: {
     name: 'getSelectedText',
+    category: 'read',
     description:
       'Get the currently selected text in the email compose window. Returns empty string if nothing is selected or not in compose mode.',
     inputSchema: {
@@ -135,6 +137,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   setEmailBody: {
     name: 'setEmailBody',
+    category: 'write',
     description:
       'Replace the entire email body with the provided text. Only works in compose mode.',
     inputSchema: {
@@ -167,6 +170,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   insertTextAtCursor: {
     name: 'insertTextAtCursor',
+    category: 'write',
     description: 'Insert plain text at the current cursor position in the email body (compose mode).',
     inputSchema: {
       type: 'object',
@@ -199,6 +203,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   setEmailBodyHtml: {
     name: 'setEmailBodyHtml',
+    category: 'write',
     description: 'Replace the full email body with HTML content (compose mode).',
     inputSchema: {
       type: 'object',
@@ -231,6 +236,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getEmailSubject: {
     name: 'getEmailSubject',
+    category: 'read',
     description: 'Get the current email subject in read or compose mode.',
     inputSchema: {
       type: 'object',
@@ -255,6 +261,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   setEmailSubject: {
     name: 'setEmailSubject',
+    category: 'write',
     description: 'Set the email subject in compose mode.',
     inputSchema: {
       type: 'object',
@@ -283,6 +290,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getEmailRecipients: {
     name: 'getEmailRecipients',
+    category: 'read',
     description: 'Get the current To, Cc, and Bcc recipients of the email.',
     inputSchema: {
       type: 'object',
@@ -328,6 +336,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   addRecipient: {
     name: 'addRecipient',
+    category: 'write',
     description: 'Add recipient(s) to To, Cc, or Bcc in compose mode.',
     inputSchema: {
       type: 'object',
@@ -370,6 +379,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getEmailSender: {
     name: 'getEmailSender',
+    category: 'read',
     description: 'Get sender information for the current email.',
     inputSchema: {
       type: 'object',
@@ -389,6 +399,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getEmailDate: {
     name: 'getEmailDate',
+    category: 'read',
     description: 'Get creation date/time for the current email item (read mode).',
     inputSchema: {
       type: 'object',
@@ -411,6 +422,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   getAttachments: {
     name: 'getAttachments',
+    category: 'read',
     description: 'List attachments of the current email.',
     inputSchema: {
       type: 'object',
@@ -443,6 +455,7 @@ const outlookToolDefinitions: Record<OutlookToolName, OutlookToolDefinition> = {
 
   insertHtmlAtCursor: {
     name: 'insertHtmlAtCursor',
+    category: 'write',
     description: 'Insert HTML content at the current cursor position in the email body (compose mode).',
     inputSchema: {
       type: 'object',

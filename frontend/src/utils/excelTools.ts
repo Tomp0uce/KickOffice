@@ -50,6 +50,7 @@ function getExcelFormulaLanguage(): 'en' | 'fr' {
 const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
   getSelectedCells: {
     name: 'getSelectedCells',
+    category: 'read',
     description:
       'Get the values, address, and dimensions of the currently selected cells in Excel. Returns a JSON object with address, rowCount, columnCount, and the 2D values array.',
     inputSchema: {
@@ -78,6 +79,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   setCellValue: {
     name: 'setCellValue',
+    category: 'write',
     description:
       'Set a value in a specific cell or range. Use A1-style notation for the address (e.g., "A1", "B2:D5").',
     inputSchema: {
@@ -122,6 +124,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getWorksheetData: {
     name: 'getWorksheetData',
+    category: 'read',
     description:
       'Get all data from the used range of the active worksheet. Returns the values, address, row count, and column count.',
     inputSchema: {
@@ -151,6 +154,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   addDataValidation: {
     name: 'addDataValidation',
+    category: 'write',
     description:
       'Apply data validation rules to a range (dropdown list, number/date limits, text length, or custom formula).',
     inputSchema: {
@@ -244,6 +248,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   createTable: {
     name: 'createTable',
+    category: 'write',
     description:
       'Convert a range to an Excel structured table (ListObject), with optional table name and style.',
     inputSchema: {
@@ -287,6 +292,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   copyRange: {
     name: 'copyRange',
+    category: 'write',
     description:
       'Copy values, formulas, and number formats from a source range to a destination range.',
     inputSchema: {
@@ -324,6 +330,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   insertFormula: {
     name: 'insertFormula',
+    category: 'write',
     description:
       'Insert an Excel formula at a specific cell address. The formula should start with "=" (e.g., "=SUM(A1:A10)", "=AVERAGE(B2:B20)").',
     inputSchema: {
@@ -362,6 +369,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   fillFormulaDown: {
     name: 'fillFormulaDown',
+    category: 'write',
     description:
       'Insert an Excel formula into the first cell of a range and fill it down to all rows in that range. This is much more efficient than calling insertFormula repeatedly for each row. The formula should reference the first row and Excel will automatically adjust relative references for each subsequent row. For example, to apply "=A2*B2" from C2 to C100, use startCell="C2", endCell="C100", formula="=A2*B2".',
     inputSchema: {
@@ -416,6 +424,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   createChart: {
     name: 'createChart',
+    category: 'write',
     description:
       'Create a chart from the currently selected data range. Supports various chart types.',
     inputSchema: {
@@ -481,6 +490,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   formatRange: {
     name: 'formatRange',
+    category: 'format',
     description:
       'Apply formatting to the selected range or a specific range address. Can set fill color, font color, bold, italic, font size, and borders.',
     inputSchema: {
@@ -694,6 +704,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   sortRange: {
     name: 'sortRange',
+    category: 'write',
     description: 'Sort the selected data range by a specific column.',
     inputSchema: {
       type: 'object',
@@ -743,6 +754,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   applyAutoFilter: {
     name: 'applyAutoFilter',
+    category: 'write',
     description: 'Apply auto filter to the selected range so users can filter data by column values.',
     inputSchema: {
       type: 'object',
@@ -775,6 +787,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   removeAutoFilter: {
     name: 'removeAutoFilter',
+    category: 'write',
     description: 'Remove auto filter from a worksheet.',
     inputSchema: {
       type: 'object',
@@ -801,6 +814,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getWorksheetInfo: {
     name: 'getWorksheetInfo',
+    category: 'read',
     description: 'Get information about the active worksheet including name, used range dimensions, and worksheet count.',
     inputSchema: {
       type: 'object',
@@ -843,6 +857,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   renameWorksheet: {
     name: 'renameWorksheet',
+    category: 'write',
     description: 'Rename an existing worksheet.',
     inputSchema: {
       type: 'object',
@@ -871,6 +886,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   deleteWorksheet: {
     name: 'deleteWorksheet',
+    category: 'write',
     description: 'Delete a worksheet by name.',
     inputSchema: {
       type: 'object',
@@ -895,6 +911,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   activateWorksheet: {
     name: 'activateWorksheet',
+    category: 'write',
     description: 'Activate a worksheet by name.',
     inputSchema: {
       type: 'object',
@@ -919,6 +936,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getDataFromSheet: {
     name: 'getDataFromSheet',
+    category: 'read',
     description: 'Read data from another worksheet without activating it.',
     inputSchema: {
       type: 'object',
@@ -959,6 +977,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   freezePanes: {
     name: 'freezePanes',
+    category: 'write',
     description: 'Freeze or unfreeze worksheet panes by rows, columns, or anchor cell.',
     inputSchema: {
       type: 'object',
@@ -1005,6 +1024,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   addHyperlink: {
     name: 'addHyperlink',
+    category: 'write',
     description: 'Add a clickable hyperlink to a cell or range.',
     inputSchema: {
       type: 'object',
@@ -1047,6 +1067,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   addCellComment: {
     name: 'addCellComment',
+    category: 'write',
     description: 'Add a comment (note) to a cell range.',
     inputSchema: {
       type: 'object',
@@ -1075,6 +1096,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   insertRow: {
     name: 'insertRow',
+    category: 'write',
     description: 'Insert one or more rows at the specified position.',
     inputSchema: {
       type: 'object',
@@ -1104,6 +1126,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   insertColumn: {
     name: 'insertColumn',
+    category: 'write',
     description: 'Insert one or more columns at the specified position.',
     inputSchema: {
       type: 'object',
@@ -1134,6 +1157,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   deleteRow: {
     name: 'deleteRow',
+    category: 'write',
     description: 'Delete one or more rows at the specified position.',
     inputSchema: {
       type: 'object',
@@ -1163,6 +1187,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   deleteColumn: {
     name: 'deleteColumn',
+    category: 'write',
     description: 'Delete one or more columns at the specified position.',
     inputSchema: {
       type: 'object',
@@ -1193,6 +1218,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   mergeCells: {
     name: 'mergeCells',
+    category: 'format',
     description: 'Merge or unmerge the selected cells or a specific range.',
     inputSchema: {
       type: 'object',
@@ -1227,6 +1253,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   setCellNumberFormat: {
     name: 'setCellNumberFormat',
+    category: 'format',
     description:
       'Set the number format for a range of cells (e.g., currency, percentage, date format).',
     inputSchema: {
@@ -1258,6 +1285,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   clearRange: {
     name: 'clearRange',
+    category: 'write',
     description: 'Clear the contents, formatting, or both from the selected range.',
     inputSchema: {
       type: 'object',
@@ -1299,6 +1327,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getCellFormula: {
     name: 'getCellFormula',
+    category: 'read',
     description: 'Get the formula (if any) from a specific cell or the selected range.',
     inputSchema: {
       type: 'object',
@@ -1334,6 +1363,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   searchAndReplace: {
     name: 'searchAndReplace',
+    category: 'read',
     description: 'Search for a value in the used range and optionally replace it.',
     inputSchema: {
       type: 'object',
@@ -1384,6 +1414,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   autoFitColumns: {
     name: 'autoFitColumns',
+    category: 'format',
     description: 'Auto-fit column widths to match their content for the selected range or the entire used range.',
     inputSchema: {
       type: 'object',
@@ -1410,6 +1441,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   addWorksheet: {
     name: 'addWorksheet',
+    category: 'write',
     description: 'Add a new worksheet to the workbook.',
     inputSchema: {
       type: 'object',
@@ -1435,6 +1467,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   setColumnWidth: {
     name: 'setColumnWidth',
+    category: 'format',
     description: 'Set the width of one or more columns.',
     inputSchema: {
       type: 'object',
@@ -1467,6 +1500,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   setRowHeight: {
     name: 'setRowHeight',
+    category: 'format',
     description: 'Set the height of one or more rows.',
     inputSchema: {
       type: 'object',
@@ -1496,6 +1530,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   protectWorksheet: {
     name: 'protectWorksheet',
+    category: 'write',
     description: 'Protect or unprotect a worksheet with optional password and permissions.',
     inputSchema: {
       type: 'object',
@@ -1562,6 +1597,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getNamedRanges: {
     name: 'getNamedRanges',
+    category: 'read',
     description: 'List workbook named ranges and their formulas/references.',
     inputSchema: {
       type: 'object',
@@ -1592,6 +1628,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   setNamedRange: {
     name: 'setNamedRange',
+    category: 'write',
     description: 'Create or update a workbook named range.',
     inputSchema: {
       type: 'object',
@@ -1620,6 +1657,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   applyConditionalFormatting: {
     name: 'applyConditionalFormatting',
+    category: 'format',
     description:
       'Create conditional formatting rules on a range, including cell value, text contains, custom formulas, color scales, data bars, and icon sets. Can also clear existing rules first.',
     inputSchema: {
@@ -1822,6 +1860,7 @@ const excelToolDefinitions: Record<ExcelToolName, ExcelToolDefinition> = {
 
   getConditionalFormattingRules: {
     name: 'getConditionalFormattingRules',
+    category: 'format',
     description:
       'Read conditional formatting rules from a target range (or from the worksheet used range when no address is provided).',
     inputSchema: {

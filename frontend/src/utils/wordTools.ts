@@ -42,6 +42,7 @@ export type WordToolName =
 const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
   getSelectedText: {
     name: 'getSelectedText',
+    category: 'read',
     description:
       'Get the currently selected text in the Word document. Returns the selected text or empty string if nothing is selected.',
     inputSchema: {
@@ -61,6 +62,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getDocumentContent: {
     name: 'getDocumentContent',
+    category: 'read',
     description: 'Get the full content of the Word document body as plain text.',
     inputSchema: {
       type: 'object',
@@ -79,6 +81,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertText: {
     name: 'insertText',
+    category: 'write',
     description: 'Insert text at the current cursor position in the Word document.',
     inputSchema: {
       type: 'object',
@@ -108,6 +111,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   replaceSelectedText: {
     name: 'replaceSelectedText',
+    category: 'write',
     description: 'Replace the currently selected text with new text.',
     inputSchema: {
       type: 'object',
@@ -157,6 +161,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   appendText: {
     name: 'appendText',
+    category: 'write',
     description: 'Append text to the end of the document.',
     inputSchema: {
       type: 'object',
@@ -181,6 +186,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertParagraph: {
     name: 'insertParagraph',
+    category: 'format',
     description: 'Insert a new paragraph at the specified location.',
     inputSchema: {
       type: 'object',
@@ -235,6 +241,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   formatText: {
     name: 'formatText',
+    category: 'format',
     description: 'Apply formatting to the currently selected text. At least one text character must be selected.',
     inputSchema: {
       type: 'object',
@@ -293,6 +300,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   searchAndReplace: {
     name: 'searchAndReplace',
+    category: 'read',
     description: 'Search for text in the document and replace it with new text.',
     inputSchema: {
       type: 'object',
@@ -339,6 +347,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getDocumentProperties: {
     name: 'getDocumentProperties',
+    category: 'read',
     description: 'Get document properties including paragraph count, word count, and character count.',
     inputSchema: {
       type: 'object',
@@ -375,6 +384,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertTable: {
     name: 'insertTable',
+    category: 'write',
     description: 'Insert a table at the current cursor position.',
     inputSchema: {
       type: 'object',
@@ -421,6 +431,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertList: {
     name: 'insertList',
+    category: 'write',
     description: 'Insert a bulleted or numbered list at the current position.',
     inputSchema: {
       type: 'object',
@@ -464,6 +475,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   deleteText: {
     name: 'deleteText',
+    category: 'write',
     description:
       'Delete the currently selected text or a specific range. If no text is selected, this will delete at the cursor position.',
     inputSchema: {
@@ -501,6 +513,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   clearFormatting: {
     name: 'clearFormatting',
+    category: 'format',
     description: 'Clear all formatting from the selected text, returning it to default style.',
     inputSchema: {
       type: 'object',
@@ -522,6 +535,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   setFontName: {
     name: 'setFontName',
+    category: 'format',
     description: 'Set the font name/family for the selected text (e.g., Arial, Times New Roman, Calibri).',
     inputSchema: {
       type: 'object',
@@ -546,6 +560,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertPageBreak: {
     name: 'insertPageBreak',
+    category: 'write',
     description: 'Insert a page break at the current cursor position.',
     inputSchema: {
       type: 'object',
@@ -573,6 +588,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getRangeInfo: {
     name: 'getRangeInfo',
+    category: 'read',
     description: 'Get detailed information about the current selection including text, formatting, and position.',
     inputSchema: {
       type: 'object',
@@ -616,6 +632,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   selectText: {
     name: 'selectText',
+    category: 'write',
     description: 'Select all text in the document or specific location.',
     inputSchema: {
       type: 'object',
@@ -644,6 +661,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertImage: {
     name: 'insertImage',
+    category: 'write',
     description: 'Insert an image from a URL at the current cursor position. The image URL must be accessible.',
     inputSchema: {
       type: 'object',
@@ -685,6 +703,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getTableInfo: {
     name: 'getTableInfo',
+    category: 'read',
     description: 'Get information about tables in the document, including row and column counts.',
     inputSchema: {
       type: 'object',
@@ -726,6 +745,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertBookmark: {
     name: 'insertBookmark',
+    category: 'write',
     description: 'Insert a bookmark at the current selection to mark a location in the document.',
     inputSchema: {
       type: 'object',
@@ -757,6 +777,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   goToBookmark: {
     name: 'goToBookmark',
+    category: 'write',
     description: 'Navigate to a previously created bookmark in the document.',
     inputSchema: {
       type: 'object',
@@ -794,6 +815,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertContentControl: {
     name: 'insertContentControl',
+    category: 'write',
     description:
       'Insert a content control (a container for content) at the current selection. Useful for creating structured documents.',
     inputSchema: {
@@ -832,6 +854,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   findText: {
     name: 'findText',
+    category: 'read',
     description: 'Find text in the document and return information about matches. Does not modify the document.',
     inputSchema: {
       type: 'object',
@@ -878,6 +901,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   applyTaggedFormatting: {
     name: 'applyTaggedFormatting',
+    category: 'format',
     description:
       'Convert inline formatting tags in the document into real Word formatting (e.g., <format>text</format> can apply size, font, italic, bold, underline, strike, highlight, color, and other font settings).',
     inputSchema: {
@@ -1015,6 +1039,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   setParagraphFormat: {
     name: 'setParagraphFormat',
+    category: 'format',
     description:
       'Set paragraph formatting on the current selection (alignment, spacing before/after, line spacing, and indentation).',
     inputSchema: {
@@ -1077,6 +1102,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertHyperlink: {
     name: 'insertHyperlink',
+    category: 'write',
     description: 'Insert a clickable hyperlink at the current selection.',
     inputSchema: {
       type: 'object',
@@ -1106,6 +1132,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getDocumentHtml: {
     name: 'getDocumentHtml',
+    category: 'read',
     description: 'Get the full document body as HTML to preserve structure and rich formatting context.',
     inputSchema: {
       type: 'object',
@@ -1123,6 +1150,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   modifyTableCell: {
     name: 'modifyTableCell',
+    category: 'write',
     description: 'Replace content of a specific table cell in an existing table.',
     inputSchema: {
       type: 'object',
@@ -1156,6 +1184,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   addTableRow: {
     name: 'addTableRow',
+    category: 'write',
     description: 'Add row(s) to an existing table.',
     inputSchema: {
       type: 'object',
@@ -1196,6 +1225,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   addTableColumn: {
     name: 'addTableColumn',
+    category: 'write',
     description: 'Add column(s) to an existing table.',
     inputSchema: {
       type: 'object',
@@ -1236,6 +1266,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   deleteTableRowColumn: {
     name: 'deleteTableRowColumn',
+    category: 'write',
     description: 'Delete row(s) or column(s) from an existing table.',
     inputSchema: {
       type: 'object',
@@ -1278,6 +1309,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   formatTableCell: {
     name: 'formatTableCell',
+    category: 'format',
     description: 'Apply formatting to a specific table cell (background and font style).',
     inputSchema: {
       type: 'object',
@@ -1323,6 +1355,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertHeaderFooter: {
     name: 'insertHeaderFooter',
+    category: 'write',
     description: 'Insert text into the document header or footer of the first section.',
     inputSchema: {
       type: 'object',
@@ -1358,6 +1391,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertFootnote: {
     name: 'insertFootnote',
+    category: 'write',
     description: 'Insert a footnote at the current selection.',
     inputSchema: {
       type: 'object',
@@ -1379,6 +1413,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   addComment: {
     name: 'addComment',
+    category: 'write',
     description: 'Add a review comment to the current selection.',
     inputSchema: {
       type: 'object',
@@ -1400,6 +1435,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getComments: {
     name: 'getComments',
+    category: 'read',
     description: 'Get comments from the document body with author and content.',
     inputSchema: {
       type: 'object',
@@ -1430,6 +1466,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   setPageSetup: {
     name: 'setPageSetup',
+    category: 'format',
     description: 'Configure page setup on the first section (margins, orientation, paper size).',
     inputSchema: {
       type: 'object',
@@ -1472,6 +1509,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   getSpecificParagraph: {
     name: 'getSpecificParagraph',
+    category: 'format',
     description: 'Get a paragraph by index without reading all document content.',
     inputSchema: {
       type: 'object',
@@ -1521,6 +1559,7 @@ const wordToolDefinitions: Record<WordToolName, WordToolDefinition> = {
 
   insertSectionBreak: {
     name: 'insertSectionBreak',
+    category: 'write',
     description: 'Insert a section break at the current selection.',
     inputSchema: {
       type: 'object',

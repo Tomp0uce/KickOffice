@@ -17,6 +17,7 @@
         ref="messageListRef"
         :history="history"
         :history-with-segments="historyWithSegments"
+        :current-action="currentAction"
         :backend-online="backendOnline"
         :empty-title="$t('emptyTitle')"
         :empty-subtitle="$t(hostIsOutlook ? 'emptySubtitleOutlook' : hostIsPowerPoint ? 'emptySubtitlePowerPoint' : hostIsExcel ? 'emptySubtitleExcel' : 'emptySubtitle')"
@@ -172,7 +173,7 @@ const officeInsert = useOfficeInsert({
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
 })
 
-const { sendMessage, applyQuickAction } = useAgentLoop({
+const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   t,
   history,
   userInput,
