@@ -1,10 +1,14 @@
 import { Router } from 'express'
 
-import { buildChatBody, isChatGptModel, LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
+import { buildChatBody, isChatGptModel, isGpt5Model, LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
 import { validateMaxTokens, validateTemperature, validateTools } from '../middleware/validate.js'
 import { fetchWithTimeout, logAndRespond } from '../utils/http.js'
 
 const chatRouter = Router()
+
+function requiresReasoningSafeParams(modelConfig) {
+  return isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort !== 'none'
+}
 
 function getChatTimeoutMs(modelTier) {
   if (modelTier === 'reasoning') return 300_000
@@ -40,6 +44,12 @@ chatRouter.post('/', async (req, res) => {
   if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
     return logAndRespond(res, 400, {
       error: 'temperature and maxTokens are not supported for ChatGPT models',
+    }, 'POST /api/chat')
+  }
+
+  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
+    return logAndRespond(res, 400, {
+      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
     }, 'POST /api/chat')
   }
 
@@ -123,6 +133,12 @@ chatRouter.post('/sync', async (req, res) => {
   if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
     return logAndRespond(res, 400, {
       error: 'temperature and maxTokens are not supported for ChatGPT models',
+    }, 'POST /api/chat/sync')
+  }
+
+  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
+    return logAndRespond(res, 400, {
+      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
     }, 'POST /api/chat/sync')
   }
 
