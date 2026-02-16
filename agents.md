@@ -6,6 +6,13 @@ This document provides operational guidance for AI coding agents working in this
 - This guide applies to the whole repository unless a more specific guide exists in a nested directory.
 - Follow system/developer/user instructions first when conflicts occur.
 
+### Companion documents
+| File | Purpose |
+|------|---------|
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality issues — tracked by severity with proposed fixes |
+| [UX_REVIEW.md](./UX_REVIEW.md) | User experience issues — 21 open items by priority (HIGH/MEDIUM/LOW) |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md) | Tool set audit — current tools per host + proposed additions (PowerPoint gap is priority 1) |
+
 ## 2) Product and Architecture Snapshot
 KickOffice is a Microsoft Office add-in with:
 - `frontend/` (Vue 3 + Vite + TypeScript): task pane UI, chat/agent/image UX, Office.js tool execution.
@@ -18,7 +25,7 @@ The frontend follows a composable-based architecture:
 - **Pages**: `HomePage.vue` (265 lines, orchestration only), `SettingsPage.vue` (settings UI)
 - **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`)
 - **Composables**: `useAgentLoop.ts` (agent execution + prompts), `useImageActions.ts` (image generation + insertion), `useOfficeInsert.ts` (document insertion + clipboard)
-- **Utils**: `wordTools.ts` (39 tools), `excelTools.ts` (39 tools), `powerpointTools.ts` (8 tools), `outlookTools.ts` (13 tools), `generalTools.ts` (2 tools), `wordFormatter.ts` (markdown-to-Word), `constant.ts` (built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `officeOutlook.ts`
+- **Utils**: `wordTools.ts` (39 tools), `excelTools.ts` (39 tools), `powerpointTools.ts` (8 tools), `outlookTools.ts` (13 tools), `generalTools.ts` (2 tools), `wordFormatter.ts` (markdown-to-Word), `constant.ts` (built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `officeOutlook.ts`, `officeAction.ts`, `tokenManager.ts`, `markdown.ts`
 
 ### Backend architecture (post-refactor)
 ```
@@ -136,11 +143,18 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **Quick actions**: Bullets, Speaker Notes, Impact (Punchify), Shrink, Visual (draft mode).
 
 ## 9) Known Issues to Watch For
-- **C7 (CRITICAL)**: Chat in Word is broken. `reasoning_effort: 'none'` sent with tools causes empty model responses. Fix: omit `reasoning_effort` when value is `'none'` in `buildChatBody`. See DESIGN_REVIEW.md.
-- **H6**: Agent loop exits silently on empty model response. The "⏳ Analyse de la demande..." placeholder stays with no error. Fix: add empty response detection after the loop.
-- **H7**: Tool enable/disable toggles in Settings are dead code. `useAgentLoop.ts` ignores `localStorage('enabledTools')`.
-- **M6**: Hardcoded French strings in `useAgentLoop.ts:157,204` — should use `t()` i18n keys.
-- **M7**: README model tiers table is stale (shows 4 tiers with old model IDs, actual config has 3 tiers with GPT-5.2).
+
+See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full root-cause analysis and proposed fixes.
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| **C7** | **CRITICAL** | Chat in Word is broken. `reasoning_effort: 'none'` sent with tools causes empty model responses. Fix: omit `reasoning_effort` when value is `'none'` in `buildChatBody` (`config/models.js:83-85`). |
+| **H6** | HIGH | Agent loop exits silently on empty model response. The loading placeholder stays with no error message shown to the user. Fix: add empty-response detection after the `while` loop in `useAgentLoop.ts`. |
+| **H7** | HIGH | Tool enable/disable toggles in Settings are dead code. `useAgentLoop.ts` ignores `localStorage('enabledTools')` — all tools are always sent. Fix: wire up the filter in `useAgentLoop.ts:151-153` or remove the Settings tab. |
+| **M6** | MEDIUM | Hardcoded French strings in `useAgentLoop.ts:157,204` — should use `t()` i18n keys (`agentAnalyzing`, `agentStoppedByUser`). |
+| **M2** | MEDIUM | Missing global Vue error handler in `main.ts`. Uncaught component errors fail silently. |
+| **M3** | MEDIUM | Accessibility gaps: icon-only quick action buttons have no `aria-label`, chat messages need `aria-live`, backend status needs `role="status"`. |
+| **M8** | MEDIUM | Built-in prompts editor in Settings only supports Word and Excel — PowerPoint and Outlook prompts cannot be customized via UI (`SettingsPage.vue:523-558`). |
 
 ## 10) Validation Checklist Before Commit
 - Run at least one relevant build/check command (frontend and/or backend depending on change).

@@ -1,9 +1,9 @@
 # KickOffice - Design Review
 
 **Initial date**: 2026-02-15
-**Last updated**: 2026-02-16 (revision 2)
+**Last updated**: 2026-02-16 (revision 3)
 **Scope**: Architecture, Security, Code Quality, Functional Bugs, Documentation
-**Files analyzed**: Full codebase — backend (modular: 10 source files), frontend (36 source files), documentation (6 files)
+**Files analyzed**: Full codebase — backend (modular: 10 source files), frontend (42 source files), documentation (7 files)
 
 ---
 
@@ -31,7 +31,7 @@ KickOffice is an AI-powered Microsoft Office add-in (Word, Excel, PowerPoint, Ou
 |----------|------|-------|---------|
 | **CRITICAL** | 1 | 5 | **Chat broken in Word** (`reasoning_effort: 'none'` + tools) |
 | **HIGH** | 2 | 5 | Agent loop silent exit on empty response, tool toggles dead code |
-| **MEDIUM** | 5 | 3 | Hardcoded French, incomplete README, missing error handler, a11y, CSS |
+| **MEDIUM** | 4 | 4 | Hardcoded French, missing error handler, a11y, built-in prompts incomplete |
 | **LOW** | 1 | 1 | Repeated CSS patterns |
 
 **Headline issue**: Chat in Word is broken. Quick actions work fine, but agent-mode chat (typing a message) does nothing — the message is sent but no response appears. Root cause analysis points to `reasoning_effort: 'none'` being sent to the GPT-5.2 API alongside tools, which likely causes the model to return an empty response. See [C7](#c7-chat-broken-in-word--reasoning_effort-none-prevents-tool-calling-new).
@@ -87,7 +87,7 @@ These were fixed before or during the initial review. See initial review for det
 - **No client authentication**: `ensureLlmApiKey` only checks server-side API key, not client identity
 - **Tool toggles dead code**: Settings "Tools" tab saves to localStorage but agent loop never reads it
 - **Hardcoded French strings**: Several strings in composables are not using i18n
-- **README model tiers stale**: Shows 4 tiers (nano/standard/reasoning/image) but actual config has 3
+- **README `MODEL_STANDARD_REASONING_EFFORT`**: Description still referenced `'none'` as a valid value (fixed in revision 3 — description now says to omit the parameter)
 
 ---
 
@@ -288,25 +288,15 @@ These break the i18n system — English users see French text during chat proces
 
 ---
 
-#### M7. README model tier table is stale (NEW)
+#### M7. README stale content (FIXED in revision 3)
 
-**File**: `README.md:42-51`
+**File**: `README.md`
 
-The README shows 4 model tiers with old model IDs:
-
-| What README says | What's actually configured |
-|------------------|---------------------------|
-| 4 tiers: nano, standard, reasoning, image | 3 tiers: standard, reasoning, image |
-| nano = gpt-4.1-nano | (removed) |
-| standard = gpt-4.1 | standard = gpt-5.2 |
-| reasoning = o3 | reasoning = gpt-5.2 (with reasoning_effort=high) |
-| image = gpt-image-1 | image = gpt-image-1.5 |
-
-Also: `README.md:352-355` lists `MODEL_NANO` env var which no longer exists.
-
-Also: `README.md:281-282` — Security section shows "[ ] Rate limiting on backend" and "[ ] Request logging / audit trail" as not implemented, but both are now implemented.
-
-**Proposed fix**: Update the Model Tiers section, env vars table, and security checklist to reflect current state.
+Issues fixed in revision 3:
+- Architecture diagram had `PowerPoint` listed twice; `Outlook` was missing — corrected.
+- Project structure section only showed `server.js` for the backend; now shows the full modular layout (`routes/`, `middleware/`, `config/`, `utils/`) and the composable-based frontend (`composables/`, full `components/chat/`, complete `utils/` list).
+- `MODEL_STANDARD_REASONING_EFFORT` env var description said "`none` to disable" — `'none'` is not a valid API value; description updated to clarify valid values and recommend omitting the parameter.
+- Added a "Known Open Issues" table in the Implementation Status section linking to DESIGN_REVIEW.md for quick project-health visibility.
 
 ---
 
@@ -371,17 +361,17 @@ PowerPoint and Outlook built-in prompts (`powerPointBuiltInPrompt`, `outlookBuil
 | MEDIUM | M4 | Residual `as any` in agent loop | ✅ FIXED |
 | MEDIUM | M5 | Request logging (morgan) | ✅ FIXED |
 | MEDIUM | M6 | **Hardcoded French strings in composables** | ❌ **TODO** |
-| MEDIUM | M7 | **README model tier table is stale** | ❌ **TODO** |
+| MEDIUM | M7 | README stale content (architecture diagram, project structure, env vars) | ✅ FIXED |
 | MEDIUM | M8 | **Built-in prompts customization incomplete (PPT/Outlook)** | ❌ **TODO** |
 | LOW | B1 | Dark mode toggle | ✅ FIXED |
 | LOW | B2 | Extract repeated CSS | ❌ TODO |
-| LOW | B3 | Outdated README | ⚠️ PARTIAL |
+| LOW | B3 | Outdated README | ✅ FIXED (via M7) |
 
 ### Progress
 
 - **Total items**: 24
-- **Fixed**: 16 (67%)
-- **Open**: 8 (1 critical, 2 high, 4 medium, 1 low)
+- **Fixed**: 17 (71%)
+- **Open**: 7 (1 critical, 2 high, 3 medium, 1 low)
 
 ---
 
