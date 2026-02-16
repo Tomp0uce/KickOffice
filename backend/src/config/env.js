@@ -1,0 +1,16 @@
+const PORT = process.env.PORT || 3003
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3002'
+
+const CHAT_RATE_LIMIT_WINDOW_MS = parseInt(process.env.CHAT_RATE_LIMIT_WINDOW_MS || '60000', 10)
+const CHAT_RATE_LIMIT_MAX = parseInt(process.env.CHAT_RATE_LIMIT_MAX || '20', 10)
+const IMAGE_RATE_LIMIT_WINDOW_MS = parseInt(process.env.IMAGE_RATE_LIMIT_WINDOW_MS || '60000', 10)
+const IMAGE_RATE_LIMIT_MAX = parseInt(process.env.IMAGE_RATE_LIMIT_MAX || '5', 10)
+
+export {
+  CHAT_RATE_LIMIT_MAX,
+  CHAT_RATE_LIMIT_WINDOW_MS,
+  FRONTEND_URL,
+  IMAGE_RATE_LIMIT_MAX,
+  IMAGE_RATE_LIMIT_WINDOW_MS,
+  PORT,
+}
