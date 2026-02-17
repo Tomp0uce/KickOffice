@@ -141,8 +141,12 @@ const firstChatModelTier = computed<ModelTier>(() => Object.entries(availableMod
 const inputPlaceholder = computed(() => selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'))
 
 function adjustTextareaHeight() {
-  const textarea = chatInputRef.value?.textareaEl?.value
-  if (textarea) {
+  const candidate = chatInputRef.value?.textareaEl
+  const textarea = (candidate && 'style' in candidate)
+    ? candidate as HTMLTextAreaElement
+    : candidate?.value
+
+  if (textarea && textarea.style) {
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
   }
