@@ -105,6 +105,14 @@ export async function healthCheck(): Promise<boolean> {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
+  tool_calls?: Array<{
+    id: string
+    type: 'function'
+    function: {
+      name: string
+      arguments: string
+    }
+  }>
 }
 
 export interface ToolChatMessage {
