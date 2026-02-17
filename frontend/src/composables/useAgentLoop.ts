@@ -304,7 +304,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       })
       if (!choice) break
       const assistantMsg = choice.message
-      currentMessages.push({ role: 'assistant', content: assistantMsg.content || '' })
+      currentMessages.push({
+        role: 'assistant',
+        content: assistantMsg.content || '',
+        tool_calls: assistantMsg.tool_calls,
+      })
       console.info(`${VERBOSE_CHAT_LOG_TAG} assistant message`, {
         iteration,
         hasContent: !!assistantMsg.content,
@@ -339,7 +343,20 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           abortedByUser = true
           break
         }
-        currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: result })
+        let safeContent = ''
+        if (result === null || result === undefined) {
+          safeContent = ''
+        } else if (typeof result === 'object') {
+          try {
+            safeContent = JSON.stringify(result)
+          } catch {
+            safeContent = String(result)
+          }
+        } else {
+          safeContent = String(result)
+        }
+
+        currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: safeContent })
       }
       if (abortedByUser) {
         break
