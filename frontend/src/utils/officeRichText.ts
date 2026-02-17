@@ -14,8 +14,18 @@ function normalizeUnderlineMarkdown(rawContent: string): string {
   return rawContent.replace(/(^|[^*])__(.+?)__(?!\*)/g, '$1<u>$2</u>')
 }
 
+function normalizeSuperAndSubScript(rawContent: string): string {
+  return rawContent
+    // ^^texte^^ or ^texte^ => superscript
+    .replace(/\^\^(.+?)\^\^/g, '<sup>$1</sup>')
+    .replace(/\^([^\^\n]+?)\^/g, '<sup>$1</sup>')
+    // ~texte~ => subscript (while preserving markdown strikethrough ~~texte~~)
+    .replace(/(^|[^~])~([^~\n]+?)~(?=[^~]|$)/g, '$1<sub>$2</sub>')
+}
+
 export function renderOfficeRichHtml(content: string): string {
-  const normalizedContent = normalizeUnderlineMarkdown(content?.trim() ?? '')
+  const withUnderline = normalizeUnderlineMarkdown(content?.trim() ?? '')
+  const normalizedContent = normalizeSuperAndSubScript(withUnderline)
   const unsafeHtml = officeMarkdownParser.render(normalizedContent)
 
   return DOMPurify.sanitize(unsafeHtml, {
