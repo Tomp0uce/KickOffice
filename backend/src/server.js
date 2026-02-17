@@ -53,8 +53,8 @@ app.use(helmet({
 app.use(express.json({ limit: '4mb' }))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
-app.use(healthRouter)
-app.use(modelsRouter)
+app.use('/api', healthRouter) 
+app.use('/api', modelsRouter)
 app.use('/api/chat', ensureLlmApiKey, chatLimiter, chatRouter)
 app.use('/api/image', ensureLlmApiKey, imageLimiter, imageRouter)
 
