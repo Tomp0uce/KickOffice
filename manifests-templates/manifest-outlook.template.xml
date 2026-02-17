@@ -18,7 +18,6 @@
 
   <AppDomains>
     <AppDomain>{{FRONTEND_URL}}</AppDomain>
-    <AppDomain>{{BACKEND_URL}}</AppDomain>
   </AppDomains>
 
   <Hosts>

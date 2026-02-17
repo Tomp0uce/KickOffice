@@ -1,8 +1,6 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
-
-if (!BACKEND_URL) {
-  throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env')
-}
+const DEFAULT_BACKEND_URL = 'https://mdteam-office.duckdns.org/api/'
+const configuredBackendUrl = import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND_URL
+const BACKEND_URL = configuredBackendUrl.endsWith('/') ? configuredBackendUrl.slice(0, -1) : configuredBackendUrl
 
 const REQUEST_TIMEOUT_MS = 45_000
 const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
@@ -88,7 +86,7 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
 }
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`)
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/models`)
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
   return res.json()
 }
@@ -134,7 +132,7 @@ export interface ChatStreamOptions {
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
   const { messages, modelTier, onStream, onFinishReason, abortSignal } = options
 
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, modelTier }),
@@ -235,7 +233,7 @@ export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatComp
   console.log(`${KICKOFFICE_DEBUG_TAG} chatSync: Sending request to backend...`)
 
   try {
-    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
+    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/chat/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, modelTier, tools }),
@@ -276,7 +274,7 @@ export interface ImageGenerateOptions {
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options),
