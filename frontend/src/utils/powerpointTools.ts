@@ -7,6 +7,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
+import { renderOfficeRichHtml } from './officeRichText'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -137,6 +138,28 @@ export function insertIntoPowerPoint(text: string): Promise<void> {
       Office.context.document.setSelectedDataAsync(
         normalizedText,
         { coercionType: Office.CoercionType.Text },
+        (result: any) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) {
+            resolve()
+          } else {
+            reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
+          }
+        },
+      )
+    } catch (err: any) {
+      reject(new Error(err?.message || 'setSelectedDataAsync unavailable'))
+    }
+  })
+}
+
+export function insertRichTextIntoPowerPoint(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const html = renderOfficeRichHtml(normalizePowerPointListText(text))
+
+    try {
+      Office.context.document.setSelectedDataAsync(
+        html,
+        { coercionType: Office.CoercionType.Html },
         (result: any) => {
           if (result.status === Office.AsyncResultStatus.Succeeded) {
             resolve()
