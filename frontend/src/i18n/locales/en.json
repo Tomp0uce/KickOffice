@@ -331,5 +331,6 @@
   "outlookTool_insertHtmlAtCursor_desc": "Insert formatted HTML at the current cursor position.",
   "imageClipboardNotSupported": "Unable to copy the image: clipboard image writing is not supported in this environment.",
   "imageInsertExcelNotSupported": "Image insertion is not supported in Excel add-ins. Please use Word or PowerPoint.",
-  "appVersion": "Application Version"
+  "appVersion": "Application Version",
+  "proofread": "Proofread"
 }

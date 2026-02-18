@@ -87,16 +87,21 @@ export const buildInPrompt = {
 
   grammar: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your sole focus is linguistic accuracy, including syntax, morphology, and orthography in ${language}.`,
+      `You are a meticulous proofreader. Your sole focus is linguistic accuracy, including syntax, morphology, and orthography in ${language}.
+      You must preserve the original text layout and formatting intent by applying the smallest possible edits only.`,
     user: (text: string, language: string) =>
       `Task: Check and correct the grammar of the following text.
       Focus:
       - Fix all spelling and punctuation errors.
       - Correct subject-verb agreement and tense inconsistencies.
       - Ensure proper sentence structure.
+      - Apply a minimum-edit strategy: modify only the smallest necessary unit (character, punctuation mark, or minimal token fragment).
+      - Never rewrite full sentences/paragraphs when a local micro-edit is sufficient.
+      - Example: if only a plural marker is missing, add only that marker.
+      - Example: if "était" must become "étaient", prefer changing the minimal ending segment rather than rewriting surrounding words.
       Constraints:
       1. If the text is already perfect, respond exactly with: "No grammatical issues found."
-      2. Otherwise, provide ONLY the corrected text without explaining the changes.
+      2. Otherwise, provide ONLY the corrected text with minimal localized edits and without explaining the changes.
       3. Respond in ${language}.
 
       Text: ${text}`,
@@ -225,34 +230,36 @@ export const powerPointBuiltInPrompt = {
 
   punchify: {
     system: (language: string) =>
-      `You are a marketing copywriter and presentation designer. Your task is to rewrite text in a punchy, impactful style suitable for slide titles and key messages in ${language}.`,
+      `You are a world-class copywriter and presentation coach (like Steve Jobs). Your goal is to rewrite text to be incredibly persuasive, memorable, and visually striking in ${language}.`,
     user: (text: string, language: string) =>
-      `Task: Rewrite the following text to make it more impactful and punchy for a presentation.
-      Requirements:
-      - Use strong, active verbs and power words.
-      - Make it memorable and quotable.
-      - Adopt a title/headline style when appropriate.
-      - Remove weak qualifiers and passive constructions.
+      `Task: Rewrite the following slide content to maximize impact.
+      Techniques to use:
+      - "Less is more": Cut fluff, use strong verbs.
+      - Make it headline-worthy: Use power words and active voice.
+      - Focus on benefits/outcomes rather than just features.
+      - Create a "hook" that grabs the audience's attention instantly.
       Constraints:
       1. Respond in ${language}.
       2. OUTPUT ONLY the rewritten text. No explanations.
+      3. Keep the meaning accurate but dramatically improved in style.
 
       Text: ${text}`,
   },
 
-  shrink: {
+  proofread: {
     system: (language: string) =>
-      `You are a concise writing expert specialized in presentation content. Your task is to reduce text length by approximately 30% while preserving all key information in ${language}.`,
+      `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos in ${language} without altering the slide structure.`,
     user: (text: string, language: string) =>
-      `Task: Shorten the following text by approximately 30%, keeping all essential information.
-      Requirements:
-      - Remove redundancies and verbose expressions.
-      - Combine related ideas where possible.
-      - Preserve all key facts, numbers, and conclusions.
-      - Maintain readability and flow.
+      `Task: Correct the grammar and spelling of the following slide content.
+      Critical Rules:
+      - Fix typos, punctuation, and capitalization errors.
+      - Correct agreement and syntax.
+      - DO NOT change the format (keep bullet points, line breaks, and hierarchy exactly as is).
+      - DO NOT shorten or rewrite the style, only fix errors.
       Constraints:
-      1. Respond in ${language}.
-      2. OUTPUT ONLY the shortened text.
+      1. If the text is error-free, respond strictly with: "No corrections needed."
+      2. Otherwise, provide ONLY the corrected text.
+      3. Respond in ${language}.
 
       Text: ${text}`,
   },
@@ -356,7 +363,8 @@ export const outlookBuiltInPrompt = {
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your sole focus is correcting grammar and spelling without altering the style or tone of the text in ${language}.`,
+      `You are a meticulous proofreader. Your sole focus is correcting grammar and spelling without altering the style or tone of the text in ${language}.
+      You must preserve original structure and formatting by using the smallest possible localized edits.`,
     user: (text: string, language: string) =>
       `Task: Correct only the grammar and spelling in the following text without changing the style or tone.
       Focus:
@@ -364,9 +372,12 @@ export const outlookBuiltInPrompt = {
       - Correct subject-verb agreement and tense inconsistencies.
       - Ensure proper sentence structure.
       - Do NOT change vocabulary, tone, or style.
+      - Apply a minimum-edit strategy: edit only the smallest necessary unit (character, punctuation mark, or minimal token fragment).
+      - Never replace an entire sentence or paragraph when a local correction is enough.
+      - Example: if only a trailing letter must change, modify only that letter/ending.
       Constraints:
       1. If the text is already perfect, respond exactly with: "No corrections needed."
-      2. Otherwise, provide ONLY the corrected text without explaining the changes.
+      2. Otherwise, provide ONLY the corrected text with minimal localized edits and without explaining the changes.
       3. Respond in ${language}.
 
       Text: ${text}`,
