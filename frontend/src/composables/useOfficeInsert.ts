@@ -4,7 +4,7 @@ import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { insertIntoPowerPoint, insertRichTextIntoPowerPoint } from '@/utils/powerpointTools'
-import { renderOfficeRichHtml } from '@/utils/officeRichText'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from '@/utils/officeRichText'
 
 const VERBOSE_INSERT_LOG_TAG = '[KO-VERBOSE-INSERT][REMOVE_ME]'
 
@@ -87,7 +87,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         const mailbox = getOutlookMailbox()
         const item = mailbox?.item
         if (item?.body?.setAsync) {
-          const htmlBody = renderOfficeRichHtml(normalizedContent)
+          const htmlBody = renderOfficeCommonApiHtml(normalizedContent)
           await new Promise<void>((resolve, reject) => {
             item.body.setAsync(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
@@ -110,7 +110,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         messageUtil.success(t('insertedToSlide'))
       } catch {
         try {
-          await insertIntoPowerPoint(normalizedContent)
+          await insertIntoPowerPoint(stripRichFormattingSyntax(normalizedContent))
           messageUtil.success(t('insertedToSlide'))
         } catch {
           await copyToClipboard(normalizedContent, true)

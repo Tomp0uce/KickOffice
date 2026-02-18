@@ -1,11 +1,12 @@
 import { Ref } from 'vue'
 
+import { stripRichFormattingSyntax } from '@/utils/officeRichText'
 import { WordFormatter } from '@/utils/wordFormatter'
 
 export async function insertResult(result: string, insertType: Ref): Promise<void> {
-  const normalizedResult = result
+  const normalizedResult = stripRichFormattingSyntax(result
     .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
+    .replace(/\r/g, '\n'))
 
   if (!normalizedResult.trim()) return
 
@@ -41,6 +42,6 @@ export async function insertFormattedResult(result: string, insertType: Ref): Pr
     await WordFormatter.insertFormattedResult(result, insertType)
   } catch (error) {
     console.warn('Formatted insertion failed, falling back to plain text:', error)
-    await insertResult(result, insertType)
+    await WordFormatter.insertPlainResult(result, insertType)
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeRichHtml } from './officeRichText'
+import { renderOfficeCommonApiHtml } from './officeRichText'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -48,55 +48,12 @@ export type PowerPointToolName =
   | 'insertTextBox'
   | 'insertImage'
 
-type ParsedListLine = {
-  indentLevel: number
-  text: string
-}
-
-function parseMarkdownListLine(line: string): ParsedListLine | null {
-  const bulletMatch = line.match(/^(\s*)[-*+]\s+(.+)$/)
-  if (bulletMatch) {
-    const [, indent, itemText] = bulletMatch
-    return {
-      indentLevel: Math.floor(indent.replace(/\t/g, '  ').length / 2),
-      text: itemText.trim(),
-    }
-  }
-
-  const numberedMatch = line.match(/^(\s*)\d+[.)]\s+(.+)$/)
-  if (numberedMatch) {
-    const [, indent, itemText] = numberedMatch
-    return {
-      indentLevel: Math.floor(indent.replace(/\t/g, '  ').length / 2),
-      text: itemText.trim(),
-    }
-  }
-
-  return null
-}
-
 /**
- * PowerPoint keeps existing paragraph bullet formatting when replacing text
- * inside a bulleted shape. If we insert markdown markers (-, *, 1.) directly,
- * users can end up with duplicated bullets (native bullet + literal marker).
- *
- * This converter removes list markers while preserving hierarchy via tabs.
+ * Keep list markers in plain text to preserve bullets/numbered lists when
+ * the target shape is not already configured as a native bullet paragraph.
  */
 export function normalizePowerPointListText(text: string): string {
-  const lines = text.split(/\r?\n/)
-  let hasListSyntax = false
-
-  const normalizedLines = lines.map((line) => {
-    const parsedLine = parseMarkdownListLine(line)
-    if (!parsedLine) {
-      return line
-    }
-
-    hasListSyntax = true
-    return `${'\t'.repeat(parsedLine.indentLevel)}${parsedLine.text}`
-  })
-
-  return hasListSyntax ? normalizedLines.join('\n') : text
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 }
 
 /**
@@ -154,7 +111,7 @@ export function insertIntoPowerPoint(text: string): Promise<void> {
 
 export function insertRichTextIntoPowerPoint(text: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const html = renderOfficeRichHtml(normalizePowerPointListText(text))
+    const html = renderOfficeCommonApiHtml(text)
 
     try {
       Office.context.document.setSelectedDataAsync(
