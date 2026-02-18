@@ -531,7 +531,7 @@ const editingPrompt = ref<SavedPrompt>({ id: '', name: '', systemPrompt: '', use
 // Built-in prompts - switch between host apps
 type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
 type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
-type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'shrink' | 'visual'
+type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'proofread' | 'visual'
 type OutlookBuiltinPromptKey = 'reply' | 'formalize' | 'concise' | 'proofread' | 'extract'
 type BuiltinPromptKey = WordBuiltinPromptKey | ExcelBuiltinPromptKey | PowerPointBuiltinPromptKey | OutlookBuiltinPromptKey
 
@@ -560,7 +560,7 @@ const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPr
   bullets: { ...powerPointBuiltInPrompt.bullets },
   speakerNotes: { ...powerPointBuiltInPrompt.speakerNotes },
   punchify: { ...powerPointBuiltInPrompt.punchify },
-  shrink: { ...powerPointBuiltInPrompt.shrink },
+  proofread: { ...powerPointBuiltInPrompt.proofread },
   visual: { ...powerPointBuiltInPrompt.visual },
 }
 

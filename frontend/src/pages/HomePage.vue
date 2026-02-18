@@ -55,7 +55,7 @@
 
 <script lang="ts" setup>
 import { useStorage } from '@vueuse/core'
-import { BookOpen, Brush, Briefcase, CheckCheck, CheckCircle, Eraser, Eye, FileCheck, FunctionSquare, Globe, Image, ListTodo, Mail, MessageSquare, Minus, Scissors, Sparkle, Wand2, Zap } from 'lucide-vue-next'
+import { BookOpen, Brush, Briefcase, CheckCheck, CheckCircle, Eraser, Eye, FileCheck, FunctionSquare, Globe, Image, ListTodo, Mail, MessageSquare, Scissors, Sparkle, Wand2, Zap } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeMount, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -131,7 +131,7 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
   { key: 'bullets', label: t('pptBullets'), icon: ListTodo, mode: 'immediate' },
   { key: 'speakerNotes', label: t('pptSpeakerNotes'), icon: MessageSquare, mode: 'immediate' },
   { key: 'punchify', label: t('pptPunchify'), icon: Zap, mode: 'immediate' },
-  { key: 'shrink', label: t('pptShrink'), icon: Minus, mode: 'immediate' },
+  { key: 'proofread', label: t('grammar'), icon: CheckCheck, mode: 'immediate' },
   { key: 'visual', label: t('pptVisual'), icon: Image, mode: 'draft' },
 ]
 
