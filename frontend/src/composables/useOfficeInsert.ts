@@ -3,8 +3,7 @@ import type { Ref } from 'vue'
 import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
-import { insertIntoPowerPoint, insertRichTextIntoPowerPoint } from '@/utils/powerpointTools'
-import { renderOfficeRichHtml } from '@/utils/officeRichText'
+import { insertIntoPowerPoint } from '@/utils/powerpointTools'
 
 const VERBOSE_INSERT_LOG_TAG = '[KO-VERBOSE-INSERT][REMOVE_ME]'
 
@@ -44,6 +43,15 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .trim()
+  }
+
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
   }
 
   async function copyToClipboard(text: string, fallback = false) {
@@ -87,7 +95,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         const mailbox = getOutlookMailbox()
         const item = mailbox?.item
         if (item?.body?.setAsync) {
-          const htmlBody = renderOfficeRichHtml(normalizedContent)
+          const htmlBody = `<div>${escapeHtml(normalizedContent).replace(/\n/g, '<br>')}</div>`
           await new Promise<void>((resolve, reject) => {
             item.body.setAsync(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
@@ -106,15 +114,10 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
 
     if (hostIsPowerPoint) {
       try {
-        await insertRichTextIntoPowerPoint(normalizedContent)
+        await insertIntoPowerPoint(normalizedContent)
         messageUtil.success(t('insertedToSlide'))
       } catch {
-        try {
-          await insertIntoPowerPoint(normalizedContent)
-          messageUtil.success(t('insertedToSlide'))
-        } catch {
-          await copyToClipboard(normalizedContent, true)
-        }
+        await copyToClipboard(normalizedContent, true)
       }
       return
     }
