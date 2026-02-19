@@ -1,5 +1,6 @@
 const PORT = process.env.PORT || 3003
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3002'
+const PUBLIC_FRONTEND_URL = process.env.PUBLIC_FRONTEND_URL
 
 const CHAT_RATE_LIMIT_WINDOW_MS = parseInt(process.env.CHAT_RATE_LIMIT_WINDOW_MS || '60000', 10)
 const CHAT_RATE_LIMIT_MAX = parseInt(process.env.CHAT_RATE_LIMIT_MAX || '20', 10)
@@ -13,4 +14,5 @@ export {
   IMAGE_RATE_LIMIT_MAX,
   IMAGE_RATE_LIMIT_WINDOW_MS,
   PORT,
+  PUBLIC_FRONTEND_URL,
 }
