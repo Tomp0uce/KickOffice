@@ -15,8 +15,7 @@ import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickActi
 
 const ENABLED_TOOLS_STORAGE_KEY = 'enabledTools'
 const ENABLED_TOOLS_STORAGE_VERSION = 1
-const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
-const KICKOFFICE_DEBUG_TAG = '[KICKOFFICE_DEBUG]'
+
 
 interface EnabledToolsStorageState {
   version: number
@@ -244,13 +243,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
     const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
-    console.info(`${VERBOSE_CHAT_LOG_TAG} runAgentLoop start`, {
-      host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
-      modelTier,
-      inputMessageCount: messages.length,
-      enabledToolCount: enabledToolDefs.length,
-      firstEnabledTools: enabledToolDefs.slice(0, 10).map(tool => tool.name),
-    })
     let iteration = 0
     const maxIter = Math.min(Number(agentMaxIterations.value) || 10, 10)
     let currentMessages: ChatRequestMessage[] = [...messages]
@@ -270,12 +262,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response
-      console.info(`${KICKOFFICE_DEBUG_TAG} runAgentLoop iteration request`, {
-        iteration,
-        modelTier,
-        contextMessageCount: contextSafeMessages.length,
-        toolCount: tools.length,
-      })
       try {
         response = await chatSync({ messages: contextSafeMessages, modelTier, tools, abortSignal: abortController.value?.signal })
       } catch (err: any) {
@@ -292,28 +278,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         })
         throw err
       }
-      console.info(`${KICKOFFICE_DEBUG_TAG} runAgentLoop iteration response`, {
-        iteration,
-        choiceCount: response.choices?.length || 0,
-      })
       const choice = response.choices?.[0]
-      console.info(`${VERBOSE_CHAT_LOG_TAG} runAgentLoop iteration response`, {
-        iteration,
-        hasChoice: !!choice,
-        choiceCount: response.choices?.length || 0,
-      })
       if (!choice) break
       const assistantMsg = choice.message
       currentMessages.push({
         role: 'assistant',
         content: assistantMsg.content || '',
         tool_calls: assistantMsg.tool_calls,
-      })
-      console.info(`${VERBOSE_CHAT_LOG_TAG} assistant message`, {
-        iteration,
-        hasContent: !!assistantMsg.content,
-        contentLength: assistantMsg.content?.length || 0,
-        toolCallCount: assistantMsg.tool_calls?.length || 0,
       })
       if (assistantMsg.content) history.value[lastIndex].content = assistantMsg.content
       if (!assistantMsg.tool_calls?.length) {
@@ -324,7 +295,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const toolName = toolCall.function.name
         let toolArgs: Record<string, any> = {}
         try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}
-        console.info(`${VERBOSE_CHAT_LOG_TAG} tool call`, { iteration, toolName, toolArgs })
         let result = ''
         const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {
@@ -372,10 +342,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     const assistantContent = history.value[lastIndex]?.content?.trim() || ''
     if (!assistantContent) {
-      console.warn(`${VERBOSE_CHAT_LOG_TAG} empty assistant content after loop`, {
-        iteration,
-        maxIter,
-      })
       history.value[lastIndex].content = t('noModelResponse')
     }
 
@@ -384,7 +350,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
   }
 
   async function processChat(userMessage: string) {
-    console.log(`${KICKOFFICE_DEBUG_TAG} processChat started with:`, userMessage.substring(0, 50))
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -408,16 +373,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     try {
       await runAgentLoop(messages, modelTier)
-      console.log(`${KICKOFFICE_DEBUG_TAG} runAgentLoop completed successfully`)
     } catch (error) {
-      console.error(`${KICKOFFICE_DEBUG_TAG} runAgentLoop FAILED:`, error)
       throw error
     }
   }
 
   async function sendMessage(payload?: unknown) {
-    console.group(`${KICKOFFICE_DEBUG_TAG} sendMessage execution`)
-
     let textToSend = ''
 
     if (typeof payload === 'string') {
@@ -427,23 +388,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
 
     textToSend = textToSend?.trim() || ''
-    console.log(`${KICKOFFICE_DEBUG_TAG} Final text to process:`, textToSend)
 
     if (!textToSend) {
-      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Text is empty.`)
-      console.groupEnd()
       return
     }
 
     if (loading.value) {
-      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Already loading.`)
-      console.groupEnd()
       return
     }
 
     if (!backendOnline.value) {
-      console.warn(`${KICKOFFICE_DEBUG_TAG} ABORTING: Backend offline.`)
-      console.groupEnd()
       return messageUtil.error(t('backendOffline'))
     }
 
@@ -453,19 +407,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
 
     const userMessage = textToSend
-    console.log(`${KICKOFFICE_DEBUG_TAG} Calling processChat...`)
-    console.groupEnd()
 
     loading.value = true
     abortController.value = new AbortController()
     history.value.push(createDisplayMessage('user', userMessage))
-    console.info(`${VERBOSE_CHAT_LOG_TAG} sendMessage`, {
-      host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
-      userMessageLength: userMessage.length,
-      useSelectedText: useSelectedText.value,
-      selectedModelTier: selectedModelTier.value,
-      historyLength: history.value.length,
-    })
     await scrollToBottom()
 
     try {
@@ -488,10 +433,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const fullMessage = selectedText ? `${userMessage}
 
 [${selectionLabel}: "${selectedText}"]` : userMessage
-      console.info(`${VERBOSE_CHAT_LOG_TAG} sendMessage payload`, {
-        selectedTextLength: selectedText.length,
-        fullMessageLength: fullMessage.length,
-      })
       if (selectedText) {
         history.value[history.value.length - 1].content = fullMessage
       }

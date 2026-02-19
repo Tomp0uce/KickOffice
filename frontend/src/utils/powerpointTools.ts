@@ -7,7 +7,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeCommonApiHtml } from './officeRichText'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './officeRichText'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -177,7 +177,7 @@ const powerpointToolDefinitions = createPowerPointTools({
       if (!newText || typeof newText !== 'string') {
         return 'Error: newText is required and must be a string.'
       }
-      await insertIntoPowerPoint(newText)
+      await insertRichTextIntoPowerPoint(newText)
       return 'Successfully replaced selected text in PowerPoint.'
     },
   },
@@ -403,7 +403,7 @@ const powerpointToolDefinitions = createPowerPointTools({
         }
 
         const slide = slides.getItemAt(index)
-        const shape = slide.shapes.addTextBox(text)
+        const shape = slide.shapes.addTextBox(stripRichFormattingSyntax(text))
         shape.left = Number.isFinite(args.left) ? Number(args.left) : 50
         shape.top = Number.isFinite(args.top) ? Number(args.top) : 50
         shape.width = Number.isFinite(args.width) ? Number(args.width) : 500

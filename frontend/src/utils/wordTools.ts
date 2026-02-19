@@ -1,4 +1,5 @@
 import { executeOfficeAction } from './officeAction'
+import { renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -118,7 +119,7 @@ const wordToolDefinitions = createWordTools({
     executeWord: async (context, args) => {
       const { text, location = 'End' } = args
       const range = context.document.getSelection()
-      range.insertText(text, location as Word.InsertLocation)
+      range.insertHtml(renderOfficeRichHtml(text), location as any)
       await context.sync()
       return `Successfully inserted text at ${location}`
     },
@@ -152,22 +153,20 @@ const wordToolDefinitions = createWordTools({
         return 'Error: No text selected. Select text in the document, then try again.'
       }
 
-      const insertedRange = range.insertText(newText, 'Replace')
+      const insertedRange = range.insertHtml(renderOfficeRichHtml(newText), 'Replace')
 
       if (preserveFormatting) {
         insertedRange.styleBuiltIn = range.styleBuiltIn
         insertedRange.font.name = range.font.name
         insertedRange.font.size = range.font.size
-        insertedRange.font.bold = range.font.bold
-        insertedRange.font.italic = range.font.italic
-        insertedRange.font.underline = range.font.underline
-        insertedRange.font.color = range.font.color
-        insertedRange.font.highlightColor = range.font.highlightColor
+        // We do not restore bold, italic, or underline, as it would override the rich HTML formatting
+        if (range.font.color) insertedRange.font.color = range.font.color
+        if (range.font.highlightColor) insertedRange.font.highlightColor = range.font.highlightColor
       }
 
       await context.sync()
       return preserveFormatting
-        ? 'Successfully replaced selected text while preserving formatting'
+        ? 'Successfully replaced selected text while preserving layout formatting'
         : 'Successfully replaced selected text'
     },
   },
@@ -189,7 +188,7 @@ const wordToolDefinitions = createWordTools({
     executeWord: async (context, args) => {
       const { text } = args
       const body = context.document.body
-      body.insertText(text, 'End')
+      body.insertHtml(renderOfficeRichHtml(text), 'End')
       await context.sync()
       return 'Successfully appended text to document'
     },
@@ -232,16 +231,18 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { text, location = 'After', style } = args
-      let paragraph
+      let range
+      const htmlText = renderOfficeRichHtml(text)
+
       if (location === 'Start' || location === 'End') {
         const body = context.document.body
-        paragraph = body.insertParagraph(text, location)
+        range = body.insertHtml(htmlText, location)
       } else {
-        const range = context.document.getSelection()
-        paragraph = range.insertParagraph(text, location as 'After' | 'Before')
+        const selectionRange = context.document.getSelection()
+        range = selectionRange.insertHtml(htmlText, location as 'After' | 'Before')
       }
       if (style) {
-        paragraph.styleBuiltIn = style as Word.BuiltInStyleName
+        range.styleBuiltIn = style as any
       }
       await context.sync()
       return `Successfully inserted paragraph at ${location}`
@@ -419,12 +420,9 @@ const wordToolDefinitions = createWordTools({
       
         const range = context.document.getSelection()
 
-        // Create table data
-        const tableData: string[][] =
-          data ||
-          Array(rows)
-            .fill(null)
-            .map(() => Array(columns).fill(''))
+        // Create table data with markdown stripped for raw cells
+        const tableData: string[][] = (data || Array(rows).fill(null).map(() => Array(columns).fill('')))
+          .map((row: string[]) => row.map((cell: string) => stripRichFormattingSyntax(cell || '')))
 
         const table = range.insertTable(rows, columns, 'After', tableData)
         table.styleBuiltIn = 'GridTable1Light'
@@ -458,19 +456,12 @@ const wordToolDefinitions = createWordTools({
       const { items, listType } = args
       
         const range = context.document.getSelection()
-        let insertionPoint = range
-
-        for (const item of items) {
-          const paragraph = insertionPoint.insertParagraph(item, 'After')
-
-          if (listType === 'bullet') {
-            paragraph.listItem.level = 0
-          } else {
-            paragraph.listItem.level = 0
-          }
-
-          insertionPoint = paragraph.getRange('End')
-        }
+        
+        const markdownList = listType === 'bullet' 
+          ? items.map((i: string) => `* ${i}`).join('\n')
+          : items.map((i: string, idx: number) => `${idx + 1}. ${i}`).join('\n')
+        
+        range.insertHtml(renderOfficeRichHtml(markdownList), 'After')
 
         await context.sync()
         return `Successfully inserted ${listType} list with ${items.length} items`
@@ -688,7 +679,7 @@ const wordToolDefinitions = createWordTools({
       const { imageUrl, width, height, location = 'After' } = args
       
         const range = context.document.getSelection()
-        const image = range.insertInlinePictureFromBase64(imageUrl, location as Word.InsertLocation)
+        const image = range.insertInlinePictureFromBase64(imageUrl, location as any)
 
         if (width) image.width = width
         if (height) image.height = height
