@@ -32,8 +32,8 @@ if (!SERVER_IP) {
   process.exit(1);
 }
 
-const FRONTEND_URL = `http://${SERVER_IP}:${FRONTEND_PORT}`;
-const BACKEND_URL  = `http://${SERVER_IP}:${BACKEND_PORT}`;
+const FRONTEND_URL = process.env.PUBLIC_FRONTEND_URL || `http://${SERVER_IP}:${FRONTEND_PORT}`;
+const BACKEND_URL  = process.env.PUBLIC_BACKEND_URL  || `http://${SERVER_IP}:${BACKEND_PORT}`;
 
 // ---------------------------------------------------------------------------
 // 2. Paths

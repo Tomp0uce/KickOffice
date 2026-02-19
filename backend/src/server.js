@@ -13,6 +13,7 @@ import {
   IMAGE_RATE_LIMIT_MAX,
   IMAGE_RATE_LIMIT_WINDOW_MS,
   PORT,
+  PUBLIC_FRONTEND_URL,
 } from './config/env.js'
 import { ensureLlmApiKey } from './middleware/auth.js'
 import { chatRouter } from './routes/chat.js'
@@ -39,8 +40,13 @@ const imageLimiter = rateLimit({
   message: { error: 'Too many image requests.' },
 })
 
+const allowedOrigins = [FRONTEND_URL]
+if (PUBLIC_FRONTEND_URL) {
+  allowedOrigins.push(PUBLIC_FRONTEND_URL)
+}
+
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
