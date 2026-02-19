@@ -2,15 +2,32 @@
   <div class="flex flex-col gap-1 rounded-md">
     <div class="flex items-center justify-between gap-2 overflow-hidden">
       <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <label :id="modelTierLabelId" :for="modelTierSelectId" class="shrink-0 text-xs font-medium text-secondary">{{ taskTypeLabel }}</label>
-        <select :id="modelTierSelectId" :value="selectedModelTier" :aria-labelledby="modelTierLabelId" class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none" @change="handleModelTierChange">
-          <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
+        <label
+          :id="modelTierLabelId"
+          :for="modelTierSelectId"
+          class="shrink-0 text-xs font-medium text-secondary"
+          >{{ taskTypeLabel }}</label
+        >
+        <select
+          :id="modelTierSelectId"
+          :value="selectedModelTier"
+          :aria-labelledby="modelTierLabelId"
+          class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none"
+          @change="handleModelTierChange"
+        >
+          <option
+            v-for="(info, tier) in availableModels"
+            :key="tier"
+            :value="tier"
+          >
             {{ info.label }}
           </option>
         </select>
       </div>
     </div>
-    <div class="flex min-w-12 items-center gap-2 rounded-md border border-border bg-surface p-2 focus-within:border-accent">
+    <div
+      class="card-base flex min-w-12 items-center gap-2 focus-within:border-accent"
+    >
       <textarea
         ref="textareaEl"
         :value="modelValue"
@@ -41,12 +58,31 @@
       </button>
     </div>
     <div class="flex justify-center gap-3 px-1">
-      <label v-if="showWordFormatting" :for="wordFormattingCheckboxId" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
-        <input :id="wordFormattingCheckboxId" :checked="useWordFormatting" :aria-label="useWordFormattingLabel" type="checkbox" @change="handleWordFormattingChange" />
+      <label
+        v-if="showWordFormatting"
+        :for="wordFormattingCheckboxId"
+        class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary"
+      >
+        <input
+          :id="wordFormattingCheckboxId"
+          :checked="useWordFormatting"
+          :aria-label="useWordFormattingLabel"
+          type="checkbox"
+          @change="handleWordFormattingChange"
+        />
         <span>{{ useWordFormattingLabel }}</span>
       </label>
-      <label :for="selectedTextCheckboxId" class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary">
-        <input :id="selectedTextCheckboxId" :checked="useSelectedText" :aria-label="includeSelectionLabel" type="checkbox" @change="handleSelectedTextChange" />
+      <label
+        :for="selectedTextCheckboxId"
+        class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary"
+      >
+        <input
+          :id="selectedTextCheckboxId"
+          :checked="useSelectedText"
+          :aria-label="includeSelectionLabel"
+          type="checkbox"
+          @change="handleSelectedTextChange"
+        />
         <span>{{ includeSelectionLabel }}</span>
       </label>
     </div>
@@ -54,73 +90,70 @@
 </template>
 
 <script lang="ts" setup>
-import { Send, Square } from 'lucide-vue-next'
-import { ref } from 'vue'
-
-const KICKOFFICE_DEBUG_TAG = '[KICKOFFICE_DEBUG]'
+import { Send, Square } from "lucide-vue-next";
+import { ref } from "vue";
 
 const props = defineProps<{
-  availableModels: Record<string, ModelInfo>
-  selectedModelTier: string
-  modelValue: string
-  inputPlaceholder: string
-  loading: boolean
-  backendOnline: boolean
-  showWordFormatting: boolean
-  useWordFormatting: boolean
-  useSelectedText: boolean
-  useWordFormattingLabel: string
-  includeSelectionLabel: string
-  taskTypeLabel: string
-  sendLabel: string
-  stopLabel: string
-}>()
+  availableModels: Record<string, ModelInfo>;
+  selectedModelTier: string;
+  modelValue: string;
+  inputPlaceholder: string;
+  loading: boolean;
+  backendOnline: boolean;
+  showWordFormatting: boolean;
+  useWordFormatting: boolean;
+  useSelectedText: boolean;
+  useWordFormattingLabel: string;
+  includeSelectionLabel: string;
+  taskTypeLabel: string;
+  sendLabel: string;
+  stopLabel: string;
+}>();
 
 const emit = defineEmits<{
-  (e: 'update:selectedModelTier', value: string): void
-  (e: 'update:modelValue', value: string): void
-  (e: 'update:useWordFormatting', value: boolean): void
-  (e: 'update:useSelectedText', value: boolean): void
-  (e: 'submit', value: string): void
-  (e: 'stop'): void
-  (e: 'input'): void
-}>()
+  (e: "update:selectedModelTier", value: string): void;
+  (e: "update:modelValue", value: string): void;
+  (e: "update:useWordFormatting", value: boolean): void;
+  (e: "update:useSelectedText", value: boolean): void;
+  (e: "submit", value: string): void;
+  (e: "stop"): void;
+  (e: "input"): void;
+}>();
 
 const handleModelTierChange = (event: Event) => {
-  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value)
-}
+  emit("update:selectedModelTier", (event.target as HTMLSelectElement).value);
+};
 
 const handleInput = (event: Event) => {
-  const val = (event.target as HTMLTextAreaElement).value
-  emit('update:modelValue', val)
-  emit('input')
-}
+  const val = (event.target as HTMLTextAreaElement).value;
+  emit("update:modelValue", val);
+  emit("input");
+};
 
 const triggerSubmit = () => {
-  console.log(`${KICKOFFICE_DEBUG_TAG} ChatInput: triggerSubmit called.`)
   if (!props.modelValue || !props.modelValue.trim()) {
-    return
+    return;
   }
 
-  emit('submit', props.modelValue)
-}
+  emit("submit", props.modelValue);
+};
 
 const handleStop = () => {
-  emit('stop')
-}
+  emit("stop");
+};
 
 const handleWordFormattingChange = (event: Event) => {
-  emit('update:useWordFormatting', (event.target as HTMLInputElement).checked)
-}
+  emit("update:useWordFormatting", (event.target as HTMLInputElement).checked);
+};
 
 const handleSelectedTextChange = (event: Event) => {
-  emit('update:useSelectedText', (event.target as HTMLInputElement).checked)
-}
+  emit("update:useSelectedText", (event.target as HTMLInputElement).checked);
+};
 
-const textareaEl = ref<HTMLTextAreaElement>()
-const modelTierSelectId = 'chat-model-tier-select'
-const modelTierLabelId = 'chat-model-tier-label'
-const wordFormattingCheckboxId = 'chat-word-formatting-checkbox'
-const selectedTextCheckboxId = 'chat-selected-text-checkbox'
-defineExpose({ textareaEl })
+const textareaEl = ref<HTMLTextAreaElement>();
+const modelTierSelectId = "chat-model-tier-select";
+const modelTierLabelId = "chat-model-tier-label";
+const wordFormattingCheckboxId = "chat-word-formatting-checkbox";
+const selectedTextCheckboxId = "chat-selected-text-checkbox";
+defineExpose({ textareaEl });
 </script>

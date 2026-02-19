@@ -1,6 +1,10 @@
 <template>
-  <div class="relative flex h-full w-full items-center justify-center bg-bg-secondary">
-    <div class="relative z-1 flex h-full w-full flex-col items-center justify-start gap-2 rounded-xl border-none p-2">
+  <div
+    class="relative flex h-full w-full items-center justify-center bg-bg-secondary"
+  >
+    <div
+      class="relative z-1 flex h-full w-full flex-col items-center justify-start gap-2 rounded-xl border-none p-2"
+    >
       <div
         class="flex w-full items-center justify-between gap-1 overflow-visible rounded-2xl border border-border-secondary p-0 shadow-sm"
       >
@@ -16,13 +20,15 @@
         </div>
         <div class="flex-1">
           <h2 class="text-sm font-semibold text-main">
-            {{ $t('settings') || 'Settings' }}
+            {{ $t("settings") || "Settings" }}
           </h2>
         </div>
       </div>
 
       <!-- Tab Navigation -->
-      <div class="flex w-full justify-between rounded-2xl border border-border-secondary p-0">
+      <div
+        class="flex w-full justify-between rounded-2xl border border-border-secondary p-0"
+      >
         <CustomButton
           v-for="tab in tabs"
           :key="tab.id"
@@ -38,7 +44,9 @@
 
       <!-- Main Content -->
       <div class="w-full flex-1 overflow-hidden">
-        <div class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md">
+        <div
+          class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md"
+        >
           <!-- General Settings -->
           <div
             v-show="currentTab === 'general'"
@@ -48,13 +56,19 @@
               <SingleSelect
                 v-model="localLanguage"
                 :tight="false"
-                :key-list="localLanguageOptions.map(item => item.value)"
+                :key-list="localLanguageOptions.map((item) => item.value)"
                 :title="$t('localLanguageLabel')"
                 :fronticon="false"
-                :placeholder="localLanguageOptions.find(o => o.value === localLanguage)?.label || localLanguage"
+                :placeholder="
+                  localLanguageOptions.find((o) => o.value === localLanguage)
+                    ?.label || localLanguage
+                "
               >
                 <template #item="{ item }">
-                  {{ localLanguageOptions.find(o => o.value === item)?.label || item }}
+                  {{
+                    localLanguageOptions.find((o) => o.value === item)?.label ||
+                    item
+                  }}
                 </template>
               </SingleSelect>
             </SettingCard>
@@ -63,29 +77,41 @@
               <SingleSelect
                 v-model="replyLanguage"
                 :tight="false"
-                :key-list="replyLanguageOptions.map(item => item.value)"
+                :key-list="replyLanguageOptions.map((item) => item.value)"
                 :title="$t('replyLanguageLabel')"
                 :fronticon="false"
-                :placeholder="replyLanguageOptions.find(o => o.value === replyLanguage)?.label || replyLanguage"
+                :placeholder="
+                  replyLanguageOptions.find((o) => o.value === replyLanguage)
+                    ?.label || replyLanguage
+                "
               >
                 <template #item="{ item }">
-                  {{ replyLanguageOptions.find(o => o.value === item)?.label || item }}
+                  {{
+                    replyLanguageOptions.find((o) => o.value === item)?.label ||
+                    item
+                  }}
                 </template>
               </SingleSelect>
             </SettingCard>
 
             <SettingCard>
-              <label class="flex cursor-pointer items-center justify-between gap-2">
+              <label
+                class="flex cursor-pointer items-center justify-between gap-2"
+              >
                 <div class="flex flex-col">
-                  <span class="text-sm font-semibold text-main">{{ $t('darkModeLabel') || 'Dark mode' }}</span>
-                  <span class="text-xs text-secondary">{{ $t('darkModeDescription') || 'Use a darker color theme' }}</span>
+                  <span class="text-sm font-semibold text-main">{{
+                    $t("darkModeLabel") || "Dark mode"
+                  }}</span>
+                  <span class="text-xs text-secondary">{{
+                    $t("darkModeDescription") || "Use a darker color theme"
+                  }}</span>
                 </div>
                 <input
                   v-model="darkMode"
                   type="checkbox"
                   class="h-4 w-4 cursor-pointer accent-accent"
                   :aria-label="$t('darkModeLabel') || 'Dark mode'"
-                >
+                />
               </label>
             </SettingCard>
 
@@ -93,13 +119,22 @@
               <SingleSelect
                 v-model="excelFormulaLanguage"
                 :tight="false"
-                :key-list="excelFormulaLanguageOptions.map(item => item.value)"
+                :key-list="
+                  excelFormulaLanguageOptions.map((item) => item.value)
+                "
                 :title="$t('excelFormulaLanguageLabel')"
                 :fronticon="false"
-                :placeholder="excelFormulaLanguageOptions.find(o => o.value === excelFormulaLanguage)?.label || excelFormulaLanguage"
+                :placeholder="
+                  excelFormulaLanguageOptions.find(
+                    (o) => o.value === excelFormulaLanguage,
+                  )?.label || excelFormulaLanguage
+                "
               >
                 <template #item="{ item }">
-                  {{ excelFormulaLanguageOptions.find(o => o.value === item)?.label || item }}
+                  {{
+                    excelFormulaLanguageOptions.find((o) => o.value === item)
+                      ?.label || item
+                  }}
                 </template>
               </SingleSelect>
             </SettingCard>
@@ -123,13 +158,18 @@
               <SingleSelect
                 v-model="userGender"
                 :tight="false"
-                :key-list="genderOptions.map(item => item.value)"
+                :key-list="genderOptions.map((item) => item.value)"
                 :title="$t('userGenderLabel')"
                 :fronticon="false"
-                :placeholder="genderOptions.find(o => o.value === userGender)?.label || t('userGenderUnspecified')"
+                :placeholder="
+                  genderOptions.find((o) => o.value === userGender)?.label ||
+                  t('userGenderUnspecified')
+                "
               >
                 <template #item="{ item }">
-                  {{ genderOptions.find(o => o.value === item)?.label || item }}
+                  {{
+                    genderOptions.find((o) => o.value === item)?.label || item
+                  }}
                 </template>
               </SingleSelect>
             </SettingCard>
@@ -146,40 +186,63 @@
             <!-- Backend status -->
             <SettingCard>
               <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-secondary">{{ $t('backendStatus') }}</span>
+                <span class="text-sm font-semibold text-secondary">{{
+                  $t("backendStatus")
+                }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-                  :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  :class="
+                    backendOnline
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-red-100 text-red-700'
+                  "
                 >
                   <div
                     class="h-2 w-2 rounded-full"
                     :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
                   />
-                  {{ backendOnline ? $t('backendOnline') : $t('backendOffline') }}
+                  {{
+                    backendOnline ? $t("backendOnline") : $t("backendOffline")
+                  }}
                 </div>
               </div>
             </SettingCard>
 
             <SettingCard>
               <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-secondary">{{ $t('appVersion') }}</span>
-                <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{ appVersion }}</span>
+                <span class="text-sm font-semibold text-secondary">{{
+                  $t("appVersion")
+                }}</span>
+                <span
+                  class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary"
+                  >{{ appVersion }}</span
+                >
               </div>
             </SettingCard>
 
             <!-- Available models (read-only) -->
             <SettingCard v-if="Object.keys(availableModels).length > 0">
               <div class="flex flex-col gap-2">
-                <span class="text-sm font-semibold text-secondary">{{ $t('configuredModels') }}</span>
+                <span class="text-sm font-semibold text-secondary">{{
+                  $t("configuredModels")
+                }}</span>
                 <div
                   v-for="(info, tier) in availableModels"
                   :key="tier"
-                  class="flex items-center justify-between rounded-md border border-border bg-surface p-2"
+                  class="card-base flex items-center justify-between"
                 >
-                  <span class="text-xs font-medium text-main">{{ info.label }}</span>
+                  <span class="text-xs font-medium text-main">{{
+                    info.label
+                  }}</span>
                   <div class="flex items-center gap-1.5">
-                    <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{ info.id }}</span>
-                    <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{ tier }}</span>
+                    <span
+                      class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary"
+                      >{{ info.id }}</span
+                    >
+                    <span
+                      class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent"
+                      >{{ tier }}</span
+                    >
                   </div>
                 </div>
               </div>
@@ -196,7 +259,7 @@
             >
               <div class="flex items-center justify-between">
                 <h3 class="text-center text-sm font-semibold text-main">
-                  {{ $t('savedPrompts') }}
+                  {{ $t("savedPrompts") }}
                 </h3>
                 <CustomButton
                   :icon="Plus"
@@ -222,7 +285,9 @@
                       @blur="savePromptEdit"
                       @keyup.enter="savePromptEdit"
                     />
-                    <span v-else class="text-sm font-semibold text-main">{{ prompt.name }}</span>
+                    <span v-else class="text-sm font-semibold text-main">{{
+                      prompt.name
+                    }}</span>
                   </div>
                   <div class="flex shrink-0 gap-1">
                     <CustomButton
@@ -247,8 +312,14 @@
                   </div>
                 </div>
 
-                <div v-if="editingPromptId === prompt.id" class="mt-3 border-t border-t-border pt-3">
-                  <label class="mb-1 block text-xs font-semibold text-secondary">{{ $t('systemPrompt') }}</label>
+                <div
+                  v-if="editingPromptId === prompt.id"
+                  class="mt-3 border-t border-t-border pt-3"
+                >
+                  <label
+                    class="mb-1 block text-xs font-semibold text-secondary"
+                    >{{ $t("systemPrompt") }}</label
+                  >
                   <textarea
                     v-model="editingPrompt.systemPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
@@ -256,7 +327,10 @@
                     :placeholder="$t('systemPromptPlaceholder')"
                   />
 
-                  <label class="mb-1 block text-xs font-semibold text-secondary">{{ $t('userPrompt') }}</label>
+                  <label
+                    class="mb-1 block text-xs font-semibold text-secondary"
+                    >{{ $t("userPrompt") }}</label
+                  >
                   <textarea
                     v-model="editingPrompt.userPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
@@ -265,14 +339,27 @@
                   />
 
                   <div class="mt-3 flex gap-2">
-                    <CustomButton type="primary" class="flex-1" :text="t('save')" @click="savePromptEdit" />
-                    <CustomButton type="secondary" class="flex-1" :text="t('cancel')" @click="cancelEdit" />
+                    <CustomButton
+                      type="primary"
+                      class="flex-1"
+                      :text="t('save')"
+                      @click="savePromptEdit"
+                    />
+                    <CustomButton
+                      type="secondary"
+                      class="flex-1"
+                      :text="t('cancel')"
+                      @click="cancelEdit"
+                    />
                   </div>
                 </div>
 
                 <div v-else class="mt-2">
-                  <p class="overflow-hidden text-xs font-semibold text-ellipsis text-secondary">
-                    {{ prompt.systemPrompt.substring(0, 100) }}{{ prompt.systemPrompt.length > 100 ? '...' : '' }}
+                  <p
+                    class="overflow-hidden text-xs font-semibold text-ellipsis text-secondary"
+                  >
+                    {{ prompt.systemPrompt.substring(0, 100)
+                    }}{{ prompt.systemPrompt.length > 100 ? "..." : "" }}
                   </p>
                 </div>
               </div>
@@ -287,17 +374,23 @@
             <div
               class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
             >
-              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
+              <div
+                class="rounded-md border border-border-secondary p-1 shadow-sm"
+              >
                 <h3 class="text-center text-sm font-semibold text-accent/70">
-                  {{ t('builtinPrompts') || 'Built-in Prompts' }}
+                  {{ t("builtinPrompts") || "Built-in Prompts" }}
                 </h3>
               </div>
-              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
-                <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
+              <div
+                class="rounded-md border border-border-secondary p-1 shadow-sm"
+              >
+                <p
+                  class="text-xs leading-normal font-medium wrap-break-word text-secondary"
+                >
                   {{
-                    t('builtinPromptsDescription', {
-                      language: '${language}',
-                      text: '${text}',
+                    t("builtinPromptsDescription", {
+                      language: "${language}",
+                      text: "${text}",
                     })
                   }}
                 </p>
@@ -306,17 +399,25 @@
               <div
                 v-for="(promptConfig, key) in builtInPromptsData"
                 :key="key"
-                class="flex flex-col gap-2 rounded-md border border-border bg-surface p-2 hover:border-2 hover:border-accent"
+                class="card-base flex flex-col gap-2 hover:border-2 hover:border-accent"
               >
                 <div class="flex flex-row items-start justify-between">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-secondary">{{ t(hostIsExcel ? `excel${key.charAt(0).toUpperCase() + key.slice(1)}` : key) || key }}</span>
+                    <span class="text-sm font-semibold text-secondary">{{
+                      t(
+                        hostIsExcel
+                          ? `excel${key.charAt(0).toUpperCase() + key.slice(1)}`
+                          : key,
+                      ) || key
+                    }}</span>
                   </div>
                   <div class="flex gap-1">
                     <CustomButton
                       :icon="editingBuiltinPromptKey === key ? Save : Edit2"
                       text=""
-                      :title="editingBuiltinPromptKey === key ? t('save') : t('edit')"
+                      :title="
+                        editingBuiltinPromptKey === key ? t('save') : t('edit')
+                      "
                       class="border-none bg-surface! p-1.5!"
                       type="secondary"
                       :icon-size="14"
@@ -336,13 +437,19 @@
                 </div>
 
                 <div v-if="editingBuiltinPromptKey === key">
-                  <label class="mt-2 block text-xs font-semibold text-secondary">{{ $t('systemPrompt') }}</label>
+                  <label
+                    class="mt-2 block text-xs font-semibold text-secondary"
+                    >{{ $t("systemPrompt") }}</label
+                  >
                   <textarea
                     v-model="editingBuiltinPrompt.system"
                     class="min-h-20 w-full rounded-md border border-border bg-bg-secondary p-2 text-xs text-main focus:border-accent focus:outline-none"
                     rows="3"
                   />
-                  <label class="mt-2 block text-xs font-semibold text-secondary">{{ $t('userPrompt') }}</label>
+                  <label
+                    class="mt-2 block text-xs font-semibold text-secondary"
+                    >{{ $t("userPrompt") }}</label
+                  >
                   <textarea
                     v-model="editingBuiltinPrompt.user"
                     class="min-h-20 w-full rounded-md border border-border bg-bg-secondary p-2 text-xs text-main focus:border-accent focus:outline-none"
@@ -351,12 +458,20 @@
                 </div>
 
                 <div v-else class="mt-2">
-                  <p class="mb-2 text-xs font-semibold text-secondary">{{ $t('systemPrompt') }}:</p>
-                  <p class="text-xs leading-normal wrap-break-word text-secondary">
+                  <p class="mb-2 text-xs font-semibold text-secondary">
+                    {{ $t("systemPrompt") }}:
+                  </p>
+                  <p
+                    class="text-xs leading-normal wrap-break-word text-secondary"
+                  >
                     {{ getSystemPromptPreview(promptConfig.system) }}
                   </p>
-                  <p class="mt-2 mb-2 text-xs font-semibold text-secondary">{{ $t('userPrompt') }}:</p>
-                  <p class="text-xs leading-normal wrap-break-word text-secondary">
+                  <p class="mt-2 mb-2 text-xs font-semibold text-secondary">
+                    {{ $t("userPrompt") }}:
+                  </p>
+                  <p
+                    class="text-xs leading-normal wrap-break-word text-secondary"
+                  >
                     {{ getUserPromptPreview(promptConfig.user) }}
                   </p>
                 </div>
@@ -372,13 +487,19 @@
             <div
               class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
             >
-              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
+              <div
+                class="rounded-md border border-border-secondary p-1 shadow-sm"
+              >
                 <h3 class="text-center text-sm font-semibold text-accent/70">
-                  {{ t('tools') }}
+                  {{ t("tools") }}
                 </h3>
               </div>
-              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
-                <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
+              <div
+                class="rounded-md border border-border-secondary p-1 shadow-sm"
+              >
+                <p
+                  class="text-xs leading-normal font-medium wrap-break-word text-secondary"
+                >
                   {{ t(toolDescriptionKey) }}
                 </p>
               </div>
@@ -386,7 +507,7 @@
                 <div
                   v-for="tool in allToolsList"
                   :key="tool.name"
-                  class="flex items-center gap-2 rounded-md border border-border bg-surface p-2 hover:border-accent"
+                  class="card-base flex items-center gap-2 hover:border-accent"
                 >
                   <input
                     :id="'tool-' + tool.name"
@@ -396,7 +517,10 @@
                     @change="toggleTool(tool.name)"
                   />
                   <div class="flex flex-col" @click="toggleTool(tool.name)">
-                    <label :for="'tool-' + tool.name" class="text-xs font-semibold text-secondary">
+                    <label
+                      :for="'tool-' + tool.name"
+                      class="text-xs font-semibold text-secondary"
+                    >
                       {{ $t(`${toolTranslationPrefix}_${tool.name}`) }}
                     </label>
                     <span class="text-xs text-secondary/90">
@@ -414,7 +538,7 @@
 </template>
 
 <script lang="ts" setup>
-import { useStorage } from '@vueuse/core'
+import { useStorage } from "@vueuse/core";
 import {
   ArrowLeft,
   Edit2,
@@ -426,74 +550,91 @@ import {
   Settings,
   Trash2,
   Wrench,
-} from 'lucide-vue-next'
-import { onBeforeMount, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+} from "lucide-vue-next";
+import { onBeforeMount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
-import { fetchModels, healthCheck } from '@/api/backend'
-import CustomButton from '@/components/CustomButton.vue'
-import CustomInput from '@/components/CustomInput.vue'
-import SettingCard from '@/components/SettingCard.vue'
-import SingleSelect from '@/components/SingleSelect.vue'
-import { buildInPrompt, excelBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
-import { optionLists } from '@/utils/common'
-import { localStorageKey } from '@/utils/enum'
-import { getExcelToolDefinitions } from '@/utils/excelTools'
-import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { isExcel, isOutlook, isPowerPoint } from '@/utils/hostDetection'
-import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
-import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
-import { getWordToolDefinitions } from '@/utils/wordTools'
-import { i18n } from '@/i18n'
+import { fetchModels, healthCheck } from "@/api/backend";
+import CustomButton from "@/components/CustomButton.vue";
+import CustomInput from "@/components/CustomInput.vue";
+import SettingCard from "@/components/SettingCard.vue";
+import SingleSelect from "@/components/SingleSelect.vue";
+import {
+  buildInPrompt,
+  excelBuiltInPrompt,
+  outlookBuiltInPrompt,
+  powerPointBuiltInPrompt,
+} from "@/utils/constant";
+import { optionLists } from "@/utils/common";
+import { localStorageKey } from "@/utils/enum";
+import { getExcelToolDefinitions } from "@/utils/excelTools";
+import { getGeneralToolDefinitions } from "@/utils/generalTools";
+import { isExcel, isOutlook, isPowerPoint } from "@/utils/hostDetection";
+import {
+  loadSavedPromptsFromStorage,
+  type SavedPrompt,
+} from "@/utils/savedPrompts";
+import { getOutlookToolDefinitions } from "@/utils/outlookTools";
+import { getPowerPointToolDefinitions } from "@/utils/powerpointTools";
+import { getWordToolDefinitions } from "@/utils/wordTools";
+import { i18n } from "@/i18n";
 
-const { t } = useI18n()
-const router = useRouter()
-const appVersion = __APP_VERSION__
+const { t } = useI18n();
+const router = useRouter();
+const appVersion = __APP_VERSION__;
 
-const currentTab = ref('general')
+const currentTab = ref("general");
 
 // Settings
-const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
-const replyLanguage = useStorage(localStorageKey.replyLanguage, 'Fran\u00e7ais')
-const darkMode = useStorage(localStorageKey.darkMode, false)
-const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
-const AGENT_MAX_ITERATIONS_MIN = 1
-const AGENT_MAX_ITERATIONS_MAX = 100
+const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
+const replyLanguage = useStorage(
+  localStorageKey.replyLanguage,
+  "Fran\u00e7ais",
+);
+const darkMode = useStorage(localStorageKey.darkMode, false);
+const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
+const AGENT_MAX_ITERATIONS_MIN = 1;
+const AGENT_MAX_ITERATIONS_MAX = 100;
 
 function sanitizeAgentMaxIterations(value: unknown): number {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 25
-  const normalized = Math.trunc(parsed)
-  return Math.min(AGENT_MAX_ITERATIONS_MAX, Math.max(AGENT_MAX_ITERATIONS_MIN, normalized))
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 25;
+  const normalized = Math.trunc(parsed);
+  return Math.min(
+    AGENT_MAX_ITERATIONS_MAX,
+    Math.max(AGENT_MAX_ITERATIONS_MIN, normalized),
+  );
 }
-const userGender = useStorage(localStorageKey.userGender, 'unspecified')
-const userFirstName = useStorage(localStorageKey.userFirstName, '')
-const userLastName = useStorage(localStorageKey.userLastName, '')
-const excelFormulaLanguage = useStorage(localStorageKey.excelFormulaLanguage, 'en')
+const userGender = useStorage(localStorageKey.userGender, "unspecified");
+const userFirstName = useStorage(localStorageKey.userFirstName, "");
+const userLastName = useStorage(localStorageKey.userLastName, "");
+const excelFormulaLanguage = useStorage(
+  localStorageKey.excelFormulaLanguage,
+  "en",
+);
 
-const localLanguageOptions = optionLists.localLanguageList
-const replyLanguageOptions = optionLists.replyLanguageList
+const localLanguageOptions = optionLists.localLanguageList;
+const replyLanguageOptions = optionLists.replyLanguageList;
 const excelFormulaLanguageOptions = [
-  { label: t('excelFormulaLanguageEnglish'), value: 'en' },
-  { label: t('excelFormulaLanguageFrench'), value: 'fr' },
-]
+  { label: t("excelFormulaLanguageEnglish"), value: "en" },
+  { label: t("excelFormulaLanguageFrench"), value: "fr" },
+];
 const genderOptions = [
-  { label: t('userGenderUnspecified'), value: 'unspecified' },
-  { label: t('userGenderFemale'), value: 'female' },
-  { label: t('userGenderMale'), value: 'male' },
-  { label: t('userGenderNonBinary'), value: 'nonbinary' },
-]
+  { label: t("userGenderUnspecified"), value: "unspecified" },
+  { label: t("userGenderFemale"), value: "female" },
+  { label: t("userGenderMale"), value: "male" },
+  { label: t("userGenderNonBinary"), value: "nonbinary" },
+];
 
 // Backend
-const backendOnline = ref(false)
-const availableModels = ref<Record<string, ModelInfo>>({})
+const backendOnline = ref(false);
+const availableModels = ref<Record<string, ModelInfo>>({});
 
 // Host detection
-const hostIsExcel = isExcel()
-const hostIsPowerPoint = isPowerPoint()
-const hostIsOutlook = isOutlook()
+const hostIsExcel = isExcel();
+const hostIsPowerPoint = isPowerPoint();
+const hostIsOutlook = isOutlook();
 
 // Tools - switch based on host
 const appToolsList = hostIsOutlook
@@ -502,306 +643,377 @@ const appToolsList = hostIsOutlook
     ? getExcelToolDefinitions()
     : hostIsPowerPoint
       ? getPowerPointToolDefinitions()
-      : getWordToolDefinitions()
-const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
-const enabledTools = ref<Set<string>>(new Set())
-
+      : getWordToolDefinitions();
+const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList];
+const enabledTools = ref<Set<string>>(new Set());
 
 const toolDescriptionKey = hostIsOutlook
-  ? 'outlookToolsDescription'
+  ? "outlookToolsDescription"
   : hostIsExcel
-    ? 'excelToolsDescription'
+    ? "excelToolsDescription"
     : hostIsPowerPoint
-      ? 'powerpointToolsDescription'
-      : 'wordToolsDescription'
+      ? "powerpointToolsDescription"
+      : "wordToolsDescription";
 
 const toolTranslationPrefix = hostIsOutlook
-  ? 'outlookTool'
+  ? "outlookTool"
   : hostIsExcel
-    ? 'excelTool'
+    ? "excelTool"
     : hostIsPowerPoint
-      ? 'powerpointTool'
-      : 'wordTool'
+      ? "powerpointTool"
+      : "wordTool";
 
 // Prompt management
-const savedPrompts = ref<SavedPrompt[]>([])
-const editingPromptId = ref<string>('')
-const editingPrompt = ref<SavedPrompt>({ id: '', name: '', systemPrompt: '', userPrompt: '' })
+const savedPrompts = ref<SavedPrompt[]>([]);
+const editingPromptId = ref<string>("");
+const editingPrompt = ref<SavedPrompt>({
+  id: "",
+  name: "",
+  systemPrompt: "",
+  userPrompt: "",
+});
 
 // Built-in prompts - switch between host apps
-type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'grammar'
-type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
-type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'proofread' | 'visual'
-type OutlookBuiltinPromptKey = 'reply' | 'formalize' | 'concise' | 'proofread' | 'extract'
-type BuiltinPromptKey = WordBuiltinPromptKey | ExcelBuiltinPromptKey | PowerPointBuiltinPromptKey | OutlookBuiltinPromptKey
+type WordBuiltinPromptKey =
+  | "translate"
+  | "polish"
+  | "academic"
+  | "summary"
+  | "grammar";
+type ExcelBuiltinPromptKey =
+  | "analyze"
+  | "chart"
+  | "formula"
+  | "format"
+  | "explain";
+type PowerPointBuiltinPromptKey =
+  | "bullets"
+  | "speakerNotes"
+  | "punchify"
+  | "proofread"
+  | "visual";
+type OutlookBuiltinPromptKey =
+  | "reply"
+  | "formalize"
+  | "concise"
+  | "proofread"
+  | "extract";
+type BuiltinPromptKey =
+  | WordBuiltinPromptKey
+  | ExcelBuiltinPromptKey
+  | PowerPointBuiltinPromptKey
+  | OutlookBuiltinPromptKey;
 
 interface BuiltinPromptConfig {
-  system: (language: string) => string
-  user: (text: string, language: string) => string
+  system: (language: string) => string;
+  user: (text: string, language: string) => string;
 }
 
-const wordBuiltInPromptsData: Record<WordBuiltinPromptKey, BuiltinPromptConfig> = {
+const wordBuiltInPromptsData: Record<
+  WordBuiltinPromptKey,
+  BuiltinPromptConfig
+> = {
   translate: { ...buildInPrompt.translate },
   polish: { ...buildInPrompt.polish },
   academic: { ...buildInPrompt.academic },
   summary: { ...buildInPrompt.summary },
   grammar: { ...buildInPrompt.grammar },
-}
+};
 
-const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig> = {
+const excelBuiltInPromptsData: Record<
+  ExcelBuiltinPromptKey,
+  BuiltinPromptConfig
+> = {
   analyze: { ...excelBuiltInPrompt.analyze },
   chart: { ...excelBuiltInPrompt.chart },
   formula: { ...excelBuiltInPrompt.formula },
   format: { ...excelBuiltInPrompt.format },
   explain: { ...excelBuiltInPrompt.explain },
-}
+};
 
-const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPromptConfig> = {
+const powerPointBuiltInPromptsData: Record<
+  PowerPointBuiltinPromptKey,
+  BuiltinPromptConfig
+> = {
   bullets: { ...powerPointBuiltInPrompt.bullets },
   speakerNotes: { ...powerPointBuiltInPrompt.speakerNotes },
   punchify: { ...powerPointBuiltInPrompt.punchify },
   proofread: { ...powerPointBuiltInPrompt.proofread },
   visual: { ...powerPointBuiltInPrompt.visual },
-}
+};
 
-const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptConfig> = {
+const outlookBuiltInPromptsData: Record<
+  OutlookBuiltinPromptKey,
+  BuiltinPromptConfig
+> = {
   reply: { ...outlookBuiltInPrompt.reply },
   formalize: { ...outlookBuiltInPrompt.formalize },
   concise: { ...outlookBuiltInPrompt.concise },
   proofread: { ...outlookBuiltInPrompt.proofread },
   extract: { ...outlookBuiltInPrompt.extract },
-}
+};
 
-const selectedBuiltInPromptsData: Record<string, BuiltinPromptConfig> = hostIsOutlook
-  ? { ...outlookBuiltInPromptsData }
-  : hostIsExcel
-    ? { ...excelBuiltInPromptsData }
-    : hostIsPowerPoint
-      ? { ...powerPointBuiltInPromptsData }
-      : { ...wordBuiltInPromptsData }
+const selectedBuiltInPromptsData: Record<string, BuiltinPromptConfig> =
+  hostIsOutlook
+    ? { ...outlookBuiltInPromptsData }
+    : hostIsExcel
+      ? { ...excelBuiltInPromptsData }
+      : hostIsPowerPoint
+        ? { ...powerPointBuiltInPromptsData }
+        : { ...wordBuiltInPromptsData };
 
-const selectedOriginalBuiltInPrompts: Record<string, BuiltinPromptConfig> = hostIsOutlook
-  ? { ...outlookBuiltInPrompt }
-  : hostIsExcel
-    ? { ...excelBuiltInPrompt }
-    : hostIsPowerPoint
-      ? { ...powerPointBuiltInPrompt }
-      : { ...buildInPrompt }
+const selectedOriginalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
+  hostIsOutlook
+    ? { ...outlookBuiltInPrompt }
+    : hostIsExcel
+      ? { ...excelBuiltInPrompt }
+      : hostIsPowerPoint
+        ? { ...powerPointBuiltInPrompt }
+        : { ...buildInPrompt };
 
 const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(
   selectedBuiltInPromptsData,
-)
+);
 
-const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('')
-const editingBuiltinPrompt = ref<{ system: string; user: string }>({ system: '', user: '' })
-const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = selectedOriginalBuiltInPrompts
+const editingBuiltinPromptKey = ref<BuiltinPromptKey | "">("");
+const editingBuiltinPrompt = ref<{ system: string; user: string }>({
+  system: "",
+  user: "",
+});
+const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
+  selectedOriginalBuiltInPrompts;
 const builtInPromptsStorageKey = hostIsOutlook
-  ? 'customOutlookBuiltInPrompts'
+  ? "customOutlookBuiltInPrompts"
   : hostIsExcel
-    ? 'customExcelBuiltInPrompts'
+    ? "customExcelBuiltInPrompts"
     : hostIsPowerPoint
-      ? 'customPowerPointBuiltInPrompts'
-      : 'customBuiltInPrompts'
+      ? "customPowerPointBuiltInPrompts"
+      : "customBuiltInPrompts";
 
 const tabs = [
-  { id: 'general', label: 'general', defaultLabel: 'General', icon: Globe },
-  { id: 'prompts', label: 'prompts', defaultLabel: 'Prompts', icon: MessageSquare },
-  { id: 'builtinPrompts', label: 'builtinPrompts', defaultLabel: 'Built-in Prompts', icon: Settings },
-  { id: 'tools', label: 'tools', defaultLabel: 'Tools', icon: Wrench },
-]
+  { id: "general", label: "general", defaultLabel: "General", icon: Globe },
+  {
+    id: "prompts",
+    label: "prompts",
+    defaultLabel: "Prompts",
+    icon: MessageSquare,
+  },
+  {
+    id: "builtinPrompts",
+    label: "builtinPrompts",
+    defaultLabel: "Built-in Prompts",
+    icon: Settings,
+  },
+  { id: "tools", label: "tools", defaultLabel: "Tools", icon: Wrench },
+];
 
 // Watchers
 watch(localLanguage, (val) => {
-  i18n.global.locale.value = val as 'en' | 'fr'
-})
+  i18n.global.locale.value = val as "en" | "fr";
+});
 
-watch(agentMaxIterations, (value) => {
-  const sanitized = sanitizeAgentMaxIterations(value)
-  if (sanitized !== value) {
-    agentMaxIterations.value = sanitized
-  }
-}, { immediate: true })
-
+watch(
+  agentMaxIterations,
+  (value) => {
+    const sanitized = sanitizeAgentMaxIterations(value);
+    if (sanitized !== value) {
+      agentMaxIterations.value = sanitized;
+    }
+  },
+  { immediate: true },
+);
 
 // Prompt management
 function loadPrompts() {
   const defaultPrompts: SavedPrompt[] = [
-    { id: 'default', name: 'Default', systemPrompt: '', userPrompt: '' },
-  ]
-  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts)
+    { id: "default", name: "Default", systemPrompt: "", userPrompt: "" },
+  ];
+  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts);
   if (savedPrompts.value.length === 0) {
-    savedPrompts.value = defaultPrompts
+    savedPrompts.value = defaultPrompts;
   }
-  savePromptsToStorage()
+  savePromptsToStorage();
 }
 
 function savePromptsToStorage() {
-  localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts.value))
+  localStorage.setItem("savedPrompts", JSON.stringify(savedPrompts.value));
 }
 
 function addNewPrompt() {
   const newPrompt: SavedPrompt = {
     id: `prompt_${Date.now()}`,
     name: `Prompt ${savedPrompts.value.length + 1}`,
-    systemPrompt: '',
-    userPrompt: '',
-  }
-  savedPrompts.value.push(newPrompt)
-  savePromptsToStorage()
-  startEditPrompt(newPrompt)
+    systemPrompt: "",
+    userPrompt: "",
+  };
+  savedPrompts.value.push(newPrompt);
+  savePromptsToStorage();
+  startEditPrompt(newPrompt);
 }
 
 function startEditPrompt(prompt: SavedPrompt) {
-  editingPromptId.value = prompt.id
-  editingPrompt.value = { ...prompt }
+  editingPromptId.value = prompt.id;
+  editingPrompt.value = { ...prompt };
 }
 
 function savePromptEdit() {
-  const index = savedPrompts.value.findIndex(p => p.id === editingPromptId.value)
+  const index = savedPrompts.value.findIndex(
+    (p) => p.id === editingPromptId.value,
+  );
   if (index !== -1) {
-    savedPrompts.value[index] = { ...editingPrompt.value }
-    savePromptsToStorage()
+    savedPrompts.value[index] = { ...editingPrompt.value };
+    savePromptsToStorage();
   }
-  editingPromptId.value = ''
+  editingPromptId.value = "";
 }
 
 function cancelEdit() {
-  editingPromptId.value = ''
+  editingPromptId.value = "";
 }
 
 function deletePrompt(id: string) {
-  if (savedPrompts.value.length <= 1) return
-  const index = savedPrompts.value.findIndex(p => p.id === id)
+  if (savedPrompts.value.length <= 1) return;
+  const index = savedPrompts.value.findIndex((p) => p.id === id);
   if (index !== -1) {
-    savedPrompts.value.splice(index, 1)
-    savePromptsToStorage()
+    savedPrompts.value.splice(index, 1);
+    savePromptsToStorage();
   }
 }
 
 // Built-in prompts
 function loadBuiltInPrompts() {
-  const stored = localStorage.getItem(builtInPromptsStorageKey)
+  const stored = localStorage.getItem(builtInPromptsStorageKey);
   if (stored) {
     try {
-      const customPrompts = JSON.parse(stored)
-      Object.keys(customPrompts).forEach(key => {
+      const customPrompts = JSON.parse(stored);
+      Object.keys(customPrompts).forEach((key) => {
         if (builtInPromptsData.value[key]) {
           builtInPromptsData.value[key] = {
-            system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+            system: (language: string) =>
+              customPrompts[key].system.replace(/\$\{language\}/g, language),
             user: (text: string, language: string) =>
-              customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
-          }
+              customPrompts[key].user
+                .replace(/\$\{text\}/g, text)
+                .replace(/\$\{language\}/g, language),
+          };
         }
-      })
+      });
     } catch (error) {
-      console.error('Error loading custom built-in prompts:', error)
+      console.error("Error loading custom built-in prompts:", error);
     }
   }
 }
 
 function saveBuiltInPrompts() {
-  const customPrompts: Record<string, { system: string; user: string }> = {}
-  Object.keys(builtInPromptsData.value).forEach(key => {
+  const customPrompts: Record<string, { system: string; user: string }> = {};
+  Object.keys(builtInPromptsData.value).forEach((key) => {
     customPrompts[key] = {
-      system: builtInPromptsData.value[key].system('${language}'),
-      user: builtInPromptsData.value[key].user('${text}', '${language}'),
-    }
-  })
-  localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts))
+      system: builtInPromptsData.value[key].system("${language}"),
+      user: builtInPromptsData.value[key].user("${text}", "${language}"),
+    };
+  });
+  localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
 }
 
 function toggleEditBuiltinPrompt(key: string) {
   if (editingBuiltinPromptKey.value === key) {
     builtInPromptsData.value[key] = {
-      system: (language: string) => editingBuiltinPrompt.value.system.replace(/\$\{language\}/g, language),
+      system: (language: string) =>
+        editingBuiltinPrompt.value.system.replace(/\$\{language\}/g, language),
       user: (text: string, language: string) =>
-        editingBuiltinPrompt.value.user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
-    }
-    saveBuiltInPrompts()
-    editingBuiltinPromptKey.value = ''
+        editingBuiltinPrompt.value.user
+          .replace(/\$\{text\}/g, text)
+          .replace(/\$\{language\}/g, language),
+    };
+    saveBuiltInPrompts();
+    editingBuiltinPromptKey.value = "";
   } else {
-    editingBuiltinPromptKey.value = key as BuiltinPromptKey
+    editingBuiltinPromptKey.value = key as BuiltinPromptKey;
     editingBuiltinPrompt.value = {
-      system: builtInPromptsData.value[key].system('${language}'),
-      user: builtInPromptsData.value[key].user('${text}', '${language}'),
-    }
+      system: builtInPromptsData.value[key].system("${language}"),
+      user: builtInPromptsData.value[key].user("${text}", "${language}"),
+    };
   }
 }
 
 function isBuiltinPromptModified(key: string): boolean {
-  if (!originalBuiltInPrompts[key]) return false
+  if (!originalBuiltInPrompts[key]) return false;
   const current = {
-    system: builtInPromptsData.value[key].system('English'),
-    user: builtInPromptsData.value[key].user('sample text', 'English'),
-  }
+    system: builtInPromptsData.value[key].system("English"),
+    user: builtInPromptsData.value[key].user("sample text", "English"),
+  };
   const original = {
-    system: originalBuiltInPrompts[key].system('English'),
-    user: originalBuiltInPrompts[key].user('sample text', 'English'),
-  }
-  return current.system !== original.system || current.user !== original.user
+    system: originalBuiltInPrompts[key].system("English"),
+    user: originalBuiltInPrompts[key].user("sample text", "English"),
+  };
+  return current.system !== original.system || current.user !== original.user;
 }
 
 function resetBuiltinPrompt(key: string) {
-  if (!originalBuiltInPrompts[key]) return
-  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] }
-  saveBuiltInPrompts()
+  if (!originalBuiltInPrompts[key]) return;
+  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] };
+  saveBuiltInPrompts();
   if (editingBuiltinPromptKey.value === key) {
-    editingBuiltinPromptKey.value = ''
+    editingBuiltinPromptKey.value = "";
   }
 }
 
-function getSystemPromptPreview(systemFunc: (language: string) => string): string {
-  const full = systemFunc('English')
-  return full.length > 100 ? full.substring(0, 100) + '...' : full
+function getSystemPromptPreview(
+  systemFunc: (language: string) => string,
+): string {
+  const full = systemFunc("English");
+  return full.length > 100 ? full.substring(0, 100) + "..." : full;
 }
 
-function getUserPromptPreview(userFunc: (text: string, language: string) => string): string {
-  const full = userFunc('[selected text]', 'English')
-  return full.length > 100 ? full.substring(0, 100) + '...' : full
+function getUserPromptPreview(
+  userFunc: (text: string, language: string) => string,
+): string {
+  const full = userFunc("[selected text]", "English");
+  return full.length > 100 ? full.substring(0, 100) + "..." : full;
 }
 
 // Tools
 function loadToolPreferences() {
-  const stored = localStorage.getItem('enabledTools')
+  const stored = localStorage.getItem("enabledTools");
   if (stored) {
     try {
-      enabledTools.value = new Set(JSON.parse(stored))
+      enabledTools.value = new Set(JSON.parse(stored));
     } catch {
-      enabledTools.value = new Set(allToolsList.map(t => t.name))
+      enabledTools.value = new Set(allToolsList.map((t) => t.name));
     }
   } else {
-    enabledTools.value = new Set(allToolsList.map(t => t.name))
+    enabledTools.value = new Set(allToolsList.map((t) => t.name));
   }
 }
 
 function toggleTool(toolName: string) {
   if (enabledTools.value.has(toolName)) {
-    enabledTools.value.delete(toolName)
+    enabledTools.value.delete(toolName);
   } else {
-    enabledTools.value.add(toolName)
+    enabledTools.value.add(toolName);
   }
-  localStorage.setItem('enabledTools', JSON.stringify([...enabledTools.value]))
+  localStorage.setItem("enabledTools", JSON.stringify([...enabledTools.value]));
 }
 
 async function checkBackend() {
-  backendOnline.value = await healthCheck()
+  backendOnline.value = await healthCheck();
   if (backendOnline.value) {
     try {
-      availableModels.value = await fetchModels()
+      availableModels.value = await fetchModels();
     } catch {
-      console.error('Failed to fetch models')
+      console.error("Failed to fetch models");
     }
   }
 }
 
 function backToHome() {
-  router.push('/')
+  router.push("/");
 }
 
 onBeforeMount(() => {
-  loadPrompts()
-  loadBuiltInPrompts()
-  loadToolPreferences()
-  checkBackend()
-})
+  loadPrompts();
+  loadBuiltInPrompts();
+  loadToolPreferences();
+  checkBackend();
+});
 </script>
