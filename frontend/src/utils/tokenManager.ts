@@ -51,6 +51,9 @@ export function prepareMessagesForContext(allMessages: ChatRequestMessage[], sys
     }
   }
 
+  // First priority: System prompt (already added)
+  // Second priority: The latest user message and its immediate tool context
+  
   const findLastIndexByRole = (role: ChatRequestMessage['role']): number => {
     for (let index = nonSystemMessages.length - 1; index >= 0; index -= 1) {
       if (nonSystemMessages[index].role === role) return index
@@ -63,17 +66,20 @@ export function prepareMessagesForContext(allMessages: ChatRequestMessage[], sys
     addMessageWithBudget(lastUserIndex, nonSystemMessages[lastUserIndex], true)
   }
 
-  const lastToolIndex = findLastIndexByRole('tool')
-  if (lastToolIndex >= 0) {
-    addMessageWithBudget(lastToolIndex, nonSystemMessages[lastToolIndex], false)
-  }
-
+  // Iterate backwards to add messages, ensuring tool/tool_calls pairs are kept together
   for (let index = nonSystemMessages.length - 1; index >= 0; index -= 1) {
     if (selectedIndices.has(index)) continue
 
     const message = nonSystemMessages[index]
     const messageLength = getMessageContentLength(message)
-    if (messageLength > remainingBudget) break
+    
+    // If it's a tool call or tool response, we try to include the whole block if it fits
+    if (message.role === 'tool' || message.role === 'assistant') {
+      if (messageLength > remainingBudget) break
+    } else {
+      // Normal user messages can break if they exceed budget, or we can truncate them
+      if (messageLength > remainingBudget) break
+    }
 
     selectedMessages.push({ index, message })
     selectedIndices.add(index)
@@ -81,6 +87,22 @@ export function prepareMessagesForContext(allMessages: ChatRequestMessage[], sys
   }
 
   selectedMessages.sort((a, b) => a.index - b.index)
+
+  // Ensure tool_calls logic integrity
+  // If an assistant message has tool_calls, but the subsequent tool messages were pruned,
+  // we should remove those tool_calls from the assistant message to prevent API errors.
+  const finalMessages = selectedMessages.map(entry => entry.message)
+  for (let i = 0; i < finalMessages.length; i++) {
+    const msg = finalMessages[i]
+    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+      // Check if the next messages are the tool responses
+      const hasMatchingTools = finalMessages.slice(i + 1).some(m => m.role === 'tool')
+      if (!hasMatchingTools) {
+        // Strip tool_calls if we pruned the tool responses
+        delete msg.tool_calls
+      }
+    }
+  }
 
   return [systemMessage, ...selectedMessages.map(entry => entry.message)]
 }

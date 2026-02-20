@@ -389,8 +389,8 @@
                 >
                   {{
                     t("builtinPromptsDescription", {
-                      language: "${language}",
-                      text: "${text}",
+                      language: "[LANGUAGE]",
+                      text: "[TEXT]",
                     })
                   }}
                 </p>
@@ -923,19 +923,19 @@ function toggleEditBuiltinPrompt(key: string) {
   if (editingBuiltinPromptKey.value === key) {
     builtInPromptsData.value[key] = {
       system: (language: string) =>
-        editingBuiltinPrompt.value.system.replace(/\$\{language\}/g, language),
+        editingBuiltinPrompt.value.system.replace(/\[LANGUAGE\]/g, language),
       user: (text: string, language: string) =>
         editingBuiltinPrompt.value.user
-          .replace(/\$\{text\}/g, text)
-          .replace(/\$\{language\}/g, language),
+          .replace(/\[TEXT\]/g, text)
+          .replace(/\[LANGUAGE\]/g, language),
     };
     saveBuiltInPrompts();
     editingBuiltinPromptKey.value = "";
   } else {
     editingBuiltinPromptKey.value = key as BuiltinPromptKey;
     editingBuiltinPrompt.value = {
-      system: builtInPromptsData.value[key].system("${language}"),
-      user: builtInPromptsData.value[key].user("${text}", "${language}"),
+      system: builtInPromptsData.value[key].system("[LANGUAGE]"),
+      user: builtInPromptsData.value[key].user("[TEXT]", "[LANGUAGE]"),
     };
   }
 }

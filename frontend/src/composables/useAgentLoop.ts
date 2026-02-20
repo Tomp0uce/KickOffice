@@ -162,15 +162,46 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       currentAction.value = t('agentAnalyzing')
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
-      let response
+      let response: any = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
       try {
-        response = await chatSync({ messages: contextSafeMessages, modelTier, tools, abortSignal: abortController.value?.signal })
+        let streamStarted = false
+        await chatStream({
+          messages: contextSafeMessages,
+          modelTier,
+          tools,
+          abortSignal: abortController.value?.signal,
+          onStream: (text) => {
+            if (!streamStarted) {
+              streamStarted = true
+              currentAction.value = ''
+            }
+            history.value[lastIndex].content = text
+            response.choices[0].message.content = text
+            scrollToBottom().catch(console.error)
+          },
+          onToolCallDelta: (toolCallDeltas) => {
+            if (!streamStarted) {
+              streamStarted = true
+              currentAction.value = ''
+            }
+            for (const delta of toolCallDeltas) {
+              const idx = delta.index
+              if (!response.choices[0].message.tool_calls[idx]) {
+                response.choices[0].message.tool_calls[idx] = { id: delta.id, type: 'function', function: { name: delta.function.name || '', arguments: '' } }
+              }
+              if (delta.function?.arguments) {
+                response.choices[0].message.tool_calls[idx].function.arguments += delta.function.arguments
+              }
+            }
+          }
+        })
+        response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
       } catch (err: any) {
         if (err.name === 'AbortError' || abortController.value?.signal.aborted) {
           abortedByUser = true
           break
         }
-        console.error('[AgentLoop] chatSync failed', {
+        console.error('[AgentLoop] chatStream failed', {
           host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
           modelTier,
           iteration,

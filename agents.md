@@ -28,10 +28,10 @@ KickOffice is a Microsoft Office add-in with:
 
 The frontend follows a composable-based architecture:
 
-- **Pages**: `HomePage.vue` (265 lines, orchestration only), `SettingsPage.vue` (settings UI)
+- **Pages**: `HomePage.vue` (orchestration, history persistence per host), `SettingsPage.vue` (settings UI, feature toggles)
 - **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`)
-- **Composables**: `useAgentLoop.ts` (agent execution loop), `useAgentPrompts.ts` (prompts array generation), `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard)
-- **Utils**: `wordTools.ts` (39 tools), `excelTools.ts` (39 tools), `powerpointTools.ts` (8 tools), `outlookTools.ts` (13 tools), `generalTools.ts` (2 tools), `wordFormatter.ts` (markdown-to-Word), `constant.ts` (built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `toolStorage.ts`, `officeOutlook.ts`, `officeAction.ts`, `tokenManager.ts`, `markdown.ts`
+- **Composables**: `useAgentLoop.ts` (agent execution loop with recursive context gathering and dynamic tool filtering), `useAgentPrompts.ts` (prompts array generation), `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard)
+- **Utils**: `tokenManager.ts` (context pruning and LLM token budget management), `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordFormatter.ts`, `constant.ts` (translation-aware built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `toolStorage.ts`, `officeOutlook.ts`, `officeAction.ts`, `markdown.ts`
 
 ### Backend architecture (post-refactor)
 
@@ -98,8 +98,8 @@ Frontend changes touching image flow must keep support for both payload styles u
 
 ### Chat responses
 
-- Streaming path (`/api/chat`) consumes SSE-like `data:` lines with buffer-based parsing (`backend.ts:131-139`).
-- Sync path (`/api/chat/sync`) expects OpenAI-compatible `choices/message/tool_calls` structures.
+- Streaming path (`/api/chat`) consumes SSE-like `data:` lines with buffer-based parsing (`backend.ts:131-139`). The agent loop primarily relies on streaming (even for tool calls).
+- Sync path (`/api/chat/sync`) expects OpenAI-compatible `choices/message/tool_calls` structures. Reserved for deeply nested sequential synchronous logic if required.
 
 ### Model parameter compatibility
 
@@ -142,6 +142,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - Use `logAndRespond()` from `utils/http.js` for all error responses — never use bare `res.status().json()`.
 - **`buildChatBody` in `config/models.js` is the single source of truth** for request shaping. When changing model parameters, update this function and ensure both streaming and sync paths are tested.
 - **Do not send `reasoning_effort: 'none'` to the API**. Either omit the parameter or use a valid value (`low`, `medium`, `high`).
+- **CI Pipelines**: The `.github/workflows/bump-version.yml` action relies on `permissions: contents: write` to allow the GitHub Actions bot to push version bumps back to the repository. No manual configuration in the repository settings is needed as the workflow file overrides the default read-only token permissions explicitly.
 
 ## 7) Documentation Guidelines
 
@@ -163,14 +164,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 ## 9) Known Issues to Watch For
 
-See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full root-cause analysis and proposed fixes.
-
-| ID     | Severity | Description                                                                                                                                                                                              |
-| ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **H6** | HIGH     | Agent loop exits silently on empty model response. The loading placeholder stays with no error message shown to the user. Fix: add empty-response detection after the `while` loop in `useAgentLoop.ts`. |
-| **M2** | MEDIUM   | Missing global Vue error handler in `main.ts`. Uncaught component errors fail silently.                                                                                                                  |
-| **M3** | MEDIUM   | Accessibility gaps: icon-only quick action buttons have no `aria-label`, chat messages need `aria-live`, backend status needs `role="status"`.                                                           |
-| **M8** | MEDIUM   | Built-in prompts editor in Settings only supports Word and Excel — PowerPoint and Outlook prompts cannot be customized via UI (`SettingsPage.vue:523-558`).                                              |
+For the most up-to-date list of known issues, architectural gaps, and proposed fixes, always refer to the [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) file. This document serves as the single source of truth for technical debt and active blocking issues to prevent information divergence.
 
 ## 10) Validation Checklist Before Commit
 

@@ -17,7 +17,7 @@ function getChatTimeoutMs(modelTier) {
 }
 
 chatRouter.post('/', async (req, res) => {
-  const { messages, modelTier = 'standard', temperature, maxTokens } = req.body
+  const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
   console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat incoming`, {
     modelTier,
     messageCount: Array.isArray(messages) ? messages.length : 0,
@@ -60,6 +60,11 @@ chatRouter.post('/', async (req, res) => {
     }, 'POST /api/chat')
   }
 
+  const parsedTools = validateTools(tools)
+  if (parsedTools.error) {
+    return logAndRespond(res, 400, { error: parsedTools.error }, 'POST /api/chat')
+  }
+
   try {
     const body = buildChatBody({
       modelTier,
@@ -68,6 +73,7 @@ chatRouter.post('/', async (req, res) => {
       temperature,
       maxTokens,
       stream: true,
+      tools: parsedTools.value,
     })
 
     console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat upstream payload`, {

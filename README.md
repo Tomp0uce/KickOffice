@@ -250,6 +250,8 @@ KickOffice/
 - [x] Backend online/offline indicator with auto-reconnect check
 - [x] Image generation mode (UI + backend integration, with auto-selection detection)
 - [x] Dynamic output language matching (AI automatically replies in the language of the selected text for all quick actions)
+- [x] Auto-scrolls to the start of long AI responses for better readability
+- [x] Localized tooltips for quick actions across all hosts
 
 ### Frontend - Agent Mode
 
@@ -318,7 +320,7 @@ KickOffice/
 - [x] Configured models display (read-only)
 - [x] Custom prompts management (add/edit/delete)
 - [x] Built-in prompts editor (with reset)
-- [x] Tool enable/disable toggles
+- [x] Tool enable/disable toggles (with dynamic syncing to the agent loop)
 
 ### Internationalization
 
@@ -360,8 +362,9 @@ See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full details and root-cause analy
 | ------------ | --------------------------------------------------------------------------------------------- | ------- |
 | **CRITICAL** | Chat in Word broken — `reasoning_effort: 'none'` sent with tools causes empty model responses | ❌ TODO |
 | HIGH         | Agent loop exits silently on empty model response (no user-visible error)                     | ❌ TODO |
-| HIGH         | Tool enable/disable toggles in Settings have no effect (dead code)                            | ❌ TODO |
+| HIGH         | Tool enable/disable toggles in Settings have no effect (dead code)                            | ✅ DONE |
 | MEDIUM       | Hardcoded French strings in `useAgentLoop.ts` (should use i18n `t()`)                         | ❌ TODO |
+| MEDIUM       | Developer syntax exposed in built-in prompts settings                                         | ✅ DONE |
 | MEDIUM       | Missing global Vue error handler                                                              | ❌ TODO |
 | MEDIUM       | Accessibility (ARIA attributes) incomplete                                                    | ❌ TODO |
 | MEDIUM       | Built-in prompts editor missing for PowerPoint and Outlook                                    | ❌ TODO |

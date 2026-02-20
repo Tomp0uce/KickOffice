@@ -43,6 +43,7 @@
         :replace-selected-text="t('replaceSelectedText')"
         :append-to-selection="t('appendToSelection')"
         :copy-to-clipboard="t('copyToClipboard')"
+        :thought-process-label="t('thoughtProcess')"
         @insert-message="insertMessageToDocument"
         @copy-message="copyMessageToClipboard"
       />
@@ -156,7 +157,16 @@ const selectedModelTier = useStorage<ModelTier>(
   localStorageKey.modelTier,
   "standard",
 );
-const history = ref<DisplayMessage[]>([]);
+const currentHost = hostIsWord
+  ? "word"
+  : hostIsExcel
+    ? "excel"
+    : hostIsPowerPoint
+      ? "powerpoint"
+      : hostIsOutlook
+        ? "outlook"
+        : "unknown";
+const history = useStorage<DisplayMessage[]>(`chatHistory_${currentHost}`, []);
 const userInput = ref("");
 const loading = ref(false);
 const imageLoading = ref(false);
@@ -202,6 +212,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: Eraser,
     mode: "immediate",
     systemPrompt: "You are a data cleaning expert.",
+    tooltipKey: "excelClean_tooltip",
   },
   {
     key: "beautify",
@@ -209,6 +220,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: Brush,
     mode: "immediate",
     systemPrompt: "You are an Excel formatting expert.",
+    tooltipKey: "excelBeautify_tooltip",
   },
   {
     key: "formula",
@@ -216,6 +228,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: FunctionSquare,
     mode: "draft",
     prefix: "Génère une formule Excel pour : ",
+    tooltipKey: "excelFormula_tooltip",
   },
   {
     key: "transform",
@@ -223,6 +236,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: Wand2,
     mode: "draft",
     prefix: "Transforme la sélection pour : ",
+    tooltipKey: "excelTransform_tooltip",
   },
   {
     key: "highlight",
@@ -230,24 +244,42 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: Eye,
     mode: "draft",
     prefix: "Mets en évidence (couleur) les cellules qui : ",
+    tooltipKey: "excelHighlight_tooltip",
   },
 ]);
 const outlookQuickActions: OutlookQuickAction[] = [
-  { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
+  {
+    key: "proofread",
+    label: t("outlookProofread"),
+    icon: CheckCheck,
+    tooltipKey: "outlookProofread_tooltip",
+  },
   {
     key: "reply",
     label: t("outlookReply"),
     icon: Mail,
     mode: "draft",
     prefix: t("outlookReplyPrePrompt"),
+    tooltipKey: "outlookReply_tooltip",
   },
   {
     key: "translate_formalize",
     label: t("outlookTranslateFormalize"),
     icon: Briefcase,
+    tooltipKey: "outlookTranslateFormalize_tooltip",
   },
-  { key: "concise", label: t("outlookConcise"), icon: Scissors },
-  { key: "extract", label: t("outlookExtract"), icon: ListTodo },
+  {
+    key: "concise",
+    label: t("outlookConcise"),
+    icon: Scissors,
+    tooltipKey: "outlookConcise_tooltip",
+  },
+  {
+    key: "extract",
+    label: t("outlookExtract"),
+    icon: ListTodo,
+    tooltipKey: "outlookExtract_tooltip",
+  },
 ];
 const powerPointQuickActions: PowerPointQuickAction[] = [
   {
@@ -256,16 +288,36 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     icon: CheckCheck,
     mode: "immediate",
     executeWithAgent: true,
+    tooltipKey: "proofread_tooltip",
   },
-  { key: "bullets", label: t("pptBullets"), icon: ListTodo, mode: "immediate" },
+  {
+    key: "bullets",
+    label: t("pptBullets"),
+    icon: ListTodo,
+    mode: "immediate",
+    tooltipKey: "pptBullets_tooltip",
+  },
   {
     key: "speakerNotes",
     label: t("pptSpeakerNotes"),
     icon: MessageSquare,
     mode: "immediate",
+    tooltipKey: "pptSpeakerNotes_tooltip",
   },
-  { key: "punchify", label: t("pptPunchify"), icon: Zap, mode: "immediate" },
-  { key: "visual", label: t("pptVisual"), icon: Image, mode: "draft" },
+  {
+    key: "punchify",
+    label: t("pptPunchify"),
+    icon: Zap,
+    mode: "immediate",
+    tooltipKey: "pptPunchify_tooltip",
+  },
+  {
+    key: "visual",
+    label: t("pptVisual"),
+    icon: Image,
+    mode: "draft",
+    tooltipKey: "pptVisual_tooltip",
+  },
 ];
 
 const quickActions = computed(() =>
@@ -311,8 +363,30 @@ watch(userInput, () => {
 
 async function scrollToBottom() {
   await nextTick();
-  const container = messageListRef.value?.containerEl?.value;
-  if (container) container.scrollTop = container.scrollHeight;
+  const rawContainer = messageListRef.value?.containerEl;
+  const container = ((rawContainer as any)?.value || rawContainer) as
+    | HTMLElement
+    | undefined;
+  if (!container) return;
+
+  const messageElements = container.querySelectorAll(".group");
+  const lastMessage = messageElements[messageElements.length - 1] as
+    | HTMLElement
+    | undefined;
+
+  if (lastMessage) {
+    const msgTop = lastMessage.offsetTop;
+    const padding = 20; // Some top padding
+    // If the message is taller than the container, keep its start visible.
+    // Otherwise, scroll organically to the bottom as it grows.
+    if (lastMessage.offsetHeight > container.clientHeight) {
+      container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
+  } else {
+    container.scrollTop = container.scrollHeight;
+  }
 }
 
 const imageActions = useImageActions(t);
