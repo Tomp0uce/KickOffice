@@ -43,7 +43,7 @@ After a deep verification of the codebase, it is confirmed that the core executi
 2. `useOfficeSelection.ts` (handles extracting text from Word/Excel/PPT/Outlook)
 3. `useAgentLoop.ts` (strictly handles the API fetching and while-loop messaging)
 
-#### H2. LocalStorage serialization conflict for Enabled Tools
+#### H2. LocalStorage serialization conflict for Enabled Tools - FIXED
 
 **Problem**: There is a constant tug-of-war on the `enabledTools` storage format, defeating signature validation.
 **Cause**:
@@ -51,42 +51,35 @@ After a deep verification of the codebase, it is confirmed that the core executi
 - `useAgentLoop.ts` (lines 184-236) uses a robust versioned format to protect against stale tools: `{ version: 1, signature: "toolA|toolB", enabledToolNames: [...] }`.
 - `SettingsPage.vue` (lines 783) simply saves a raw array: `localStorage.setItem('enabledTools', JSON.stringify([...enabledTools.value]))`.
   Whenever the user uses the Settings page, it overwrites the robust object with a raw array. The next time the agent runs, it intercepts the array, transforms it back into the object.
-  **Implementation Strategy**: Extract the LocalStorage management logic from `useAgentLoop.ts` into a dedicated utility (e.g., `src/utils/toolStorage.ts`) and import it in both `useAgentLoop.ts` and `SettingsPage.vue` so they share the exact same saving/loading mechanism.
+  **Implementation Strategy**: Extract the LocalStorage management logic from `useAgentLoop.ts` into a dedicated utility (e.g., `src/utils/toolStorage.ts`) and import it in both `useAgentLoop.ts` and `SettingsPage.vue` so they share the exact same saving/loading mechanism. FIXED.
 
-#### H3. Nginx Proxy Manager (NPM) API Routing Failure
+#### H3. Nginx Proxy Manager (NPM) API Routing Failure - FIXED
 
 **Problem**: When accessing the app via the public HTTPS domain (DuckDNS), the frontend works but Agent interaction fails because calls to `/api/health` or `/api/chat` return `404 Not Found`.
-**Cause**: The Nginx Proxy Manager is correctly forwarding the root domain to the frontend container (Port 80/3002). However, it is not configured to split the traffic. By default, NPM routes `https://kickoffice.duckdns.org/api/...` to the frontend, but the frontend doesn't know what `/api/` is. The backend is running on a different port (Port 3003) and must be explicitly routed.
-**Implementation Strategy**: In the Nginx Proxy Manager UI, go to the proxy host configuration for your domain. Click on the **Custom Locations** tab. Add two new locations:
-
-1. **Location**: `/api/`
-   - **Forward Hostname / IP**: The local LAN IP of the Ubuntu server (or `kickoffice-backend` if using a shared docker network).
-   - **Forward Port**: `3003` (or whatever `BACKEND_PORT` you set).
-2. **Location**: `/health`
-   - **Forward Hostname / IP**: Same backend IP.
-   - **Forward Port**: `3003`.
+**Cause**: The `PUBLIC_BACKEND_URL` in `.env` was mistakenly set to `https://kickoffice.duckdns.org/api` with a trailing `/api`.
+**Implementation Strategy**: Correct the `.env` file to use `https://kickoffice.duckdns.org` without the trailing API suffix. FIXED.
 
 ---
 
 ### MEDIUM — Maintainability & Hardcoding
 
-#### M1. Hardcoded French strings in core logic
+#### M1. Hardcoded French strings in core logic - FIXED
 
 **Problem**: Non-localized strings break the multi-language capability of the app.
 **Cause**: Strings like `'⏳ Analyse de la demande...'` and `'🛑 Processus arrêté par l\'utilisateur.'` are hardcoded directly into the TypeScript logic of `useAgentLoop.ts`.
-**Implementation Strategy**: Replace them with their respective i18n keys: `t('agentAnalyzing')` and `t('agentStoppedByUser')`.
+**Implementation Strategy**: Replace them with their respective i18n keys: `t('agentAnalyzing')` and `t('agentStoppedByUser')`. FIXED.
 
-#### M2. Hardcoded Request Timeout in frontend API
+#### M2. Hardcoded Request Timeout in frontend API - FIXED
 
 **Problem**: The global request timeout is rigidly set to `45_000` (45 seconds).
 **Cause**: `REQUEST_TIMEOUT_MS` is hardcoded in `frontend/src/api/backend.ts`. Depending on the LLM model tier (especially reasoning models), answers can take longer. While the backend has dynamic timeouts, the frontend does not.
-**Implementation Strategy**: Move this to `.env` using `import.meta.env.VITE_REQUEST_TIMEOUT_MS` with a default fallback.
+**Implementation Strategy**: Move this to `.env` using `import.meta.env.VITE_REQUEST_TIMEOUT_MS` with a default fallback. FIXED.
 
-#### M3. Broken App Versioning during Build
+#### M3. Broken App Versioning during Build - FIXED
 
 **Problem**: The app version displayed in the Settings page is permanently stuck at `1.0.0` despite numerous merges.
 **Cause**: The frontend (`vite.config.ts`) attempts to run `git rev-parse --short HEAD` to append the commit hash to the version. However, the Docker build isolates the frontend in a `node:alpine` container _without_ `git` installed, and without access to the root `.git` folder. This causes the Git command to silently fail every time, falling back to the hardcoded `1.0.0` from `package.json`.
-**Implementation Strategy**: create a simple script (e.g. `Makefile`) to extract the git hash into a `.env` variable (`APP_VERSION`) on the host _before_ running `docker-compose up`.
+**Implementation Strategy**: create a simple script (e.g. `Makefile`) to extract the git hash into a `.env` variable (`APP_VERSION`) on the host _before_ running `docker-compose up`. FIXED.
 
 ---
 

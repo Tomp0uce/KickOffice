@@ -8,7 +8,7 @@ import { defineConfig } from 'vite'
 
 function getBuildVersion() {
   const packageVersion = frontendPackage.version
-  const explicitBuildVersion = process.env.VITE_APP_VERSION?.trim()
+  const explicitBuildVersion = process.env.VITE_APP_VERSION?.trim() || process.env.APP_VERSION?.trim()
 
   if (explicitBuildVersion) {
     return explicitBuildVersion

@@ -109,27 +109,7 @@ export function insertIntoPowerPoint(text: string): Promise<void> {
   })
 }
 
-export function insertRichTextIntoPowerPoint(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const html = renderOfficeCommonApiHtml(text)
 
-    try {
-      Office.context.document.setSelectedDataAsync(
-        html,
-        { coercionType: Office.CoercionType.Html },
-        (result: any) => {
-          if (result.status === Office.AsyncResultStatus.Succeeded) {
-            resolve()
-          } else {
-            reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
-          }
-        },
-      )
-    } catch (err: any) {
-      reject(new Error(err?.message || 'setSelectedDataAsync unavailable'))
-    }
-  })
-}
 
 function isPowerPointApiSupported(version: string): boolean {
   try {
@@ -161,7 +141,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   replaceSelectedText: {
     name: 'replaceSelectedText',
     category: 'write',
-    description: 'Replace the currently selected PowerPoint text with new text.',
+    description: 'Replace the currently selected PowerPoint text with new text. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted. If the user asks to format or style text, politely explain this technical limitation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -177,7 +157,7 @@ const powerpointToolDefinitions = createPowerPointTools({
       if (!newText || typeof newText !== 'string') {
         return 'Error: newText is required and must be a string.'
       }
-      await insertRichTextIntoPowerPoint(newText)
+      await insertIntoPowerPoint(newText)
       return 'Successfully replaced selected text in PowerPoint.'
     },
   },
@@ -361,7 +341,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   insertTextBox: {
     name: 'insertTextBox',
     category: 'write',
-    description: 'Insert a text box into a specific slide with optional position and size.',
+    description: 'Insert a text box into a specific slide with optional position and size. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted.',
     inputSchema: {
       type: 'object',
       properties: {
