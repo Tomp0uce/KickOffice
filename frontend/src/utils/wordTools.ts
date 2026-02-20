@@ -1385,7 +1385,7 @@ const wordToolDefinitions = createWordTools({
   addComment: {
     name: 'addComment',
     category: 'write',
-    description: 'Add a review comment to the current selection.',
+    description: 'Add a review comment bubble to the current selection. Use this to suggest changes, provide feedback, or alert the user during proofreading without modifying the original text directly.',
     inputSchema: {
       type: 'object',
       properties: {

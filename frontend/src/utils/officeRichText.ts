@@ -140,6 +140,25 @@ function normalizeListIndentationForPlainText(content: string): string {
     .join('\n')
 }
 
+/**
+ * Strips markdown list markers (-, *, +, 1.) from the beginning of lines
+ * while preserving the hierarchical indentation.
+ * Useful for PowerPoint where shapes often natively apply their own bullet points.
+ */
+export function stripMarkdownListMarkers(content: string): string {
+  return content
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/)
+      if (!match) return line
+
+      const [, leading, itemText] = match
+      const indentLevel = Math.floor(leading.replace(/\t/g, '  ').length / 2)
+      return `${'\t'.repeat(indentLevel)}${itemText}`
+    })
+    .join('\n')
+}
+
 export function renderOfficeRichHtml(content: string): string {
   const withStyleAliases = normalizeNamedStyles(content?.trim() ?? '')
   const withUnderline = normalizeUnderlineMarkdown(withStyleAliases)
@@ -166,7 +185,7 @@ export function renderOfficeCommonApiHtml(content: string): string {
   return styledHtml.trim() || content
 }
 
-export function stripRichFormattingSyntax(content: string): string {
+export function stripRichFormattingSyntax(content: string, stripListMarkers = false): string {
   const withLineBreaks = content
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<\/\s*(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre|ul|ol)\s*>/gi, '\n')
@@ -188,5 +207,5 @@ export function stripRichFormattingSyntax(content: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-  return normalizeListIndentationForPlainText(stripped)
+  return stripListMarkers ? stripMarkdownListMarkers(stripped) : normalizeListIndentationForPlainText(stripped)
 }
