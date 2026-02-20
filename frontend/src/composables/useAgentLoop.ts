@@ -1,7 +1,7 @@
 import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, chatStream, chatSync, generateImage } from '@/api/backend'
-import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -368,24 +368,45 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1500)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     if (selectedExcelQuickAction?.mode === 'draft') {
       userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     if (selectedPowerPointQuickAction?.mode === 'draft') {
       userInput.value = t('pptVisualPrefix')
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
     if (!selectedText) return messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
@@ -407,6 +428,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       systemMsg = action.system(lang)
       userMsg = action.user(selectedText, lang)
     }
+    
+    // Enforce global formatting constraints on all Quick Actions
+    systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
 
     const actionLabel = selectedQuickAction?.label || t(actionKey)
     history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))

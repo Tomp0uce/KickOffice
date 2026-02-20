@@ -14,6 +14,12 @@ export const languageMap: IStringKeyMap = {
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
 }
 
+export const GLOBAL_STYLE_INSTRUCTIONS = `
+CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
+- NEVER use em-dashes (—).
+- NEVER use semicolons (;).
+- Keep the sentence structure natural and highly human-like.`
+
 export const buildInPrompt = {
   translate: {
     system: (language: string) =>
@@ -322,6 +328,8 @@ export const outlookBuiltInPrompt = {
       3. Keep the reply concise and well-structured.
       4. Respond in the exact SAME language as the original email thread.
       5. OUTPUT ONLY the reply text, ready to send. Do not include "Here is your reply" or any meta-commentary.
+      6. Do NOT include a subject line (e.g., "Objet: " or "Subject: "). Start the output directly with the greeting.
+      ${GLOBAL_STYLE_INSTRUCTIONS}
 
       Email thread:
       ${text}`,
