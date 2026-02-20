@@ -111,20 +111,22 @@ export interface ToolChatMessage {
 export type ChatRequestMessage = ChatMessage | ToolChatMessage
 
 export interface ChatStreamOptions {
-  messages: ChatMessage[]
+  messages: ChatRequestMessage[]
   modelTier: ModelTier
+  tools?: ToolDefinition[]
   onStream: (text: string) => void
+  onToolCallDelta?: (toolCallDeltas: any[]) => void
   onFinishReason?: (finishReason: string | null) => void
   abortSignal?: AbortSignal
 }
 
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
-  const { messages, modelTier, onStream, onFinishReason, abortSignal } = options
+  const { messages, modelTier, tools, onStream, onToolCallDelta, onFinishReason, abortSignal } = options
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, modelTier }),
+    body: JSON.stringify({ messages, modelTier, tools }),
     signal: abortSignal,
   })
 
@@ -158,10 +160,13 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
         if (finishReason !== null) {
           onFinishReason?.(finishReason)
         }
-        const delta = parsed.choices?.[0]?.delta?.content
-        if (delta) {
-          fullContent += delta
+        const delta = parsed.choices?.[0]?.delta
+        if (delta?.content) {
+          fullContent += delta.content
           onStream(fullContent)
+        }
+        if (delta?.tool_calls?.length && onToolCallDelta) {
+          onToolCallDelta(delta.tool_calls)
         }
       } catch {
         // Skip malformed JSON lines

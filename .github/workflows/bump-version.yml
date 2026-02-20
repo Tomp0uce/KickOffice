@@ -10,6 +10,8 @@ jobs:
     # Only run if the commit wasn't made by the bot indicating a release bump
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository

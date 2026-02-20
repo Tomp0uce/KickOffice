@@ -5,7 +5,7 @@
     <CustomButton
       v-for="action in quickActions"
       :key="action.key"
-      :title="$t(action.key + '_tooltip')"
+      :title="$t(action.tooltipKey || action.key + '_tooltip')"
       text=""
       :icon="action.icon"
       type="secondary"
