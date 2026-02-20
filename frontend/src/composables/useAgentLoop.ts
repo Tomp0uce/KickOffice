@@ -173,7 +173,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           messageCount: currentMessages.length,
           error: err,
         })
-        throw err
+        history.value[lastIndex].content = `Error: The model or API failed to respond. ${err.message || ''}`
+        currentAction.value = ''
+        break
       }
       const choice = response.choices?.[0]
       if (!choice) break

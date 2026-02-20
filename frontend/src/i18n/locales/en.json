@@ -234,7 +234,7 @@
   "wordTool_applyTaggedFormatting": "Apply Tagged Formatting",
   "wordTool_applyTaggedFormatting_desc": "Convert inline tags (e.g., <format>text</format>) into formatted Word text.",
   "outlookReply": "Smart Reply",
-  "outlookFormalize": "Formalize",
+  "outlookTranslateFormalize": "Form. & Translate",
   "outlookConcise": "Concise",
   "outlookProofread": "Proofread",
   "outlookExtract": "Extract Tasks",
