@@ -698,7 +698,7 @@ type PowerPointBuiltinPromptKey =
   | "visual";
 type OutlookBuiltinPromptKey =
   | "reply"
-  | "formalize"
+  | "translate_formalize"
   | "concise"
   | "proofread"
   | "extract";
@@ -751,7 +751,7 @@ const outlookBuiltInPromptsData: Record<
   BuiltinPromptConfig
 > = {
   reply: { ...outlookBuiltInPrompt.reply },
-  formalize: { ...outlookBuiltInPrompt.formalize },
+  translate_formalize: { ...outlookBuiltInPrompt.translate_formalize },
   concise: { ...outlookBuiltInPrompt.concise },
   proofread: { ...outlookBuiltInPrompt.proofread },
   extract: { ...outlookBuiltInPrompt.extract },

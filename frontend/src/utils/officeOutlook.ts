@@ -13,6 +13,11 @@ interface OutlookBody {
     options: { coercionType: string },
     callback: (result: OfficeAsyncResult) => void,
   ): void
+  setSelectedDataAsync?: (
+    data: string,
+    options: { coercionType: string },
+    callback: (result: OfficeAsyncResult) => void,
+  ) => void
 }
 
 interface OutlookItem {

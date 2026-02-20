@@ -86,12 +86,12 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       try {
         const mailbox = getOutlookMailbox()
         const item = mailbox?.item
-        if (item?.body?.setAsync) {
+        if (item?.body?.setSelectedDataAsync) {
           const htmlBody = renderOfficeCommonApiHtml(normalizedContent)
           await new Promise<void>((resolve, reject) => {
-            item.body.setAsync(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
+            item.body.setSelectedDataAsync!(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
-              else reject(new Error(result.error?.message || 'setAsync failed'))
+              else reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
             })
           })
           messageUtil.success(t('insertedToEmail'))
