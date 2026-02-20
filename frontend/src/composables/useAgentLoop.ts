@@ -411,17 +411,21 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const actionLabel = selectedQuickAction?.label || t(actionKey)
     history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
     history.value.push(createDisplayMessage('assistant', ''))
-    await chatStream({
-      messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-      modelTier: resolveChatModelTier(),
-      onStream: async (text: string) => {
-        const message = history.value[history.value.length - 1]
-        message.role = 'assistant'
-        message.content = text
-        await scrollToBottom()
-      },
-      abortSignal: abortController.value?.signal,
-    })
+    if (selectedQuickAction?.executeWithAgent) {
+      await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
+    } else {
+      await chatStream({
+        messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+        modelTier: resolveChatModelTier(),
+        onStream: async (text: string) => {
+          const message = history.value[history.value.length - 1]
+          message.role = 'assistant'
+          message.content = text
+          await scrollToBottom()
+        },
+        abortSignal: abortController.value?.signal,
+      })
+    }
   }
 
   return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction }

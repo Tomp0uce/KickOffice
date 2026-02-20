@@ -1385,22 +1385,36 @@ const wordToolDefinitions = createWordTools({
   addComment: {
     name: 'addComment',
     category: 'write',
-    description: 'Add a review comment bubble to the current selection. Use this to suggest changes, provide feedback, or alert the user during proofreading without modifying the original text directly.',
+    description: 'Add a review comment bubble to a specific segment within the current selection. Use this to suggest changes, provide feedback, or alert the user during proofreading without modifying the original text directly.',
     inputSchema: {
       type: 'object',
       properties: {
-        text: { type: 'string', description: 'Comment text.' },
+        textSegment: { type: 'string', description: 'The specific word or phrase in the selection that has an error.' },
+        comment: { type: 'string', description: 'The feedback or correction for the text segment.' },
       },
-      required: ['text'],
+      required: ['textSegment', 'comment'],
     },
     executeWord: async (context, args) => {
-      const { text } = args
+      const { textSegment, comment } = args
       
-        const range = context.document.getSelection() as any
-        range.insertComment(text)
-        await context.sync()
-        return 'Successfully added comment'
-      },
+      const range = context.document.getSelection() as any
+      // Perform a search within the selected range
+      const searchResults = range.search(textSegment, { matchCase: false })
+      searchResults.load('items')
+      
+      await context.sync()
+      
+      if (searchResults.items && searchResults.items.length > 0) {
+        // Apply the comment exclusively to the first match within the selection
+        searchResults.items[0].insertComment(comment)
+      } else {
+        // Fallback: apply to entire selection if the specific segment string is somehow not found
+        range.insertComment(`[On: "${textSegment}"]\n${comment}`)
+      }
+      
+      await context.sync()
+      return `Successfully added comment to segment: "${textSegment}"`
+    },
   },
 
   getComments: {
