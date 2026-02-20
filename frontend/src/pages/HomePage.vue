@@ -75,6 +75,7 @@
         :task-type-label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
+        :draft-focus-glow="draftFocusGlow"
         @submit="sendMessage"
         @stop="stopGeneration"
       />
@@ -127,6 +128,7 @@ import type {
   DisplayMessage,
   ExcelQuickAction,
   PowerPointQuickAction,
+  OutlookQuickAction,
   QuickAction,
 } from "@/types/chat";
 import { localStorageKey } from "@/utils/enum";
@@ -147,6 +149,7 @@ const { t } = useI18n();
 const savedPrompts = ref<SavedPrompt[]>([]);
 const selectedPromptId = ref("");
 const customSystemPrompt = ref("");
+const draftFocusGlow = ref(false);
 const backendOnline = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
 const selectedModelTier = useStorage<ModelTier>(
@@ -224,9 +227,15 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     prefix: "Mets en évidence (couleur) les cellules qui : ",
   },
 ]);
-const outlookQuickActions: QuickAction[] = [
+const outlookQuickActions: OutlookQuickAction[] = [
   { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
-  { key: "reply", label: t("outlookReply"), icon: Mail },
+  {
+    key: "reply",
+    label: t("outlookReply"),
+    icon: Mail,
+    mode: "draft",
+    prefix: t("outlookReplyPrePrompt"),
+  },
   {
     key: "translate_formalize",
     label: t("outlookTranslateFormalize"),
@@ -346,8 +355,10 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   hostIsExcel,
   hostIsWord,
   quickActions,
+  outlookQuickActions: computed(() => outlookQuickActions),
   excelQuickActions,
   powerPointQuickActions,
+  draftFocusGlow,
   createDisplayMessage: imageActions.createDisplayMessage,
   adjustTextareaHeight,
   scrollToBottom,
