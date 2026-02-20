@@ -106,7 +106,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
 
     if (hostIsPowerPoint) {
       try {
-        await insertIntoPowerPoint(stripRichFormattingSyntax(normalizedContent))
+        await insertIntoPowerPoint(normalizedContent)
         messageUtil.success(t('insertedToSlide'))
       } catch {
         await copyToClipboard(normalizedContent, true)
