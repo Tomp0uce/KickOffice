@@ -3,31 +3,38 @@
 This document provides operational guidance for AI coding agents working in this repository.
 
 ## 1) Scope
+
 - This guide applies to the whole repository unless a more specific guide exists in a nested directory.
 - Follow system/developer/user instructions first when conflicts occur.
 
 ### Companion documents
-| File | Purpose |
-|------|---------|
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality issues — tracked by severity with proposed fixes |
-| [UX_REVIEW.md](./UX_REVIEW.md) | User experience issues — 21 open items by priority (HIGH/MEDIUM/LOW) |
-| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md) | Tool set audit — current tools per host + proposed additions (PowerPoint gap is priority 1) |
+
+| File                                   | Purpose                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality issues — tracked by severity with proposed fixes       |
+| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — 21 open items by priority (HIGH/MEDIUM/LOW)                        |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions (PowerPoint gap is priority 1) |
 
 ## 2) Product and Architecture Snapshot
+
 KickOffice is a Microsoft Office add-in with:
+
 - `frontend/` (Vue 3 + Vite + TypeScript): task pane UI, chat/agent/image UX, Office.js tool execution.
 - `backend/` (Express, modular): secure proxy for model calls and model configuration exposure.
 - `manifests-templates/`: manifest templates used to generate runtime manifests.
 - `scripts/generate-manifests.js`: script that generates `manifest-office.xml` and `manifest-outlook.xml` from root `.env`.
 
 ### Frontend architecture (post-refactor)
+
 The frontend follows a composable-based architecture:
+
 - **Pages**: `HomePage.vue` (265 lines, orchestration only), `SettingsPage.vue` (settings UI)
 - **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`)
-- **Composables**: `useAgentLoop.ts` (agent execution + prompts), `useImageActions.ts` (image generation + insertion), `useOfficeInsert.ts` (document insertion + clipboard)
-- **Utils**: `wordTools.ts` (39 tools), `excelTools.ts` (39 tools), `powerpointTools.ts` (8 tools), `outlookTools.ts` (13 tools), `generalTools.ts` (2 tools), `wordFormatter.ts` (markdown-to-Word), `constant.ts` (built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `officeOutlook.ts`, `officeAction.ts`, `tokenManager.ts`, `markdown.ts`
+- **Composables**: `useAgentLoop.ts` (agent execution loop), `useAgentPrompts.ts` (prompts array generation), `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard)
+- **Utils**: `wordTools.ts` (39 tools), `excelTools.ts` (39 tools), `powerpointTools.ts` (8 tools), `outlookTools.ts` (13 tools), `generalTools.ts` (2 tools), `wordFormatter.ts` (markdown-to-Word), `constant.ts` (built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `toolStorage.ts`, `officeOutlook.ts`, `officeAction.ts`, `tokenManager.ts`, `markdown.ts`
 
 ### Backend architecture (post-refactor)
+
 ```
 backend/src/
 ├── server.js              # Entry point: middleware setup, route mounting (80 lines)
@@ -47,13 +54,16 @@ backend/src/
 ```
 
 Manifest outputs:
+
 - `manifest-office.xml`: Word + Excel + PowerPoint TaskPane add-in.
 - `manifest-outlook.xml`: Outlook Mail add-in.
 
 Important manifest rule:
+
 - Do not hand-edit generated manifest files when URL/host values change. Update templates and/or `.env`, then regenerate.
 
 Backend API surface:
+
 - `POST /api/chat` (streaming) — uses `buildChatBody` with `stream: true`, no tools
 - `POST /api/chat/sync` (agent tool loop) — uses `buildChatBody` with `stream: false`, tools + tool_choice
 - `POST /api/image`
@@ -61,12 +71,14 @@ Backend API surface:
 - `GET /health`
 
 Operational backend behavior to preserve:
+
 - IP rate limiting is enabled on `/api/chat*` and `/api/image`.
 - Server logs include request logging (`morgan`) and sanitized API error responses.
 - Upstream provider errors are logged server-side; clients receive generic/safe error messages (502).
 - Helmet security headers are enabled (CSP and COEP disabled for Office add-in compatibility).
 
 ## 3) Working Principles
+
 1. **Preserve behavior unless explicitly requested**.
 2. **Prefer minimal, localized diffs** over broad rewrites.
 3. **Keep frontend and backend contracts aligned**.
@@ -76,17 +88,21 @@ Operational backend behavior to preserve:
 ## 4) API Contract Rules (Important)
 
 ### Image responses
+
 Do not assume a single image payload format. Compatible providers may return:
+
 - `data[0].b64_json`
 - `data[0].url`
 
 Frontend changes touching image flow must keep support for both payload styles unless a migration plan says otherwise.
 
 ### Chat responses
+
 - Streaming path (`/api/chat`) consumes SSE-like `data:` lines with buffer-based parsing (`backend.ts:131-139`).
 - Sync path (`/api/chat/sync`) expects OpenAI-compatible `choices/message/tool_calls` structures.
 
 ### Model parameter compatibility
+
 - Keep compatibility with OpenAI-compatible providers that may differ on parameter support.
 - `ChatGPT-*` model IDs do not support `temperature` / token-limit parameters in current backend logic (`isChatGptModel` check).
 - GPT-5 models use `max_completion_tokens` while non-GPT-5 chat models use `max_tokens` (`isGpt5Model` check).
@@ -96,6 +112,7 @@ Frontend changes touching image flow must keep support for both payload styles u
 Any contract change should update both backend and frontend in the same change set.
 
 ## 5) Frontend Editing Guidelines
+
 - Keep type names explicit and stable.
 - Avoid silent failures in user-facing flows; surface understandable errors.
 - Preserve i18n behavior and existing translation keys when possible.
@@ -109,14 +126,14 @@ Any contract change should update both backend and frontend in the same change s
   - Tool definitions are correctly gathered for the current host
 
 Current host/tool landscape (keep in mind for tool/agent changes):
+
 - Word tools: 39 tools (high-count set) + 2 general tools used in agent mode.
 - Excel tools: 39 tools (high-count set) + 2 general tools used in agent mode.
 - PowerPoint tools: 8 tools (focused set for slide editing and speaker notes) + 2 general tools.
 - Outlook tools: 13 tools (mail compose/read helpers) + 2 general tools.
 
-**Known dead code**: The Settings "Tools" tab saves enabled/disabled tool preferences to `localStorage('enabledTools')`, but `useAgentLoop.ts` does not read this value. All tools are always included. If wiring this up, filter tools in `useAgentLoop.ts:151-153` before constructing the tools array.
-
 ## 6) Backend Editing Guidelines
+
 - Keep proxy logic provider-agnostic for OpenAI-compatible endpoints.
 - Log upstream provider errors on the server, but return sanitized client-facing messages (no raw upstream `details`).
 - Do not leak API keys or environment secrets in logs or responses.
@@ -127,6 +144,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **Do not send `reasoning_effort: 'none'` to the API**. Either omit the parameter or use a valid value (`low`, `medium`, `high`).
 
 ## 7) Documentation Guidelines
+
 - **Language**: All documentation files (`.md`) must be written in **English**, not French. This includes `README.md`, `DESIGN_REVIEW.md`, `UX_REVIEW.md`, `SKILLS_AUDIT.md`, `agents.md`, and any future documentation files.
 - When updating `README.md`:
   - Prefer **incremental updates** to existing sections.
@@ -136,6 +154,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
   - **Keep the model tiers table in sync** with `backend/src/config/models.js` and `backend/.env.example`.
 
 ## 8) PowerPoint Agent
+
 - **Persona**: Expert in visual communication and public speaking.
 - **Style**: Concise, punchy, structured (bullet points), slide-oriented.
 - **System prompt basis**: "Tu es un expert en présentations PowerPoint. Ton but est d'aider l'utilisateur à créer des diapositives claires et percutantes. Tu privilégies les listes à puces, les phrases courtes et le style direct. Tu peux aussi rédiger des notes pour l'orateur qui sont, à l'inverse, conversationnelles et engageantes."
@@ -146,17 +165,15 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full root-cause analysis and proposed fixes.
 
-| ID | Severity | Description |
-|----|----------|-------------|
-| **C7** | **CRITICAL** | Chat in Word is broken. `reasoning_effort: 'none'` sent with tools causes empty model responses. Fix: omit `reasoning_effort` when value is `'none'` in `buildChatBody` (`config/models.js:83-85`). |
-| **H6** | HIGH | Agent loop exits silently on empty model response. The loading placeholder stays with no error message shown to the user. Fix: add empty-response detection after the `while` loop in `useAgentLoop.ts`. |
-| **H7** | HIGH | Tool enable/disable toggles in Settings are dead code. `useAgentLoop.ts` ignores `localStorage('enabledTools')` — all tools are always sent. Fix: wire up the filter in `useAgentLoop.ts:151-153` or remove the Settings tab. |
-| **M6** | MEDIUM | Hardcoded French strings in `useAgentLoop.ts:157,204` — should use `t()` i18n keys (`agentAnalyzing`, `agentStoppedByUser`). |
-| **M2** | MEDIUM | Missing global Vue error handler in `main.ts`. Uncaught component errors fail silently. |
-| **M3** | MEDIUM | Accessibility gaps: icon-only quick action buttons have no `aria-label`, chat messages need `aria-live`, backend status needs `role="status"`. |
-| **M8** | MEDIUM | Built-in prompts editor in Settings only supports Word and Excel — PowerPoint and Outlook prompts cannot be customized via UI (`SettingsPage.vue:523-558`). |
+| ID     | Severity | Description                                                                                                                                                                                              |
+| ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **H6** | HIGH     | Agent loop exits silently on empty model response. The loading placeholder stays with no error message shown to the user. Fix: add empty-response detection after the `while` loop in `useAgentLoop.ts`. |
+| **M2** | MEDIUM   | Missing global Vue error handler in `main.ts`. Uncaught component errors fail silently.                                                                                                                  |
+| **M3** | MEDIUM   | Accessibility gaps: icon-only quick action buttons have no `aria-label`, chat messages need `aria-live`, backend status needs `role="status"`.                                                           |
+| **M8** | MEDIUM   | Built-in prompts editor in Settings only supports Word and Excel — PowerPoint and Outlook prompts cannot be customized via UI (`SettingsPage.vue:523-558`).                                              |
 
 ## 10) Validation Checklist Before Commit
+
 - Run at least one relevant build/check command (frontend and/or backend depending on change).
 - Verify touched UI flows if applicable.
 - Ensure changed docs match actual code behavior.
@@ -166,6 +183,7 @@ See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full root-cause analysis and prop
 - If changing tool definitions: verify the tool count stays under `MAX_TOOLS` (default 128).
 
 ## 11) Commit/PR Quality Bar
+
 - Commit title should describe user-facing impact.
 - PR summary should include:
   - what changed,

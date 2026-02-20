@@ -27,21 +27,16 @@ After a deep verification of the codebase, it is confirmed that the core executi
 
 ### HIGH — Architectural Bottleneck & State Conflict
 
-#### H1. `useAgentLoop.ts` is a "God Composable"
+#### H1. `useAgentLoop.ts` is a "God Composable" - FIXED
 
-**Problem**: The file `frontend/src/composables/useAgentLoop.ts` is almost 600 lines long and handles completely distinct business domains.
-**Cause**: When refactoring `HomePage.vue`, logic was simply moved into a single massive composable rather than being divided by responsibility. It currently manages:
+**Problem**: The file `frontend/src/composables/useAgentLoop.ts` was almost 600 lines long and handled completely distinct business domains.
+**Cause**: When refactoring `HomePage.vue`, logic was simply moved into a single massive composable rather than being divided by responsibility. It managed local storage, prompt templates, UI side effects, Office API extractions, and the entire LLM agent loop.
+**Implementation Strategy**: Broken down into focused composables:
 
-- Local storage operations for Tool toggling
-- Prompt generation templates for all four Office hosts
-- UI side-effects (`adjustTextareaHeight`, `scrollToBottom`)
-- MS Office API extractions (`Excel.run`, `Word.run`, `getOutlookMailbox`)
-- The entire LLM Agent stream/sync looping logic
-  **Implementation Strategy**: Break it down into focused composables:
-
-1. `useAgentPrompts.ts` (handles prompt generation logic)
-2. `useOfficeSelection.ts` (handles extracting text from Word/Excel/PPT/Outlook)
-3. `useAgentLoop.ts` (strictly handles the API fetching and while-loop messaging)
+1. `useAgentPrompts.ts` (handles prompt generation logic and context string building)
+2. `useOfficeSelection.ts` (handles extracting text from Word/Excel/PPT/Outlook via native Office DOM APIs)
+3. `useAgentLoop.ts` (strictly handles the AI agent streaming/sync loop and chat UI state)
+   STATUS: FIXED ✅
 
 #### H2. LocalStorage serialization conflict for Enabled Tools - FIXED
 

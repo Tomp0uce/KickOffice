@@ -5,12 +5,13 @@ import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPro
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
-import { getOfficeTextCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointSelection, getPowerPointToolDefinitions } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
 import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
+import { useAgentPrompts } from '@/composables/useAgentPrompts'
+import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickAction } from '@/types/chat'
 
@@ -45,6 +46,7 @@ interface UseAgentLoopOptions {
   hostIsOutlook: boolean
   hostIsPowerPoint: boolean
   hostIsExcel: boolean
+  hostIsWord: boolean
   quickActions: Ref<QuickAction[]>
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: PowerPointQuickAction[]
@@ -78,6 +80,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
+    hostIsWord,
     quickActions,
     excelQuickActions,
     powerPointQuickActions,
@@ -100,75 +103,27 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     }
   }
 
-  const excelFormulaLanguageInstruction = () => excelFormulaLanguage.value === 'fr'
-    ? 'Excel interface locale: French. Use localized French function names and separators when providing formulas, and prefer localized formula tool behavior.'
-    : 'Excel interface locale: English. Use English function names and standard English formula syntax.'
-
-  const userProfilePromptBlock = () => {
-    const firstName = userFirstName.value.trim()
-    const lastName = userLastName.value.trim()
-    const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName')
-    const genderMap: Record<string, string> = {
-      female: t('userGenderFemale'), male: t('userGenderMale'), nonbinary: t('userGenderNonBinary'), unspecified: t('userGenderUnspecified'),
-    }
-    const genderLabel = genderMap[userGender.value] || t('userGenderUnspecified')
-    return `\n\nUser profile context for communications (especially emails):\n- First name: ${firstName || t('userProfileUnknownFirstName')}\n- Last name: ${lastName || t('userProfileUnknownLastName')}\n- Full name: ${fullName}\n- Gender: ${genderLabel}\nUse this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
-  }
-
-  const wordAgentPrompt = (lang: string) => `# Role\nYou are a highly skilled Microsoft Word Expert Agent. Your goal is to assist users in creating, editing, and formatting documents with professional precision.\n\n# Capabilities\n- You can interact with the document directly using provided tools (reading text, applying styles, inserting content, etc.).\n- You understand document structure, typography, and professional writing standards.\n\n# Guidelines\n1. **Tool First**: If a request requires document modification or inspection, prioritize using the available tools.\n2. **Direct Actions**: For Word formatting requests (bold, underline, highlight, size, color, superscript, uppercase, tags like <format>...</format>, etc.), execute the change directly with tools instead of giving manual steps.\n3. **Accuracy**: Ensure formatting and content changes are precise and follow the user's intent.\n4. **Conciseness**: Provide brief, helpful explanations of your actions.\n5. **Language**: You must communicate entirely in ${lang}.\n\n# Safety\nDo not perform destructive actions (like clearing the whole document) unless explicitly instructed.`
-  const excelAgentPrompt = (lang: string) => `# Role\nYou are a highly skilled Microsoft Excel Expert Agent. Your goal is to assist users with data analysis, formulas, charts, formatting, and spreadsheet operations with professional precision.\n\n# Guidelines\n1. **Tool First**\n2. **Read First**\n3. **Accuracy**\n4. **Conciseness**\n5. **Language**: You must communicate entirely in ${lang}.\n6. **Formula locale**: ${excelFormulaLanguageInstruction()}\n7. **Formula duplication**: use fillFormulaDown when applying same formula across rows.`
-  const powerPointAgentPrompt = (lang: string) => `# Role\nYou are a PowerPoint presentation expert.\n# Guidelines\n5. **Language**: You must communicate entirely in ${lang}.`
-  const outlookAgentPrompt = (lang: string) => `# Role\nYou are a highly skilled Microsoft Outlook Email Expert Agent.\n# Guidelines\n4. **Language**: You must communicate entirely in ${lang}.`
-
-  const agentPrompt = (lang: string) => {
-    let base = hostIsOutlook ? outlookAgentPrompt(lang) : hostIsPowerPoint ? powerPointAgentPrompt(lang) : hostIsExcel ? excelAgentPrompt(lang) : wordAgentPrompt(lang)
-    return `${base}${userProfilePromptBlock()}`
-  }
+  const { agentPrompt } = useAgentPrompts({
+    t,
+    userGender,
+    userFirstName,
+    userLastName,
+    excelFormulaLanguage,
+    hostIsOutlook,
+    hostIsPowerPoint,
+    hostIsExcel,
+    hostIsWord,
+  })
 
   function buildChatMessages(systemPrompt: string): ChatMessage[] {
     return [{ role: 'system', content: systemPrompt }, ...history.value.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))]
   }
 
-  const getOutlookMailBody = (): Promise<string> => new Promise((resolve) => {
-    try {
-      const mailbox = getOutlookMailbox()
-      if (!mailbox?.item) return resolve('')
-      mailbox.item.body.getAsync(getOfficeTextCoercionType(), (result: OfficeAsyncResult<string>) => resolve(isOfficeAsyncSucceeded(result.status) ? (result.value || '') : ''))
-    } catch { resolve('') }
+  const { getOfficeSelection } = useOfficeSelection({
+    hostIsOutlook,
+    hostIsPowerPoint,
+    hostIsExcel,
   })
-
-  const getOutlookSelectedText = (): Promise<string> => new Promise((resolve) => {
-    try {
-      const mailbox = getOutlookMailbox()
-      if (!mailbox?.item || typeof mailbox.item.getSelectedDataAsync !== 'function') return resolve('')
-      mailbox.item.getSelectedDataAsync(getOfficeTextCoercionType(), (result: OfficeAsyncResult<{ data?: string }>) => resolve(isOfficeAsyncSucceeded(result.status) && result.value?.data ? result.value.data : ''))
-    } catch { resolve('') }
-  })
-
-  async function getOfficeSelection(options?: { includeOutlookSelectedText?: boolean }): Promise<string> {
-    if (hostIsOutlook) {
-      if (options?.includeOutlookSelectedText) {
-        const selected = await getOutlookSelectedText()
-        if (selected) return selected
-      }
-      return getOutlookMailBody()
-    }
-    if (hostIsPowerPoint) return getPowerPointSelection()
-    if (hostIsExcel) {
-      return Excel.run(async (ctx) => {
-        const range = ctx.workbook.getSelectedRange()
-        range.load('values, address')
-        await ctx.sync()
-        return `[${range.address}]\n${range.values.map((row: any[]) => row.join('\t')).join('\n')}`
-      })
-    }
-    return Word.run(async (ctx) => {
-      const range = ctx.document.getSelection()
-      range.load('text')
-      await ctx.sync()
-      return range.text
-    })
-  }
 
   const resolveChatModelTier = (): ModelTier => (
     selectedModelInfo.value?.type === 'image' ? firstChatModelTier.value : selectedModelTier.value
