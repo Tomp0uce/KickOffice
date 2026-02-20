@@ -42,17 +42,18 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 
 Models are configured **server-side only** (in `backend/.env`). Users cannot add or modify models. Three tiers:
 
-| Tier | Purpose | Default Model | Use Case |
-|------|---------|---------------|----------|
-| `standard` | Normal tasks | `gpt-5.2` | Chat, writing, analysis |
-| `reasoning` | Complex tasks | `gpt-5.2` (`reasoning_effort=high`) | Multi-step reasoning, planning |
-| `image` | Image generation | `gpt-image-1.5` | Generate images |
+| Tier        | Purpose          | Default Model                       | Use Case                       |
+| ----------- | ---------------- | ----------------------------------- | ------------------------------ |
+| `standard`  | Normal tasks     | `gpt-5.2`                           | Chat, writing, analysis        |
+| `reasoning` | Complex tasks    | `gpt-5.2` (`reasoning_effort=high`) | Multi-step reasoning, planning |
+| `image`     | Image generation | `gpt-image-1.5`                     | Generate images                |
 
 ---
 
 ## Deployment (Docker on Synology NAS)
 
 ### Prerequisites
+
 - Synology NAS with Container Manager (Docker)
 - IP: `192.168.50.10` (configurable)
 - OpenAI API key (for testing)
@@ -62,6 +63,7 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 1. **Clone the repository** on the NAS or copy the project to `/volume1/docker/kickoffice/`
 
 2. **Create environment files**:
+
    ```bash
    # Root .env – server IP and ports (used by docker-compose + manifest generation)
    cp .env.example .env
@@ -73,11 +75,14 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    ```
 
 3. **Build and start**:
+
    ```bash
    docker compose up -d --build
    ```
+
    > The `manifest-gen` init service (Node.js) automatically generates two
    > manifests from the templates in `manifests-templates/`:
+   >
    > - `manifest-office.xml` — Word, Excel, PowerPoint (TaskPaneApp)
    > - `manifest-outlook.xml` — Outlook (MailApp)
    >
@@ -85,9 +90,11 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
    > defined in the root `.env`. No manual URL editing is required.
    >
    > Optional cleanup (once generation is done):
+   >
    > ```bash
    > docker compose rm -f manifest-gen
    > ```
+   >
    > This removes the stopped init container from status views; it will be recreated automatically on the next `docker compose up`.
 
 4. **Verify**:
@@ -102,11 +109,11 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 ### Docker Compose Details
 
-| Container | Port | Image | Notes |
-|-----------|------|-------|-------|
-| `kickoffice-manifest-gen` | — | Node 18 Alpine (init) | Generates manifests, then exits (can be removed with `docker compose rm -f manifest-gen`) |
-| `kickoffice-backend` | 3003 | Node 22 Alpine | |
-| `kickoffice-frontend` | 3002 | Nginx Alpine (serving built Vue app) | |
+| Container                 | Port | Image                                | Notes                                                                                     |
+| ------------------------- | ---- | ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `kickoffice-manifest-gen` | —    | Node 18 Alpine (init)                | Generates manifests, then exits (can be removed with `docker compose rm -f manifest-gen`) |
+| `kickoffice-backend`      | 3003 | Node 22 Alpine                       |                                                                                           |
+| `kickoffice-frontend`     | 3002 | Nginx Alpine (serving built Vue app) |                                                                                           |
 
 Both containers use `PUID=1026` / `PGID=100` for Synology compatibility.
 
@@ -163,9 +170,11 @@ KickOffice/
 │       │   ├── SettingSection.vue
 │       │   └── SingleSelect.vue
 │       ├── composables/
-│       │   ├── useAgentLoop.ts    # Agent execution + tool calling + system prompt building
-│       │   ├── useImageActions.ts # Image generation, insertion (Word/PPT), clipboard
-│       │   └── useOfficeInsert.ts # Unified document insertion for all hosts
+│       │   ├── useAgentLoop.ts      # Agent interaction flow and API fetching loop
+│       │   ├── useAgentPrompts.ts   # System prompt builders and user profile context
+│       │   ├── useImageActions.ts   # Image generation, insertion (Word/PPT), clipboard
+│       │   ├── useOfficeInsert.ts   # Unified document insertion for all hosts
+│       │   └── useOfficeSelection.ts# Extraction of text from Word/Excel/PPT/Outlook APIs
 │       ├── i18n/
 │       │   └── locales/
 │       │       ├── en.json   # English UI strings (200+ keys)
@@ -189,6 +198,7 @@ KickOffice/
 │           ├── officeAction.ts       # Office.js error handling wrapper
 │           ├── officeOutlook.ts      # Outlook-specific API helpers
 │           ├── savedPrompts.ts       # Custom prompt management (localStorage)
+│           ├── toolStorage.ts        # LocalStorage enabled tools persistence
 │           ├── tokenManager.ts       # Message token optimization
 │           ├── markdown.ts           # Markdown parsing helpers
 │           ├── common.ts             # Shared option lists
@@ -210,6 +220,7 @@ KickOffice/
 ## Implementation Status
 
 ### Core Infrastructure
+
 - [x] Backend Express server with CORS and JSON parsing
 - [x] LLM API proxy (streaming + synchronous)
 - [x] Image generation proxy endpoint
@@ -225,6 +236,7 @@ KickOffice/
 - [x] Office add-in manifests: TaskPaneApp (Word/Excel/PowerPoint) + MailApp (Outlook)
 
 ### Frontend - Chat Interface
+
 - [x] Chat UI with message history (user/assistant bubbles)
 - [x] Streaming responses (SSE parsing)
 - [x] Model tier selector (dropdown from backend-provided list)
@@ -239,6 +251,7 @@ KickOffice/
 - [x] Image generation mode (UI + backend integration)
 
 ### Frontend - Agent Mode
+
 - [x] Ask mode / Agent mode toggle
 - [x] Agent loop: sends tools to LLM via `/api/chat/sync`, executes locally, loops
 - [x] OpenAI function-calling format for tool definitions
@@ -251,6 +264,7 @@ KickOffice/
 - [x] 2 General tools: getCurrentDate, calculateMath
 
 ### Frontend - Quick Actions (Word)
+
 - [x] Translate (with target language)
 - [x] Polish / Rewrite
 - [x] Academic rewriting
@@ -259,6 +273,7 @@ KickOffice/
 - [x] Customizable built-in prompts (editable in settings)
 
 ### Frontend - Quick Actions (Excel)
+
 - [x] Clean (normalize whitespace, trim, remove duplicates)
 - [x] Beautify (format cell content for readability)
 - [x] Formula (generate an Excel formula from a natural-language description)
@@ -266,6 +281,7 @@ KickOffice/
 - [x] Highlight (suggest conditional formatting rules for the selection)
 
 ### Frontend - Quick Actions (Outlook)
+
 - [x] Smart Reply (pre-fills prompt, user completes intent, sends with email context)
 - [x] Formalize (transforms draft into professional email)
 - [x] Concise (reduces text by 30-50% while keeping key info)
@@ -273,6 +289,7 @@ KickOffice/
 - [x] Extract Tasks (extracts summary, key points, and required actions from email)
 
 ### Frontend - Quick Actions (PowerPoint)
+
 - [x] Bullets (convert selected text to concise bullet-point list)
 - [x] Speaker Notes (generate conversational presenter notes from slide content)
 - [x] Impact / Punchify (rewrite text in punchy headline/marketing style)
@@ -280,6 +297,7 @@ KickOffice/
 - [x] Visual (draft mode: generate an image prompt for slide visuals)
 
 ### Frontend - PowerPoint Support
+
 - [x] PowerPoint host detection (`isPowerPoint()`)
 - [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
 - [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
@@ -290,6 +308,7 @@ KickOffice/
 - [x] PowerPoint-specific built-in prompts (customizable)
 
 ### Frontend - Settings
+
 - [x] UI language selector (French / English)
 - [x] Reply language selector
 - [x] Agent max iterations setting
@@ -301,11 +320,13 @@ KickOffice/
 - [x] Tool enable/disable toggles
 
 ### Internationalization
+
 - [x] i18n framework (vue-i18n)
 - [x] 2 UI locales: English, French
 - [x] 13 reply languages selectable by the user: English, Spanish, French, German, Italian, Portuguese, Simplified Chinese, Japanese, Korean, Dutch, Polish, Arabic, Russian
 
 ### Security
+
 - [x] API keys stored server-side only (never sent to client)
 - [x] CORS restricted to frontend origin
 - [x] No third-party web search or web fetch (removed)
@@ -316,6 +337,7 @@ KickOffice/
 - [x] Request logging / audit trail
 
 ### Frontend - Outlook Support
+
 - [x] Outlook host detection (`isOutlook()`)
 - [x] Manifest extension points: `MessageReadCommandSurface` + `MessageComposeCommandSurface`
 - [x] Asynchronous email body retrieval (`body.getAsync`)
@@ -333,17 +355,18 @@ KickOffice/
 
 See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full details and root-cause analysis.
 
-| Priority | Issue | Status |
-|----------|-------|--------|
+| Priority     | Issue                                                                                         | Status  |
+| ------------ | --------------------------------------------------------------------------------------------- | ------- |
 | **CRITICAL** | Chat in Word broken — `reasoning_effort: 'none'` sent with tools causes empty model responses | ❌ TODO |
-| HIGH | Agent loop exits silently on empty model response (no user-visible error) | ❌ TODO |
-| HIGH | Tool enable/disable toggles in Settings have no effect (dead code) | ❌ TODO |
-| MEDIUM | Hardcoded French strings in `useAgentLoop.ts` (should use i18n `t()`) | ❌ TODO |
-| MEDIUM | Missing global Vue error handler | ❌ TODO |
-| MEDIUM | Accessibility (ARIA attributes) incomplete | ❌ TODO |
-| MEDIUM | Built-in prompts editor missing for PowerPoint and Outlook | ❌ TODO |
+| HIGH         | Agent loop exits silently on empty model response (no user-visible error)                     | ❌ TODO |
+| HIGH         | Tool enable/disable toggles in Settings have no effect (dead code)                            | ❌ TODO |
+| MEDIUM       | Hardcoded French strings in `useAgentLoop.ts` (should use i18n `t()`)                         | ❌ TODO |
+| MEDIUM       | Missing global Vue error handler                                                              | ❌ TODO |
+| MEDIUM       | Accessibility (ARIA attributes) incomplete                                                    | ❌ TODO |
+| MEDIUM       | Built-in prompts editor missing for PowerPoint and Outlook                                    | ❌ TODO |
 
 ### Not Yet Implemented
+
 - [ ] Conversation history persistence (currently in-memory only, lost on page reload)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)
@@ -361,6 +384,7 @@ See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full details and root-cause analy
 ## Development
 
 ### Backend (local)
+
 ```bash
 cd backend
 cp .env.example .env   # Fill in LLM_API_KEY
@@ -369,6 +393,7 @@ npm run dev            # Starts on port 3003 with --watch
 ```
 
 ### Frontend (local)
+
 ```bash
 cd frontend
 npm install
@@ -384,36 +409,38 @@ export APP_VERSION="$(node -p "require('./frontend/package.json').version")+$(gi
 docker compose up -d --build
 ```
 
-
 #### Root (`.env`)
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SERVER_IP` | Host machine IP address | `192.168.50.10` |
-| `FRONTEND_PORT` | Published port for the frontend | `3002` |
-| `BACKEND_PORT` | Published port for the backend | `3003` |
-| `APP_VERSION` | Frontend version shown in Settings (passed as Docker build arg). Set by CI on deploy, e.g. `1.0.0+<short_sha>` | (empty, auto-fallback) |
+
+| Variable        | Description                                                                                                    | Default                |
+| --------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `SERVER_IP`     | Host machine IP address                                                                                        | `192.168.50.10`        |
+| `FRONTEND_PORT` | Published port for the frontend                                                                                | `3002`                 |
+| `BACKEND_PORT`  | Published port for the backend                                                                                 | `3003`                 |
+| `APP_VERSION`   | Frontend version shown in Settings (passed as Docker build arg). Set by CI on deploy, e.g. `1.0.0+<short_sha>` | (empty, auto-fallback) |
 
 #### Backend (`backend/.env`)
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Backend port | `3003` |
-| `FRONTEND_URL` | Allowed CORS origin | `http://192.168.50.10:3002` |
-| `LLM_API_BASE_URL` | OpenAI-compatible API base URL | `https://api.openai.com/v1` |
-| `LLM_API_KEY` | API key for LLM provider | (required) |
-| `MAX_TOOLS` | Max number of tools accepted by `/api/chat/sync` | `128` |
-| `CHAT_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/chat*` (milliseconds) | `60000` |
-| `CHAT_RATE_LIMIT_MAX` | Max requests per IP during chat window | `20` |
-| `IMAGE_RATE_LIMIT_WINDOW_MS` | Rate-limit window for `/api/image` (milliseconds) | `60000` |
-| `IMAGE_RATE_LIMIT_MAX` | Max requests per IP during image window | `5` |
-| `MODEL_STANDARD` | Model ID for standard tasks | `gpt-5.2` |
-| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`low`, `medium`, `high`; omit to use API default) | (omitted) |
-| `MODEL_REASONING` | Model ID for complex tasks | `gpt-5.2` |
-| `MODEL_REASONING_EFFORT` | Reasoning effort for reasoning model | `high` |
-| `MODEL_IMAGE` | Model ID for image generation | `gpt-image-1.5` |
+
+| Variable                          | Description                                                                            | Default                     |
+| --------------------------------- | -------------------------------------------------------------------------------------- | --------------------------- |
+| `PORT`                            | Backend port                                                                           | `3003`                      |
+| `FRONTEND_URL`                    | Allowed CORS origin                                                                    | `http://192.168.50.10:3002` |
+| `LLM_API_BASE_URL`                | OpenAI-compatible API base URL                                                         | `https://api.openai.com/v1` |
+| `LLM_API_KEY`                     | API key for LLM provider                                                               | (required)                  |
+| `MAX_TOOLS`                       | Max number of tools accepted by `/api/chat/sync`                                       | `128`                       |
+| `CHAT_RATE_LIMIT_WINDOW_MS`       | Rate-limit window for `/api/chat*` (milliseconds)                                      | `60000`                     |
+| `CHAT_RATE_LIMIT_MAX`             | Max requests per IP during chat window                                                 | `20`                        |
+| `IMAGE_RATE_LIMIT_WINDOW_MS`      | Rate-limit window for `/api/image` (milliseconds)                                      | `60000`                     |
+| `IMAGE_RATE_LIMIT_MAX`            | Max requests per IP during image window                                                | `5`                         |
+| `MODEL_STANDARD`                  | Model ID for standard tasks                                                            | `gpt-5.2`                   |
+| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`low`, `medium`, `high`; omit to use API default) | (omitted)                   |
+| `MODEL_REASONING`                 | Model ID for complex tasks                                                             | `gpt-5.2`                   |
+| `MODEL_REASONING_EFFORT`          | Reasoning effort for reasoning model                                                   | `high`                      |
+| `MODEL_IMAGE`                     | Model ID for image generation                                                          | `gpt-image-1.5`             |
 
 #### Frontend (`frontend/.env`)
-| Variable | Description | Default |
-|----------|-------------|---------|
+
+| Variable           | Description              | Default                 |
+| ------------------ | ------------------------ | ----------------------- |
 | `VITE_BACKEND_URL` | Backend URL (build-time) | `http://localhost:3003` |
 
 ---
@@ -429,6 +456,7 @@ For production, the architecture stays the same but:
 5. **Auth**: Add authentication middleware to the backend
 
 Update `backend/.env`:
+
 ```env
 LLM_API_BASE_URL=https://your-litellm-proxy.azure.com/v1
 LLM_API_KEY=your-litellm-key
@@ -451,11 +479,13 @@ The following was directly reused or adapted from WordGPT Plus:
 - **i18n framework** — `vue-i18n` integration and locale file structure
 
 Removed from WordGPT Plus for KickOffice:
+
 - Multi-provider LLM support (OpenAI, Azure, Gemini, etc.) → single controlled backend endpoint
 - User-side API key and endpoint configuration → admin-only via `backend/.env`
 - Web search / web fetch features (privacy)
 
 Added or extended for KickOffice:
+
 - Backend Express proxy server (API keys never reach the client)
 - Docker deployment for Synology NAS (PUID/PGID, health check, multi-stage frontend build)
 - Extended from Word-only to Word + Excel + PowerPoint + Outlook
@@ -475,6 +505,7 @@ The following was directly reused or adapted from excel-ai-assistant:
 - **Formula language localization** — concept of detecting the user's configured formula language (`getExcelFormulaLanguage()`, fr/en) to match locale-specific function names
 
 Removed from excel-ai-assistant for KickOffice:
+
 - LangChain dependency entirely → direct OpenAI-compatible API calls
 - Python/server-side Excel bindings → replaced by client-side `Excel.run()` (Office.js)
 - Standalone script architecture → integrated into the unified Office add-in frontend

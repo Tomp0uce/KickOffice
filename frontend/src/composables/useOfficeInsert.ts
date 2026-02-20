@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
-import { insertIntoPowerPoint, insertRichTextIntoPowerPoint } from '@/utils/powerpointTools'
+import { insertIntoPowerPoint } from '@/utils/powerpointTools'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from '@/utils/officeRichText'
 
 const VERBOSE_INSERT_LOG_TAG = '[KO-VERBOSE-INSERT][REMOVE_ME]'
@@ -106,15 +106,10 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
 
     if (hostIsPowerPoint) {
       try {
-        await insertRichTextIntoPowerPoint(normalizedContent)
+        await insertIntoPowerPoint(stripRichFormattingSyntax(normalizedContent))
         messageUtil.success(t('insertedToSlide'))
       } catch {
-        try {
-          await insertIntoPowerPoint(stripRichFormattingSyntax(normalizedContent))
-          messageUtil.success(t('insertedToSlide'))
-        } catch {
-          await copyToClipboard(normalizedContent, true)
-        }
+        await copyToClipboard(normalizedContent, true)
       }
       return
     }
