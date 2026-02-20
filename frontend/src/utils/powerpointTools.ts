@@ -94,13 +94,12 @@ export function getPowerPointSelection(): Promise<string> {
  * Replace the current text selection inside the active PowerPoint shape
  * with the provided text.
  */
-export async function insertIntoPowerPoint(text: string): Promise<void> {
-  const normalizedText = normalizePowerPointListText(text)
-
-  const htmlContent = renderOfficeCommonApiHtml(normalizedText)
+export async function insertIntoPowerPoint(text: string, useHtml = true): Promise<void> {
+  const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const htmlContent = renderOfficeCommonApiHtml(normalizedNewlines)
 
   // Try the Modern API first if available (requires PowerPointApi 1.5+)
-  if (isPowerPointApiSupported('1.5')) {
+  if (isPowerPointApiSupported('1.5') && useHtml) {
     try {
       await executeOfficeAction(async () => {
         await PowerPoint.run(async (context: any) => {
@@ -115,36 +114,45 @@ export async function insertIntoPowerPoint(text: string): Promise<void> {
     }
   }
 
-  // Fallback to the legacy Shared API (destroys shape formatting if raw text)
+  // Fallback to the legacy Shared API
   return new Promise((resolve, reject) => {
     try {
-      Office.context.document.setSelectedDataAsync(
-        htmlContent,
-        { coercionType: Office.CoercionType.Html },
-        (result: any) => {
-          if (result.status === Office.AsyncResultStatus.Succeeded) {
-            resolve()
-          } else {
-            console.warn('setSelectedDataAsync Html failed, falling back to raw Text')
-            // Double fallback for environments completely rejecting HTML insertion
-            Office.context.document.setSelectedDataAsync(
-              normalizedText,
-              { coercionType: Office.CoercionType.Text },
-              (fallbackResult: any) => {
-                if (fallbackResult.status === Office.AsyncResultStatus.Succeeded) {
-                  resolve()
-                } else {
-                  reject(new Error(fallbackResult.error?.message || 'setSelectedDataAsync failed'))
-                }
-              },
-            )
-          }
-        },
-      )
+      if (useHtml) {
+        Office.context.document.setSelectedDataAsync(
+          htmlContent,
+          { coercionType: Office.CoercionType.Html },
+          (result: any) => {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+              resolve()
+            } else {
+              console.warn('setSelectedDataAsync Html failed, falling back to raw Text')
+              fallbackToText(normalizedNewlines, resolve, reject)
+            }
+          },
+        )
+      } else {
+        fallbackToText(normalizedNewlines, resolve, reject)
+      }
     } catch (err: any) {
       reject(new Error(err?.message || 'setSelectedDataAsync unavailable'))
     }
   })
+}
+
+function fallbackToText(text: string, resolve: any, reject: any) {
+  // Pass true to strip list markers so it plays nice with shapes that are already natively bulleted.
+  const fallbackText = stripRichFormattingSyntax(text, true)
+  Office.context.document.setSelectedDataAsync(
+    fallbackText,
+    { coercionType: Office.CoercionType.Text },
+    (fallbackResult: any) => {
+      if (fallbackResult.status === Office.AsyncResultStatus.Succeeded) {
+        resolve()
+      } else {
+        reject(new Error(fallbackResult.error?.message || 'setSelectedDataAsync failed'))
+      }
+    },
+  )
 }
 
 

@@ -199,11 +199,32 @@ const wordQuickActions: QuickAction[] = [
     label: t("proofread"),
     icon: CheckCheck,
     executeWithAgent: true,
+    tooltipKey: "proofread_tooltip",
   },
-  { key: "translate", label: t("translate"), icon: Globe },
-  { key: "polish", label: t("polish"), icon: Sparkle },
-  { key: "academic", label: t("academic"), icon: BookOpen },
-  { key: "summary", label: t("summary"), icon: FileCheck },
+  {
+    key: "translate",
+    label: t("translate"),
+    icon: Globe,
+    tooltipKey: "translate_tooltip",
+  },
+  {
+    key: "polish",
+    label: t("polish"),
+    icon: Sparkle,
+    tooltipKey: "polish_tooltip",
+  },
+  {
+    key: "academic",
+    label: t("academic"),
+    icon: BookOpen,
+    tooltipKey: "academic_tooltip",
+  },
+  {
+    key: "summary",
+    label: t("summary"),
+    icon: FileCheck,
+    tooltipKey: "summary_tooltip",
+  },
 ];
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
@@ -255,18 +276,10 @@ const outlookQuickActions: OutlookQuickAction[] = [
     tooltipKey: "outlookProofread_tooltip",
   },
   {
-    key: "reply",
-    label: t("outlookReply"),
-    icon: Mail,
-    mode: "draft",
-    prefix: t("outlookReplyPrePrompt"),
-    tooltipKey: "outlookReply_tooltip",
-  },
-  {
-    key: "translate_formalize",
-    label: t("outlookTranslateFormalize"),
-    icon: Briefcase,
-    tooltipKey: "outlookTranslateFormalize_tooltip",
+    key: "translate",
+    label: t("translate"),
+    icon: Globe,
+    tooltipKey: "translate_tooltip",
   },
   {
     key: "concise",
@@ -280,6 +293,14 @@ const outlookQuickActions: OutlookQuickAction[] = [
     icon: ListTodo,
     tooltipKey: "outlookExtract_tooltip",
   },
+  {
+    key: "reply",
+    label: t("outlookReply"),
+    icon: Mail,
+    mode: "draft",
+    prefix: t("outlookReplyPrePrompt"),
+    tooltipKey: "outlookReply_tooltip",
+  },
 ];
 const powerPointQuickActions: PowerPointQuickAction[] = [
   {
@@ -291,11 +312,11 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     tooltipKey: "proofread_tooltip",
   },
   {
-    key: "bullets",
-    label: t("pptBullets"),
-    icon: ListTodo,
+    key: "translate",
+    label: t("translate"),
+    icon: Globe,
     mode: "immediate",
-    tooltipKey: "pptBullets_tooltip",
+    tooltipKey: "translate_tooltip",
   },
   {
     key: "speakerNotes",

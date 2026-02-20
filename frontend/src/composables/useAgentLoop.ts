@@ -488,6 +488,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
     } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
     if (!systemMsg || !userMsg) {
+      if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
       if (!action) return
       const lang = replyLanguage.value || 'Français'
       systemMsg = action.system(lang)

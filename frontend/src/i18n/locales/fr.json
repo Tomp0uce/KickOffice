@@ -114,7 +114,7 @@
   "pptVisual_tooltip": "Sélectionnez le texte de la diapositive. L'IA générera un prompt pour illustrer visuellement le concept.",
   "imageError": "Erreur de génération d'image",
   "imageSelectionTooShort": "Veuillez sélectionner au moins 5 mots pour définir le thème de l'image.",
-  "imageGenerationPrompt": "Génère une image pour illustrer les phrases suivantes : \"{text}\"",
+  "imageGenerationPrompt": "Génère une illustration professionnelle, moderne et épurée (style minimaliste ou vectoriel) idéale pour une présentation d'entreprise, représentant le texte suivant : \"{text}\"",
   "imageGenerating": "Génération de l'image en cours...",
   "imageMode": "Mode Image",
   "includeSelectionLabel": "Inclure le texte sélectionné",

@@ -110,7 +110,7 @@
   "pptShrink_tooltip": "Select slide text. The AI will shorten it while keeping the main points.",
   "pptVisual_tooltip": "Select slide text. The AI will generate a prompt to visually illustrate the concept.",
   "imageSelectionTooShort": "Please select at least 5 words to define the image theme.",
-  "imageGenerationPrompt": "Generate an image to illustrate the following sentences: \"{text}\"",
+  "imageGenerationPrompt": "Generate a professional, modern, and clean illustration (minimalist or flat vector style) ideal for a corporate presentation, representing the following text: \"{text}\"",
   "imageGenerating": "Generating image...",
   "imageMode": "Image Mode",
   "includeSelectionLabel": "Include Selected Text",

@@ -13,6 +13,9 @@ This PR addresses multiple UX, UI, and Architectural technical debts:
 - **GitHub Action Permissions**: Granted write permissions to the bump-version GitHub action workflow.
 - **PowerPoint Visual Quick Action automation**: Automatically triggers image model selection and generates images instantly.
 - **Extended PowerPoint Agent Skills**: Added `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, and `getAllSlidesOverview`.
+- **PowerPoint Bullets Rendering**: AI-generated bullet points are now inserted as properly formatted HTML lists to enforce native slide bullets.
+- **Translate Quick Action Unification**: Standardized the "Translate" action across Word, Outlook, and PowerPoint to handle bidirectional FR/EN translation automatically.
+- **Image Generation and Clipboard Fixes**: Refined the visual agent prompts and fixed an issue where copied images failed in environments lacking standard clipboard support.
 
 ## Issue ticket number and link
 

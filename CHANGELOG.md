@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 - **Excel, Outlook, PowerPoint Tooltips**: Added localized definitions for quick action tooltips.
 - **PowerPoint Visual Quick Action automation**: Automatically triggers image model selection and generates images instantly when 5+ words are selected.
 - **Extended PowerPoint Agent Skills**: Added `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, and `getAllSlidesOverview`.
+- **PowerPoint Bullets Rendering**: Fixed an issue where AI-generated bullet points were inserted as raw text. They are now inserted as properly formatted HTML lists to enforce native slide bullets.
+- **Translate Quick Action Unification**: Standardized the "Translate" action across Word, Outlook, and PowerPoint to automatically detect the source language (FR/EN) and translate to the other, sharing the same prompt, icon, tooltip, and menu position.
 
 ### Fixed
 
@@ -19,4 +21,6 @@ All notable changes to this project will be documented in this file.
 - **Chat History Persistence**: Historize conversations locally via `localStorage` (segmented by Office Host) to avoid data loss on taskpane closure.
 - **UI UX translations/texts**: Extracted hardcoded "Thought process" string to `fr.json` & `en.json`.
 - **Developer syntax**: Replaced confusing `${text}` / `${language}` syntax with standardized `[TEXT]` / `[LANGUAGE]` indicators in the built-in prompts editor in settings.
+- **Image Generation Prompts**: Refined prompts to prevent text rejection and improve the corporate presentation aesthetic.
+- **Image Clipboard Fallback**: Fixed an issue where users couldn't copy AI-generated images in environments lacking standard clipboard support (Office Webviews).
 - **GitHub Action Permissions**: Grant write permissions to the bumps-version GitHub action workflow.
