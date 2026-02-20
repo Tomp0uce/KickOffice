@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 
 - **Auto-scroll to beginning of AI response**: Automatically scrolls the chat window so the beginning of the AI response remains in view when generating long messages.
 - **Excel, Outlook, PowerPoint Tooltips**: Added localized definitions for quick action tooltips.
+- **PowerPoint Visual Quick Action automation**: Automatically triggers image model selection and generates images instantly when 5+ words are selected.
+- **Extended PowerPoint Agent Skills**: Added `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, and `getAllSlidesOverview`.
 
 ### Fixed
 

@@ -157,6 +157,11 @@ const selectedModelTier = useStorage<ModelTier>(
   localStorageKey.modelTier,
   "standard",
 );
+const hostIsExcel = isExcel();
+const hostIsWord = isWord();
+const hostIsPowerPoint = isPowerPoint();
+const hostIsOutlook = isOutlook();
+
 const currentHost = hostIsWord
   ? "word"
   : hostIsExcel
@@ -187,11 +192,6 @@ const insertType = ref<insertTypes>("replace");
 
 const chatInputRef = ref<InstanceType<typeof ChatInput>>();
 const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
-
-const hostIsExcel = isExcel();
-const hostIsWord = isWord();
-const hostIsPowerPoint = isPowerPoint();
-const hostIsOutlook = isOutlook();
 
 const wordQuickActions: QuickAction[] = [
   {
@@ -315,7 +315,7 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     key: "visual",
     label: t("pptVisual"),
     icon: Image,
-    mode: "draft",
+    mode: "immediate",
     tooltipKey: "pptVisual_tooltip",
   },
 ];

@@ -11,6 +11,8 @@ This PR addresses multiple UX, UI, and Architectural technical debts:
 - **Auto-scroll**: The chat automatically scrolls to the beginning of the AI response when generating long messages.
 - **Tooltips**: Added missing localized tooltips for Excel, Outlook, and PowerPoint quick actions.
 - **GitHub Action Permissions**: Granted write permissions to the bump-version GitHub action workflow.
+- **PowerPoint Visual Quick Action automation**: Automatically triggers image model selection and generates images instantly.
+- **Extended PowerPoint Agent Skills**: Added `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, and `getAllSlidesOverview`.
 
 ## Issue ticket number and link
 
