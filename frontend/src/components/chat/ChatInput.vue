@@ -26,12 +26,11 @@
       </div>
     </div>
     <div
-      :class="[
-        'relative flex w-full flex-col overflow-hidden rounded-2xl border bg-bg-primary shadow-sm',
-        draftFocusGlow
-          ? 'ring-2 ring-accent animate-pulse transition-all duration-300'
-          : 'border-border focus-within:border-accent',
-      ]"
+      class="card-base flex min-w-12 items-center gap-2 focus-within:border-accent"
+      :class="{
+        'ring-2 ring-accent animate-pulse transition-all duration-300':
+          draftFocusGlow,
+      }"
       :style="
         draftFocusGlow
           ? 'animation-iteration-count: 3; animation-duration: 0.5s;'
