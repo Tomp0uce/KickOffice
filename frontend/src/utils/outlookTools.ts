@@ -1,4 +1,5 @@
 import { executeOfficeAction } from './officeAction'
+import { renderOfficeRichHtml } from './officeRichText'
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -212,9 +213,10 @@ const outlookToolDefinitions = createOutlookTools({
       }
 
       return new Promise<string>((resolve) => {
+        const html = renderOfficeRichHtml(text)
         mailbox.item.body.setSelectedDataAsync(
-          text,
-          { coercionType: getOfficeCoercionType().Text },
+          html,
+          { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
             resolve(resolveAsyncResult(result, () => 'Successfully inserted text at cursor.'))
           },

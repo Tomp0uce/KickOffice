@@ -7,7 +7,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './officeRichText'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers } from './officeRichText'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -53,7 +53,8 @@ export type PowerPointToolName =
  * the target shape is not already configured as a native bullet paragraph.
  */
 export function normalizePowerPointListText(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  return stripMarkdownListMarkers(normalizedNewlines)
 }
 
 /**
@@ -87,10 +88,27 @@ export function getPowerPointSelection(): Promise<string> {
  * Replace the current text selection inside the active PowerPoint shape
  * with the provided text.
  */
-export function insertIntoPowerPoint(text: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const normalizedText = normalizePowerPointListText(text)
+export async function insertIntoPowerPoint(text: string): Promise<void> {
+  const normalizedText = normalizePowerPointListText(text)
 
+  // Try the Modern API first if available (requires PowerPointApi 1.5+)
+  if (isPowerPointApiSupported('1.5')) {
+    try {
+      await executeOfficeAction(async () => {
+        await PowerPoint.run(async (context: any) => {
+          const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
+          textRange.insertText(normalizedText, 'Replace')
+          await context.sync()
+        })
+      })
+      return
+    } catch (e: any) {
+      console.warn('Modern PowerPoint insertion failed, falling back:', e)
+    }
+  }
+
+  // Fallback to the legacy Shared API (destroys shape formatting)
+  return new Promise((resolve, reject) => {
     try {
       Office.context.document.setSelectedDataAsync(
         normalizedText,
