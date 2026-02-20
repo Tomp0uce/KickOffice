@@ -181,11 +181,11 @@ const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
 const wordQuickActions: QuickAction[] = [
+  { key: "proofread", label: t("proofread"), icon: CheckCheck },
   { key: "translate", label: t("translate"), icon: Globe },
   { key: "polish", label: t("polish"), icon: Sparkle },
   { key: "academic", label: t("academic"), icon: BookOpen },
   { key: "summary", label: t("summary"), icon: FileCheck },
-  { key: "grammar", label: t("grammar"), icon: CheckCircle },
 ];
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
@@ -225,6 +225,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   },
 ]);
 const outlookQuickActions: QuickAction[] = [
+  { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
   { key: "reply", label: t("outlookReply"), icon: Mail },
   {
     key: "translate_formalize",
@@ -232,10 +233,15 @@ const outlookQuickActions: QuickAction[] = [
     icon: Briefcase,
   },
   { key: "concise", label: t("outlookConcise"), icon: Scissors },
-  { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
   { key: "extract", label: t("outlookExtract"), icon: ListTodo },
 ];
 const powerPointQuickActions: PowerPointQuickAction[] = [
+  {
+    key: "proofread",
+    label: t("proofread"),
+    icon: CheckCheck,
+    mode: "immediate",
+  },
   { key: "bullets", label: t("pptBullets"), icon: ListTodo, mode: "immediate" },
   {
     key: "speakerNotes",
@@ -244,12 +250,6 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     mode: "immediate",
   },
   { key: "punchify", label: t("pptPunchify"), icon: Zap, mode: "immediate" },
-  {
-    key: "proofread",
-    label: t("grammar"),
-    icon: CheckCheck,
-    mode: "immediate",
-  },
   { key: "visual", label: t("pptVisual"), icon: Image, mode: "draft" },
 ];
 

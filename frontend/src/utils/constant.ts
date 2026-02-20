@@ -85,24 +85,21 @@ export const buildInPrompt = {
       Text: ${text}`,
   },
 
-  grammar: {
+  proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your sole focus is linguistic accuracy, including syntax, morphology, and orthography in ${language}.
-      You must preserve the original text layout and formatting intent by applying the smallest possible edits only.`,
+      `You are a meticulous proofreader. Your primary focus is correcting grammar, spelling, and phrasing in ${language}.
+      CRITICAL INSTRUCTION: You MUST NOT return replacement text directly. You MUST use the \`addComment\` tool to suggest corrections to the user.`,
     user: (text: string, language: string) =>
-      `Task: Check and correct the grammar of the following text.
+      `Task: Check and correct the grammar of the following text using the \`addComment\` tool.
       Focus:
-      - Fix all spelling and punctuation errors.
-      - Correct subject-verb agreement and tense inconsistencies.
+      - Fix all spelling, punctuation, syntax, and agreement errors.
       - Ensure proper sentence structure.
-      - Apply a minimum-edit strategy: modify only the smallest necessary unit (character, punctuation mark, or minimal token fragment).
-      - Never rewrite full sentences/paragraphs when a local micro-edit is sufficient.
-      - Example: if only a plural marker is missing, add only that marker.
-      - Example: if "était" must become "étaient", prefer changing the minimal ending segment rather than rewriting surrounding words.
       Constraints:
-      1. If the text is already perfect, respond exactly with: "No grammatical issues found."
-      2. Otherwise, provide ONLY the corrected text with minimal localized edits and without explaining the changes.
-      3. Respond in ${language}.
+      1. Review the provided text carefully.
+      2. For each error found, identify the specific text segment and use the \`addComment\` tool to explain the error and provide the correction (e.g., "Change 'était' to 'étaient'").
+      3. If the text is already perfect, respond exactly with: "No grammatical issues found."
+      4. Do NOT output a fully rewritten text block. Your ONLY output mechanism for corrections is the \`addComment\` tool.
+      5. Respond in ${language}.
 
       Text: ${text}`,
   },
@@ -248,7 +245,8 @@ export const powerPointBuiltInPrompt = {
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos in ${language} without altering the slide structure.`,
+      `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos in ${language} without altering the slide structure.
+      Because PowerPoint doesn't support comments via API, you MUST return the corrected text directly so it can replace the user's selection.`,
     user: (text: string, language: string) =>
       `Task: Correct the grammar and spelling of the following slide content.
       Critical Rules:
@@ -258,7 +256,7 @@ export const powerPointBuiltInPrompt = {
       - DO NOT shorten or rewrite the style, only fix errors.
       Constraints:
       1. If the text is error-free, respond strictly with: "No corrections needed."
-      2. Otherwise, provide ONLY the corrected text.
+      2. Otherwise, provide ONLY the fully corrected text block, ready to replace the original.
       3. Respond in ${language}.
 
       Text: ${text}`,

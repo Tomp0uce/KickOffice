@@ -92,7 +92,12 @@
   "agentActionRunning": "🛠️ Running tool...",
   "agentActionReading": "📖 Reading document...",
   "agentActionFormatting": "🎨 Formatting text...",
-  "grammar": "Grammar",
+  "proofread": "Proofreading",
+  "proofread_tooltip": "Select text first. The AI will proofread for grammar, spelling, agreements, structure, and provide suggestions via comments.",
+  "translate_tooltip": "Select text first. The AI will translate the text into the configured language.",
+  "polish_tooltip": "Select text first. The AI will polish and refine the tone of your text.",
+  "academic_tooltip": "Select text first. The AI will rewrite your text to meet academic standards.",
+  "summary_tooltip": "Select text first. The AI will generate a concise summary of the selected text.",
   "imageError": "Image generation error",
   "imageGenerating": "Generating image...",
   "imageMode": "Image Mode",
@@ -331,6 +336,5 @@
   "outlookTool_insertHtmlAtCursor_desc": "Insert formatted HTML at the current cursor position.",
   "imageClipboardNotSupported": "Unable to copy the image: clipboard image writing is not supported in this environment.",
   "imageInsertExcelNotSupported": "Image insertion is not supported in Excel add-ins. Please use Word or PowerPoint.",
-  "appVersion": "Application Version",
-  "proofread": "Proofread"
+  "appVersion": "Application Version"
 }
