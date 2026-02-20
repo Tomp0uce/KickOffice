@@ -47,6 +47,12 @@ export type PowerPointToolName =
   | 'setSlideNotes'
   | 'insertTextBox'
   | 'insertImage'
+  | 'deleteSlide'
+  | 'getShapes'
+  | 'deleteShape'
+  | 'setShapeFill'
+  | 'moveResizeShape'
+  | 'getAllSlidesOverview'
 
 /**
  * Keep list markers in plain text to preserve bullets/numbered lists when
@@ -481,6 +487,251 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         return `Successfully inserted an image on slide ${slideNumber}.`
       },
+  },
+
+  deleteSlide: {
+    name: 'deleteSlide',
+    category: 'write',
+    description: 'Delete a specific slide by its 1-based index.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+      },
+      required: ['slideNumber'],
+    },
+    executePowerPoint: async (context: any, args) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      slides.getItemAt(index).delete()
+      await context.sync()
+      return `Successfully deleted slide ${slideNumber}.`
+    },
+  },
+
+  getShapes: {
+    name: 'getShapes',
+    category: 'read',
+    description: 'Get all shapes on a specific slide (1-based index) with their properties (type, text, position).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+      },
+      required: ['slideNumber'],
+    },
+    executePowerPoint: async (context: any, args) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+
+      const slide = slides.getItemAt(index)
+      const shapes = slide.shapes
+      shapes.load('items')
+      await context.sync()
+
+      for (let i = 0; i < shapes.items.length; i++) {
+        const shape = shapes.items[i]
+        try { shape.textFrame.textRange.load('text') } catch {}
+        try { shape.load(['id', 'name', 'type', 'left', 'top', 'width', 'height']) } catch {}
+      }
+      await context.sync()
+
+      const details = shapes.items.map((shape: any) => {
+        let text = ''
+        try { text = shape.textFrame.textRange.text } catch {}
+        return {
+          id: shape.id,
+          name: shape.name,
+          type: shape.type,
+          left: shape.left,
+          top: shape.top,
+          width: shape.width,
+          height: shape.height,
+          text: text.trim()
+        }
+      })
+      return JSON.stringify(details, null, 2)
+    },
+  },
+
+  deleteShape: {
+    name: 'deleteShape',
+    category: 'write',
+    description: 'Delete a shape from a slide by its ID or Name.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape to delete.' },
+      },
+      required: ['slideNumber', 'shapeIdOrName'],
+    },
+    executePowerPoint: async (context: any, args) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      const shapeIdOrName = String(args.shapeIdOrName ?? '')
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      if (!shapeIdOrName) return 'Error: shapeIdOrName is required.'
+
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+
+      const slide = slides.getItemAt(index)
+      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
+      shape.load('isNullObject')
+      await context.sync()
+
+      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`
+
+      shape.delete()
+      await context.sync()
+      return `Successfully deleted shape '${shapeIdOrName}' from slide ${slideNumber}.`
+    },
+  },
+
+  setShapeFill: {
+    name: 'setShapeFill',
+    category: 'write',
+    description: 'Set the fill color of a shape on a slide.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape.' },
+        color: { type: 'string', description: 'Hex color code (e.g., "#FF0000").' },
+      },
+      required: ['slideNumber', 'shapeIdOrName', 'color'],
+    },
+    executePowerPoint: async (context: any, args) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      const shapeIdOrName = String(args.shapeIdOrName ?? '')
+      const color = String(args.color ?? '')
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      if (!shapeIdOrName || !color) return 'Error: shapeIdOrName and color are required.'
+
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+
+      const slide = slides.getItemAt(index)
+      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
+      shape.load('isNullObject')
+      await context.sync()
+
+      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found.`
+
+      shape.fill.setSolidColor(color)
+      await context.sync()
+      return `Successfully set fill color of shape '${shapeIdOrName}' to ${color}.`
+    },
+  },
+
+  moveResizeShape: {
+    name: 'moveResizeShape',
+    category: 'write',
+    description: 'Move and/or resize a shape on a slide. Missing measurements will be left unchanged.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape.' },
+        left: { type: 'number', description: 'New left position in points.' },
+        top: { type: 'number', description: 'New top position in points.' },
+        width: { type: 'number', description: 'New width in points.' },
+        height: { type: 'number', description: 'New height in points.' },
+      },
+      required: ['slideNumber', 'shapeIdOrName'],
+    },
+    executePowerPoint: async (context: any, args) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      const shapeIdOrName = String(args.shapeIdOrName ?? '')
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      if (!shapeIdOrName) return 'Error: shapeIdOrName is required.'
+
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+
+      const slide = slides.getItemAt(index)
+      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
+      shape.load('isNullObject')
+      await context.sync()
+
+      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found.`
+
+      if (Number.isFinite(args.left)) shape.left = Number(args.left)
+      if (Number.isFinite(args.top)) shape.top = Number(args.top)
+      if (Number.isFinite(args.width)) shape.width = Number(args.width)
+      if (Number.isFinite(args.height)) shape.height = Number(args.height)
+
+      await context.sync()
+      return `Successfully moved/resized shape '${shapeIdOrName}'.`
+    },
+  },
+
+  getAllSlidesOverview: {
+    name: 'getAllSlidesOverview',
+    category: 'read',
+    description: 'Get a text overview of all slides in the presentation (useful to understand the presentation structure).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    executePowerPoint: async (context: any) => {
+      ensurePowerPointRunAvailable()
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+
+      const overview: string[] = []
+      for (let i = 0; i < slides.items.length; i++) {
+        const slide = slides.items[i]
+        slide.load(['id', 'layout'])
+        const shapes = slide.shapes
+        shapes.load('items')
+        await context.sync()
+
+        for (let j = 0; j < shapes.items.length; j++) {
+          const shape = shapes.items[j]
+          try { shape.textFrame.textRange.load('text') } catch {}
+        }
+        await context.sync()
+
+        const lines = shapes.items.map((s: any) => {
+          let text = ''
+          try { text = s.textFrame.textRange.text } catch {}
+          return text.trim()
+        }).filter(Boolean)
+
+        let slideText = lines.join(' | ')
+        if (slideText.length > 100) slideText = slideText.substring(0, 100) + '...'
+
+        overview.push(`Slide ${i + 1} (Layout: ${slide?.layout || 'unknown'}): ${slideText || '<No Text>'}`)
+      }
+      return overview.join('\n')
+    },
   },
 })
 

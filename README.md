@@ -192,7 +192,7 @@ KickOffice/
 │           ├── excelTools.ts         # 39 Excel API tools (for agent)
 │           ├── hostDetection.ts      # isWord, isExcel, isPowerPoint, isOutlook
 │           ├── outlookTools.ts       # 13 Outlook API tools (for agent)
-│           ├── powerpointTools.ts    # 8 PowerPoint tools (slides, shapes, notes)
+│           ├── powerpointTools.ts    # 14 PowerPoint tools (slides, shapes, notes, modify)
 │           ├── wordFormatter.ts      # Markdown-to-Word conversion engine
 │           ├── wordTools.ts          # 39 Word API tools (for agent)
 │           ├── officeAction.ts       # Office.js error handling wrapper
@@ -262,7 +262,7 @@ KickOffice/
 - [x] Max iterations limit (configurable)
 - [x] 39 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak
 - [x] 39 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules
-- [x] 8 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage
+- [x] 14 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage, deleteSlide, getShapes, deleteShape, setShapeFill, moveResizeShape, getAllSlidesOverview
 - [x] 13 Outlook tools: getEmailBody, getSelectedText, setEmailBody, insertTextAtCursor, setEmailBodyHtml, getEmailSubject, setEmailSubject, getEmailRecipients, addRecipient, getEmailSender, getEmailDate, getAttachments, insertHtmlAtCursor
 - [x] 2 General tools: getCurrentDate, calculateMath
 
@@ -305,7 +305,7 @@ KickOffice/
 - [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
 - [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
 - [x] Text insertion via Common API (`setSelectedDataAsync` with `CoercionType.Html` to preserve bullets/formatting)
-- [x] 8 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`)
+- [x] 14 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`, `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview`)
 - [x] Requirement-set-aware behavior (`PowerPointApi 1.4+` check for speaker notes)
 - [x] PowerPoint-specific agent prompt (slide-first, concise, visual-oriented)
 - [x] PowerPoint-specific built-in prompts (customizable)

@@ -11,12 +11,12 @@
 
 ## 1. L'état actuel des compétences de KickOffice
 
-| Application    | Outils Actuels                                       | Manques Immédiats (API Office.js)                                                                  |
-| -------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Word**       | 37 outils (Formats, Styles, R/W complet, navigation) | Application de styles personnalisés, génération de la hiérarchie TDM.                              |
-| **Excel**      | 39 outils (R/W Plages, Formatting, Filtres, Charts)  | Outils de suppression de plages, lecture des propriétés de charts.                                 |
-| **PowerPoint** | 8 outils (Lecture texte, notes, insert basic)        | **Carence Critique** : Modification/suppression de slides et de formes, lecture des notes, design. |
-| **Outlook**    | 13 outils (R/W basique du compose/read)              | Attachement de fichiers dynamique, extraction de la priorité / importance.                         |
+| Application    | Outils Actuels                                       | Manques Immédiats (API Office.js)                                          |
+| -------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Word**       | 37 outils (Formats, Styles, R/W complet, navigation) | Application de styles personnalisés, génération de la hiérarchie TDM.      |
+| **Excel**      | 39 outils (R/W Plages, Formatting, Filtres, Charts)  | Outils de suppression de plages, lecture des propriétés de charts.         |
+| **PowerPoint** | 14 outils (Slides, Shapes, Notes, Insert, Modifs)    | ---                                                                        |
+| **Outlook**    | 13 outils (R/W basique du compose/read)              | Attachement de fichiers dynamique, extraction de la priorité / importance. |
 
 ---
 
@@ -50,10 +50,10 @@ Fournit une suite massive pour Word, PPT et Excel :
 
 Sur la base de cet audit (état Office.js + analyse repos), voici les Skills à implémenter par criticité et retour utilisateur potentiel :
 
-### PRIORITÉ 1 : Combler la dette PowerPoint (Office.js pur)
+### PRIORITÉ 1 : Combler la dette PowerPoint (Office.js pur) — ✅ Terminé
 
-- `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview`.
-- _Objectif_ : Donner enfin à l'agent un véritable panel de maniabilité sur PPT.
+- `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview` ont été intégrés.
+- _Objectif Atteint_ : L'agent dispose maintenant d'un véritable panel de maniabilité sur PPT.
 
 ### PRIORITÉ 2 : S'inspirer de Redink pour l'aspect de Sécurité (Corporate)
 

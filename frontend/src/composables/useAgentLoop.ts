@@ -388,7 +388,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       let fullMessage = displayMessageText
 
       // Only append context to standard text chats, not pure image generations
-      if (selectedText && !isImageFromSelection) {
+      if (isImageFromSelection) {
+        fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
+      } else if (selectedText && !isImageFromSelection) {
         const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
         fullMessage = `${userMessage}
 
@@ -423,6 +425,26 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
     const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
 
+    if (actionKey === 'visual' && hostIsPowerPoint) {
+      const imageModelTier = Object.entries(availableModels.value).find(([_, info]) => info.type === 'image')?.[0] as ModelTier
+      if (!imageModelTier) {
+        return messageUtil.error(t('imageError') || 'No image model configured.')
+      }
+
+      // Clear input so `sendMessage` detects `isImageFromSelection = true`
+      userInput.value = ''
+      adjustTextareaHeight()
+
+      const previousModelTier = selectedModelTier.value
+      selectedModelTier.value = imageModelTier
+      try {
+        await sendMessage()
+      } finally {
+        selectedModelTier.value = previousModelTier
+      }
+      return
+    }
+
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || ''
       adjustTextareaHeight()
@@ -439,20 +461,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
     if (selectedExcelQuickAction?.mode === 'draft') {
       userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight()
-      draftFocusGlow.value = true
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
-      await nextTick()
-      const el = inputTextarea.value
-      if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
-      }
-      return
-    }
-    if (selectedPowerPointQuickAction?.mode === 'draft') {
-      userInput.value = t('pptVisualPrefix')
       adjustTextareaHeight()
       draftFocusGlow.value = true
       setTimeout(() => { draftFocusGlow.value = false; }, 1000)
