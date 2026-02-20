@@ -190,3 +190,18 @@ See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full root-cause analysis and prop
   - why it changed,
   - how it was validated,
   - any compatibility notes.
+
+## 12) Pull Request Workflow
+
+When the user asks to create a Pull Request, **always follow this exact sequence**:
+
+1. **Update `README.md`**: Add the newly developed features directly to the README. Be concise, list the features clearly, and avoid detailing the underlying code implementation.
+2. **Stage & Commit**:
+   - Use `git add .` to stage changes.
+   - Use `git commit -m "feat: your concise commit message"`
+   - **Important**: If chaining commands, use PowerShell syntax `;` (e.g., `git add .; git commit -m "..."`), NOT `&&`.
+3. **Push to Remote**: `git push origin <branch_name>`
+4. **Draft the PR**:
+   - Create a temporary markdown file (e.g., `.github/pr_body.md`) containing the detailed PR body outlining the changes. This avoids multi-line string escaping errors in PowerShell.
+   - Run the GitHub CLI command: `gh pr create --title "feat: Your PR Title" --body-file .github/pr_body.md`
+5. **Notify the User**: Confirm the PR creation and provide the generated link.

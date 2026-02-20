@@ -248,7 +248,8 @@ KickOffice/
 - [x] Word formatting toggle (markdown-to-Word conversion)
 - [x] `<think>` tag parsing (collapsible reasoning display)
 - [x] Backend online/offline indicator with auto-reconnect check
-- [x] Image generation mode (UI + backend integration)
+- [x] Image generation mode (UI + backend integration, with auto-selection detection)
+- [x] Dynamic output language matching (AI automatically replies in the language of the selected text for all quick actions)
 
 ### Frontend - Agent Mode
 
@@ -301,7 +302,7 @@ KickOffice/
 - [x] PowerPoint host detection (`isPowerPoint()`)
 - [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
 - [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
-- [x] Text insertion via Common API (`setSelectedDataAsync`)
+- [x] Text insertion via Common API (`setSelectedDataAsync` with `CoercionType.Html` to preserve bullets/formatting)
 - [x] 8 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`)
 - [x] Requirement-set-aware behavior (`PowerPointApi 1.4+` check for speaker notes)
 - [x] PowerPoint-specific agent prompt (slide-first, concise, visual-oriented)
