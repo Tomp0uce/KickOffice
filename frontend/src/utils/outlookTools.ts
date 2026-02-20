@@ -365,9 +365,9 @@ const outlookToolDefinitions = createOutlookTools({
           description: 'Recipient field to update (to, cc, bcc). Defaults to to.',
         },
         recipients: {
-          type: ['array', 'string', 'object'] as any,
+          type: 'string',
           description:
-            'Recipient(s) to add. Accepts email string, comma-separated string, object {displayName,emailAddress}, or array of these.',
+            'Recipient(s) to add. Provide a single email address or a comma-separated list of emails.',
         },
       },
       required: ['recipients'],
