@@ -313,7 +313,8 @@ export const getPowerPointBuiltInPrompt = () => {
 export const outlookBuiltInPrompt = {
   reply: {
     system: (language: string) =>
-      `You are an expert email assistant. Your task is to draft professional, context-aware email replies in ${language}.
+      `You are an expert email assistant. Your task is to draft professional, context-aware email replies.
+      CRITICAL: Analyze the language of the provided email thread. You MUST write your reply in the exact SAME language as the original email. Disregard any other interface language preferences.
       Maintain a courteous and professional tone, address all points raised in the original email, and keep the reply concise.`,
     user: (text: string, language: string) =>
       `Task: Draft a professional reply to the following email thread.
@@ -321,25 +322,30 @@ export const outlookBuiltInPrompt = {
       1. Address all key points raised in the original email.
       2. Use a courteous, professional tone appropriate for business communication.
       3. Keep the reply concise and well-structured.
-      4. Respond in ${language}.
+      4. Respond in the exact SAME language as the original email thread.
       5. OUTPUT ONLY the reply text, ready to send. Do not include "Here is your reply" or any meta-commentary.
 
       Email thread:
       ${text}`,
   },
 
-  formalize: {
+  translate_formalize: {
     system: (language: string) =>
-      `You are a professional communication specialist. Your task is to transform draft emails into polished, professional correspondence in ${language}.`,
+      `You are a bilingual communication specialist. Your task is to transform draft emails into highly polished, professional correspondence.
+      If the source text is predominantly French, translate it into formal English.
+      If the source text is predominantly English, translate it into formal French.
+      If the text is mixed, translate it to the other language (French <-> English).
+      Ensure the output is highly professional, formal, and suitable for business correspondence.`,
     user: (text: string, language: string) =>
-      `Task: Rewrite this text to make it professional, polite, and courteous without changing its meaning.
+      `Task: Translate and formalize this text for professional business use.
       Requirements:
+      - Translate French to English, or English to French.
       - Use formal, business-appropriate language.
       - Ensure proper salutation and closing.
       - Maintain the original intent and all key information.
-      - Fix any grammar or spelling errors.
+      - Fix any grammar or spelling errors in the process.
       Constraints:
-      1. Respond in ${language}.
+      1. Keep the output language opposite to the input language (FR <-> EN).
       2. OUTPUT ONLY the rewritten professional email text.
 
       Text: ${text}`,

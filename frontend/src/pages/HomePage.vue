@@ -226,7 +226,11 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
 ]);
 const outlookQuickActions: QuickAction[] = [
   { key: "reply", label: t("outlookReply"), icon: Mail },
-  { key: "formalize", label: t("outlookFormalize"), icon: Briefcase },
+  {
+    key: "translate_formalize",
+    label: t("outlookTranslateFormalize"),
+    icon: Briefcase,
+  },
   { key: "concise", label: t("outlookConcise"), icon: Scissors },
   { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
   { key: "extract", label: t("outlookExtract"), icon: ListTodo },
