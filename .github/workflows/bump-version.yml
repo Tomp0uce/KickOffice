@@ -1,0 +1,36 @@
+name: Bump Version
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump-version:
+    # Only run if the commit wasn't made by the bot indicating a release bump
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Required to push back to the repository
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run version bumper script
+        run: node scripts/bump-version.js
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json backend/package.json manifests-templates/*.xml manifest-*.xml
+          git commit -m "chore(release): bump application version [skip ci]"
+          git push

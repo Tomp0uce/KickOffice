@@ -11,6 +11,7 @@ export interface QuickAction {
   key: string
   label: string
   icon: Component
+  executeWithAgent?: boolean
 }
 
 export interface ExcelQuickAction extends QuickAction {

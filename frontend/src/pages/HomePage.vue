@@ -184,7 +184,12 @@ const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
 const wordQuickActions: QuickAction[] = [
-  { key: "proofread", label: t("proofread"), icon: CheckCheck },
+  {
+    key: "proofread",
+    label: t("proofread"),
+    icon: CheckCheck,
+    executeWithAgent: true,
+  },
   { key: "translate", label: t("translate"), icon: Globe },
   { key: "polish", label: t("polish"), icon: Sparkle },
   { key: "academic", label: t("academic"), icon: BookOpen },
@@ -250,6 +255,7 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     label: t("proofread"),
     icon: CheckCheck,
     mode: "immediate",
+    executeWithAgent: true,
   },
   { key: "bullets", label: t("pptBullets"), icon: ListTodo, mode: "immediate" },
   {
