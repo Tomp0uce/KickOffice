@@ -578,6 +578,10 @@ import {
 import { getOutlookToolDefinitions } from "@/utils/outlookTools";
 import { getPowerPointToolDefinitions } from "@/utils/powerpointTools";
 import { getWordToolDefinitions } from "@/utils/wordTools";
+import {
+  getEnabledToolNamesFromStorage,
+  persistEnabledTools,
+} from "@/utils/toolStorage";
 import { i18n } from "@/i18n";
 
 const { t } = useI18n();
@@ -974,16 +978,9 @@ function getUserPromptPreview(
 
 // Tools
 function loadToolPreferences() {
-  const stored = localStorage.getItem("enabledTools");
-  if (stored) {
-    try {
-      enabledTools.value = new Set(JSON.parse(stored));
-    } catch {
-      enabledTools.value = new Set(allToolsList.map((t) => t.name));
-    }
-  } else {
-    enabledTools.value = new Set(allToolsList.map((t) => t.name));
-  }
+  enabledTools.value = getEnabledToolNamesFromStorage(
+    allToolsList.map((t) => t.name),
+  );
 }
 
 function toggleTool(toolName: string) {
@@ -992,7 +989,10 @@ function toggleTool(toolName: string) {
   } else {
     enabledTools.value.add(toolName);
   }
-  localStorage.setItem("enabledTools", JSON.stringify([...enabledTools.value]));
+  persistEnabledTools(
+    allToolsList.map((t) => t.name),
+    enabledTools.value,
+  );
 }
 
 async function checkBackend() {

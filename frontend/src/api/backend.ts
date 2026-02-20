@@ -4,7 +4,7 @@ if (!BACKEND_URL) {
   throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env')
 }
 
-const REQUEST_TIMEOUT_MS = 45_000
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 45_000
 const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
 
 function wait(ms: number): Promise<void> {

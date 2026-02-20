@@ -59,6 +59,7 @@ services:
       args:
         VITE_BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://${SERVER_IP}:${BACKEND_PORT}}
         VITE_APP_VERSION: ${APP_VERSION:-}
+        VITE_REQUEST_TIMEOUT_MS: ${VITE_REQUEST_TIMEOUT_MS:-45000}
     container_name: kickoffice-frontend
     restart: unless-stopped
     ports:

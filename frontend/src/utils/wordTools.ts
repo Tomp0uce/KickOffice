@@ -128,7 +128,7 @@ const wordToolDefinitions = createWordTools({
   replaceSelectedText: {
     name: 'replaceSelectedText',
     category: 'write',
-    description: 'Replace the currently selected text with new text.',
+    description: 'Replace the currently selected text with new text. CRITICAL: When correcting typos or making small modifications within a large block of text, NEVER use replaceSelectedText to replace the entire text block, as this destroys complex document layouts. ALWAYS use searchAndReplace to make surgical, targeted changes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -156,7 +156,6 @@ const wordToolDefinitions = createWordTools({
       const insertedRange = range.insertHtml(renderOfficeRichHtml(newText), 'Replace')
 
       if (preserveFormatting) {
-        insertedRange.styleBuiltIn = range.styleBuiltIn
         insertedRange.font.name = range.font.name
         insertedRange.font.size = range.font.size
         // We do not restore bold, italic, or underline, as it would override the rich HTML formatting
@@ -310,7 +309,7 @@ const wordToolDefinitions = createWordTools({
   searchAndReplace: {
     name: 'searchAndReplace',
     category: 'read',
-    description: 'Search for text in the document and replace it with new text.',
+    description: 'Search for text in the document and replace it with new text. PREFERRED METHOD for correcting typos, modifying phrasing, or making targeted changes within paragraphs without destroying the surrounding document layout. Be surgical.',
     inputSchema: {
       type: 'object',
       properties: {
