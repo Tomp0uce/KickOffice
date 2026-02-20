@@ -13,7 +13,7 @@ import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
-import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, QuickAction } from '@/types/chat'
+import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
 
 
 interface EnabledToolsStorageState {
@@ -48,8 +48,10 @@ interface UseAgentLoopOptions {
   hostIsExcel: boolean
   hostIsWord: boolean
   quickActions: Ref<QuickAction[]>
+  outlookQuickActions?: Ref<OutlookQuickAction[]>
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: PowerPointQuickAction[]
+  draftFocusGlow: Ref<boolean>
   createDisplayMessage: (role: DisplayMessage['role'], content: string, imageSrc?: string) => DisplayMessage
   adjustTextareaHeight: () => void
   scrollToBottom: () => Promise<void>
@@ -82,8 +84,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     hostIsExcel,
     hostIsWord,
     quickActions,
+    outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
+    draftFocusGlow,
     createDisplayMessage,
     adjustTextareaHeight,
     scrollToBottom,
@@ -354,18 +358,34 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       ? excelQuickActions.value.find(a => a.key === actionKey)
       : hostIsPowerPoint
         ? powerPointQuickActions.find(a => a.key === actionKey)
-        : quickActions.value.find(a => a.key === actionKey)
+        : hostIsOutlook && outlookQuickActions?.value
+          ? outlookQuickActions.value.find(a => a.key === actionKey)
+          : quickActions.value.find(a => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
     const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
+    const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
 
+    if (selectedOutlookQuickAction?.mode === 'draft') {
+      userInput.value = selectedOutlookQuickAction.prefix || ''
+      adjustTextareaHeight();
+      draftFocusGlow.value = true;
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
+      await nextTick(); inputTextarea.value?.focus(); return
+    }
     if (selectedExcelQuickAction?.mode === 'draft') {
       userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight(); await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight();
+      draftFocusGlow.value = true;
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
+      await nextTick(); inputTextarea.value?.focus(); return
     }
     if (selectedPowerPointQuickAction?.mode === 'draft') {
       userInput.value = t('pptVisualPrefix')
-      adjustTextareaHeight(); await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight();
+      draftFocusGlow.value = true;
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
+      await nextTick(); inputTextarea.value?.focus(); return
     }
     const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
     if (!selectedText) return messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))

@@ -683,7 +683,7 @@ type WordBuiltinPromptKey =
   | "polish"
   | "academic"
   | "summary"
-  | "grammar";
+  | "proofread";
 type ExcelBuiltinPromptKey =
   | "analyze"
   | "chart"
@@ -721,7 +721,7 @@ const wordBuiltInPromptsData: Record<
   polish: { ...buildInPrompt.polish },
   academic: { ...buildInPrompt.academic },
   summary: { ...buildInPrompt.summary },
-  grammar: { ...buildInPrompt.grammar },
+  proofread: { ...buildInPrompt.proofread },
 };
 
 const excelBuiltInPromptsData: Record<

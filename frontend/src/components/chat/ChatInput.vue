@@ -27,6 +27,10 @@
     </div>
     <div
       class="card-base flex min-w-12 items-center gap-2 focus-within:border-accent"
+      :class="{
+        'ring-2 ring-accent animate-pulse transition-all duration-300':
+          draftFocusGlow,
+      }"
     >
       <textarea
         ref="textareaEl"
@@ -108,6 +112,7 @@ const props = defineProps<{
   taskTypeLabel: string;
   sendLabel: string;
   stopLabel: string;
+  draftFocusGlow?: boolean;
 }>();
 
 const emit = defineEmits<{

@@ -23,6 +23,11 @@ export interface PowerPointQuickAction extends QuickAction {
   mode: 'immediate' | 'draft'
 }
 
+export interface OutlookQuickAction extends QuickAction {
+  mode?: 'immediate' | 'draft'
+  prefix?: string
+}
+
 export interface RenderSegment {
   type: 'text' | 'think'
   text: string

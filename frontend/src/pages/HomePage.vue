@@ -75,6 +75,7 @@
         :task-type-label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
+        :draft-focus-glow="draftFocusGlow"
         @submit="sendMessage"
         @stop="stopGeneration"
       />
@@ -127,6 +128,7 @@ import type {
   DisplayMessage,
   ExcelQuickAction,
   PowerPointQuickAction,
+  OutlookQuickAction,
   QuickAction,
 } from "@/types/chat";
 import { localStorageKey } from "@/utils/enum";
@@ -147,6 +149,7 @@ const { t } = useI18n();
 const savedPrompts = ref<SavedPrompt[]>([]);
 const selectedPromptId = ref("");
 const customSystemPrompt = ref("");
+const draftFocusGlow = ref(false);
 const backendOnline = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
 const selectedModelTier = useStorage<ModelTier>(
@@ -181,11 +184,11 @@ const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
 const wordQuickActions: QuickAction[] = [
+  { key: "proofread", label: t("proofread"), icon: CheckCheck },
   { key: "translate", label: t("translate"), icon: Globe },
   { key: "polish", label: t("polish"), icon: Sparkle },
   { key: "academic", label: t("academic"), icon: BookOpen },
   { key: "summary", label: t("summary"), icon: FileCheck },
-  { key: "grammar", label: t("grammar"), icon: CheckCircle },
 ];
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
@@ -224,18 +227,30 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     prefix: "Mets en évidence (couleur) les cellules qui : ",
   },
 ]);
-const outlookQuickActions: QuickAction[] = [
-  { key: "reply", label: t("outlookReply"), icon: Mail },
+const outlookQuickActions: OutlookQuickAction[] = [
+  { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
+  {
+    key: "reply",
+    label: t("outlookReply"),
+    icon: Mail,
+    mode: "draft",
+    prefix: t("outlookReplyPrePrompt"),
+  },
   {
     key: "translate_formalize",
     label: t("outlookTranslateFormalize"),
     icon: Briefcase,
   },
   { key: "concise", label: t("outlookConcise"), icon: Scissors },
-  { key: "proofread", label: t("outlookProofread"), icon: CheckCheck },
   { key: "extract", label: t("outlookExtract"), icon: ListTodo },
 ];
 const powerPointQuickActions: PowerPointQuickAction[] = [
+  {
+    key: "proofread",
+    label: t("proofread"),
+    icon: CheckCheck,
+    mode: "immediate",
+  },
   { key: "bullets", label: t("pptBullets"), icon: ListTodo, mode: "immediate" },
   {
     key: "speakerNotes",
@@ -244,12 +259,6 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     mode: "immediate",
   },
   { key: "punchify", label: t("pptPunchify"), icon: Zap, mode: "immediate" },
-  {
-    key: "proofread",
-    label: t("grammar"),
-    icon: CheckCheck,
-    mode: "immediate",
-  },
   { key: "visual", label: t("pptVisual"), icon: Image, mode: "draft" },
 ];
 
@@ -346,8 +355,10 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   hostIsExcel,
   hostIsWord,
   quickActions,
+  outlookQuickActions: computed(() => outlookQuickActions),
   excelQuickActions,
   powerPointQuickActions,
+  draftFocusGlow,
   createDisplayMessage: imageActions.createDisplayMessage,
   adjustTextareaHeight,
   scrollToBottom,
