@@ -1,7 +1,7 @@
 import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, chatStream, chatSync, generateImage } from '@/api/backend'
-import { buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -293,7 +293,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     textToSend = textToSend?.trim() || ''
 
     if (!textToSend) {
-      return
+      if (availableModels.value[selectedModelTier.value]?.type !== 'image') {
+        return
+      }
     }
 
     if (loading.value) {
@@ -311,14 +313,34 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     const userMessage = textToSend
 
+    let isImageFromSelection = false
+    let selectedText = ''
+    
+    // For direct image generation from selection
+    if (!userMessage && availableModels.value[selectedModelTier.value]?.type === 'image') {
+      try {
+        selectedText = await getOfficeSelection()
+      } catch (err) {
+        console.warn('[AgentLoop] Failed to fetch selection for image generation', err)
+      }
+      const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+      if (wordCount < 5) {
+        return messageUtil.error(t('imageSelectionTooShort'))
+      }
+      isImageFromSelection = true
+    }
+
     loading.value = true
     abortController.value = new AbortController()
-    history.value.push(createDisplayMessage('user', userMessage))
+
+    // If it's pure selection image, we show the selection as the user message bubble
+    const displayMessageText = isImageFromSelection ? selectedText : userMessage
+    history.value.push(createDisplayMessage('user', displayMessageText))
     await scrollToBottom()
 
     try {
-      let selectedText = ''
-      if (useSelectedText.value) {
+      // If we haven't fetched it yet and it's enabled
+      if (useSelectedText.value && !isImageFromSelection) {
         let timeoutId: ReturnType<typeof setTimeout> | null = null
         try {
           const timeoutPromise = new Promise<string>((_, reject) => {
@@ -332,13 +354,17 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       }
 
-      const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-      const fullMessage = selectedText ? `${userMessage}
+      let fullMessage = displayMessageText
 
-[${selectionLabel}: "${selectedText}"]` : userMessage
-      if (selectedText) {
+      // Only append context to standard text chats, not pure image generations
+      if (selectedText && !isImageFromSelection) {
+        const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
+        fullMessage = `${userMessage}
+
+[${selectionLabel}: "${selectedText}"]`
         history.value[history.value.length - 1].content = fullMessage
       }
+
       await processChat(fullMessage)
     } catch (error: any) {
       if (error.name !== 'AbortError') {
@@ -368,24 +394,45 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1500)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     if (selectedExcelQuickAction?.mode === 'draft') {
       userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     if (selectedPowerPointQuickAction?.mode === 'draft') {
       userInput.value = t('pptVisualPrefix')
-      adjustTextareaHeight();
-      draftFocusGlow.value = true;
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000);
-      await nextTick(); inputTextarea.value?.focus(); return
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
     }
     const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
     if (!selectedText) return messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
@@ -407,13 +454,17 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       systemMsg = action.system(lang)
       userMsg = action.user(selectedText, lang)
     }
+    
+    // Enforce global formatting constraints on all Quick Actions
+    systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
 
     const actionLabel = selectedQuickAction?.label || t(actionKey)
     history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
-    history.value.push(createDisplayMessage('assistant', ''))
+
     if (selectedQuickAction?.executeWithAgent) {
       await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
     } else {
+      history.value.push(createDisplayMessage('assistant', ''))
       await chatStream({
         messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
         modelTier: resolveChatModelTier(),

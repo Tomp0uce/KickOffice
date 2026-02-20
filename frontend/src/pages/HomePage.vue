@@ -355,7 +355,7 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   userFirstName,
   userLastName,
   abortController,
-  inputTextarea: computed(() => chatInputRef.value?.textareaEl?.value),
+  inputTextarea: computed(() => chatInputRef.value?.textareaEl),
   hostIsOutlook,
   hostIsPowerPoint,
   hostIsExcel,

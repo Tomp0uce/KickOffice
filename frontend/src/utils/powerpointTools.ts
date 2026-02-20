@@ -91,33 +91,47 @@ export function getPowerPointSelection(): Promise<string> {
 export async function insertIntoPowerPoint(text: string): Promise<void> {
   const normalizedText = normalizePowerPointListText(text)
 
+  const htmlContent = renderOfficeCommonApiHtml(normalizedText)
+
   // Try the Modern API first if available (requires PowerPointApi 1.5+)
   if (isPowerPointApiSupported('1.5')) {
     try {
       await executeOfficeAction(async () => {
         await PowerPoint.run(async (context: any) => {
           const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
-          textRange.insertText(normalizedText, 'Replace')
+          textRange.insertHtml(htmlContent, 'Replace')
           await context.sync()
         })
       })
       return
     } catch (e: any) {
-      console.warn('Modern PowerPoint insertion failed, falling back:', e)
+      console.warn('Modern PowerPoint Html insertion failed, falling back:', e)
     }
   }
 
-  // Fallback to the legacy Shared API (destroys shape formatting)
+  // Fallback to the legacy Shared API (destroys shape formatting if raw text)
   return new Promise((resolve, reject) => {
     try {
       Office.context.document.setSelectedDataAsync(
-        normalizedText,
-        { coercionType: Office.CoercionType.Text },
+        htmlContent,
+        { coercionType: Office.CoercionType.Html },
         (result: any) => {
           if (result.status === Office.AsyncResultStatus.Succeeded) {
             resolve()
           } else {
-            reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
+            console.warn('setSelectedDataAsync Html failed, falling back to raw Text')
+            // Double fallback for environments completely rejecting HTML insertion
+            Office.context.document.setSelectedDataAsync(
+              normalizedText,
+              { coercionType: Office.CoercionType.Text },
+              (fallbackResult: any) => {
+                if (fallbackResult.status === Office.AsyncResultStatus.Succeeded) {
+                  resolve()
+                } else {
+                  reject(new Error(fallbackResult.error?.message || 'setSelectedDataAsync failed'))
+                }
+              },
+            )
           }
         },
       )

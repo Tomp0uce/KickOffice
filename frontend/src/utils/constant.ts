@@ -14,6 +14,12 @@ export const languageMap: IStringKeyMap = {
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
 }
 
+export const GLOBAL_STYLE_INSTRUCTIONS = `
+CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
+- NEVER use em-dashes (—).
+- NEVER use semicolons (;).
+- Keep the sentence structure natural and highly human-like.`
+
 export const buildInPrompt = {
   translate: {
     system: (language: string) =>
@@ -37,16 +43,15 @@ export const buildInPrompt = {
 
   polish: {
     system: (language: string) =>
-      `You are a professional editor and stylist. Your goal is to make the text more professional, engaging, and clear in ${language}.`,
+      `You are a professional editor. Your goal is to improve sentence structure and flow while maintaining a natural, conversational tone. Do NOT use overly complex, pretentious, or robotic "AI" vocabulary.`,
     user: (text: string, language: string) =>
-      `Task: Polish the following text for better flow and impact.
+      `Task: Polish the following text for better readability and impact.
       Improvements:
       - Correct grammar, spelling, and punctuation.
-      - Enhance vocabulary while maintaining the original meaning.
       - Improve sentence structure and eliminate redundancy.
-      - Ensure the tone is consistent and professional.
+      - Keep the tone natural and highly human.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the polished text without any commentary.
 
       Text: ${text}`,
@@ -54,7 +59,7 @@ export const buildInPrompt = {
 
   academic: {
     system: (language: string) =>
-      `You are a senior academic editor for high-impact journals. You specialize in formal, precise, and objective scholarly writing in ${language}.`,
+      `You are a senior academic editor for high-impact journals. You specialize in formal, precise, and objective scholarly writing.`,
     user: (text: string, language: string) =>
       `Task: Rewrite the following text to meet professional academic standards.
       Requirements:
@@ -63,7 +68,7 @@ export const buildInPrompt = {
       - Maintain a third-person perspective unless the context requires otherwise.
       - Optimize for clarity and conciseness as per peer-review expectations.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the revised text. No pre-amble or meta-talk.
 
       Text: ${text}`,
@@ -71,23 +76,23 @@ export const buildInPrompt = {
 
   summary: {
     system: (language: string) =>
-      `You are an expert document analyst. You excel at distilling complex information into clear, actionable summaries in ${language}.`,
+      `You are an expert document analyst. You excel at providing highly dense, bulleted summaries focused solely on core decisions, facts, and conclusions.`,
     user: (text: string, language: string) =>
       `Task: Summarize the following text.
       Structure:
-      - Capture the core message and primary supporting points.
-      - Aim for approximately 100 words (or 3-5 key bullet points).
-      - Ensure the summary is self-contained and easy to understand.
+      - Provide a highly dense, bulleted summary.
+      - Focus solely on core decisions, facts, and conclusions.
+      - Scale the length proportionally to the input text, but prioritize extreme brevity.
       Constraints:
-      1. Respond in ${language}.
-      2. OUTPUT ONLY the summary.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      2. OUTPUT ONLY the bulleted summary. No preamble.
 
       Text: ${text}`,
   },
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your primary focus is correcting grammar, spelling, and phrasing in ${language}.
+      `You are a meticulous proofreader. Your primary focus is correcting grammar, spelling, and phrasing.
       CRITICAL INSTRUCTION: You MUST NOT return replacement text directly. You MUST use the \`addComment\` tool to suggest corrections to the user.`,
     user: (text: string, language: string) =>
       `Task: Check and correct the grammar of the following text using the \`addComment\` tool.
@@ -99,7 +104,7 @@ export const buildInPrompt = {
       2. For each error found, identify the specific text segment and use the \`addComment\` tool to explain the error and provide the correction (e.g., "Change 'était' to 'étaient'").
       3. If the text is already perfect, respond exactly with: "No grammatical issues found."
       4. Do NOT output a fully rewritten text block. Your ONLY output mechanism for corrections is the \`addComment\` tool.
-      5. Respond in ${language}.
+      5. Analyze the language of the provided text. You MUST write your comments in the exact SAME language as the original text, disregarding any other UI language preferences.
 
       Text: ${text}`,
   },
@@ -108,24 +113,24 @@ export const buildInPrompt = {
 export const excelBuiltInPrompt = {
   analyze: {
     system: (language: string) =>
-      `You are an expert data analyst. You specialize in interpreting spreadsheet data, identifying patterns, computing statistics, and presenting insights in a clear, actionable manner in ${language}.`,
+      `You are an expert data analyst. You specialize in interpreting spreadsheet data, identifying patterns, and presenting structural insights.`,
     user: (text: string, language: string) =>
       `Task: Analyze the following Excel data and provide insights.
       Structure:
       - Identify column types (numeric, text, date).
-      - Calculate key statistics (sum, average, min, max, median) for numeric columns.
-      - Identify patterns, trends, or anomalies.
+      - Identify trends, outliers, and structural patterns in the data.
       - Provide 3-5 actionable insights.
       Constraints:
-      1. Respond in ${language}.
-      2. OUTPUT ONLY the analysis results, clearly structured.
+      1. Do NOT attempt to calculate exact mathematical sums or averages unless they are explicitly obvious. Focus on relationships and meaning.
+      2. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      3. OUTPUT ONLY the analysis results, clearly structured.
 
       Data: ${text}`,
   },
 
   chart: {
     system: (language: string) =>
-      `You are a data visualization expert. You help users choose the best chart type and presentation for their data in ${language}.`,
+      `You are a data visualization expert. You help users choose the best chart type and presentation for their data.`,
     user: (text: string, language: string) =>
       `Task: Based on the following data, recommend the best chart type and explain why.
       Consider:
@@ -133,7 +138,7 @@ export const excelBuiltInPrompt = {
       - The best chart type (bar, line, pie, scatter, etc.) and why.
       - Any data preparation needed before charting.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the recommendation with brief justification.
 
       Data: ${text}`,
@@ -141,7 +146,7 @@ export const excelBuiltInPrompt = {
 
   formula: {
     system: (language: string) =>
-      `You are an Excel formula expert. You help users write efficient and correct Excel formulas for their specific needs in ${language}.`,
+      `You are an Excel formula expert. You help users write efficient and correct Excel formulas for their specific needs.`,
     user: (text: string, language: string) =>
       `Task: Based on the following data and context, suggest the most appropriate Excel formula(s).
       Requirements:
@@ -149,7 +154,7 @@ export const excelBuiltInPrompt = {
       - Explain briefly what each formula does.
       - If multiple approaches exist, suggest the most efficient one.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the formula suggestions with brief explanations.
 
       Context: ${text}`,
@@ -157,7 +162,7 @@ export const excelBuiltInPrompt = {
 
   format: {
     system: (language: string) =>
-      `You are a spreadsheet formatting specialist. You help users present their data professionally with appropriate formatting in ${language}.`,
+      `You are a spreadsheet formatting specialist. You help users present their data professionally with appropriate formatting.`,
     user: (text: string, language: string) =>
       `Task: Suggest formatting improvements for the following data.
       Consider:
@@ -166,7 +171,7 @@ export const excelBuiltInPrompt = {
       - Header styling and cell alignment.
       - Color coding for readability.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the formatting recommendations.
 
       Data: ${text}`,
@@ -174,7 +179,7 @@ export const excelBuiltInPrompt = {
 
   explain: {
     system: (language: string) =>
-      `You are a data interpretation expert. You help users understand their spreadsheet data by providing clear explanations in ${language}.`,
+      `You are a data interpretation expert. You help users understand their spreadsheet data by providing clear explanations.`,
     user: (text: string, language: string) =>
       `Task: Explain the following spreadsheet data in simple terms.
       Include:
@@ -183,7 +188,7 @@ export const excelBuiltInPrompt = {
       - Any notable patterns or outliers.
       - A brief plain-language summary.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the explanation.
 
       Data: ${text}`,
@@ -193,7 +198,7 @@ export const excelBuiltInPrompt = {
 export const powerPointBuiltInPrompt = {
   bullets: {
     system: (language: string) =>
-      `You are a PowerPoint presentation expert. Your task is to transform text into clear, concise bullet points suitable for presentation slides in ${language}. Prioritize brevity, clarity, and visual hierarchy.`,
+      `You are a PowerPoint presentation expert. Your task is to transform text into clear, concise bullet points suitable for presentation slides. Prioritize brevity, clarity, and visual hierarchy.`,
     user: (text: string, language: string) =>
       `Task: Convert the following text into a concise bullet-point list for a PowerPoint slide.
       Requirements:
@@ -202,7 +207,7 @@ export const powerPointBuiltInPrompt = {
       - Remove filler words and redundancies.
       - Keep only the essential information.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
 
       Text: ${text}`,
@@ -210,16 +215,16 @@ export const powerPointBuiltInPrompt = {
 
   speakerNotes: {
     system: (language: string) =>
-      `You are an expert public speaker and presentation coach. Your task is to write engaging, conversational speaker notes that a presenter can read or reference during their talk in ${language}.`,
+      `You are an expert presenter. Your task is to write engaging, strictly-concise speaker notes that can be instantly read while glancing at a screen during a presentation.`,
     user: (text: string, language: string) =>
-      `Task: Generate speaker notes for a presenter based on the following slide content.
+      `Task: Generate highly concise speaker notes based on the following slide content.
       Requirements:
-      - Write in a natural, conversational tone (as if speaking to an audience).
-      - Expand on each point with context, examples, or transitions.
-      - Include suggested pauses, emphasis cues, or audience engagement prompts where appropriate.
-      - Keep it concise enough to be glanced at during a presentation (150-250 words).
+      - Write in a natural, conversational tone.
+      - Expand briefly on the points with context or transitions.
+      - Keep the notes extremely short (under 100 words total).
+      - Use short, punch-able sentences and visual cues.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the speaker notes. No meta-commentary.
 
       Slide content: ${text}`,
@@ -227,7 +232,7 @@ export const powerPointBuiltInPrompt = {
 
   punchify: {
     system: (language: string) =>
-      `You are a world-class copywriter and presentation coach (like Steve Jobs). Your goal is to rewrite text to be incredibly persuasive, memorable, and visually striking in ${language}.`,
+      `You are a world-class copywriter and presentation coach (like Steve Jobs). Your goal is to rewrite text to be incredibly persuasive, memorable, and visually striking.`,
     user: (text: string, language: string) =>
       `Task: Rewrite the following slide content to maximize impact.
       Techniques to use:
@@ -236,7 +241,7 @@ export const powerPointBuiltInPrompt = {
       - Focus on benefits/outcomes rather than just features.
       - Create a "hook" that grabs the audience's attention instantly.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the rewritten text. No explanations.
       3. Keep the meaning accurate but dramatically improved in style.
 
@@ -245,7 +250,7 @@ export const powerPointBuiltInPrompt = {
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos in ${language} without altering the slide structure.
+      `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos without altering the slide structure.
       Because PowerPoint doesn't support comments via API, you MUST return the corrected text directly so it can replace the user's selection.`,
     user: (text: string, language: string) =>
       `Task: Correct the grammar and spelling of the following slide content.
@@ -257,7 +262,7 @@ export const powerPointBuiltInPrompt = {
       Constraints:
       1. If the text is error-free, respond strictly with: "No corrections needed."
       2. Otherwise, provide ONLY the fully corrected text block, ready to replace the original.
-      3. Respond in ${language}.
+      3. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
 
       Text: ${text}`,
   },
@@ -313,15 +318,17 @@ export const outlookBuiltInPrompt = {
     system: (language: string) =>
       `You are an expert email assistant. Your task is to draft professional, context-aware email replies.
       CRITICAL: Analyze the language of the provided email thread. You MUST write your reply in the exact SAME language as the original email. Disregard any other interface language preferences.
-      Maintain a courteous and professional tone, address all points raised in the original email, and keep the reply concise.`,
+      Match the tone and relationship context inferred from the email (e.g., highly formal for external clients, casual and direct for internal colleagues). Address all points and keep it concise.`,
     user: (text: string, language: string) =>
-      `Task: Draft a professional reply to the following email thread.
+      `Task: Draft a context-aware reply to the following email thread.
       Guidelines:
       1. Address all key points raised in the original email.
-      2. Use a courteous, professional tone appropriate for business communication.
+      2. Match the tone of the thread (formal vs casual).
       3. Keep the reply concise and well-structured.
       4. Respond in the exact SAME language as the original email thread.
       5. OUTPUT ONLY the reply text, ready to send. Do not include "Here is your reply" or any meta-commentary.
+      6. Do NOT include a subject line (e.g., "Objet: " or "Subject: "). Start the output directly with the greeting.
+      ${GLOBAL_STYLE_INSTRUCTIONS}
 
       Email thread:
       ${text}`,
@@ -351,15 +358,16 @@ export const outlookBuiltInPrompt = {
 
   concise: {
     system: (language: string) =>
-      `You are a concise writing expert. Your task is to shorten texts by 30% to 50% while preserving all essential information in ${language}.`,
+      `You are a concise writing expert. Your task is to condense texts for maximum readability and directness.`,
     user: (text: string, language: string) =>
-      `Task: Condense this text to reduce the word count by 30% to 50% while keeping all key information.
+      `Task: Condense this text for maximum readability.
       Requirements:
-      - Remove redundancies and verbose expressions.
-      - Preserve all important facts, dates, names, and action items.
-      - Maintain a clear and professional tone.
+      - Eliminate all corporate fluff and redundant pleasantries.
+      - Use bullet points if multiple ideas are presented.
+      - Keep it direct, punchy, and highly concise.
+      - Preserve all essential facts, dates, names, and action items.
       Constraints:
-      1. Respond in ${language}.
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
       2. OUTPUT ONLY the condensed text.
 
       Text: ${text}`,
@@ -389,16 +397,17 @@ export const outlookBuiltInPrompt = {
 
   extract: {
     system: (language: string) =>
-      `You are an expert email analyst. Your task is to extract structured information from email threads, identifying summaries, key points, and required actions in ${language}.`,
+      `You are an expert email analyst. Your sole task is to extract actionable tasks and required next steps from email threads.`,
     user: (text: string, language: string) =>
-      `Task: Analyze this email and extract structured information.
-      Provide a bulleted list with:
-      - **Summary**: A brief overview of the email content (2-3 sentences).
-      - **Key Points**: The main topics and decisions mentioned.
-      - **Required Actions**: Specific tasks, deadlines, or follow-ups mentioned.
+      `Task: Analyze this email and extract ONLY the required actions, tasks, and follow-ups.
+      Provide a concise bulleted list detailing:
+      - The exact task/action needed.
+      - Who is responsible.
+      - The deadline (if mentioned).
       Constraints:
-      1. Respond in ${language}.
-      2. OUTPUT ONLY the structured analysis.
+      1. DO NOT include a summary or key points. Focus 100% on actions.
+      2. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      3. OUTPUT ONLY the bulleted list of tasks.
 
       Email: ${text}`,
   },

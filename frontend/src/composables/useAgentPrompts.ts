@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { GLOBAL_STYLE_INSTRUCTIONS } from '@/utils/constant'
 
 export interface UseAgentPromptsOptions {
   t: (key: string) => string
@@ -50,7 +51,7 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
       : hostIsPowerPoint ? powerPointAgentPrompt(lang) 
       : hostIsExcel ? excelAgentPrompt(lang) 
       : wordAgentPrompt(lang)
-    return `${base}${userProfilePromptBlock()}`
+    return `${base}${userProfilePromptBlock()}\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
   }
 
   return { agentPrompt }
