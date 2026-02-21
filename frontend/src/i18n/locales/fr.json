@@ -366,5 +366,13 @@
   "outlookTool_insertHtmlAtCursor_desc": "Insérer du HTML formaté à la position courante du curseur.",
   "imageClipboardNotSupported": "Impossible de copier l'image : l'écriture d'image dans le presse-papiers n'est pas prise en charge dans cet environnement.",
   "imageInsertExcelNotSupported": "L'insertion d'image n'est pas prise en charge dans les compléments Excel. Utilisez Word ou PowerPoint.",
-  "appVersion": "Version de l'application"
+  "appVersion": "Version de l'application",
+  "account": "Compte",
+  "litellmUserKeyLabel": "Clé utilisateur LiteLLM",
+  "litellmUserKeyPlaceholder": "Votre clé personnelle LiteLLM",
+  "litellmUserEmailLabel": "Email utilisateur",
+  "litellmUserEmailPlaceholder": "votre.email@kickmaker.net",
+  "litellmCredentialsInfo": "Obtenez votre clé sur",
+  "litellmCredentialsConfigured": "Identifiants configurés",
+  "litellmCredentialsMissing": "Identifiants non configurés"
 }

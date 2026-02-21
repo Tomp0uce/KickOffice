@@ -47,6 +47,67 @@
         <div
           class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md"
         >
+          <!-- Account Settings (LiteLLM credentials) -->
+          <div
+            v-show="currentTab === 'account'"
+            class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
+          >
+            <SettingCard>
+              <CustomInput
+                v-model="litellmUserKey"
+                :title="$t('litellmUserKeyLabel')"
+                :placeholder="$t('litellmUserKeyPlaceholder')"
+                :is-password="true"
+              />
+            </SettingCard>
+
+            <SettingCard>
+              <CustomInput
+                v-model="litellmUserEmail"
+                :title="$t('litellmUserEmailLabel')"
+                :placeholder="$t('litellmUserEmailPlaceholder')"
+              />
+            </SettingCard>
+
+            <SettingCard>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-secondary">{{
+                  $t('litellmCredentialsMissing') || 'Statut'
+                }}</span>
+                <div
+                  class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+                  :class="
+                    litellmConfigured
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  "
+                >
+                  <div
+                    class="h-2 w-2 rounded-full"
+                    :class="litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'"
+                  />
+                  {{
+                    litellmConfigured
+                      ? $t('litellmCredentialsConfigured')
+                      : $t('litellmCredentialsMissing')
+                  }}
+                </div>
+              </div>
+            </SettingCard>
+
+            <SettingCard>
+              <div class="flex flex-col gap-1">
+                <span class="text-xs text-secondary">{{ $t('litellmCredentialsInfo') }}</span>
+                <a
+                  href="https://getkey.ai.kickmaker.net/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs text-accent underline"
+                >https://getkey.ai.kickmaker.net/</a>
+              </div>
+            </SettingCard>
+          </div>
+
           <!-- General Settings -->
           <div
             v-show="currentTab === 'general'"
@@ -543,6 +604,7 @@ import {
   ArrowLeft,
   Edit2,
   Globe,
+  KeyRound,
   MessageSquare,
   Plus,
   RotateCcwIcon,
@@ -551,7 +613,7 @@ import {
   Trash2,
   Wrench,
 } from "lucide-vue-next";
-import { onBeforeMount, ref, watch } from "vue";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -597,6 +659,8 @@ const replyLanguage = useStorage(
   "Fran\u00e7ais",
 );
 const darkMode = useStorage(localStorageKey.darkMode, false);
+const litellmUserKey = useStorage(localStorageKey.litellmUserKey, "");
+const litellmUserEmail = useStorage(localStorageKey.litellmUserEmail, "");
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
 const AGENT_MAX_ITERATIONS_MIN = 1;
 const AGENT_MAX_ITERATIONS_MAX = 100;
@@ -630,6 +694,11 @@ const genderOptions = [
   { label: t("userGenderMale"), value: "male" },
   { label: t("userGenderNonBinary"), value: "nonbinary" },
 ];
+
+// LiteLLM credentials status
+const litellmConfigured = computed(() => {
+  return litellmUserKey.value.length > 0 && litellmUserEmail.value.length > 0;
+});
 
 // Backend
 const backendOnline = ref(false);
@@ -795,6 +864,7 @@ const builtInPromptsStorageKey = hostIsOutlook
       : "customBuiltInPrompts";
 
 const tabs = [
+  { id: "account", label: "account", defaultLabel: "Account", icon: KeyRound },
   { id: "general", label: "general", defaultLabel: "General", icon: Globe },
   {
     id: "prompts",

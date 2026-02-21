@@ -27,6 +27,8 @@ imageRouter.post('/', async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${LLM_API_KEY}`,
+        'X-User-Key': req.userCredentials.userKey,
+        'X-OpenWebUi-User-Email': req.userCredentials.userEmail,
       },
       body: JSON.stringify({
         model: imageModel.id,

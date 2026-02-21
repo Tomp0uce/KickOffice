@@ -15,7 +15,7 @@ import {
   PORT,
   PUBLIC_FRONTEND_URL,
 } from './config/env.js'
-import { ensureLlmApiKey } from './middleware/auth.js'
+import { ensureLlmApiKey, ensureUserCredentials } from './middleware/auth.js'
 import { chatRouter } from './routes/chat.js'
 import { healthRouter } from './routes/health.js'
 import { imageRouter } from './routes/image.js'
@@ -48,7 +48,7 @@ if (PUBLIC_FRONTEND_URL) {
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email'],
 }))
 
 app.use(helmet({
@@ -61,8 +61,8 @@ app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
 app.use(healthRouter)
 app.use(modelsRouter)
-app.use('/api/chat', ensureLlmApiKey, chatLimiter, chatRouter)
-app.use('/api/image', ensureLlmApiKey, imageLimiter, imageRouter)
+app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRouter)
+app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

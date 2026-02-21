@@ -1,10 +1,10 @@
 const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
-const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://api.openai.com/v1'
+const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://litellm.kickmaker.net/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
 
 const models = {
   standard: {
-    id: process.env.MODEL_STANDARD || 'gpt-5.2',
+    id: process.env.MODEL_STANDARD || 'gpt-5.1',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
     maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '4096', 10),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
@@ -12,7 +12,7 @@ const models = {
     type: 'chat',
   },
   reasoning: {
-    id: process.env.MODEL_REASONING || 'gpt-5.2',
+    id: process.env.MODEL_REASONING || 'gpt-5.1',
     label: process.env.MODEL_REASONING_LABEL || 'Raisonnement',
     maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '8192', 10),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
@@ -20,7 +20,7 @@ const models = {
     type: 'chat',
   },
   image: {
-    id: process.env.MODEL_IMAGE || 'gpt-image-1.5',
+    id: process.env.MODEL_IMAGE || 'gpt-image-1',
     label: process.env.MODEL_IMAGE_LABEL || 'Image',
     type: 'image',
   },

@@ -13,6 +13,22 @@ function ensureLlmApiKey(req, res, next) {
   return next()
 }
 
+function ensureUserCredentials(req, res, next) {
+  const userKey = req.headers['x-user-key']
+  const userEmail = req.headers['x-user-email']
+  if (!userKey || !userEmail) {
+    return logAndRespond(
+      res,
+      401,
+      { error: 'LiteLLM user credentials required (X-User-Key and X-User-Email headers)' },
+      `${req.method} ${req.originalUrl}`,
+    )
+  }
+  req.userCredentials = { userKey, userEmail }
+  return next()
+}
+
 export {
   ensureLlmApiKey,
+  ensureUserCredentials,
 }
