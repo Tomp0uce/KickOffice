@@ -6,6 +6,8 @@ import type { DisplayMessage, RenderSegment } from '@/types/chat'
 
 const THINK_TAG = '<think>'
 const THINK_TAG_END = '</think>'
+// Cached regex for think tag removal (compiled once at module load)
+const THINK_TAG_REGEX = new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
 
 export function useImageActions(t: (key: string) => string) {
   function splitThinkSegments(text: string): RenderSegment[] {
@@ -36,8 +38,7 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   function cleanContent(content: string): string {
-    const regex = new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
-    return content.replace(regex, '').trim()
+    return content.replace(THINK_TAG_REGEX, '').trim()
   }
 
   function getMessageActionPayload(message: DisplayMessage): string {
@@ -97,8 +98,9 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   async function insertImageToWord(imageSrc: string, type: insertTypes) {
-    const base64Payload = imageSrc.includes(',') ? imageSrc.split(',')[1] : imageSrc
-    if (!base64Payload.trim()) throw new Error('Image base64 payload is empty')
+    // Use regex to safely extract base64 payload from data URL
+    const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim()
+    if (!base64Payload) throw new Error('Image base64 payload is empty')
     await Word.run(async (ctx) => {
       const range = ctx.document.getSelection()
       range.insertInlinePictureFromBase64(base64Payload, type === 'replace' ? 'Replace' : 'After')

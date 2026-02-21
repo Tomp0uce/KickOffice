@@ -1,14 +1,11 @@
 import { Router } from 'express'
 
-import { LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
+import { models } from '../config/models.js'
 import { validateImagePayload } from '../middleware/validate.js'
-import { fetchWithTimeout, logAndRespond } from '../utils/http.js'
+import { handleErrorResponse, imageGeneration } from '../services/llmClient.js'
+import { logAndRespond } from '../utils/http.js'
 
 const imageRouter = Router()
-
-function getImageTimeoutMs() {
-  return 180_000
-}
 
 imageRouter.post('/', async (req, res) => {
   const parsedPayload = validateImagePayload(req.body)
@@ -22,23 +19,16 @@ imageRouter.post('/', async (req, res) => {
   }
 
   try {
-    const response = await fetchWithTimeout(`${LLM_API_BASE_URL}/images/generations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-        'X-User-Key': req.userCredentials.userKey,
-        'X-OpenWebUi-User-Email': req.userCredentials.userEmail,
-      },
-      body: JSON.stringify({
+    const response = await imageGeneration({
+      body: {
         model: imageModel.id,
         ...parsedPayload.value,
-      }),
-    }, getImageTimeoutMs())
+      },
+      userCredentials: req.userCredentials,
+    })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`Image API error ${response.status}:`, errorText)
+      await handleErrorResponse(response, '/api/image')
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/image')

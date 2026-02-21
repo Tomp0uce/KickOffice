@@ -1,3 +1,28 @@
+// Sensitive header names that should be redacted from error logs
+const SENSITIVE_HEADERS = [
+  'x-user-key',
+  'x-user-email',
+  'x-openwebui-user-email',
+  'authorization',
+  'api-key',
+  'x-api-key',
+]
+
+/**
+ * Sanitizes error text by redacting known sensitive header values.
+ * Prevents credential leakage in log aggregation systems.
+ */
+function sanitizeErrorText(errorText) {
+  if (typeof errorText !== 'string') return errorText
+  let sanitized = errorText
+  for (const header of SENSITIVE_HEADERS) {
+    // Match header patterns like "X-User-Key: value" or "x-user-key":"value"
+    const headerRegex = new RegExp(`(["']?${header}["']?\\s*[:=]\\s*["']?)([^"'\\s,}]+)(["']?)`, 'gi')
+    sanitized = sanitized.replace(headerRegex, '$1[REDACTED]$3')
+  }
+  return sanitized
+}
+
 async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController()
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs)
@@ -27,4 +52,5 @@ function logAndRespond(res, status, errorObj, context = 'API') {
 export {
   fetchWithTimeout,
   logAndRespond,
+  sanitizeErrorText,
 }

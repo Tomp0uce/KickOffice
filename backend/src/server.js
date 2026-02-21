@@ -15,6 +15,9 @@ import {
   PORT,
   PUBLIC_FRONTEND_URL,
 } from './config/env.js'
+
+const isProduction = process.env.NODE_ENV === 'production'
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '600000', 10) // 10 minutes default
 import { ensureLlmApiKey, ensureUserCredentials } from './middleware/auth.js'
 import { chatRouter } from './routes/chat.js'
 import { healthRouter } from './routes/health.js'
@@ -40,6 +43,15 @@ const imageLimiter = rateLimit({
   message: { error: 'Too many image requests.' },
 })
 
+// Rate limiter for lightweight info endpoints (health, models)
+const infoLimiter = rateLimit({
+  windowMs: 60_000, // 1 minute
+  max: 120, // generous limit for info endpoints
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests.' },
+})
+
 const allowedOrigins = [FRONTEND_URL]
 if (PUBLIC_FRONTEND_URL) {
   allowedOrigins.push(PUBLIC_FRONTEND_URL)
@@ -54,13 +66,29 @@ app.use(cors({
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  // Enable HSTS in production for HTTPS enforcement
+  strictTransportSecurity: isProduction ? {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  } : false,
 }))
+
+// Request timeout middleware - prevents hanging requests
+app.use((req, res, next) => {
+  req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Request timeout' })
+    }
+  })
+  next()
+})
 
 app.use(express.json({ limit: '4mb' }))
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
-app.use(healthRouter)
-app.use(modelsRouter)
+app.use(infoLimiter, healthRouter)
+app.use(infoLimiter, modelsRouter)
 app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRouter)
 app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
 

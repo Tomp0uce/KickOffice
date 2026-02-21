@@ -1,4 +1,4 @@
-import { MAX_TOOLS } from '../config/models.js'
+import { isChatGptModel, isGpt5Model, MAX_TOOLS, models } from '../config/models.js'
 
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -87,7 +87,117 @@ function validateImagePayload(payload = {}) {
   return { value: { prompt, size, quality, n } }
 }
 
+const MAX_MESSAGES = 200
+const VALID_ROLES = new Set(['system', 'user', 'assistant', 'tool'])
+
+/**
+ * Validates individual message structure.
+ * Returns { error: string } on failure, or { valid: true } on success.
+ */
+function validateMessage(message, index) {
+  if (!message || typeof message !== 'object') {
+    return { error: `messages[${index}] must be an object` }
+  }
+
+  const { role, content, tool_calls, tool_call_id } = message
+
+  if (typeof role !== 'string' || !VALID_ROLES.has(role)) {
+    return { error: `messages[${index}].role must be one of: ${[...VALID_ROLES].join(', ')}` }
+  }
+
+  // Content validation depends on role
+  if (role === 'tool') {
+    // Tool messages require tool_call_id and content
+    if (typeof tool_call_id !== 'string' || !tool_call_id) {
+      return { error: `messages[${index}].tool_call_id is required for tool messages` }
+    }
+    if (content !== undefined && content !== null && typeof content !== 'string') {
+      return { error: `messages[${index}].content must be a string or null` }
+    }
+  } else if (role === 'assistant') {
+    // Assistant messages may have content and/or tool_calls
+    if (content !== undefined && content !== null && typeof content !== 'string') {
+      return { error: `messages[${index}].content must be a string or null` }
+    }
+    if (tool_calls !== undefined && !Array.isArray(tool_calls)) {
+      return { error: `messages[${index}].tool_calls must be an array` }
+    }
+  } else {
+    // System and user messages require content
+    if (content === undefined || content === null) {
+      return { error: `messages[${index}].content is required` }
+    }
+    if (typeof content !== 'string' && !Array.isArray(content)) {
+      return { error: `messages[${index}].content must be a string or array` }
+    }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Validates chat request parameters (shared between /api/chat and /api/chat/sync).
+ * Returns { error: string } on failure, or { modelConfig, parsedTools } on success.
+ */
+function validateChatRequest({ messages, modelTier = 'standard', temperature, maxTokens, tools }, routeName) {
+  if (!messages || !Array.isArray(messages)) {
+    return { error: 'messages array is required' }
+  }
+
+  if (messages.length === 0) {
+    return { error: 'messages array cannot be empty' }
+  }
+
+  if (messages.length > MAX_MESSAGES) {
+    return { error: `messages array cannot exceed ${MAX_MESSAGES} messages` }
+  }
+
+  // Validate each message structure
+  for (let i = 0; i < messages.length; i++) {
+    const validation = validateMessage(messages[i], i)
+    if (validation.error) {
+      return { error: validation.error }
+    }
+  }
+
+  const modelConfig = models[modelTier]
+  if (!modelConfig) {
+    return { error: `Unknown model tier: ${modelTier}` }
+  }
+
+  if (modelConfig.type === 'image') {
+    return { error: 'Use /api/image for image generation' }
+  }
+
+  const parsedTemperature = validateTemperature(temperature)
+  if (parsedTemperature.error) {
+    return { error: parsedTemperature.error }
+  }
+
+  const parsedMaxTokens = validateMaxTokens(maxTokens)
+  if (parsedMaxTokens.error) {
+    return { error: parsedMaxTokens.error }
+  }
+
+  if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
+    return { error: 'temperature and maxTokens are not supported for ChatGPT models' }
+  }
+
+  const requiresReasoningSafeParams = isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort
+  if (requiresReasoningSafeParams && temperature !== undefined) {
+    return { error: 'temperature is only supported for GPT-5 models when reasoning effort is none' }
+  }
+
+  const parsedTools = validateTools(tools)
+  if (parsedTools.error) {
+    return { error: parsedTools.error }
+  }
+
+  return { modelConfig, parsedTools }
+}
+
 export {
+  validateChatRequest,
   validateImagePayload,
   validateMaxTokens,
   validateTemperature,

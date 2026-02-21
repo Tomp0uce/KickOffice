@@ -2,6 +2,16 @@ const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://litellm.kickmaker.net/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
 
+// Validate required configuration at startup
+const isProduction = process.env.NODE_ENV === 'production'
+if (!LLM_API_KEY) {
+  if (isProduction) {
+    throw new Error('FATAL: LLM_API_KEY environment variable is required in production')
+  } else {
+    console.warn('[Config] WARNING: LLM_API_KEY is not set. API requests will fail.')
+  }
+}
+
 const models = {
   standard: {
     id: process.env.MODEL_STANDARD || 'gpt-5.1',

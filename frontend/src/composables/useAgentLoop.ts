@@ -16,23 +16,58 @@ import { useOfficeSelection } from '@/composables/useOfficeSelection'
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
 
 
-interface EnabledToolsStorageState {
-  version: number
-  signature: string
-  enabledToolNames: string[]
+interface ToolCallFunction {
+  name: string
+  arguments: string
 }
 
-interface UseAgentLoopOptions {
-  t: (key: string) => string
+interface ToolCall {
+  id: string
+  type: 'function'
+  function: ToolCallFunction
+}
+
+interface AssistantMessage {
+  role: 'assistant'
+  content: string
+  tool_calls: ToolCall[]
+}
+
+interface StreamResponseChoice {
+  message: AssistantMessage
+  finish_reason?: string | null
+}
+
+interface StreamResponse {
+  choices: StreamResponseChoice[]
+}
+
+interface AgentLoopRefs {
   history: Ref<DisplayMessage[]>
   userInput: Ref<string>
   loading: Ref<boolean>
   imageLoading: Ref<boolean>
   backendOnline: Ref<boolean>
+  abortController: Ref<AbortController | null>
+  inputTextarea: Ref<HTMLTextAreaElement | undefined>
+  draftFocusGlow: Ref<boolean>
+}
+
+interface AgentLoopModels {
   availableModels: Ref<Record<string, ModelInfo>>
   selectedModelTier: Ref<ModelTier>
   selectedModelInfo: Ref<ModelInfo | undefined>
   firstChatModelTier: Ref<ModelTier>
+}
+
+interface AgentLoopHost {
+  isOutlook: boolean
+  isPowerPoint: boolean
+  isExcel: boolean
+  isWord: boolean
+}
+
+interface AgentLoopSettings {
   customSystemPrompt: Ref<string>
   replyLanguage: Ref<string>
   agentMaxIterations: Ref<number>
@@ -41,34 +76,64 @@ interface UseAgentLoopOptions {
   userGender: Ref<string>
   userFirstName: Ref<string>
   userLastName: Ref<string>
-  abortController: Ref<AbortController | null>
-  inputTextarea: Ref<HTMLTextAreaElement | undefined>
-  hostIsOutlook: boolean
-  hostIsPowerPoint: boolean
-  hostIsExcel: boolean
-  hostIsWord: boolean
+}
+
+interface AgentLoopActions {
   quickActions: Ref<QuickAction[]>
   outlookQuickActions?: Ref<OutlookQuickAction[]>
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: PowerPointQuickAction[]
-  draftFocusGlow: Ref<boolean>
+}
+
+interface AgentLoopHelpers {
   createDisplayMessage: (role: DisplayMessage['role'], content: string, imageSrc?: string) => DisplayMessage
   adjustTextareaHeight: () => void
   scrollToBottom: () => Promise<void>
 }
 
+interface UseAgentLoopOptions {
+  t: (key: string) => string
+  refs: AgentLoopRefs
+  models: AgentLoopModels
+  host: AgentLoopHost
+  settings: AgentLoopSettings
+  actions: AgentLoopActions
+  helpers: AgentLoopHelpers
+}
+
 export function useAgentLoop(options: UseAgentLoopOptions) {
+  const { t, refs, models, host, settings, actions, helpers } = options
+
+  // Destructure refs
   const {
-    t,
     history,
     userInput,
     loading,
     imageLoading,
     backendOnline,
+    abortController,
+    inputTextarea,
+    draftFocusGlow,
+  } = refs
+
+  // Destructure models
+  const {
     availableModels,
     selectedModelTier,
     selectedModelInfo,
     firstChatModelTier,
+  } = models
+
+  // Destructure host flags (aliased to match existing code)
+  const {
+    isOutlook: hostIsOutlook,
+    isPowerPoint: hostIsPowerPoint,
+    isExcel: hostIsExcel,
+    isWord: hostIsWord,
+  } = host
+
+  // Destructure settings
+  const {
     customSystemPrompt,
     replyLanguage,
     agentMaxIterations,
@@ -77,21 +142,22 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     userGender,
     userFirstName,
     userLastName,
-    abortController,
-    inputTextarea,
-    hostIsOutlook,
-    hostIsPowerPoint,
-    hostIsExcel,
-    hostIsWord,
+  } = settings
+
+  // Destructure actions
+  const {
     quickActions,
     outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
-    draftFocusGlow,
+  } = actions
+
+  // Destructure helpers
+  const {
     createDisplayMessage,
     adjustTextareaHeight,
     scrollToBottom,
-  } = options
+  } = helpers
 
   const currentAction = ref('')
 
@@ -162,7 +228,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       currentAction.value = t('agentAnalyzing')
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
-      let response: any = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
+      let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
       try {
         let streamStarted = false
         await chatStream({
@@ -225,14 +291,24 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         currentAction.value = ''
         break
       }
+      // Collect all tool results before adding to messages (atomic update)
+      const toolResults: { tool_call_id: string; content: string }[] = []
+      let toolLoopAborted = false
+
       for (const toolCall of assistantMsg.tool_calls) {
+        // Check abort before each tool execution
+        if (abortController.value?.signal.aborted) {
+          toolLoopAborted = true
+          break
+        }
+
         const toolName = toolCall.function.name
         let toolArgs: Record<string, any> = {}
         try {
           toolArgs = JSON.parse(toolCall.function.arguments)
         } catch (parseErr) {
           console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
-          currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: `Error: malformed tool arguments — JSON parse failed` })
+          toolResults.push({ tool_call_id: toolCall.id, content: `Error: malformed tool arguments — JSON parse failed` })
           continue
         }
         let result = ''
@@ -249,10 +325,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
             lastToolSignature = currentSignature
           }
         }
+
+        // Check abort after tool execution
         if (abortController.value?.signal.aborted) {
-          abortedByUser = true
+          toolLoopAborted = true
           break
         }
+
         let safeContent = ''
         if (result === null || result === undefined) {
           safeContent = ''
@@ -266,10 +345,23 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           safeContent = String(result)
         }
 
-        currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: safeContent })
+        toolResults.push({ tool_call_id: toolCall.id, content: safeContent })
       }
-      if (abortedByUser) {
+
+      // If aborted mid-tool-loop, rollback partial state by removing incomplete assistant message
+      if (toolLoopAborted) {
+        // Remove the last assistant message with tool_calls since we didn't complete all tools
+        const lastMsgIdx = currentMessages.length - 1
+        if (lastMsgIdx >= 0 && currentMessages[lastMsgIdx].role === 'assistant') {
+          currentMessages.pop()
+        }
+        abortedByUser = true
         break
+      }
+
+      // Atomically add all tool results now that loop completed successfully
+      for (const toolResult of toolResults) {
+        currentMessages.push({ role: 'tool', tool_call_id: toolResult.tool_call_id, content: toolResult.content })
       }
       currentAction.value = t('agentAnalyzing')
     }
