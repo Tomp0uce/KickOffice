@@ -650,7 +650,7 @@ const { t } = useI18n();
 const router = useRouter();
 const appVersion = __APP_VERSION__;
 
-const currentTab = ref("general");
+const currentTab = ref("account");
 
 // Settings
 const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
