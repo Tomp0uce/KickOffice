@@ -41,6 +41,21 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks - split large dependencies
+          'vendor-vue': ['vue', 'vue-router', 'vue-i18n'],
+          'vendor-ui': ['lucide-vue-next'],
+          'vendor-utils': ['@vueuse/core', 'dompurify', 'markdown-it'],
+          'vendor-math': ['mathjs'],
+        },
+      },
+    },
+    // Increase warning threshold to 600kB (from default 500kB)
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 3002,
     host: '0.0.0.0',

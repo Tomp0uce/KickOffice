@@ -20,7 +20,7 @@
         </div>
         <div class="flex-1">
           <h2 class="text-sm font-semibold text-main">
-            {{ $t("settings") || "Settings" }}
+            {{ $t("settings") }}
           </h2>
         </div>
       </div>
@@ -943,6 +943,7 @@ function savePromptEdit() {
 
 function cancelEdit() {
   editingPromptId.value = "";
+  editingPrompt.value = { id: "", name: "", systemPrompt: "", userPrompt: "" };
 }
 
 function deletePrompt(id: string) {

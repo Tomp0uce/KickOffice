@@ -6,7 +6,8 @@ import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, t
 import { insertIntoPowerPoint } from '@/utils/powerpointTools'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from '@/utils/officeRichText'
 
-const VERBOSE_INSERT_LOG_TAG = '[KO-VERBOSE-INSERT][REMOVE_ME]'
+const VERBOSE_LOGGING_ENABLED = import.meta.env.VITE_VERBOSE_LOGGING === 'true'
+const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-INSERT]') : () => {}
 
 interface UseOfficeInsertOptions {
   hostIsOutlook: boolean
@@ -53,7 +54,9 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       await navigator.clipboard.writeText(text)
       notifySuccess()
       return
-    } catch {}
+    } catch (err) {
+      console.warn('Clipboard API writeText failed, trying fallback:', err)
+    }
     try {
       const textarea = document.createElement('textarea')
       textarea.value = text
@@ -75,7 +78,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     const normalizedContent = normalizeInsertionContent(content)
     if (!normalizedContent) return
 
-    console.info(`${VERBOSE_INSERT_LOG_TAG} insertToDocument`, {
+    verboseLog('insertToDocument', {
       host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
       type,
       contentLength: normalizedContent.length,

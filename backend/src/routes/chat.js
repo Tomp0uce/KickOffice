@@ -1,69 +1,29 @@
 import { Router } from 'express'
 
-import { buildChatBody, isChatGptModel, isGpt5Model, LLM_API_BASE_URL, LLM_API_KEY, models } from '../config/models.js'
-import { validateMaxTokens, validateTemperature, validateTools } from '../middleware/validate.js'
-import { fetchWithTimeout, logAndRespond } from '../utils/http.js'
+import { buildChatBody } from '../config/models.js'
+import { validateChatRequest } from '../middleware/validate.js'
+import { chatCompletion, handleErrorResponse } from '../services/llmClient.js'
+import { logAndRespond } from '../utils/http.js'
 
 const chatRouter = Router()
-const VERBOSE_CHAT_LOG_TAG = '[KO-VERBOSE-CHAT][REMOVE_ME]'
-
-function requiresReasoningSafeParams(modelConfig) {
-  return isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort !== 'none'
-}
-
-function getChatTimeoutMs(modelTier) {
-  if (modelTier === 'reasoning') return 300_000
-  return 120_000
-}
+const VERBOSE_LOGGING_ENABLED = process.env.VERBOSE_LOGGING === 'true'
+const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-CHAT]') : () => {}
 
 chatRouter.post('/', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
-  console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat incoming`, {
+  verboseLog(` /api/chat incoming`, {
     modelTier,
     messageCount: Array.isArray(messages) ? messages.length : 0,
     hasTemperature: temperature !== undefined,
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  if (!messages || !Array.isArray(messages)) {
-    return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat')
+  const validation = validateChatRequest(req.body, 'POST /api/chat')
+  if (validation.error) {
+    return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat')
   }
 
-  const modelConfig = models[modelTier]
-  if (!modelConfig) {
-    return logAndRespond(res, 400, { error: `Unknown model tier: ${modelTier}` }, 'POST /api/chat')
-  }
-
-  if (modelConfig.type === 'image') {
-    return logAndRespond(res, 400, { error: 'Use /api/image for image generation' }, 'POST /api/chat')
-  }
-
-  const parsedTemperature = validateTemperature(temperature)
-  if (parsedTemperature.error) {
-    return logAndRespond(res, 400, { error: parsedTemperature.error }, 'POST /api/chat')
-  }
-
-  const parsedMaxTokens = validateMaxTokens(maxTokens)
-  if (parsedMaxTokens.error) {
-    return logAndRespond(res, 400, { error: parsedMaxTokens.error }, 'POST /api/chat')
-  }
-
-  if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
-    return logAndRespond(res, 400, {
-      error: 'temperature and maxTokens are not supported for ChatGPT models',
-    }, 'POST /api/chat')
-  }
-
-  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
-    return logAndRespond(res, 400, {
-      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
-    }, 'POST /api/chat')
-  }
-
-  const parsedTools = validateTools(tools)
-  if (parsedTools.error) {
-    return logAndRespond(res, 400, { error: parsedTools.error }, 'POST /api/chat')
-  }
+  const { modelConfig, parsedTools } = validation
 
   try {
     const body = buildChatBody({
@@ -76,7 +36,7 @@ chatRouter.post('/', async (req, res) => {
       tools: parsedTools.value,
     })
 
-    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat upstream payload`, {
+    verboseLog(` /api/chat upstream payload`, {
       model: body.model,
       stream: body.stream,
       messageCount: body.messages?.length || 0,
@@ -85,20 +45,14 @@ chatRouter.post('/', async (req, res) => {
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
     })
 
-    const response = await fetchWithTimeout(`${LLM_API_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-        'X-User-Key': req.userCredentials.userKey,
-        'X-OpenWebUi-User-Email': req.userCredentials.userEmail,
-      },
-      body: JSON.stringify(body),
-    }, getChatTimeoutMs(modelTier))
+    const response = await chatCompletion({
+      body,
+      userCredentials: req.userCredentials,
+      modelTier,
+    })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('LLM API error on /api/chat', { status: response.status, modelTier, errorText })
+      await handleErrorResponse(response, '/api/chat')
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat')
@@ -110,18 +64,38 @@ chatRouter.post('/', async (req, res) => {
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
+    let clientDisconnected = false
+
+    // Track client disconnection
+    res.on('close', () => { clientDisconnected = true })
 
     try {
       while (true) {
+        if (clientDisconnected) break
         const { done, value } = await reader.read()
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
-        res.write(chunk)
+
+        // Check write result for backpressure
+        const canContinue = res.write(chunk)
+        if (!canContinue && !clientDisconnected) {
+          // Wait for drain before continuing
+          await new Promise(resolve => res.once('drain', resolve))
+        }
+      }
+      // Flush any remaining bytes in the decoder
+      const finalChunk = decoder.decode()
+      if (finalChunk && !clientDisconnected) {
+        res.write(finalChunk)
       }
     } catch (streamError) {
-      console.error('Stream error:', streamError)
+      if (!clientDisconnected) {
+        console.error('Stream error:', streamError)
+      }
     } finally {
-      res.end()
+      if (!res.writableEnded) {
+        res.end()
+      }
     }
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -134,7 +108,7 @@ chatRouter.post('/', async (req, res) => {
 
 chatRouter.post('/sync', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
-  console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync incoming`, {
+  verboseLog(` /api/chat/sync incoming`, {
     modelTier,
     messageCount: Array.isArray(messages) ? messages.length : 0,
     toolCount: Array.isArray(tools) ? tools.length : 0,
@@ -142,41 +116,12 @@ chatRouter.post('/sync', async (req, res) => {
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  if (!messages || !Array.isArray(messages)) {
-    return logAndRespond(res, 400, { error: 'messages array is required' }, 'POST /api/chat/sync')
+  const validation = validateChatRequest(req.body, 'POST /api/chat/sync')
+  if (validation.error) {
+    return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat/sync')
   }
 
-  const modelConfig = models[modelTier]
-  if (!modelConfig || modelConfig.type === 'image') {
-    return logAndRespond(res, 400, { error: `Invalid model tier for chat: ${modelTier}` }, 'POST /api/chat/sync')
-  }
-
-  const parsedTemperature = validateTemperature(temperature)
-  if (parsedTemperature.error) {
-    return logAndRespond(res, 400, { error: parsedTemperature.error }, 'POST /api/chat/sync')
-  }
-
-  const parsedMaxTokens = validateMaxTokens(maxTokens)
-  if (parsedMaxTokens.error) {
-    return logAndRespond(res, 400, { error: parsedMaxTokens.error }, 'POST /api/chat/sync')
-  }
-
-  if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
-    return logAndRespond(res, 400, {
-      error: 'temperature and maxTokens are not supported for ChatGPT models',
-    }, 'POST /api/chat/sync')
-  }
-
-  if (requiresReasoningSafeParams(modelConfig) && temperature !== undefined) {
-    return logAndRespond(res, 400, {
-      error: 'temperature is only supported for GPT-5 models when reasoning effort is none',
-    }, 'POST /api/chat/sync')
-  }
-
-  const parsedTools = validateTools(tools)
-  if (parsedTools.error) {
-    return logAndRespond(res, 400, { error: parsedTools.error }, 'POST /api/chat/sync')
-  }
+  const { modelConfig, parsedTools } = validation
 
   try {
     const body = buildChatBody({
@@ -189,7 +134,7 @@ chatRouter.post('/sync', async (req, res) => {
       tools: parsedTools.value,
     })
 
-    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync upstream payload`, {
+    verboseLog(` /api/chat/sync upstream payload`, {
       model: body.model,
       stream: body.stream,
       messageCount: body.messages?.length || 0,
@@ -199,27 +144,45 @@ chatRouter.post('/sync', async (req, res) => {
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
     })
 
-    const response = await fetchWithTimeout(`${LLM_API_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-        'X-User-Key': req.userCredentials.userKey,
-        'X-OpenWebUi-User-Email': req.userCredentials.userEmail,
-      },
-      body: JSON.stringify(body),
-    }, getChatTimeoutMs(modelTier))
+    const response = await chatCompletion({
+      body,
+      userCredentials: req.userCredentials,
+      modelTier,
+    })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('LLM API error on /api/chat/sync', { status: response.status, modelTier, errorText })
+      await handleErrorResponse(response, '/api/chat/sync')
       return logAndRespond(res, 502, {
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat/sync')
     }
 
     const data = await response.json()
-    console.info(`${VERBOSE_CHAT_LOG_TAG} /api/chat/sync upstream response`, {
+
+    // Validate upstream response structure
+    if (!data || typeof data !== 'object') {
+      console.error('LLM API returned invalid response format', { type: typeof data })
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an invalid response format.',
+      }, 'POST /api/chat/sync')
+    }
+
+    if (!Array.isArray(data.choices) || data.choices.length === 0) {
+      console.error('LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500) })
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an empty response.',
+      }, 'POST /api/chat/sync')
+    }
+
+    const firstChoice = data.choices[0]
+    if (!firstChoice.message || typeof firstChoice.message !== 'object') {
+      console.error('LLM API returned invalid choice structure', { choice: firstChoice })
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an invalid response structure.',
+      }, 'POST /api/chat/sync')
+    }
+
+    verboseLog(` /api/chat/sync upstream response`, {
       id: data?.id,
       model: data?.model,
       choiceCount: data?.choices?.length || 0,
