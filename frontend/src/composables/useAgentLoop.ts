@@ -228,7 +228,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       for (const toolCall of assistantMsg.tool_calls) {
         const toolName = toolCall.function.name
         let toolArgs: Record<string, any> = {}
-        try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}
+        try {
+          toolArgs = JSON.parse(toolCall.function.arguments)
+        } catch (parseErr) {
+          console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
+          currentMessages.push({ role: 'tool', tool_call_id: toolCall.id, content: `Error: malformed tool arguments — JSON parse failed` })
+          continue
+        }
         let result = ''
         const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
         if (toolDef) {

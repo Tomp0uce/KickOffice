@@ -659,8 +659,8 @@ const replyLanguage = useStorage(
   "Fran\u00e7ais",
 );
 const darkMode = useStorage(localStorageKey.darkMode, false);
-const litellmUserKey = useStorage(localStorageKey.litellmUserKey, "");
-const litellmUserEmail = useStorage(localStorageKey.litellmUserEmail, "");
+const litellmUserKey = useStorage(localStorageKey.litellmUserKey, "", sessionStorage);
+const litellmUserEmail = useStorage(localStorageKey.litellmUserEmail, "", sessionStorage);
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
 const AGENT_MAX_ITERATIONS_MIN = 1;
 const AGENT_MAX_ITERATIONS_MAX = 100;

@@ -76,8 +76,8 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
 
 
 function getUserCredentialHeaders(): Record<string, string> {
-  const userKey = localStorage.getItem('litellmUserKey') || ''
-  const userEmail = localStorage.getItem('litellmUserEmail') || ''
+  const userKey = sessionStorage.getItem('litellmUserKey') || ''
+  const userEmail = sessionStorage.getItem('litellmUserEmail') || ''
   const headers: Record<string, string> = {}
   if (userKey) headers['X-User-Key'] = userKey
   if (userEmail) headers['X-User-Email'] = userEmail
