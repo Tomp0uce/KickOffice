@@ -35,30 +35,23 @@ The following major issues have been successfully addressed:
 
 ### CRITICAL (C1-C3) — Requires immediate action
 
-#### C1. LiteLLM credentials stored in plain localStorage
-- **File**: `frontend/src/api/backend.ts:79-80`
+#### C1. LiteLLM credentials stored in plain localStorage ✅ FIXED
+- **File**: `frontend/src/api/backend.ts:79-80`, `frontend/src/pages/SettingsPage.vue:662-663`
 - **Issue**: User API keys (`litellmUserKey`) and emails are stored unencrypted in localStorage.
 - **Impact**: If browser is compromised (XSS, malicious extension), credentials can be extracted.
-- **Fix**: Use sessionStorage with short TTL, or encrypt credentials at rest with a derived key.
+- **Fix applied**: Migrated to `sessionStorage` — credentials now cleared automatically when the browser session ends. Both the read side (`backend.ts`) and write side (`SettingsPage.vue` via `useStorage`) updated.
 
-#### C2. reasoning_effort default value 'none' is invalid
+#### C2. reasoning_effort default value 'none' is invalid ✅ FIXED
 - **File**: `backend/src/config/models.js:11,52`
 - **Issue**: `reasoningEffort` defaults to `'none'` which is NOT a valid OpenAI API value. Valid values are `'low'`, `'medium'`, `'high'`.
 - **Impact**: When tools are used with GPT-5 models and `reasoningEffort='none'`, the API returns empty responses. Line 83 guards against sending `'none'`, but the default assignment creates confusion.
-- **Fix**: Remove `'none'` as default. Use `undefined` or omit the parameter entirely when reasoning is not needed.
-- **Evidence**:
-  ```javascript
-  // Line 11 - env default is 'none'
-  reasoningEffort: process.env.MODEL_STANDARD_REASONING_EFFORT || 'none',
-  // Line 52 - fallback is 'none'
-  const reasoningEffort = isGpt5Model(modelId) ? (modelConfig.reasoningEffort || 'none') : undefined
-  ```
+- **Fix applied**: Replaced `|| 'none'` with `|| undefined` on lines 11 and 52. The `canUseSamplingParams` check updated from `=== 'none'` to `!reasoningEffort`. The redundant `!== 'none'` guard on line 83 also removed.
 
-#### C3. Silent JSON parse failure in agent tool arguments
+#### C3. Silent JSON parse failure in agent tool arguments ✅ FIXED
 - **File**: `frontend/src/composables/useAgentLoop.ts:231`
 - **Issue**: `try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}` — if parsing fails, `toolArgs` is empty object `{}`.
 - **Impact**: Malformed tool call arguments from LLM are silently swallowed, causing tools to execute with wrong/missing parameters.
-- **Fix**: Log parse failures and surface error to user; consider aborting tool execution on malformed input.
+- **Fix applied**: Parse failure now logs the error (tool name + raw arguments) to console and pushes a `tool` error message back into `currentMessages` with `continue` to skip execution — preventing the tool from running with empty/incorrect parameters.
 
 ---
 
@@ -277,9 +270,9 @@ The following major issues have been successfully addressed:
 
 | ID  | Severity | Category    | Status   | File(s)                          |
 |-----|----------|-------------|----------|----------------------------------|
-| C1  | CRITICAL | Security    | OPEN     | backend.ts                       |
-| C2  | CRITICAL | Correctness | OPEN     | models.js                        |
-| C3  | CRITICAL | Correctness | OPEN     | useAgentLoop.ts                  |
+| C1  | CRITICAL | Security    | FIXED    | backend.ts, SettingsPage.vue     |
+| C2  | CRITICAL | Correctness | FIXED    | models.js                        |
+| C3  | CRITICAL | Correctness | FIXED    | useAgentLoop.ts                  |
 | H1  | HIGH     | Security    | OPEN     | MarkdownRenderer.vue             |
 | H2  | HIGH     | Security    | OPEN     | chat.js, image.js                |
 | H3  | HIGH     | Quality     | OPEN     | chat.js                          |
