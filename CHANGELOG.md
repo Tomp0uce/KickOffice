@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 - **PowerPoint Bullets Rendering**: Fixed an issue where AI-generated bullet points were inserted as raw text. They are now inserted as properly formatted HTML lists to enforce native slide bullets.
 - **Translate Quick Action Unification**: Standardized the "Translate" action across Word, Outlook, and PowerPoint to automatically detect the source language (FR/EN) and translate to the other, sharing the same prompt, icon, tooltip, and menu position.
 
+### Changed
+
+- **DESIGN_REVIEW.md rewritten in English**: Full code audit with 35 identified issues organized by severity (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW). Includes tracking matrix and priority recommendations.
+
 ### Fixed
 
 - **Tool state synchronization**: The interface "Settings" now correctly restricts the tools dynamically passed to the agent.
