@@ -74,6 +74,16 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
   }
 }
 
+
+function getUserCredentialHeaders(): Record<string, string> {
+  const userKey = localStorage.getItem('litellmUserKey') || ''
+  const userEmail = localStorage.getItem('litellmUserEmail') || ''
+  const headers: Record<string, string> = {}
+  if (userKey) headers['X-User-Key'] = userKey
+  if (userEmail) headers['X-User-Email'] = userEmail
+  return headers
+}
+
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`)
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
@@ -125,7 +135,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
     body: JSON.stringify({ messages, modelTier, tools }),
     signal: abortSignal,
   })
@@ -221,7 +231,7 @@ export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatComp
   try {
     const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
       body: JSON.stringify({ messages, modelTier, tools }),
       signal: abortSignal,
     })
@@ -247,7 +257,7 @@ export interface ImageGenerateOptions {
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
     body: JSON.stringify(options),
   })
 
