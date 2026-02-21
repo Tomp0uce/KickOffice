@@ -366,7 +366,7 @@
   "litellmUserKeyLabel": "LiteLLM User Key",
   "litellmUserKeyPlaceholder": "Your personal LiteLLM key",
   "litellmUserEmailLabel": "User Email",
-  "litellmUserEmailPlaceholder": "your.email@kickmaker.net",
+  "litellmUserEmailPlaceholder": "your.email{'@'}kickmaker.net",
   "litellmCredentialsInfo": "Get your key at",
   "litellmCredentialsConfigured": "Credentials configured",
   "litellmCredentialsMissing": "Credentials not configured"
