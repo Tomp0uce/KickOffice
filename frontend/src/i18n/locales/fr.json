@@ -371,7 +371,7 @@
   "litellmUserKeyLabel": "Clé utilisateur LiteLLM",
   "litellmUserKeyPlaceholder": "Votre clé personnelle LiteLLM",
   "litellmUserEmailLabel": "Email utilisateur",
-  "litellmUserEmailPlaceholder": "votre.email@kickmaker.net",
+  "litellmUserEmailPlaceholder": "votre.email{'@'}kickmaker.net",
   "litellmCredentialsInfo": "Obtenez votre clé sur",
   "litellmCredentialsConfigured": "Identifiants configurés",
   "litellmCredentialsMissing": "Identifiants non configurés"
