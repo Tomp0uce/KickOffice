@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **DESIGN_REVIEW.md v2**: Complete fresh audit with 28 new issues identified (3 CRITICAL, 5 HIGH, 10 MEDIUM, 7 LOW, 3 BUILD). Previous v1 audit (38 issues, all resolved) preserved as reference.
+- **README.md updated**: Fixed model default values to match actual code (`gpt-5.1`, `gpt-image-1`). Updated backend API surface description. Added undocumented frontend env vars (`VITE_REQUEST_TIMEOUT_MS`, `VITE_VERBOSE_LOGGING`). Refreshed Known Open Issues section with v2 findings. Cleaned up Not Yet Implemented list.
+- **agents.md updated**: Fixed PowerPoint tool count (14, not 8). Updated backend architecture section to include `services/llmClient.js`. Corrected streaming endpoint documentation (now supports tools). Refreshed known issues reference to DESIGN_REVIEW.md v2.
+- **CHANGELOG.md updated**: Added documentation update entries.
+
+---
+
+## [Previous]
+
 ### Added
 
 - **Auto-scroll to beginning of AI response**: Automatically scrolls the chat window so the beginning of the AI response remains in view when generating long messages.

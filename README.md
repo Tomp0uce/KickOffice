@@ -28,7 +28,7 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
 ```
 
 - **Frontend**: Vue 3 task pane add-in loaded inside Office apps. Handles UI, chat, agent tool execution (Word API calls run locally in the browser).
-- **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming), `/api/chat/sync` (agent mode with tools), `/api/image`, `/api/models`, and `/health`.
+- **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming, supports tool calls), `/api/chat/sync` (synchronous fallback), `/api/image`, `/api/models`, and `/health`.
   - IP-based rate limiting is enabled for `/api/chat*` and `/api/image` to reduce DoS risk and control API credit consumption.
   - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
   - Request logging uses Morgan middleware for consistent HTTP access logs across endpoints.
@@ -44,9 +44,9 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 | Tier        | Purpose          | Default Model                       | Use Case                       |
 | ----------- | ---------------- | ----------------------------------- | ------------------------------ |
-| `standard`  | Normal tasks     | `gpt-5.2`                           | Chat, writing, analysis        |
-| `reasoning` | Complex tasks    | `gpt-5.2` (`reasoning_effort=high`) | Multi-step reasoning, planning |
-| `image`     | Image generation | `gpt-image-1.5`                     | Generate images                |
+| `standard`  | Normal tasks     | `gpt-5.1`                           | Chat, writing, analysis        |
+| `reasoning` | Complex tasks    | `gpt-5.1` (`reasoning_effort=high`) | Multi-step reasoning, planning |
+| `image`     | Image generation | `gpt-image-1`                       | Generate images                |
 
 ---
 
@@ -373,29 +373,33 @@ KickOffice/
 
 ### Known Open Issues
 
-See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for full details and root-cause analysis.
+See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) (v2, 2026-02-22) for the full audit with 28 open issues organized by severity.
 
-**All 38 issues from the design review have been resolved** (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD).
-
-| Priority | Issue                                                            | Status  |
-| -------- | ---------------------------------------------------------------- | ------- |
-| MEDIUM   | Missing global Vue error handler                                 | ❌ TODO |
-| MEDIUM   | Accessibility (ARIA attributes) incomplete                       | ❌ TODO |
-| MEDIUM   | Built-in prompts editor missing for PowerPoint and Outlook       | ❌ TODO |
+| Priority | Issue                                                                | Status  |
+| -------- | -------------------------------------------------------------------- | ------- |
+| CRITICAL | Agent max iterations setting silently capped at 10                   | ❌ TODO |
+| CRITICAL | `.env.example` contains invalid `reasoning_effort=none`              | ❌ TODO |
+| CRITICAL | Quick actions bypass loading/abort state                             | ❌ TODO |
+| HIGH     | Chat history grows unbounded in localStorage                         | ❌ TODO |
+| HIGH     | Token manager uses character count instead of token count            | ❌ TODO |
+| MEDIUM   | Accessibility (ARIA attributes) incomplete                           | ❌ TODO |
+| MEDIUM   | No confirmation dialog for "New Chat"                                | ❌ TODO |
+| BUILD    | No unit test infrastructure (vitest)                                 | ❌ TODO |
+| BUILD    | No linting/formatting configuration (ESLint + Prettier)              | ❌ TODO |
+| BUILD    | No CI pipeline for automated testing on PRs                          | ❌ TODO |
 
 ### Not Yet Implemented
 
-- [x] Conversation history persistence (localStorage, per-host isolation)
 - [ ] User authentication and authorization
 - [ ] HTTPS/TLS (required for production Office add-in sideloading)
 - [ ] Azure deployment configuration (production server)
-- [ ] LiteLLM integration configuration (production LLM endpoints)
-- [ ] Web search capability (disabled for now, could be re-enabled via backend proxy)
 - [ ] Chat export (save conversation to file)
 - [ ] Token usage tracking / cost monitoring
 - [ ] Admin dashboard for model configuration (currently .env only)
 - [ ] Multi-user support / user preferences stored server-side
 - [ ] Offline mode / graceful degradation when backend is down
+- [ ] Unit test coverage (vitest)
+- [ ] ESLint + Prettier configuration
 
 ---
 
@@ -449,17 +453,19 @@ docker compose up -d --build
 | `CHAT_RATE_LIMIT_MAX`             | Max requests per IP during chat window                                                 | `20`                        |
 | `IMAGE_RATE_LIMIT_WINDOW_MS`      | Rate-limit window for `/api/image` (milliseconds)                                      | `60000`                     |
 | `IMAGE_RATE_LIMIT_MAX`            | Max requests per IP during image window                                                | `5`                         |
-| `MODEL_STANDARD`                  | Model ID for standard tasks                                                            | `gpt-5.2`                   |
+| `MODEL_STANDARD`                  | Model ID for standard tasks                                                            | `gpt-5.1`                   |
 | `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`low`, `medium`, `high`; omit to use API default) | (omitted)                   |
-| `MODEL_REASONING`                 | Model ID for complex tasks                                                             | `gpt-5.2`                   |
+| `MODEL_REASONING`                 | Model ID for complex tasks                                                             | `gpt-5.1`                   |
 | `MODEL_REASONING_EFFORT`          | Reasoning effort for reasoning model                                                   | `high`                      |
-| `MODEL_IMAGE`                     | Model ID for image generation                                                          | `gpt-image-1.5`             |
+| `MODEL_IMAGE`                     | Model ID for image generation                                                          | `gpt-image-1`               |
 
 #### Frontend (`frontend/.env`)
 
-| Variable           | Description              | Default                 |
-| ------------------ | ------------------------ | ----------------------- |
-| `VITE_BACKEND_URL` | Backend URL (build-time) | `http://localhost:3003` |
+| Variable                 | Description                                          | Default                 |
+| ------------------------ | ---------------------------------------------------- | ----------------------- |
+| `VITE_BACKEND_URL`       | Backend URL (build-time)                             | `http://localhost:3003` |
+| `VITE_REQUEST_TIMEOUT_MS`| HTTP request timeout in milliseconds (build-time)    | `45000`                 |
+| `VITE_VERBOSE_LOGGING`   | Enable verbose console logging (`true` / `false`)    | (disabled)              |
 
 ---
 

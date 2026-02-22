@@ -1,312 +1,300 @@
-# Design Review & Code Audit
+# Design Review & Code Audit — v2
 
-**Date**: 2026-02-21
-**Scope**: KickOffice architecture, security, code quality, and technical debt.
+**Date**: 2026-02-22
+**Scope**: Full architecture, security, code quality, UX, and technical debt analysis of the KickOffice codebase.
 
 ---
 
 ## 1. Executive Summary
 
-The KickOffice add-in architecture (Vue 3 + Vite frontend, Express backend proxy) has undergone a successful refactoring cycle. Core UX bottlenecks have been addressed: streaming agent responses, persistent chat history, token pruning, and i18n externalization.
+KickOffice is a production-grade Microsoft Office add-in (Word, Excel, PowerPoint, Outlook) powered by an AI backend proxy. The architecture — Vue 3 + Vite frontend, Express.js backend, OpenAI-compatible LLM API — is sound and well-structured after the v1 audit cycle.
 
-This audit identified **38 issues** across frontend and backend, organized by severity:
-- **CRITICAL**: 3 issues (security & correctness) ✅ ALL FIXED
-- **HIGH**: 6 issues (stability & data integrity) ✅ ALL FIXED
-- **MEDIUM**: 16 issues (code quality & architecture) ✅ ALL FIXED
-- **LOW**: 10 issues (polish & optimization) ✅ ALL FIXED
-- **BUILD**: 3 warnings (performance, config, testing) ✅ ALL FIXED
+The previous audit (v1, 2026-02-21) identified and resolved **38 issues**. This v2 review is a fresh analysis of the current codebase state, identifying **28 new issues** that were not covered or have emerged since:
 
----
+- **CRITICAL**: 3 issues (correctness, configuration)
+- **HIGH**: 5 issues (architecture, data integrity, documentation accuracy)
+- **MEDIUM**: 10 issues (code quality, UX, maintainability)
+- **LOW**: 7 issues (polish, performance, resilience)
+- **BUILD**: 3 warnings (testing, tooling, CI)
 
-## 2. Recently Resolved Issues (Fixed)
+### Previous Audit Status
 
-The following major issues have been successfully addressed:
-
-- ✅ **Tool state desynchronization (Feature Toggle)**: Settings UI now correctly filters tools used dynamically by the agent.
-- ✅ **Missing streaming in agent loop**: Sync calls replaced by `chatStream`, providing real-time feedback including during tool execution.
-- ✅ **Conversation history persistence**: History is now saved persistently via `localStorage` (isolated per Office Host).
-- ✅ **Context pruning (Token management)**: Implemented intelligent context window ensuring token limits are respected while preserving tool call integrity.
-- ✅ **Hardcoded translations**: "Thought process" label externalized to i18n. Missing tooltips for Excel/PPT/Outlook quick actions added.
-- ✅ **Developer syntax exposure**: Replaced obscure `${text}` syntax with intuitive `[TEXT]` placeholders in settings UI.
-- ✅ **Auto-scroll UX**: Added automatic scrolling that keeps the start of AI-generated messages visible during long responses.
+All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD) have been resolved and verified. Key wins from v1:
+- Session storage for credentials (C1)
+- Reasoning effort parameter fix (C2)
+- JSON parse failure handling (C3)
+- XSS protection, credential sanitization, rate limiting, HSTS
+- LLM API service abstraction, validation middleware, E2E test infrastructure
 
 ---
 
-## 3. Open Issues by Severity
+## 2. New Issues by Severity
 
-### CRITICAL (C1-C3) — Requires immediate action
+### CRITICAL (C1–C3) — Requires immediate action
 
-#### C1. LiteLLM credentials stored in plain localStorage ✅ FIXED
-- **File**: `frontend/src/api/backend.ts:79-80`, `frontend/src/pages/SettingsPage.vue:662-663`
-- **Issue**: User API keys (`litellmUserKey`) and emails are stored unencrypted in localStorage.
-- **Impact**: If browser is compromised (XSS, malicious extension), credentials can be extracted.
-- **Fix applied**: Migrated to `sessionStorage` — credentials now cleared automatically when the browser session ends. Both the read side (`backend.ts`) and write side (`SettingsPage.vue` via `useStorage`) updated.
+#### C1. Agent max iterations setting is silently ignored
+- **Files**: `frontend/src/composables/useAgentLoop.ts:214`, `frontend/src/pages/SettingsPage.vue:664-676`
+- **Issue**: The Settings UI allows `agentMaxIterations` between 1 and 100, but `useAgentLoop.ts` hardcodes `Math.min(Number(agentMaxIterations.value) || 10, 10)` — capping the effective maximum at **10 iterations** regardless of user setting.
+- **Impact**: The settings UI misleads users. Setting iterations to 25 (the default) or 100 has no effect; the agent always stops at 10. For complex multi-step tasks this is a significant functional limitation.
+- **Fix**: Replace the hardcoded `10` with the setting value: `Math.min(Number(agentMaxIterations.value) || 10, agentMaxIterations.value)`, or more simply use the setting value directly with a reasonable cap (e.g. 50).
 
-#### C2. reasoning_effort default value 'none' is invalid ✅ FIXED
-- **File**: `backend/src/config/models.js:11,52`
-- **Issue**: `reasoningEffort` defaults to `'none'` which is NOT a valid OpenAI API value. Valid values are `'low'`, `'medium'`, `'high'`.
-- **Impact**: When tools are used with GPT-5 models and `reasoningEffort='none'`, the API returns empty responses. Line 83 guards against sending `'none'`, but the default assignment creates confusion.
-- **Fix applied**: Replaced `|| 'none'` with `|| undefined` on lines 11 and 52. The `canUseSamplingParams` check updated from `=== 'none'` to `!reasoningEffort`. The redundant `!== 'none'` guard on line 83 also removed.
+#### C2. `.env.example` still contains invalid `reasoning_effort=none`
+- **File**: `backend/.env.example:27`
+- **Issue**: `MODEL_STANDARD_REASONING_EFFORT=none` is present in the example env file. The v1 audit (C2) fixed the code default from `'none'` to `undefined`, but the `.env.example` was not updated. Since `models.js:21` reads `process.env.MODEL_STANDARD_REASONING_EFFORT || undefined`, the string `'none'` is truthy and passes through, ultimately sending `reasoning_effort: 'none'` to the OpenAI API.
+- **Impact**: Any deployment following the `.env.example` template will send an invalid API parameter, causing empty responses when tools are used with GPT-5 models.
+- **Fix**: Change line 27 to `MODEL_STANDARD_REASONING_EFFORT=` (empty, meaning "omit the parameter") and add a comment explaining valid values.
 
-#### C3. Silent JSON parse failure in agent tool arguments ✅ FIXED
-- **File**: `frontend/src/composables/useAgentLoop.ts:231`
-- **Issue**: `try { toolArgs = JSON.parse(toolCall.function.arguments) } catch {}` — if parsing fails, `toolArgs` is empty object `{}`.
-- **Impact**: Malformed tool call arguments from LLM are silently swallowed, causing tools to execute with wrong/missing parameters.
-- **Fix applied**: Parse failure now logs the error (tool name + raw arguments) to console and pushes a `tool` error message back into `currentMessages` with `continue` to skip execution — preventing the tool from running with empty/incorrect parameters.
-
----
-
-### HIGH (H1-H6) — Should fix soon
-
-#### H1. XSS risk via v-html directive ✅ FIXED
-- **File**: `frontend/src/components/chat/MarkdownRenderer.vue:2`
-- **Issue**: Uses `v-html` with DOMPurify sanitization, but relies on correct configuration.
-- **Impact**: If sanitization is bypassed (misconfiguration, DOMPurify vulnerability), arbitrary HTML/JS can execute.
-- **Fix applied**: Added strict `ALLOWED_TAGS` and `ALLOWED_ATTR` allowlists to DOMPurify configuration in `markdown.ts`. Disabled `ALLOW_DATA_ATTR` and `ALLOW_ARIA_ATTR` to minimize attack surface.
-
-#### H2. User credentials exposure in error logs ✅ FIXED
-- **Files**: `backend/src/routes/chat.js:101,215`, `backend/src/routes/image.js:41`
-- **Issue**: `errorText` from upstream API may contain request headers (including `X-User-Key`, `X-User-Email`). These are logged to console.
-- **Impact**: Credentials could leak to log aggregation systems.
-- **Fix applied**: Added `sanitizeErrorText()` utility in `utils/http.js` that redacts known sensitive headers (`X-User-Key`, `X-User-Email`, `Authorization`, etc.) before logging. Applied to all error logging in chat and image routes.
-
-#### H3. Chat route validation code duplication ✅ FIXED
-- **File**: `backend/src/routes/chat.js:19-66, 135-179`
-- **Issue**: Both `/api/chat` and `/api/chat/sync` contain identical validation logic (messages, temperature, maxTokens, tools, ChatGPT checks, reasoning checks).
-- **Impact**: Maintenance burden; risk of divergent behavior when one route is updated but not the other.
-- **Fix applied**: Extracted validation into `validateChatRequest()` function in `middleware/validate.js`. Both routes now use this shared validator, ensuring consistent behavior. Also added empty messages array check (M4 partial fix).
-
-#### H4. Tool storage signature reset causes data loss ✅ FIXED
-- **File**: `frontend/src/utils/toolStorage.ts:51-64`
-- **Issue**: When tool definitions change (add/remove tool), the signature hash changes, causing all user tool preferences to reset silently.
-- **Impact**: User loses custom tool enable/disable state without warning.
-- **Fix applied**: Implemented `migrateToolPreferences()` function that preserves enabled state for existing tools, enables new tools by default, and silently drops removed tools. Logs migration info to console for debugging.
-
-#### H5. Race condition in agent loop during abort ✅ FIXED
-- **File**: `frontend/src/composables/useAgentLoop.ts:156-159, 246-249`
-- **Issue**: If user aborts during tool execution, tool result may be partially added to history, corrupting conversation state.
-- **Impact**: Inconsistent message history; potential errors on next agent iteration.
-- **Fix applied**: Refactored tool execution loop to collect results in a temporary array before committing. Abort checks added before AND after each tool execution. On abort mid-loop, the incomplete assistant message is rolled back from `currentMessages` to prevent state corruption.
-
-#### H6. Empty API key defaults to empty string ✅ FIXED
-- **File**: `backend/src/config/models.js:3`
-- **Issue**: `LLM_API_KEY = process.env.LLM_API_KEY || ''` — server starts even if critical API key is missing.
-- **Impact**: Requests fail at runtime instead of startup; harder to diagnose misconfiguration.
-- **Fix applied**: Added startup validation in `config/models.js`. In production (`NODE_ENV=production`), throws fatal error if `LLM_API_KEY` is not set. In development, logs a warning.
+#### C3. Quick actions bypass loading/abort state management
+- **Files**: `frontend/src/composables/useAgentLoop.ts:512-617`
+- **Issue**: `applyQuickAction()` calls `chatStream` and `runAgentLoop` without setting `loading.value = true` or creating an `AbortController`. The stop button doesn't work during quick actions.
+- **Impact**: Users cannot abort a running quick action. If a quick action is triggered while another is running, concurrent stream writes corrupt the chat history. The UI gives no visual feedback that a quick action is in progress.
+- **Fix**: Wrap the quick action execution in the same loading/abort pattern as `sendMessage()`.
 
 ---
 
-### MEDIUM (M1-M16) — Should address
+### HIGH (H1–H5) — Should fix soon
 
-#### M1. Verbose debug logging with REMOVE_ME tags ✅ FIXED
-- **Files**: `backend/src/routes/chat.js:8`, `frontend/src/composables/useOfficeInsert.ts:9`
-- **Issue**: Production code contains debug tags `[KO-VERBOSE-CHAT][REMOVE_ME]` intended to be temporary.
-- **Fix applied**: Replaced with environment-gated `verboseLog()` function controlled by `VERBOSE_LOGGING=true` env var.
+#### H1. Chat history grows unbounded in localStorage
+- **File**: `frontend/src/pages/HomePage.vue:174`
+- **Issue**: `useStorage<DisplayMessage[]>('chatHistory_word', [])` has no size limit. Each message (especially tool results with full document content) can be several KB. Long agent sessions can produce hundreds of messages.
+- **Impact**: `localStorage` has a ~5-10 MB limit per origin. When exceeded, `QuotaExceededError` is thrown silently (Vue `useStorage` swallows it), causing data loss or broken persistence.
+- **Fix**: Implement a max history size (e.g. 100 messages or 1 MB). Prune oldest messages when the limit is reached. Consider a warning toast when approaching the limit.
 
-#### M2. Stream write error handling missing ✅ FIXED
-- **File**: `backend/src/routes/chat.js:114-125`
-- **Issue**: `res.write(chunk)` doesn't check for backpressure or write failures. If client disconnects mid-stream, errors may occur.
-- **Fix applied**: Added backpressure handling with `res.write()` return value check, `drain` event wait, and client disconnection tracking.
+#### H2. Token manager uses character count instead of token count
+- **File**: `frontend/src/utils/tokenManager.ts:3`
+- **Issue**: `MAX_CONTEXT_CHARS = 100_000` uses character count as a proxy for token count. The function name `prepareMessagesForContext` and the variable name suggest token management, but no tokenization occurs.
+- **Impact**: For CJK text (1-2 chars per token), the budget is ~2x too generous, risking API token limit errors. For English (~4 chars per token), 100k chars ≈ 25k tokens, which is acceptable but imprecise. Additionally, `getMessageContentLength()` does not account for `tool_calls` JSON payload in assistant messages, leading to budget underestimation in tool-heavy conversations.
+- **Fix**: Either rename to `MAX_CONTEXT_CHARS` (already done) and document the approximation, or integrate a lightweight tokenizer (e.g. `tiktoken` WASM build) for accurate counting. At minimum, include `tool_calls` serialized length in the budget calculation.
 
-#### M3. No validation of upstream response structure ✅ FIXED
-- **File**: `backend/src/routes/chat.js:221-231`
-- **Issue**: Sync endpoint returns `res.json(data)` without validating that `data` has expected shape (`choices`, `message`, etc.).
-- **Fix applied**: Added validation for `data` object type, `choices` array presence, and `message` object structure with 502 responses on failure.
+#### H3. Validation error message references invalid `none` value
+- **File**: `backend/src/middleware/validate.js:189`
+- **Issue**: Error message says `"temperature is only supported for GPT-5 models when reasoning effort is none"`. The value `'none'` is no longer valid (removed in v1 C2 fix). The correct phrasing is "when reasoning effort is not set".
+- **Impact**: Confusing error message for API consumers. Could lead developers to set `reasoning_effort=none` based on this message.
+- **Fix**: Change to `"temperature is not supported for GPT-5 models when reasoning effort is enabled"`.
 
-#### M4. Empty messages array allowed ✅ FIXED
-- **File**: `backend/src/routes/chat.js:28-29`
-- **Issue**: Validation checks `Array.isArray(messages)` but not `messages.length > 0`.
-- **Fix applied**: Added `messages.length === 0` check in `validateChatRequest()`.
+#### H4. `chatSync` function is exported but unused (dead code)
+- **File**: `frontend/src/api/backend.ts:228-249`
+- **Issue**: The `chatSync()` function is still fully implemented and exported, but the agent loop was migrated to use `chatStream()` with `onToolCallDelta` instead. No code path calls `chatSync`.
+- **Impact**: Dead code increases maintenance burden and confusion. The function also contains a useless `try { ... } catch (error) { throw error }` wrapper.
+- **Fix**: Remove the `chatSync` function, its interface `ChatSyncOptions`, and the unused import in any consuming file. If kept as future API surface, mark it with a `@deprecated` comment.
 
-#### M5. Message field structure not validated ✅ FIXED
-- **File**: `backend/src/routes/chat.js:20,136`
-- **Issue**: No validation that each message has required fields (`role`, `content`).
-- **Fix applied**: Added `validateMessage()` function that validates role (system/user/assistant/tool), content, tool_calls, and tool_call_id fields based on role.
-
-#### M6. No messages array size limit ✅ FIXED
-- **File**: `backend/src/routes/chat.js:28`
-- **Issue**: While body parser limits to 4MB, there's no limit on `messages.length`.
-- **Fix applied**: Added `MAX_MESSAGES = 200` constant and validation check.
-
-#### M7. No request timeout for Express handlers ✅ FIXED
-- **File**: `backend/src/server.js`
-- **Issue**: Individual API calls have timeouts, but no overall handler timeout exists.
-- **Fix applied**: Added request timeout middleware using `req.setTimeout()` with configurable `REQUEST_TIMEOUT_MS` env var (default 10 minutes).
-
-#### M8. Rate limit env var validation missing ✅ FIXED
-- **File**: `backend/src/config/env.js:5-8`
-- **Issue**: `parseInt()` on env vars doesn't validate result. If set to `"invalid"`, returns `NaN`.
-- **Fix applied**: Added `parsePositiveInt()` helper that throws on NaN or negative values.
-
-#### M9. Excessive prop drilling in useAgentLoop ✅ FIXED
-- **File**: `frontend/src/composables/useAgentLoop.ts:45-91`
-- **Issue**: `UseAgentLoopOptions` interface has 34 parameters, tightly coupling composable to component structure.
-- **Fix applied**: Refactored options into logical sub-interfaces: `AgentLoopRefs`, `AgentLoopModels`, `AgentLoopHost`, `AgentLoopSettings`, `AgentLoopActions`, `AgentLoopHelpers`. Updated `HomePage.vue` caller to use grouped structure.
-
-#### M10. Type safety issues with `any` types ✅ FIXED
-- **Files**: `frontend/src/pages/HomePage.vue:388`, `frontend/src/composables/useAgentLoop.ts:127,165`
-- **Issue**: Multiple `any` type assertions bypass TypeScript type checking.
-- **Fix applied**: Added `StreamResponse`, `StreamResponseChoice`, `AssistantMessage`, `ToolCall`, `ToolCallFunction` interfaces for proper typing of agent loop response handling.
-
-#### M11. Silent clipboard failures ✅ FIXED
-- **File**: `frontend/src/composables/useImageActions.ts:56,62,93`
-- **Issue**: Empty catch blocks for clipboard operations silently swallow errors.
-- **Fix applied**: Added `console.warn` logging for clipboard API failures (already present in useImageActions.ts, added to useOfficeInsert.ts).
-
-#### M12. No HTTPS enforcement ✅ FIXED
-- **File**: `backend/src/server.js`
-- **Issue**: No HTTPS enforcement or HSTS headers in production.
-- **Fix applied**: Added HSTS headers via Helmet config with `maxAge: 1 year`, `includeSubDomains`, and `preload` when `NODE_ENV=production`.
-
-#### M13. TextDecoder stream not flushed ✅ FIXED
-- **File**: `backend/src/routes/chat.js:118`
-- **Issue**: `decoder.decode(value, { stream: true })` used but final `decoder.decode(undefined)` not called to flush remaining bytes.
-- **Fix applied**: Added `decoder.decode()` call after stream loop to flush remaining bytes.
-
-#### M14. Unsafe JSON handling in settings ✅ FIXED
-- **File**: `frontend/src/pages/SettingsPage.vue:962`, `frontend/src/utils/savedPrompts.ts:13-15`
-- **Issue**: `JSON.parse` with inadequate structure validation. Array existence checked but element types not validated.
-- **Fix applied**: Added `isValidSavedPrompt()` type guard function that validates all required fields. Invalid items are logged and skipped.
-
-#### M15. No LLM API service abstraction ✅ FIXED
-- **Files**: `backend/src/routes/chat.js:88-97,202-211`, `backend/src/routes/image.js:25-37`
-- **Issue**: Each route directly constructs HTTP requests to LLM API. No centralized abstraction.
-- **Fix applied**: Created `services/llmClient.js` module with `chatCompletion()`, `imageGeneration()`, and `handleErrorResponse()` functions. Routes now use this centralized service.
-
-#### M16. Timeout values hardcoded in routes ✅ FIXED
-- **Files**: `backend/src/routes/chat.js:14-17`, `backend/src/routes/image.js:9-11`
-- **Issue**: Timeout values (120s, 300s) defined in route handlers, not centralized config.
-- **Fix applied**: Moved timeouts to `services/llmClient.js` with exported `TIMEOUTS` object and `getChatTimeoutMs()`, `getImageTimeoutMs()` functions.
+#### H5. README model defaults do not match actual code
+- **Files**: `README.md:47-49`, `backend/src/config/models.js:17,26,33`, `backend/.env.example:23,30,37`
+- **Issue**: README documents default models as `gpt-5.2` and `gpt-image-1.5`, but actual code defaults are `gpt-5.1` and `gpt-image-1`. The `.env.example` correctly shows `gpt-5.1` and `gpt-image-1`.
+- **Impact**: Documentation mismatch causes confusion during deployment.
+- **Fix**: Update README to match actual defaults (`gpt-5.1`, `gpt-image-1`).
 
 ---
 
-### LOW (L1-L10) — Nice to have
+### MEDIUM (M1–M10) — Should address
 
-#### L1. Hardcoded French strings in quick actions ✅ FIXED
-- **File**: `frontend/src/pages/HomePage.vue:251,259,267`
-- **Issue**: Draft mode quick action prefixes contain hardcoded French text.
-- **Fix applied**: Moved French strings to i18n keys (`excelFormulaPrefix`, `excelTransformPrefix`, `excelHighlightPrefix`) in `fr.json` and `en.json`.
+#### M1. No confirmation dialog for "New Chat"
+- **File**: `frontend/src/pages/HomePage.vue:490-497`
+- **Issue**: `startNewChat()` immediately clears all history without confirmation. One accidental click destroys the entire conversation.
+- **Impact**: Users lose conversation data with no recovery path.
+- **Fix**: Add a confirmation prompt before clearing, or implement undo functionality.
 
-#### L2. Missing i18n fallback pattern ✅ FIXED
-- **File**: `frontend/src/pages/SettingsPage.vue:23`
-- **Issue**: `{{ $t("settings") || "Settings" }}` uses JS fallback instead of i18n fallback mechanism.
-- **Fix applied**: Removed JS fallback, i18n fallback locale handles missing keys.
+#### M2. `processChat` has useless try/catch wrapper
+- **File**: `frontend/src/composables/useAgentLoop.ts:406-410`
+- **Issue**: `try { await runAgentLoop(messages, modelTier) } catch (error) { throw error }` catches and immediately re-throws without transformation.
+- **Impact**: Dead code that adds noise. The catch block does nothing useful.
+- **Fix**: Remove the try/catch, call `runAgentLoop` directly.
 
-#### L3. Inconsistent error message text ✅ FIXED
-- **File**: `backend/src/routes/chat.js:34,151`
-- **Issue**: Different error messages for same condition (`"Unknown model tier"` vs `"Invalid model tier"`).
-- **Fix applied**: Standardized to `"Invalid model tier"` throughout `validateChatRequest()`.
+#### M3. Inconsistent quick action type definitions
+- **Files**: `frontend/src/pages/HomePage.vue:271,305`, `frontend/src/composables/useAgentLoop.ts:83-86`
+- **Issue**: `outlookQuickActions` is a plain array, `excelQuickActions` is a `computed`, `powerPointQuickActions` is a plain array, and `wordQuickActions` is a plain array. The `AgentLoopActions` interface expects `outlookQuickActions` as `Ref<OutlookQuickAction[]>` (optional) and `powerPointQuickActions` as a plain array. Then `HomePage.vue:469` wraps `outlookQuickActions` in `computed(() => outlookQuickActions)` to satisfy the ref requirement.
+- **Impact**: Unnecessary complexity and inconsistent patterns make the code harder to understand.
+- **Fix**: Standardize all quick action arrays to the same type (either all `computed` or all plain arrays) and update the interface accordingly.
 
-#### L4. User credential format not validated ✅ FIXED
-- **File**: `backend/src/middleware/auth.js:17-27`
-- **Issue**: Email format and key length not validated.
-- **Fix applied**: Added `EMAIL_REGEX` validation and `MIN_KEY_LENGTH = 8` check in `ensureUserCredentials()`.
+#### M4. Missing accessibility (ARIA) attributes
+- **Files**: `frontend/src/pages/SettingsPage.vue`, `frontend/src/components/chat/ChatInput.vue`
+- **Issue**: Settings tabs lack `role="tablist"` / `role="tab"` / `role="tabpanel"` attributes. Tool checkboxes have no `aria-label`. The chat input textarea has no `aria-label`.
+- **Impact**: Screen reader users cannot properly navigate the UI. May not meet corporate accessibility requirements (WCAG 2.1 AA).
+- **Fix**: Add ARIA roles and labels to interactive elements.
 
-#### L5. Stream cleanup race condition ✅ FIXED
-- **File**: `backend/src/routes/chat.js:114-125`
-- **Issue**: If client disconnects while streaming, both stream error handler and outer catch block might execute.
-- **Fix applied**: Added `clientDisconnected` flag tracking for proper stream cleanup (already done as part of M2 backpressure handling).
+#### M5. Built-in prompts serialization uses fragile interpolation
+- **Files**: `frontend/src/pages/SettingsPage.vue:968-971,986-987,997-1001`
+- **Issue**: Custom built-in prompts are serialized with `${language}` and `${text}` placeholders but the editor UI uses `[LANGUAGE]` and `[TEXT]`. The bidirectional translation works but is fragile. If a user types a literal `${text}` in the editor, it would be interpreted as a replacement variable during deserialization.
+- **Impact**: Edge case data corruption. The dual-format approach is a maintenance risk.
+- **Fix**: Standardize on a single placeholder format (prefer `[LANGUAGE]`/`[TEXT]` since that's what the user sees) and use it for both serialization and deserialization.
 
-#### L6. Inefficient array operations ✅ FIXED
-- **Files**: `frontend/src/composables/useAgentLoop.ts:198`, `frontend/src/pages/SettingsPage.vue:934-936`
-- **Issue**: Unnecessary `filter(Boolean)` calls; double array search with `findIndex` then index access.
-- **Fix applied**: Added index guards to prevent undefined insertion in tool_calls; used `find()` directly in SettingsPage.
+#### M6. `useOfficeInsert.ts` uses `any` for message parameters
+- **File**: `frontend/src/composables/useOfficeInsert.ts:20-21,145,153`
+- **Issue**: `shouldTreatMessageAsImage: (message: any) => boolean`, `copyMessageToClipboard(message: any)`, `insertMessageToDocument(message: any)` all use `any` type.
+- **Impact**: No TypeScript type safety. Callers could pass incorrect objects without compile-time errors.
+- **Fix**: Use `DisplayMessage` type from `@/types/chat`.
 
-#### L7. Modal state not reset on cancel ✅ FIXED
-- **File**: `frontend/src/pages/SettingsPage.vue:944-946`
-- **Issue**: `cancelEdit()` doesn't reset `editingPrompt` ref; old data persists.
-- **Fix applied**: Added `editingPrompt.value = null` reset in `cancelEdit()`.
+#### M7. No TypeScript on backend
+- **Files**: All `backend/src/*.js` files
+- **Issue**: The entire backend is plain JavaScript with no JSDoc type annotations or TypeScript. Request bodies, model configs, and API responses have no type definitions.
+- **Impact**: As the project grows, refactoring becomes risky. Runtime type errors are caught late. IDE support (autocomplete, refactoring) is limited.
+- **Fix**: Consider migrating to TypeScript incrementally, starting with `config/models.js` and `middleware/validate.js` which handle the most complex data shapes. At minimum, add JSDoc types.
 
-#### L8. Unnecessary regex compilation ✅ FIXED
-- **File**: `frontend/src/composables/useImageActions.ts:10`
-- **Issue**: Regex for think tag removal created on every call.
-- **Fix applied**: Cached `THINK_TAG_REGEX` as module-level constant.
+#### M8. Missing `Content-Type` enforcement on backend
+- **File**: `backend/src/server.js:87`
+- **Issue**: `express.json({ limit: '4mb' })` silently ignores requests without `Content-Type: application/json`. A POST with `text/plain` body will pass through with an empty `req.body`.
+- **Impact**: Potentially confusing error messages when content type is wrong (validation says "messages array is required" instead of "invalid content type").
+- **Fix**: Add middleware that rejects POST requests without `application/json` content type.
 
-#### L9. Image base64 splitting unsafe ✅ FIXED
-- **File**: `frontend/src/composables/useImageActions.ts:102,112`
-- **Issue**: `imageSrc.split(',')[1]` assumes single comma in data URL.
-- **Fix applied**: Used regex replacement `imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '')` for safe extraction.
+#### M9. Docker Compose `version` field is deprecated
+- **File**: `docker-compose.yml:1`
+- **Issue**: `version: "3.8"` is deprecated in Docker Compose v2. It's silently ignored but generates warnings.
+- **Impact**: Build-time warning noise.
+- **Fix**: Remove the `version` line.
 
-#### L10. Models/health endpoints unrated ✅ FIXED
-- **File**: `backend/src/server.js:53-59,92-93`
-- **Issue**: `/api/models` and `/health` endpoints have no rate limiting.
-- **Fix applied**: Added `infoLimiter` with 120 requests per minute limit for `/health` and `/api/models` endpoints.
-
----
-
-## 4. Build & Environment Warnings
-
-### B1. JavaScript chunk size warnings ✅ FIXED
-- **Status**: Resolved
-- **Issue**: Vite build reports chunks exceeding 500kB warning threshold.
-- **Fix applied**: Added `manualChunks` configuration in `vite.config.js` to split vendor dependencies into separate chunks (`vendor-vue`, `vendor-ui`, `vendor-utils`, `vendor-math`). Increased warning threshold to 600kB.
-
-### B2. Node.js version constraint ✅ FIXED
-- **Status**: Resolved
-- **Previous**: `package.json` specified `>=20.0.0`
-- **Fix applied**: Updated both frontend and backend `package.json` to `>=20.19.0 || >=22.0.0` to align with Node.js LTS versions.
-
-### B3. E2E tests missing ✅ FIXED
-- **Status**: Infrastructure in place
-- **Issue**: No automated E2E tests for Office Host interactions.
-- **Fix applied**: Added Playwright test infrastructure with `playwright.config.ts`, basic navigation tests in `e2e/navigation.spec.ts`, and test scripts (`test:e2e`, `test:e2e:ui`, `test:e2e:report`). Note: Office.js runtime interactions still require manual testing; Playwright tests cover web-only flows.
+#### M10. `officeRichText.ts` markdown parser has `html: true`
+- **File**: `frontend/src/utils/officeRichText.ts:9`
+- **Issue**: The Office markdown parser has `html: true`, allowing raw HTML pass-through before DOMPurify sanitization. While the sanitization step (line 326-333) properly filters tags, the `ALLOWED_ATTR` list includes `style` attribute, which can carry CSS injection payloads (e.g., `expression()` in older IE, `url()` for data exfiltration).
+- **Impact**: Low risk in modern browsers/Office webviews, but the `style` attribute in the allow list is broader than needed. Since the input comes from AI responses (not direct user input), exploitation requires prompt injection.
+- **Fix**: Consider using DOMPurify's `FORBID_ATTR: ['style']` or a CSS sanitizer for the `style` attribute values if stricter security is needed.
 
 ---
 
-## 5. Tracking Matrix
+### LOW (L1–L7) — Nice to have
 
-| ID  | Severity | Category    | Status   | File(s)                          |
-|-----|----------|-------------|----------|----------------------------------|
-| C1  | CRITICAL | Security    | FIXED    | backend.ts, SettingsPage.vue     |
-| C2  | CRITICAL | Correctness | FIXED    | models.js                        |
-| C3  | CRITICAL | Correctness | FIXED    | useAgentLoop.ts                  |
-| H1  | HIGH     | Security    | FIXED    | MarkdownRenderer.vue, markdown.ts |
-| H2  | HIGH     | Security    | FIXED    | chat.js, image.js, http.js       |
-| H3  | HIGH     | Quality     | FIXED    | chat.js, validate.js             |
-| H4  | HIGH     | UX          | FIXED    | toolStorage.ts                   |
-| H5  | HIGH     | Stability   | FIXED    | useAgentLoop.ts                  |
-| H6  | HIGH     | Config      | FIXED    | models.js                        |
-| M1  | MEDIUM   | Quality     | FIXED    | chat.js, useOfficeInsert.ts      |
-| M2  | MEDIUM   | Stability   | FIXED    | chat.js                          |
-| M3  | MEDIUM   | Validation  | FIXED    | chat.js                          |
-| M4  | MEDIUM   | Validation  | FIXED    | validate.js                      |
-| M5  | MEDIUM   | Validation  | FIXED    | validate.js                      |
-| M6  | MEDIUM   | Validation  | FIXED    | validate.js                      |
-| M7  | MEDIUM   | Stability   | FIXED    | server.js                        |
-| M8  | MEDIUM   | Config      | FIXED    | env.js                           |
-| M9  | MEDIUM   | Architecture| FIXED    | useAgentLoop.ts, HomePage.vue    |
-| M10 | MEDIUM   | Quality     | FIXED    | useAgentLoop.ts                  |
-| M11 | MEDIUM   | UX          | FIXED    | useOfficeInsert.ts               |
-| M12 | MEDIUM   | Security    | FIXED    | server.js                        |
-| M13 | MEDIUM   | Correctness | FIXED    | chat.js                          |
-| M14 | MEDIUM   | Validation  | FIXED    | savedPrompts.ts                  |
-| M15 | MEDIUM   | Architecture| FIXED    | services/llmClient.js            |
-| M16 | MEDIUM   | Architecture| FIXED    | services/llmClient.js            |
-| L1  | LOW      | i18n        | FIXED    | HomePage.vue, fr.json, en.json   |
-| L2  | LOW      | i18n        | FIXED    | SettingsPage.vue                 |
-| L3  | LOW      | Quality     | FIXED    | validate.js                      |
-| L4  | LOW      | Validation  | FIXED    | auth.js                          |
-| L5  | LOW      | Stability   | FIXED    | chat.js                          |
-| L6  | LOW      | Performance | FIXED    | useAgentLoop.ts, SettingsPage.vue|
-| L7  | LOW      | UX          | FIXED    | SettingsPage.vue                 |
-| L8  | LOW      | Performance | FIXED    | useImageActions.ts               |
-| L9  | LOW      | Correctness | FIXED    | useImageActions.ts               |
-| L10 | LOW      | Security    | FIXED    | server.js                        |
-| B1  | BUILD    | Performance | FIXED    | vite.config.js                   |
-| B2  | BUILD    | Config      | FIXED    | package.json (frontend, backend) |
-| B3  | BUILD    | Testing     | FIXED    | playwright.config.ts, e2e/       |
+#### L1. `scrollToBottom` couples to Tailwind CSS class
+- **File**: `frontend/src/pages/HomePage.vue:393`
+- **Issue**: `container.querySelectorAll('.group')` uses the Tailwind `.group` utility class as a DOM selector. A Tailwind version upgrade or class rename would silently break auto-scroll.
+- **Fix**: Use a `data-*` attribute or dedicated CSS class for message identification.
+
+#### L2. Custom `debounce` reimplemented despite `@vueuse/core` dependency
+- **File**: `frontend/src/main.ts:15-25`
+- **Issue**: A custom debounce function is written inline, but `@vueuse/core` (already imported in the same file) provides `useDebounceFn`.
+- **Fix**: Replace with `useDebounceFn` from VueUse.
+
+#### L3. Backend polling interval is fixed at 30 seconds
+- **File**: `frontend/src/pages/HomePage.vue:539`
+- **Issue**: `window.setInterval(checkBackend, 30000)` polls regardless of user activity. No exponential backoff when backend is down, no pause when the add-in is backgrounded.
+- **Fix**: Use `document.visibilityState` check to pause polling when the tab is hidden. Consider backoff when offline.
+
+#### L4. `backend.ts:148` non-null assertion on response body
+- **File**: `frontend/src/api/backend.ts:148`
+- **Issue**: `res.body!.getReader()` uses a non-null assertion. While a 200 response always has a body, a defensive check would prevent crashes on unexpected responses.
+- **Fix**: Add a null check: `if (!res.body) throw new Error('Empty response body')`.
+
+#### L5. Undocumented frontend environment variables
+- **Files**: `frontend/src/composables/useOfficeInsert.ts:9`, `frontend/src/api/backend.ts:7`
+- **Issue**: `VITE_VERBOSE_LOGGING` and `VITE_REQUEST_TIMEOUT_MS` are used in the frontend but not documented in the README's environment variables section or in any `.env.example`.
+- **Fix**: Add these to the frontend environment variables table in README.
+
+#### L6. SettingsPage status label has hardcoded French fallback
+- **File**: `frontend/src/pages/SettingsPage.vue:75`
+- **Issue**: `$t('litellmCredentialsMissing') || 'Statut'` contains a hardcoded French fallback string. This pattern was identified and fixed in the v1 audit (L2) for other instances, but this one was missed.
+- **Fix**: Remove the `|| 'Statut'` fallback; the i18n system handles missing keys.
+
+#### L7. Inconsistent error message format in agent tool execution
+- **File**: `frontend/src/composables/useAgentLoop.ts:311,323`
+- **Issue**: Parse errors return `"Error: malformed tool arguments — JSON parse failed"` while execution errors return `"Error: ${err.message}"`. The first format includes context, the second doesn't include the tool name.
+- **Fix**: Standardize error messages to include tool name and error type: `"Error in ${toolName}: ${description}"`.
 
 ---
 
-## 6. Recommended Priority Order
+## 3. Build & Environment Warnings
 
-1. **Immediate** (this sprint): C1, C2, C3 ✅ DONE
-2. **Next sprint**: H1-H6 ✅ DONE
-3. **Backlog**: M1-M16 ✅ DONE, L1-L10 ✅ DONE
-4. **Build & Environment**: B1-B3 ✅ DONE
+### B1. No unit test infrastructure
+- **Status**: Not addressed
+- **Issue**: No unit test framework (vitest, jest) is configured. Critical business logic in `tokenManager.ts`, `toolStorage.ts`, `validate.js`, `models.js`, and `buildChatBody()` has zero unit test coverage. Only E2E tests via Playwright exist.
+- **Fix**: Add vitest to the frontend. Key candidates for unit testing:
+  - `tokenManager.ts:prepareMessagesForContext` — budget calculation and message pruning
+  - `toolStorage.ts:migrateToolPreferences` — migration logic
+  - `validate.js:validateChatRequest` — input validation
+  - `models.js:buildChatBody` — request construction
 
-**All 38 issues have been resolved (35 code issues + 3 build/environment warnings).**
+### B2. No linting or formatting configuration
+- **Status**: Not addressed
+- **Issue**: No ESLint configuration file (`.eslintrc`, `eslint.config.js`) or Prettier config exists in the repository. No pre-commit hooks (husky, lint-staged) are configured.
+- **Fix**: Add ESLint + Prettier with a pre-commit hook. This prevents style drift and catches common errors before commit.
+
+### B3. No CI pipeline for automated testing
+- **Status**: Partial
+- **Issue**: Only a `bump-version.yml` GitHub Action exists. No automated test execution (lint, build, E2E) on pull requests. Code can be merged without passing any checks.
+- **Fix**: Add a CI workflow that runs `npm run build` (both frontend and backend), `npm run lint` (once configured), and `npm run test:e2e` on every PR.
 
 ---
 
-*Last updated: 2026-02-21*
+## 4. Tracking Matrix
+
+| ID  | Severity | Category       | Status | File(s)                                   |
+|-----|----------|----------------|--------|-------------------------------------------|
+| C1  | CRITICAL | Correctness    | OPEN   | useAgentLoop.ts, SettingsPage.vue         |
+| C2  | CRITICAL | Configuration  | OPEN   | .env.example, models.js                   |
+| C3  | CRITICAL | UX / Stability | OPEN   | useAgentLoop.ts                           |
+| H1  | HIGH     | Data Integrity | OPEN   | HomePage.vue                              |
+| H2  | HIGH     | Architecture   | OPEN   | tokenManager.ts                           |
+| H3  | HIGH     | Correctness    | OPEN   | validate.js                               |
+| H4  | HIGH     | Quality        | OPEN   | backend.ts                                |
+| H5  | HIGH     | Documentation  | OPEN   | README.md, models.js                      |
+| M1  | MEDIUM   | UX             | OPEN   | HomePage.vue                              |
+| M2  | MEDIUM   | Quality        | OPEN   | useAgentLoop.ts                           |
+| M3  | MEDIUM   | Architecture   | OPEN   | HomePage.vue, useAgentLoop.ts             |
+| M4  | MEDIUM   | Accessibility  | OPEN   | SettingsPage.vue, ChatInput.vue           |
+| M5  | MEDIUM   | Quality        | OPEN   | SettingsPage.vue                          |
+| M6  | MEDIUM   | Type Safety    | OPEN   | useOfficeInsert.ts                        |
+| M7  | MEDIUM   | Architecture   | OPEN   | backend/src/*.js                          |
+| M8  | MEDIUM   | Validation     | OPEN   | server.js                                 |
+| M9  | MEDIUM   | Config         | OPEN   | docker-compose.yml                        |
+| M10 | MEDIUM   | Security       | OPEN   | officeRichText.ts                         |
+| L1  | LOW      | Quality        | OPEN   | HomePage.vue                              |
+| L2  | LOW      | Quality        | OPEN   | main.ts                                   |
+| L3  | LOW      | Performance    | OPEN   | HomePage.vue                              |
+| L4  | LOW      | Resilience     | OPEN   | backend.ts                                |
+| L5  | LOW      | Documentation  | OPEN   | README.md                                 |
+| L6  | LOW      | i18n           | OPEN   | SettingsPage.vue                          |
+| L7  | LOW      | Quality        | OPEN   | useAgentLoop.ts                           |
+| B1  | BUILD    | Testing        | OPEN   | (no test framework)                       |
+| B2  | BUILD    | Tooling        | OPEN   | (no lint config)                          |
+| B3  | BUILD    | CI/CD          | OPEN   | .github/workflows/                        |
+
+---
+
+## 5. Recommended Implementation Priority
+
+### Phase 1 — Immediate (critical correctness)
+1. **C1** — Fix agent max iterations cap (5 min fix, high user impact)
+2. **C2** — Fix `.env.example` reasoning_effort value (1 min fix, prevents broken deployments)
+3. **C3** — Add loading/abort state to quick actions (prevents data corruption)
+4. **H5** — Update README model defaults (documentation accuracy)
+
+### Phase 2 — Short-term (stability & data integrity)
+5. **H1** — Implement chat history size limits
+6. **H3** — Fix validation error message
+7. **H4** — Remove dead `chatSync` code
+8. **M1** — Add new chat confirmation dialog
+9. **M2** — Remove useless try/catch
+
+### Phase 3 — Medium-term (quality & maintainability)
+10. **H2** — Improve token budget calculation
+11. **M3** — Standardize quick action types
+12. **M5** — Unify prompt serialization format
+13. **M6** — Replace `any` types with `DisplayMessage`
+14. **M8** — Add Content-Type enforcement
+15. **M9** — Remove deprecated Docker Compose version
+16. **L6** — Remove French fallback string
+
+### Phase 4 — Backlog (polish & infrastructure)
+17. **M4** — Accessibility improvements
+18. **M7** — Backend TypeScript migration
+19. **M10** — Review `style` attribute in DOMPurify config
+20. **B1** — Add vitest unit test infrastructure
+21. **B2** — Add ESLint + Prettier
+22. **B3** — Add CI pipeline
+23. **L1–L5, L7** — Minor quality and resilience improvements
+
+---
+
+## 6. Architecture Strengths (preserved from v1)
+
+The following architectural decisions are sound and should be maintained:
+
+- **Proxy pattern**: API keys never reach the client. All LLM communication goes through the Express backend.
+- **Modular composables**: `useAgentLoop`, `useAgentPrompts`, `useOfficeInsert`, `useImageActions` provide clear separation of concerns.
+- **Host-aware design**: Tool definitions, prompts, quick actions, and insertion logic are all host-specific (Word/Excel/PowerPoint/Outlook).
+- **Centralized LLM client**: `services/llmClient.js` is the single point of contact with the upstream API.
+- **Validation middleware**: `validate.js` provides thorough input validation with clear error messages.
+- **Security posture**: DOMPurify strict allowlists, HSTS in production, credential sanitization, rate limiting, session storage for user credentials.
+- **i18n framework**: Full English and French locale support with translation-aware built-in prompts.
+- **Tool preference migration**: `toolStorage.ts` gracefully handles tool definition changes without resetting user preferences.
+
+---
+
+*Last updated: 2026-02-22*
