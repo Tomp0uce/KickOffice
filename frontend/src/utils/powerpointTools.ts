@@ -187,7 +187,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   replaceSelectedText: {
     name: 'replaceSelectedText',
     category: 'write',
-    description: 'Replace the currently selected PowerPoint text with new text. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted. If the user asks to format or style text, politely explain this technical limitation.',
+    description: 'Replace the currently selected PowerPoint text with new content. The text will be rendered from Markdown to HTML before insertion. You can use Markdown formatting: **bold**, *italic*, bullet lists (- item), numbered lists (1. item), and headings (## Heading). Indented sub-items are supported for nested lists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -387,7 +387,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   insertTextBox: {
     name: 'insertTextBox',
     category: 'write',
-    description: 'Insert a text box into a specific slide with optional position and size. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted.',
+    description: 'Insert a text box into a specific slide with optional position and size. Content supports Markdown formatting for rich text rendering.',
     inputSchema: {
       type: 'object',
       properties: {

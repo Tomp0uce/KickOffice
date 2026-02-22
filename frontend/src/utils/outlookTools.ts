@@ -195,7 +195,7 @@ const outlookToolDefinitions = createOutlookTools({
   insertTextAtCursor: {
     name: 'insertTextAtCursor',
     category: 'write',
-    description: 'Insert plain text at the current cursor position in the email body (compose mode).',
+    description: 'Insert Markdown-formatted text at the cursor position in the email body (compose mode). The text is automatically converted to rich HTML before insertion. Use Markdown: **bold**, *italic*, - bullets, 1. numbered lists, indented sub-items (2 spaces).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -472,7 +472,7 @@ const outlookToolDefinitions = createOutlookTools({
   insertHtmlAtCursor: {
     name: 'insertHtmlAtCursor',
     category: 'write',
-    description: 'Insert HTML content at the current cursor position in the email body (compose mode).',
+    description: 'Insert raw HTML at the cursor position in the email body (compose mode). Only use this for pre-formatted HTML content. For normal text or Markdown content, prefer insertTextAtCursor.',
     inputSchema: {
       type: 'object',
       properties: {
