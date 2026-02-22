@@ -1,5 +1,35 @@
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
+import DiffMatchPatch from 'diff-match-patch'
+import TurndownService from 'turndown'
+
+import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
+
+// R16 — Reusable TurndownService instance configured for Word-flavoured Markdown output
+const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' })
+turndownService.addRule('underline', {
+  filter: ['u'],
+  replacement: (content) => `__${content}__`,
+})
+turndownService.addRule('strikethrough', {
+  filter: ['del', 's'],
+  replacement: (content) => `~~${content}~~`,
+})
+
+// R17 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
+function generateVisualDiff(originalText: string, newText: string): string {
+  const dmp = new DiffMatchPatch()
+  const diffs = dmp.diff_main(originalText, newText)
+  dmp.diff_cleanupSemantic(diffs)
+
+  return diffs
+    .map(([op, text]) => {
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
+      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
+      return escaped
+    })
+    .join('')
+}
 
 export type WordToolName =
   | 'getSelectedText'
@@ -41,9 +71,122 @@ export type WordToolName =
   | 'setPageSetup'
   | 'getSpecificParagraph'
   | 'insertSectionBreak'
+  | 'applyStyle'
+  | 'getSelectedTextWithFormatting'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
+
+/**
+ * Detect whether the current selection is inside a Word native list
+ * (bulleted or numbered paragraph). Used to prevent double-bullet issues
+ * when inserting HTML list content into an already-bulleted context.
+ */
+async function isInsertionInList(context: Word.RequestContext): Promise<boolean> {
+  try {
+    const selection = context.document.getSelection()
+    const para = selection.paragraphs.getFirst()
+    para.load('style')
+    await context.sync()
+    // listItem throws if the paragraph is not part of a list
+    para.listItem.load('level')
+    await context.sync()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Strip outer <ul>/<ol> wrapper tags from HTML while keeping <li> elements.
+ * Prevents double-bullets when inserting list HTML into an existing list context —
+ * Word's native list style handles the bullet display for each <li>.
+ */
+function stripOuterListTags(html: string): string {
+  return html
+    .replace(/<ul[^>]*>/gi, '')
+    .replace(/<\/ul>/gi, '')
+    .replace(/<ol[^>]*>/gi, '')
+    .replace(/<\/ol>/gi, '')
+}
+
+interface InsertionContext {
+  inList: boolean
+  styles: InheritedStyles
+}
+
+/**
+ * R1 — Read insertion-point font/spacing styles and list context in 2 syncs.
+ * Combines isInsertionInList + style capture to minimise round-trips.
+ * Note: paragraph-level spacing (spaceBefore/spaceAfter) is on Paragraph, not Range.
+ */
+async function readInsertionContext(context: Word.RequestContext): Promise<InsertionContext> {
+  // Sync 1: load font from range + spaceBefore/spaceAfter + style from first paragraph
+  const selection = context.document.getSelection()
+  selection.load('font/name,font/size,font/bold,font/italic,font/color')
+  const para = selection.paragraphs.getFirst()
+  para.load('style,spaceBefore,spaceAfter')
+  await context.sync()
+
+  const styles: InheritedStyles = {
+    fontFamily: selection.font.name || '',
+    fontSize: selection.font.size ? `${selection.font.size}pt` : '',
+    fontWeight: selection.font.bold ? 'bold' : 'normal',
+    fontStyle: selection.font.italic ? 'italic' : 'normal',
+    color: selection.font.color || '',
+    marginTop: `${para.spaceBefore ?? 0}pt`,
+    marginBottom: `${para.spaceAfter ?? 0}pt`,
+  }
+
+  // Sync 2: detect list context (throws if paragraph is not in a list)
+  let inList = false
+  try {
+    para.listItem.load('level')
+    await context.sync()
+    inList = true
+  } catch {
+    inList = false
+  }
+
+  return { inList, styles }
+}
+
+/**
+ * R14 — After inserting HTML, detect paragraphs whose font size matches heading
+ * thresholds and apply the corresponding Word builtin heading style.
+ * This ensures headings become proper Word styles (h1→Heading 1, etc.) so that
+ * features like Table of Contents work correctly.
+ * Best-effort: silently skips if the API call fails.
+ */
+async function applyHeadingBuiltinStyles(
+  context: Word.RequestContext,
+  insertedRange: Word.Range,
+  html: string,
+): Promise<void> {
+  if (!/\<h[1-6]/i.test(html)) return
+
+  try {
+    const paras = insertedRange.paragraphs
+    paras.load('items')
+    await context.sync()
+
+    for (const p of paras.items) {
+      p.load('font/size')
+    }
+    await context.sync()
+
+    for (const p of paras.items) {
+      const size = p.font.size
+      if (!size) continue
+      if (size >= 20) p.styleBuiltIn = Word.BuiltInStyleName.heading1
+      else if (size >= 15) p.styleBuiltIn = Word.BuiltInStyleName.heading2
+      else if (size >= 12.5) p.styleBuiltIn = Word.BuiltInStyleName.heading3
+    }
+    await context.sync()
+  } catch {
+    // Best-effort only — heading size detection may not be available in all runtimes
+  }
+}
 
 type WordToolTemplate = Omit<WordToolDefinition, 'execute'> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
@@ -118,9 +261,17 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { text, location = 'End' } = args
+      // R1: read insertion context (list detection + document styles) in 2 syncs
+      const { inList, styles } = await readInsertionContext(context)
+      const html = renderOfficeRichHtml(text)
+      const adjustedHtml = inList ? stripOuterListTags(html) : html
+      // R1: inject document-level font/spacing into <p> and <li> elements
+      const styledHtml = applyInheritedStyles(adjustedHtml, styles)
       const range = context.document.getSelection()
-      range.insertHtml(renderOfficeRichHtml(text), location as any)
-      await context.sync()
+      const insertedRange = range.insertHtml(styledHtml, location as any)
+      await context.sync()  // execute the insertHtml
+      // R14: post-process headings to apply Word builtin heading styles
+      await applyHeadingBuiltinStyles(context, insertedRange, html)
       return `Successfully inserted text at ${location}`
     },
   },
@@ -140,30 +291,78 @@ const wordToolDefinitions = createWordTools({
           type: 'boolean',
           description: 'Keep the original font styling (name, size, color, bold, italic, underline, highlight) from the selected text. Default: true.',
         },
+        diffTracking: {
+          type: 'boolean',
+          description: 'R17: When true, instead of replacing the selection, show a visual diff: insertions in blue/underline, deletions in red/strikethrough. Useful for proofreading and corrections. Default: false.',
+        },
       },
       required: ['newText'],
     },
     executeWord: async (context, args) => {
-      const { newText, preserveFormatting = true } = args
+      const { newText, preserveFormatting = true, diffTracking = false } = args
       const range = context.document.getSelection()
       range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
+      // R15: load paragraph-level spacing/alignment from first paragraph (not available on Range)
+      const firstPara = range.paragraphs.getFirst()
+      firstPara.load('alignment,spaceBefore,spaceAfter')
       await context.sync()
 
       if (!range.text || range.text.length === 0) {
         return 'Error: No text selected. Select text in the document, then try again.'
       }
 
-      const insertedRange = range.insertHtml(renderOfficeRichHtml(newText), 'Replace')
-
-      if (preserveFormatting) {
-        insertedRange.font.name = range.font.name
-        insertedRange.font.size = range.font.size
-        // We do not restore bold, italic, or underline, as it would override the rich HTML formatting
-        if (range.font.color) insertedRange.font.color = range.font.color
-        if (range.font.highlightColor) insertedRange.font.highlightColor = range.font.highlightColor
+      // R17: diffTracking mode — show visual diff instead of replacing directly
+      if (diffTracking) {
+        const diffHtml = generateVisualDiff(range.text, newText)
+        range.insertHtml(diffHtml, 'Replace')
+        await context.sync()
+        return 'Inserted text with visual diff: insertions shown in blue/underline, deletions in red/strikethrough.'
       }
 
-      await context.sync()
+      // Capture all formatting before additional syncs invalidate cached values
+      const savedFontName = range.font.name
+      const savedFontSize = range.font.size
+      const savedFontColor = range.font.color
+      const savedHighlightColor = range.font.highlightColor
+      // R15: paragraph-level properties (from first paragraph)
+      const savedAlignment = firstPara.alignment
+      const savedSpaceBefore = firstPara.spaceBefore
+      const savedSpaceAfter = firstPara.spaceAfter
+
+      // Detect list context to avoid double-bullets
+      const inList = await isInsertionInList(context)
+      const html = renderOfficeRichHtml(newText)
+      const insertedRange = range.insertHtml(inList ? stripOuterListTags(html) : html, 'Replace')
+
+      if (preserveFormatting) {
+        insertedRange.font.name = savedFontName
+        insertedRange.font.size = savedFontSize
+        // We do not restore bold, italic, or underline, as it would override the rich HTML formatting
+        if (savedFontColor) insertedRange.font.color = savedFontColor
+        if (savedHighlightColor) insertedRange.font.highlightColor = savedHighlightColor
+      }
+
+      await context.sync()  // execute insertHtml + font restoration
+
+      // R15: restore paragraph spacing/alignment on each inserted paragraph
+      if (preserveFormatting) {
+        try {
+          const insertedParas = insertedRange.paragraphs
+          insertedParas.load('items')
+          await context.sync()
+          for (const p of insertedParas.items) {
+            if (savedAlignment) p.alignment = savedAlignment
+            if (savedSpaceBefore != null) p.spaceBefore = savedSpaceBefore
+            if (savedSpaceAfter != null) p.spaceAfter = savedSpaceAfter
+          }
+          await context.sync()
+        } catch {
+          // Best-effort: paragraph spacing restoration may fail in some runtimes
+        }
+      }
+
+      // R14: post-process headings to apply Word builtin heading styles
+      await applyHeadingBuiltinStyles(context, insertedRange, html)
       return preserveFormatting
         ? 'Successfully replaced selected text while preserving layout formatting'
         : 'Successfully replaced selected text'
@@ -434,14 +633,15 @@ const wordToolDefinitions = createWordTools({
   insertList: {
     name: 'insertList',
     category: 'write',
-    description: 'Insert a bulleted or numbered list at the current position.',
+    description: 'Insert a bulleted or numbered list at the current position. Each item can be a plain string or an object {text, children} for nested sub-items.',
     inputSchema: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'Array of list item texts',
-          items: { type: 'string' },
+          description:
+            'Array of list items. Each entry is either a plain string or an object {text: string, children?: string[]} for nested sub-items.',
+          items: { type: 'object' },
         },
         listType: {
           type: 'string',
@@ -453,18 +653,26 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { items, listType } = args
-      
-        const range = context.document.getSelection()
-        
-        const markdownList = listType === 'bullet' 
-          ? items.map((i: string) => `* ${i}`).join('\n')
-          : items.map((i: string, idx: number) => `${idx + 1}. ${i}`).join('\n')
-        
-        range.insertHtml(renderOfficeRichHtml(markdownList), 'After')
+      const range = context.document.getSelection()
 
-        await context.sync()
-        return `Successfully inserted ${listType} list with ${items.length} items`
-      },
+      let topLevelIndex = 0
+      const markdownLines: string[] = []
+
+      for (const item of items) {
+        const text = typeof item === 'string' ? item : (item.text ?? '')
+        const marker = listType === 'bullet' ? '-' : `${++topLevelIndex}.`
+        markdownLines.push(`${marker} ${text}`)
+
+        const children: string[] = typeof item === 'object' && Array.isArray(item.children) ? item.children : []
+        for (const child of children) {
+          markdownLines.push(listType === 'bullet' ? `  - ${child}` : `  1. ${child}`)
+        }
+      }
+
+      range.insertHtml(renderOfficeRichHtml(markdownLines.join('\n')), 'After')
+      await context.sync()
+      return `Successfully inserted ${listType} list with ${items.length} items`
+    },
   },
 
   deleteText: {
@@ -1555,12 +1763,86 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { location = 'After' } = args
-      
+
         const range = context.document.getSelection() as any
         range.insertBreak('SectionNext', location)
         await context.sync()
         return `Successfully inserted section break ${location.toLowerCase()} selection`
       },
+  },
+
+  applyStyle: {
+    name: 'applyStyle',
+    category: 'format',
+    description: 'Apply a Word builtin paragraph style to the current selection or paragraph. '
+      + 'Use this to set headings (Heading1-9), body text (Normal), special styles (Title, Subtitle, Quote, etc.). '
+      + 'Builtin styles work across all languages and appear in the Word Style Gallery. '
+      + 'Target "current-paragraph" to style only the paragraph containing the cursor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        styleBuiltIn: {
+          type: 'string',
+          description: 'Word builtin style name.',
+          enum: [
+            'Normal', 'Heading1', 'Heading2', 'Heading3', 'Heading4', 'Heading5',
+            'Heading6', 'Heading7', 'Heading8', 'Heading9',
+            'Title', 'Subtitle', 'Strong', 'Emphasis',
+            'ListBullet', 'ListBullet2', 'ListBullet3',
+            'ListNumber', 'ListNumber2', 'ListNumber3',
+            'Quote', 'IntenseQuote', 'SubtleEmphasis', 'IntenseEmphasis',
+            'SubtleReference', 'IntenseReference', 'BookTitle',
+            'NoSpacing', 'ListParagraph',
+          ],
+        },
+        target: {
+          type: 'string',
+          description: 'Where to apply: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
+          enum: ['selection', 'current-paragraph'],
+        },
+      },
+      required: ['styleBuiltIn'],
+    },
+    executeWord: async (context, args) => {
+      const { styleBuiltIn, target = 'selection' } = args
+      const selection = context.document.getSelection()
+
+      if (target === 'current-paragraph') {
+        const para = selection.paragraphs.getFirst()
+        para.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+      } else {
+        selection.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+      }
+
+      await context.sync()
+      return `Applied style "${styleBuiltIn}" to ${target}.`
+    },
+  },
+
+  getSelectedTextWithFormatting: {
+    name: 'getSelectedTextWithFormatting',
+    category: 'read',
+    description: 'R16: Get the currently selected text as Markdown, preserving all formatting '
+      + '(bold, italic, underline, headings, lists, hyperlinks). '
+      + 'Use this instead of getSelectedText when you need to modify text while preserving its rich formatting. '
+      + 'The LLM can edit the Markdown and pass the result back to replaceSelectedText.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    executeWord: async (context) => {
+      const selection = context.document.getSelection()
+      const htmlResult = selection.getHtml()
+      await context.sync()
+
+      if (!htmlResult.value || htmlResult.value.trim() === '') {
+        return 'No text selected or selection is empty.'
+      }
+
+      const markdown = turndownService.turndown(htmlResult.value)
+      return markdown || 'Selection contains no convertible content.'
+    },
   },
 })
 

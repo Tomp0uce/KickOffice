@@ -1,5 +1,22 @@
+import DiffMatchPatch from 'diff-match-patch'
+
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './officeRichText'
+
+// R17 — Visual diff helper shared with Word (blue/underline = inserted, red/strikethrough = deleted)
+function generateVisualDiff(originalText: string, newText: string): string {
+  const dmp = new DiffMatchPatch()
+  const diffs = dmp.diff_main(originalText, newText)
+  dmp.diff_cleanupSemantic(diffs)
+  return diffs
+    .map(([op, text]) => {
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
+      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
+      return escaped
+    })
+    .join('')
+}
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -195,7 +212,7 @@ const outlookToolDefinitions = createOutlookTools({
   insertTextAtCursor: {
     name: 'insertTextAtCursor',
     category: 'write',
-    description: 'Insert plain text at the current cursor position in the email body (compose mode).',
+    description: 'Insert Markdown-formatted text at the cursor position in the email body (compose mode). The text is automatically converted to rich HTML before insertion. Use Markdown: **bold**, *italic*, - bullets, 1. numbered lists, indented sub-items (2 spaces).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -203,22 +220,36 @@ const outlookToolDefinitions = createOutlookTools({
           type: 'string',
           description: 'The text to insert at the cursor position',
         },
+        diffTracking: {
+          type: 'boolean',
+          description: 'R17: When true, compares the inserted text with the currently selected text and shows a visual diff (insertions in blue/underline, deletions in red/strikethrough). Useful for proofreading corrections in compose mode. Default: false.',
+        },
+        originalText: {
+          type: 'string',
+          description: 'Required when diffTracking is true: the original text to compare against.',
+        },
       },
       required: ['text'],
     },
     executeOutlook: async (mailbox, args) => {
-      const { text } = args
+      const { text, diffTracking = false, originalText = '' } = args
       if (!mailbox?.item?.body?.setSelectedDataAsync) {
         return 'Cannot insert text at cursor: compose mode is not available.'
       }
 
+      // R17: if diffTracking is requested, generate a visual diff instead of raw text
+      const html = diffTracking && originalText
+        ? generateVisualDiff(originalText, text)
+        : renderOfficeRichHtml(text)
+
       return new Promise<string>((resolve) => {
-        const html = renderOfficeRichHtml(text)
         mailbox.item.body.setSelectedDataAsync(
           html,
           { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
-            resolve(resolveAsyncResult(result, () => 'Successfully inserted text at cursor.'))
+            resolve(resolveAsyncResult(result, () => diffTracking
+              ? 'Inserted visual diff: insertions in blue/underline, deletions in red/strikethrough.'
+              : 'Successfully inserted text at cursor.'))
           },
         )
       })
@@ -472,7 +503,7 @@ const outlookToolDefinitions = createOutlookTools({
   insertHtmlAtCursor: {
     name: 'insertHtmlAtCursor',
     category: 'write',
-    description: 'Insert HTML content at the current cursor position in the email body (compose mode).',
+    description: 'Insert raw HTML at the cursor position in the email body (compose mode). Only use this for pre-formatted HTML content. For normal text or Markdown content, prefer insertTextAtCursor.',
     inputSchema: {
       type: 'object',
       properties: {

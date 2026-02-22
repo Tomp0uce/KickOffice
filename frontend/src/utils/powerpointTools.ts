@@ -96,7 +96,6 @@ export function getPowerPointSelection(): Promise<string> {
  */
 export async function insertIntoPowerPoint(text: string, useHtml = true): Promise<void> {
   const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const htmlContent = renderOfficeCommonApiHtml(normalizedNewlines)
 
   // Try the Modern API first if available (requires PowerPointApi 1.5+)
   if (isPowerPointApiSupported('1.5') && useHtml) {
@@ -104,7 +103,20 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       await executeOfficeAction(async () => {
         await PowerPoint.run(async (context: any) => {
           const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
-          textRange.insertHtml(htmlContent, 'Replace')
+
+          // Check for native bullets to prevent double-bullet rendering
+          const nativeBullets = await hasNativeBullets(context, textRange)
+
+          if (nativeBullets) {
+            // Shape has native bullets: insert plain text so the shape's bullet
+            // style applies without conflict. List markers are stripped so they
+            // don't appear as literal characters alongside the native bullets.
+            textRange.text = stripRichFormattingSyntax(normalizedNewlines, true)
+          } else {
+            // No native bullets: insert rich HTML (brings its own list styling)
+            textRange.insertHtml(renderOfficeCommonApiHtml(normalizedNewlines), 'Replace')
+          }
+
           await context.sync()
         })
       })
@@ -114,7 +126,8 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
     }
   }
 
-  // Fallback to the legacy Shared API
+  // Fallback to the legacy Shared API (no native bullet detection possible here)
+  const htmlContent = renderOfficeCommonApiHtml(normalizedNewlines)
   return new Promise((resolve, reject) => {
     try {
       if (useHtml) {
@@ -165,6 +178,28 @@ function isPowerPointApiSupported(version: string): boolean {
   }
 }
 
+/**
+ * Detect whether the given PowerPoint text range belongs to a shape with native
+ * (layout/master) bullet points. When true, we should avoid inserting HTML
+ * <ul>/<li> tags to prevent double-bullet rendering.
+ */
+async function hasNativeBullets(context: any, textRange: any): Promise<boolean> {
+  try {
+    const paragraphs = textRange.paragraphs
+    paragraphs.load('items')
+    await context.sync()
+    if (paragraphs.items.length > 0) {
+      const firstPara = paragraphs.items[0]
+      firstPara.load('bulletFormat/visible')
+      await context.sync()
+      return firstPara.bulletFormat?.visible === true
+    }
+  } catch {
+    // API not available or paragraphs inaccessible — assume no native bullets
+  }
+  return false
+}
+
 function ensurePowerPointRunAvailable() {
   if (typeof PowerPoint?.run !== 'function') {
     throw new Error('PowerPoint.run is not available in this Office host/runtime.')
@@ -187,7 +222,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   replaceSelectedText: {
     name: 'replaceSelectedText',
     category: 'write',
-    description: 'Replace the currently selected PowerPoint text with new text. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted. If the user asks to format or style text, politely explain this technical limitation.',
+    description: 'Replace the currently selected PowerPoint text with new content. The text will be rendered from Markdown to HTML before insertion. You can use Markdown formatting: **bold**, *italic*, bullet lists (- item), numbered lists (1. item), and headings (## Heading). Indented sub-items are supported for nested lists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -387,7 +422,7 @@ const powerpointToolDefinitions = createPowerPointTools({
   insertTextBox: {
     name: 'insertTextBox',
     category: 'write',
-    description: 'Insert a text box into a specific slide with optional position and size. IMPORTANT: PowerPoint API does NOT support inserting HTML, Markdown, or applying text formatting (bold, italics). ONLY plain text can be inserted.',
+    description: 'Insert a text box into a specific slide with optional position and size. Content supports Markdown formatting for rich text rendering.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -429,12 +464,23 @@ const powerpointToolDefinitions = createPowerPointTools({
         }
 
         const slide = slides.getItemAt(index)
+        // addTextBox requires plain text — create with stripped version initially
         const shape = slide.shapes.addTextBox(stripRichFormattingSyntax(text))
         shape.left = Number.isFinite(args.left) ? Number(args.left) : 50
         shape.top = Number.isFinite(args.top) ? Number(args.top) : 50
         shape.width = Number.isFinite(args.width) ? Number(args.width) : 500
         shape.height = Number.isFinite(args.height) ? Number(args.height) : 120
         await context.sync()
+
+        // Try to upgrade to rich HTML formatting (requires PowerPointApi 1.5+)
+        if (isPowerPointApiSupported('1.5')) {
+          try {
+            shape.textFrame.textRange.insertHtml(renderOfficeCommonApiHtml(text), 'Replace')
+            await context.sync()
+          } catch {
+            // insertHtml not available in this context — plain text already set
+          }
+        }
 
         return `Successfully inserted a text box on slide ${slideNumber}.`
       },

@@ -2,6 +2,7 @@
 ## Recommandations d'amelioration KickOffice
 
 **Date** : 2026-02-22
+**Derniere mise a jour** : 2026-02-22 — Phases 1 a 5 implementees (voir section 16)
 **Objectif** : Identifier les approches de reference en matiere de mise en forme de texte et de gestion des puces qui pourraient resoudre les problemes actuels de KickOffice (puces PowerPoint/Word, mise en forme texte).
 
 ---
@@ -1278,37 +1279,54 @@ Les `<pre>` dans le CSS de `applyOfficeBlockStyles` n'ont pas de style specifiqu
 | R14 | Headings -> styles Word builtin | wordTools.ts | 1h |
 | R15 | Restauration formatage complete | wordTools.ts | 1h |
 
-### Phase 5 - Fonctionnalites avancees (optionnel, ~8h)
+### Phase 5 - Fonctionnalites avancees (~8h) — IMPLEMENTEE
 
-| # | Action | Fichier(s) | Effort |
+| # | Action | Fichier(s) | Statut |
 |---|--------|---------|--------|
-| R16 | Selection avec formatage Markdown | wordTools.ts + useOfficeSelection.ts | 2h |
-| R17 | Diff visuel pour corrections | Nouveau composable + lib diff | 3h |
-| R19 | Footnotes Markdown completes | officeRichText.ts + package.json | 1h |
-| R18 | Tool applyStyle | wordTools.ts | 1h |
-| R20 | Support Excel basique | Nouveau excelTools.ts | 4h+ |
+| R16 | `getSelectedTextWithFormatting` (HTML->Markdown via turndown) | wordTools.ts | ✅ |
+| R17 | Diff visuel (`diffTracking`) dans replaceSelectedText + insertTextAtCursor | wordTools.ts + outlookTools.ts | ✅ |
+| R18 | Tool `applyStyle` (styles Word builtin via LLM) | wordTools.ts | ✅ |
+| R19 | Post-traitement footnotes markdown-it-footnote pour Office | officeRichText.ts | ✅ |
+| R20 | Support Excel (tools et prompt) | excelTools.ts (existant, 40+ tools) | ✅ |
 
 ---
 
-## 17. CONCLUSION MISE A JOUR
+## 17. CONCLUSION ET STATUT D'IMPLEMENTATION
 
-Au-dela des problemes de puces et de mise en forme de base, l'analyse de Redink revele **3 categories de fonctionnalites manquantes** dans KickOffice :
+Toutes les phases du plan ont ete implementees. Voici le bilan complet :
 
-### A. Fonctionnalites de mise en forme immediatement applicables (Phases 1-3)
-- Corrections de prompts et descriptions de tools (R2, R3, R6, R9, R12, R13)
-- Detection des puces natives (R10)
-- Styles code blocks, horizontal rules, task lists (R21, R22, R23)
+### Phase 1 — Corrections de prompts ✅ IMPLEMENTEE
+- R2 : Descriptions tools PowerPoint corrigees (`powerpointTools.ts`)
+- R3 : Prompt PowerPoint ameliore (`useAgentPrompts.ts`)
+- R6 : Prompt Word harmonise vers Markdown (`useAgentPrompts.ts`)
+- R9 : `GLOBAL_STYLE_INSTRUCTIONS` enrichi (`constant.ts`)
+- R12 : Bloc `COMMON_FORMATTING_INSTRUCTIONS` partage 3 hotes (`useAgentPrompts.ts`)
+- R13 : Tools Outlook clarifies (`outlookTools.ts`)
 
-### B. Fonctionnalites de qualite de rendu (Phase 4)
-- Heritage des styles du document (R1)
-- Headings en styles Word builtin au lieu de tailles CSS (R14)
-- Restauration complete du formatage apres modification (R15)
-- Plugins Markdown avances - definition lists, footnotes (R7, R19)
+### Phase 2 — Elimination des doubles puces ✅ IMPLEMENTEE
+- R10 PPT : Detection `bulletFormat.visible` avant insertion (`powerpointTools.ts`)
+- R10 Word : Detection `para.listItem` + strip `<ul>/<ol>` (`wordTools.ts`)
+- R8 : `insertTextBox` avec upgrade HTML via `textRange.insertHtml` (`powerpointTools.ts`)
 
-### C. Fonctionnalites avancees (Phase 5)
-- Envoi du formatage au LLM via Markdown (R16) - le LLM pourra preserver gras/italique
-- Diff visuel pour les corrections (R17) - comme Redink dans Outlook
-- Application intelligente de styles (R18)
-- Support Excel (R20) - si dans la roadmap
+### Phase 3 — Ameliorations du pipeline HTML ✅ IMPLEMENTEE
+- R21 : Plugin `markdown-it-task-lists` (`officeRichText.ts`)
+- R5 : `preserveMultipleLineBreaks()` (`officeRichText.ts`)
+- R4 : `splitBrInListItems()` via DOMParser (`officeRichText.ts`)
+- R22 : Conversion `<hr>` en paragraphe avec bordure (`officeRichText.ts`)
+- R23 : Styles `<pre>/<code>` avec approche 2-passes (`officeRichText.ts`)
+- R11 : `insertList` avec support sous-niveaux `{text, children}` (`wordTools.ts`)
 
-Les Phases 1 a 3 resolvent les problemes actuels. La Phase 4 eleve la qualite au niveau de Redink. La Phase 5 ajoute des fonctionnalites differenciantes.
+### Phase 4 — Heritage des styles et formatage avance ✅ IMPLEMENTEE
+- R7 : Plugins `markdown-it-deflist` et `markdown-it-footnote` + DOMPurify (`officeRichText.ts`)
+- R1 : `InheritedStyles` + `applyInheritedStyles()` + `readInsertionContext()` (`officeRichText.ts`, `wordTools.ts`)
+- R14 : `applyHeadingBuiltinStyles()` post-insertion (>=20pt->H1, >=15pt->H2) (`wordTools.ts`)
+- R15 : Restauration `alignment/spaceBefore/spaceAfter` dans `replaceSelectedText` (`wordTools.ts`)
+
+### Phase 5 — Fonctionnalites avancees ✅ IMPLEMENTEE
+- R16 : Tool `getSelectedTextWithFormatting` (HTML->Markdown via turndown) (`wordTools.ts`)
+- R17 : Option `diffTracking` dans `replaceSelectedText` et `insertTextAtCursor` — diff bleu/rouge (`wordTools.ts`, `outlookTools.ts`)
+- R18 : Tool `applyStyle` pour appliquer styles Word builtin via LLM (`wordTools.ts`)
+- R19 : `processFootnotes()` — rendu Office-compatible de la section footnotes (`officeRichText.ts`)
+- R20 : Support Excel deja present (40+ tools dans `excelTools.ts`, prompt dans `useAgentPrompts.ts`)
+
+**Toutes les recommandations R1 a R23 sont implementees.** La codebase KickOffice est desormais au niveau de qualite de la solution de reference pour la mise en forme, avec des approches adaptees aux contraintes specifiques des Office Add-ins JavaScript.

@@ -18,7 +18,14 @@ export const GLOBAL_STYLE_INSTRUCTIONS = `
 CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
 - NEVER use em-dashes (—).
 - NEVER use semicolons (;).
-- Keep the sentence structure natural and highly human-like.`
+- Keep the sentence structure natural and highly human-like.
+- When creating bullet lists, use standard Markdown syntax:
+  - Use "-" for unordered lists (not "*" or "+")
+  - Use "1." "2." "3." for numbered lists
+  - Use 2-space indentation for nested sub-items
+  - Each bullet should be a concise, standalone point
+- For emphasis, use **bold** (not CAPS or underlining)
+- For document structure, use Markdown headings (# ## ###)`
 
 export const buildInPrompt = {
   translate: {
