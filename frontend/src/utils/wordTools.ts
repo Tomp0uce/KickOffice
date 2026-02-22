@@ -45,6 +45,39 @@ export type WordToolName =
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
 
+/**
+ * Detect whether the current selection is inside a Word native list
+ * (bulleted or numbered paragraph). Used to prevent double-bullet issues
+ * when inserting HTML list content into an already-bulleted context.
+ */
+async function isInsertionInList(context: Word.RequestContext): Promise<boolean> {
+  try {
+    const selection = context.document.getSelection()
+    const para = selection.paragraphs.getFirst()
+    para.load('style')
+    await context.sync()
+    // listItem throws if the paragraph is not part of a list
+    para.listItem.load('level')
+    await context.sync()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Strip outer <ul>/<ol> wrapper tags from HTML while keeping <li> elements.
+ * Prevents double-bullets when inserting list HTML into an existing list context —
+ * Word's native list style handles the bullet display for each <li>.
+ */
+function stripOuterListTags(html: string): string {
+  return html
+    .replace(/<ul[^>]*>/gi, '')
+    .replace(/<\/ul>/gi, '')
+    .replace(/<ol[^>]*>/gi, '')
+    .replace(/<\/ol>/gi, '')
+}
+
 type WordToolTemplate = Omit<WordToolDefinition, 'execute'> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
 }
@@ -118,8 +151,11 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { text, location = 'End' } = args
+      // Detect list context to avoid double-bullets
+      const inList = await isInsertionInList(context)
+      const html = renderOfficeRichHtml(text)
       const range = context.document.getSelection()
-      range.insertHtml(renderOfficeRichHtml(text), location as any)
+      range.insertHtml(inList ? stripOuterListTags(html) : html, location as any)
       await context.sync()
       return `Successfully inserted text at ${location}`
     },
@@ -153,14 +189,23 @@ const wordToolDefinitions = createWordTools({
         return 'Error: No text selected. Select text in the document, then try again.'
       }
 
-      const insertedRange = range.insertHtml(renderOfficeRichHtml(newText), 'Replace')
+      // Capture font properties before additional syncs invalidate cached values
+      const savedFontName = range.font.name
+      const savedFontSize = range.font.size
+      const savedFontColor = range.font.color
+      const savedHighlightColor = range.font.highlightColor
+
+      // Detect list context to avoid double-bullets
+      const inList = await isInsertionInList(context)
+      const html = renderOfficeRichHtml(newText)
+      const insertedRange = range.insertHtml(inList ? stripOuterListTags(html) : html, 'Replace')
 
       if (preserveFormatting) {
-        insertedRange.font.name = range.font.name
-        insertedRange.font.size = range.font.size
+        insertedRange.font.name = savedFontName
+        insertedRange.font.size = savedFontSize
         // We do not restore bold, italic, or underline, as it would override the rich HTML formatting
-        if (range.font.color) insertedRange.font.color = range.font.color
-        if (range.font.highlightColor) insertedRange.font.highlightColor = range.font.highlightColor
+        if (savedFontColor) insertedRange.font.color = savedFontColor
+        if (savedHighlightColor) insertedRange.font.highlightColor = savedHighlightColor
       }
 
       await context.sync()
