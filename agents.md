@@ -11,9 +11,9 @@ This document provides operational guidance for AI coding agents working in this
 
 | File                                   | Purpose                                                                                     |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality issues — tracked by severity with proposed fixes       |
-| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — 21 open items by priority (HIGH/MEDIUM/LOW)                        |
-| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions (PowerPoint gap is priority 1) |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality audit v2 — 28 open issues by severity (CRITICAL/HIGH/MEDIUM/LOW/BUILD) |
+| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority (HIGH/MEDIUM/LOW)                           |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions                                |
 
 ## 2) Product and Architecture Snapshot
 
@@ -37,20 +37,22 @@ The frontend follows a composable-based architecture:
 
 ```
 backend/src/
-├── server.js              # Entry point: middleware setup, route mounting (80 lines)
+├── server.js              # Entry point: middleware setup, route mounting
 ├── config/
 │   ├── env.js             # Environment variable loading (PORT, FRONTEND_URL, rate limits)
 │   └── models.js          # Model tier config, buildChatBody(), isGpt5Model(), isChatGptModel()
 ├── middleware/
-│   ├── auth.js            # ensureLlmApiKey — checks API key is configured
-│   └── validate.js        # validateTemperature, validateMaxTokens, validateTools, validateImagePayload
+│   ├── auth.js            # ensureLlmApiKey, ensureUserCredentials — API key + user credential checks
+│   └── validate.js        # validateChatRequest, validateTemperature, validateMaxTokens, validateTools, validateImagePayload
 ├── routes/
-│   ├── chat.js            # POST /api/chat (streaming), POST /api/chat/sync (agent tool loop)
+│   ├── chat.js            # POST /api/chat (streaming, supports tools), POST /api/chat/sync (synchronous fallback)
 │   ├── health.js          # GET /health
 │   ├── image.js           # POST /api/image
 │   └── models.js          # GET /api/models
+├── services/
+│   └── llmClient.js       # Centralized LLM API client (chatCompletion, imageGeneration, handleErrorResponse)
 └── utils/
-    └── http.js            # fetchWithTimeout, logAndRespond
+    └── http.js            # fetchWithTimeout, logAndRespond, sanitizeErrorText
 ```
 
 Manifest outputs:
@@ -64,8 +66,8 @@ Important manifest rule:
 
 Backend API surface:
 
-- `POST /api/chat` (streaming) — uses `buildChatBody` with `stream: true`, no tools
-- `POST /api/chat/sync` (agent tool loop) — uses `buildChatBody` with `stream: false`, tools + tool_choice
+- `POST /api/chat` (streaming) — uses `buildChatBody` with `stream: true`, supports tools via `onToolCallDelta` SSE deltas
+- `POST /api/chat/sync` (synchronous) — uses `buildChatBody` with `stream: false`, tools + tool_choice (kept as fallback; primary agent loop now uses streaming)
 - `POST /api/image`
 - `GET /api/models`
 - `GET /health`
@@ -106,7 +108,7 @@ Frontend changes touching image flow must keep support for both payload styles u
 - Keep compatibility with OpenAI-compatible providers that may differ on parameter support.
 - `ChatGPT-*` model IDs do not support `temperature` / token-limit parameters in current backend logic (`isChatGptModel` check).
 - GPT-5 models use `max_completion_tokens` while non-GPT-5 chat models use `max_tokens` (`isGpt5Model` check).
-- **CRITICAL**: `reasoning_effort` parameter behavior varies by model. The value `'none'` is NOT a valid OpenAI API value and causes empty responses when used with tools. Valid values are `'low'`, `'medium'`, `'high'`. When reasoning is not needed, **omit the parameter entirely** rather than sending `'none'`. See DESIGN_REVIEW.md C7 for details.
+- **CRITICAL**: `reasoning_effort` parameter behavior varies by model. The value `'none'` is NOT a valid OpenAI API value and causes empty responses when used with tools. Valid values are `'low'`, `'medium'`, `'high'`. When reasoning is not needed, **omit the parameter entirely** rather than sending `'none'`. See DESIGN_REVIEW.md v2 C2 for the `.env.example` issue.
 - If model plumbing is changed, update backend validation + request shaping + frontend expectations together.
 
 Any contract change should update both backend and frontend in the same change set.
@@ -129,7 +131,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 - Word tools: 39 tools (high-count set) + 2 general tools used in agent mode.
 - Excel tools: 39 tools (high-count set) + 2 general tools used in agent mode.
-- PowerPoint tools: 8 tools (focused set for slide editing and speaker notes) + 2 general tools.
+- PowerPoint tools: 14 tools (slides, shapes, notes, modify) + 2 general tools.
 - Outlook tools: 13 tools (mail compose/read helpers) + 2 general tools.
 
 ## 6) Backend Editing Guidelines
@@ -164,7 +166,11 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 ## 9) Known Issues to Watch For
 
-For the most up-to-date list of known issues, architectural gaps, and proposed fixes, always refer to the [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) file. This document serves as the single source of truth for technical debt and active blocking issues to prevent information divergence.
+For the most up-to-date list of known issues, architectural gaps, and proposed fixes, always refer to the [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) (v2) file. This document serves as the single source of truth for technical debt and active blocking issues. Key issues to be aware of:
+
+- **C1**: Agent max iterations setting is silently capped at 10 regardless of user setting.
+- **C2**: `.env.example` contains invalid `reasoning_effort=none` which breaks tool use with GPT-5 models.
+- **C3**: Quick actions bypass loading/abort state, preventing stop and risking history corruption.
 
 ## 10) Validation Checklist Before Commit
 
