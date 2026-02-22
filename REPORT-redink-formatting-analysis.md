@@ -1015,3 +1015,300 @@ Les problemes de puces et de mise en forme dans KickOffice ont **3 couches de ca
 **Outlook fonctionne mieux** car les emails HTML n'ont pas de concept de "puces natives de shape" et le chemin HTML -> email est le plus naturel. Il sert de reference pour uniformiser Word et PowerPoint.
 
 L'approche Redink confirme que le pipeline Markdown -> HTML enrichi avec styles inline est la bonne direction. La difference cle est que Redink a un meilleur controle sur le HTML final grace a la manipulation DOM (HtmlAgilityPack) et l'heritage des styles du document, deux choses que KickOffice peut reproduire avec `DOMParser` et l'API Word.js/PowerPoint.js.
+
+---
+
+## 14. FONCTIONNALITES DE MISE EN FORME REDINK MANQUANTES DANS KICKOFFICE
+
+### 14.1 Rendu HTML natif Word avec DOM traversal (HTMLToWord.vb)
+
+**Ce que fait Redink** :
+Redink a un moteur complet `ParseHtmlNode` / `RenderInline` qui traverse l'arbre DOM HTML noeud par noeud et genere du contenu Word natif avec l'API COM Interop. Chaque element HTML est converti en formatage Word reel :
+
+| Element HTML | Rendu Word natif Redink | KickOffice |
+|---|---|---|
+| `<strong>/<b>` | `range.Font.Bold = True` | Via `insertHtml` (indirect) |
+| `<em>/<i>` | `range.Font.Italic = True` | Via `insertHtml` (indirect) |
+| `<u>` | `range.Font.Underline = wdUnderlineSingle` | Via `insertHtml` (indirect) |
+| `<del>/<s>` | `range.Font.StrikeThrough = True` | **ABSENT** |
+| `<sub>` | `range.Font.Subscript = True` | Via custom Markdown `~text~` |
+| `<sup>` | `range.Font.Superscript = True` | Via custom Markdown `^text^` |
+| `<code>` inline | Courier New 10pt + fond gris | **Style CSS seulement** |
+| `<pre>` code block | Courier New 10pt + indent 14pt | **Style CSS seulement** |
+| `<br>` | Saut de ligne souple `ChrW(11)` (Shift+Enter) | **Saut de paragraphe dur** |
+| `<img>` | `InlineShapes.AddPicture` (local ou download URL) | **ABSENT dans le rendu HTML** |
+| `<a href>` | Hyperlink Word natif | Via `insertHtml` (indirect) |
+| `<h1>` a `<h6>` | Styles Word builtin `wdStyleHeading1-6` | **Taille CSS seulement, pas de style Word** |
+| `<blockquote>` | Paragraphe avec indent 0.75cm | **Margin CSS seulement** |
+| `<hr>` | Bordure de paragraphe basse | **ABSENT** |
+| `<table>` | `Tables.Add` avec cells recursive | Tool `insertTable` separe |
+| `<input checkbox>` | ContentControl checkbox natif Word | **ABSENT** |
+| `<dl>/<dt>/<dd>` | Term en gras + indent definition | **ABSENT** |
+| Footnotes `<sup><a>` | Bookmark + Hyperlink interne | **ABSENT** |
+| Emoji | Police "Segoe UI Emoji" + fond bleu | **ABSENT** |
+
+**Impact pour KickOffice** :
+La methode `insertHtml()` de Word.js fait la plupart de ce travail automatiquement car Word interprete le HTML. Mais certaines choses ne passent pas bien via `insertHtml` :
+- Les **headings** ne deviennent pas des styles Word builtin (juste du texte avec une grande taille)
+- Le **`<br>`** cree un paragraphe dur au lieu d'un saut de ligne souple
+- Les **code blocks** n'ont pas le bon formatage (police monospace + fond)
+- Les **checkboxes** sont rendues en caracteres Unicode au lieu de ContentControls
+
+**Recommandation R14** : Pour les headings, post-traiter l'insertion HTML avec Word.js pour appliquer les styles builtin sur les paragraphes correspondants. Cela resoudrait le probleme de TOC (table des matieres) qui ne fonctionne pas avec du texte simplement en gros caracteres.
+
+### 14.2 Sauvegarde et restauration du formatage (FormatSaveAndRestore.vb)
+
+**Ce que fait Redink** :
+Avant de modifier un texte (correction, traduction, etc.), Redink capture l'integralite du formatage du paragraphe :
+- Style Word (Normal, Heading1, etc.)
+- Police, taille, gras, italique, souligne, couleur
+- Format de liste (template, niveau)
+- Alignement, espacement, interligne
+- SpaceBeforeAuto, SpaceAfterAuto, DisableLineHeightGrid
+
+Apres la modification LLM, Redink restaure ce formatage sur chaque paragraphe, meme si le LLM a renvoye du texte brut.
+
+**Ce que KickOffice ne fait PAS** :
+- Quand le LLM modifie un texte via `replaceSelectedText`, il y a un `preserveFormatting` qui restaure juste police/taille/couleur mais PAS :
+  - Le style de paragraphe (Heading1, etc.)
+  - Le format de liste (bullets natifs, niveau)
+  - L'espacement inter-paragraphe
+  - L'alignement
+
+**Recommandation R15** : Enrichir `replaceSelectedText` dans `wordTools.ts` pour capturer et restaurer le style de paragraphe complet (au minimum `styleBuiltIn` et `listItem`).
+
+### 14.3 Conversion Markdown -> Word avec preservation du formatage (ConvertRangeToMarkdown)
+
+**Ce que fait Redink** :
+Quand Redink envoie du texte au LLM pour correction/traduction, il convertit d'abord le formatage Word en Markdown :
+- Gras -> `**text**`
+- Italique -> `*text*`
+- Souligne -> `__text__`
+- Barre -> `~~text~~`
+- Surligne -> tags HTML inline
+- Headings -> `# heading`
+- Listes -> `- item` / `1. item`
+
+Le LLM recoit donc du Markdown structure et peut le modifier tout en preservant le formatage. Quand le resultat revient, Redink re-convertit le Markdown en formatage Word natif.
+
+**Ce que KickOffice ne fait PAS** :
+Quand KickOffice envoie le texte selectionne au LLM, il envoie du texte brut (via `getSelectedText` -> `range.text`). Tout le formatage est perdu. Le LLM renvoie du texte sans savoir qu'il y avait du gras, de l'italique, etc.
+
+**Recommandation R16** : Ajouter un mode "selection avec formatage" qui convertit la selection Word en Markdown avant envoi au LLM. Utiliser `getDocumentHtml` (tool existant) puis un convertisseur HTML -> Markdown cote client.
+
+### 14.4 Diff visuel avec tracked changes (Outlook - CompareAndInsertText)
+
+**Ce que fait Redink pour Outlook** :
+Apres correction d'un email, Redink genere un **diff visuel** avec :
+- Texte insere en **bleu souligne**
+- Texte supprime en **rouge barre**
+
+Cela utilise soit `Word.CompareDocuments` (compare complete) soit `DiffPlex` (diff word-level).
+
+**Ce que KickOffice ne fait PAS** :
+KickOffice remplace le texte directement sans montrer les differences. L'utilisateur ne peut pas voir ce qui a change.
+
+**Recommandation R17** : Implementer un mode "diff visuel" optionnel pour les corrections dans Outlook et Word. Utiliser une librairie JS comme `diff-match-patch` pour generer le diff, puis encoder les insertions/suppressions en HTML colore (`<span style="color:blue;text-decoration:underline">` / `<span style="color:red;text-decoration:line-through">`).
+
+### 14.5 DocStyle - Application intelligente de styles Word
+
+**Ce que fait Redink** :
+Le systeme DocStyle de Redink peut :
+1. **Extraire** les styles d'un document modele (police, taille, espacement, listes, bordures) en JSON
+2. **Appliquer** ces styles a un autre document en utilisant le LLM pour mapper les paragraphes aux styles
+3. **Gerer les numbering restarts** (reprises de numerotation dans les listes)
+
+**Ce que KickOffice ne fait PAS** :
+KickOffice n'a aucune fonctionnalite d'application de styles de document. Le formatage est soit hardcode en CSS (via `applyOfficeBlockStyles`), soit laisse a l'interpretation du LLM.
+
+**Recommandation R18** : A terme, permettre au LLM d'appliquer des styles Word builtin via un tool. Le tool `setParagraphFormat` existe mais ne gere pas les styles builtin. Ajouter un parametre `styleBuiltIn` au tool, ou creer un tool `applyStyle`.
+
+### 14.6 Gestion des notes de bas de page (Footnotes)
+
+**Ce que fait Redink** :
+Le moteur HTMLToWord gere les footnotes Markdown (extension Markdig) :
+- Detecte les `<li id="fn:1">` (definitions de footnotes)
+- Cree des bookmarks Word
+- Insere des hyperlinks internes (`<sup><a href="#fn:1">`)
+- Genere des references croisees navigables
+
+**Ce que KickOffice ne fait PAS** :
+Le tool `insertFootnote` existe dans `wordTools.ts` mais :
+- Il insere des footnotes "brutes" sans formatage
+- Il n'y a pas de gestion des footnotes dans le pipeline Markdown -> HTML
+- markdown-it ne genere pas de footnotes par defaut (necessite le plugin `markdown-it-footnote`)
+
+**Recommandation R19** : Ajouter le plugin `markdown-it-footnote` au pipeline `renderOfficeRichHtml` pour que les footnotes Markdown soient correctement rendues en HTML, puis en footnotes Word via `insertHtml`.
+
+### 14.7 Excel - Insertion structuree dans les cellules
+
+**Ce que fait Redink** :
+L'insertion dans Excel suit un protocole structure :
+- Le LLM repond avec des directives `[Cell: A1] [Formula: =SUM(B1:B10)]` ou `[Value: Hello]`
+- Le parser `ParseLLMResponse` extrait ces directives
+- `ApplyLLMInstructions` applique formules/valeurs/commentaires cellule par cellule
+- Gestion de la localisation des formules (separateurs `,` vs `;`)
+- Sauvegarde/restauration de l'etat des cellules (undo)
+- Nettoyage RTF/JSON des valeurs
+
+**Ce que KickOffice ne fait PAS** :
+KickOffice n'a **aucun support Excel**. Il n'y a pas de `excelTools.ts`, pas de prompts Excel, pas de tools d'insertion dans les cellules.
+
+**Recommandation R20** : Si Excel est dans la roadmap, s'inspirer du protocole structuree `[Cell:][Formula:][Value:]` de Redink. Implementer un `excelTools.ts` avec les tools :
+- `getCellValue` / `setCellValue` / `setCellFormula`
+- `getSelectedRange` / `insertData` (tableau 2D)
+- `addComment` / `formatCells`
+
+### 14.8 Checkboxes et task lists
+
+**Ce que fait Redink** :
+- Markdown task lists (`- [x] Done`, `- [ ] Todo`) sont rendues en :
+  - Soit des symboles Unicode (☑ / ☐) avec texte
+  - Soit des **ContentControl Checkboxes** Word natifs (cochables)
+
+**Ce que KickOffice ne fait PAS** :
+- Les task lists Markdown ne sont pas reconnues (pas de plugin `markdown-it-task-lists`)
+- Pas de rendu en checkboxes Word
+
+**Recommandation R21** : Ajouter `markdown-it-task-lists` au pipeline. Les checkboxes HTML generees seront interpretees par Word.js `insertHtml` comme des symboles.
+
+### 14.9 Horizontal rules (`<hr>`)
+
+**Ce que fait Redink** :
+Les `---` Markdown sont rendus comme un paragraphe vide avec une bordure basse (trait horizontal natif Word).
+
+**Ce que KickOffice ne fait PAS** :
+Les `<hr>` HTML sont generes par markdown-it mais `insertHtml` de Word.js les interprete de maniere incoherente (parfois un trait, parfois rien).
+
+**Recommandation R22** : Ajouter un post-traitement dans `applyOfficeBlockStyles` pour convertir les `<hr>` en `<p style="border-bottom:1px solid #000; margin:8px 0;">&nbsp;</p>`.
+
+### 14.10 Code blocks avec fond colore
+
+**Ce que fait Redink** :
+Les blocs de code (`<pre>`) recoivent Courier New 10pt + indentation + fond gris (`Shading.BackgroundPatternColor`).
+
+**Ce que KickOffice ne fait PAS** :
+Les `<pre>` dans le CSS de `applyOfficeBlockStyles` n'ont pas de style specifique. Le code apparait en police normale sans differenciation visuelle.
+
+**Recommandation R23** : Ajouter dans `applyOfficeBlockStyles` :
+```typescript
+.replace(/<pre>/gi, '<pre style="font-family:Consolas,monospace; font-size:10pt; background:#f4f4f4; padding:8px; margin:6px 0;">')
+.replace(/<code>/gi, '<code style="font-family:Consolas,monospace; font-size:0.9em; background:#f0f0f0; padding:1px 4px;">')
+```
+
+---
+
+## 15. TABLEAU COMPARATIF COMPLET REDINK vs KICKOFFICE
+
+### 15.1 Fonctionnalites de mise en forme
+
+| Fonctionnalite | Redink | KickOffice Word | KickOffice PPT | KickOffice Outlook | Action |
+|---|---|---|---|---|---|
+| Gras/Italique/Souligne | Natif Word | Via insertHtml | Partiel | Via insertHtml | OK |
+| Barre (strikethrough) | Natif Word | **ABSENT du pipeline** | **ABSENT** | **ABSENT** | R14 |
+| Subscript/Superscript | Natif Word | Via Markdown custom | Via Markdown custom | Via Markdown custom | OK |
+| Headings -> Styles Word | Styles builtin | **Taille CSS seulement** | N/A | N/A | R14 |
+| Code inline (fond gris) | Natif Word | **CSS basique** | **ABSENT** | **CSS basique** | R23 |
+| Code block (Courier+indent) | Natif Word | **CSS basique** | **ABSENT** | **CSS basique** | R23 |
+| Listes a puces | Natif Word + niveaux | Via insertHtml | Double puces | Via insertHtml | R10 |
+| Listes numerotees | Natif Word + niveaux | Via insertHtml | **ABSENT** | Via insertHtml | R10 |
+| Listes imbriquees | Multi-niveau Word | Possible mais pas guide | **ABSENT** | Possible | R2+R3 |
+| Definition lists `<dl>` | Natif Word | **ABSENT** | **ABSENT** | **ABSENT** | R7 |
+| Task lists (checkboxes) | ContentControl | **ABSENT** | **ABSENT** | **ABSENT** | R21 |
+| Footnotes | Bookmarks + liens | Tool basique | N/A | N/A | R19 |
+| Horizontal rule `<hr>` | Bordure paragraphe | **Inconsistant** | N/A | N/A | R22 |
+| Tables | Natif Word | Tool insertTable | N/A | Via insertHtml | OK |
+| Images inline | InlineShapes | Tool insertImage | N/A | N/A | OK |
+| Hyperlinks | Natif Word | Via insertHtml | N/A | Via insertHtml | OK |
+| Emoji (police dediee) | Segoe UI Emoji | **ABSENT** | **ABSENT** | **ABSENT** | Optionnel |
+| Blockquote (indent) | Paragraphe indente | Via CSS margin | N/A | Via CSS margin | OK |
+
+### 15.2 Fonctionnalites de workflow
+
+| Fonctionnalite | Redink | KickOffice | Action |
+|---|---|---|---|
+| Heritage styles document | Font/taille/couleur/espacement | **ABSENT** | R1 |
+| Sauvegarde/restauration formatage | Style+font+liste+spacing complet | Partiel (font name/size/color) | R15 |
+| Selection avec formatage (Markdown) | ConvertRangeToMarkdown | Texte brut seulement | R16 |
+| Diff visuel (corrections) | Bleu insere / Rouge supprime | **ABSENT** | R17 |
+| DocStyle (templates de style) | Extraction + application JSON/LLM | **ABSENT** | R18 |
+| `<br>` -> saut souple (Shift+Enter) | `ChrW(11)` | **Saut dur de paragraphe** | R14 |
+| Support Excel | Complet (formules, valeurs, commentaires) | **ABSENT** | R20 |
+
+---
+
+## 16. PLAN D'IMPLEMENTATION FINAL (TOUTES RECOMMANDATIONS)
+
+### Phase 1 - Corrections de prompts (impact immediat, ~2h)
+
+| # | Action | Fichier(s) | Effort |
+|---|--------|---------|--------|
+| R2 | Corriger descriptions tools PowerPoint | powerpointTools.ts | 15 min |
+| R3 | Ameliorer prompt PowerPoint | useAgentPrompts.ts | 30 min |
+| R6 | Harmoniser prompt Word (Markdown) | useAgentPrompts.ts | 30 min |
+| R9 | Enrichir GLOBAL_STYLE_INSTRUCTIONS | constant.ts | 15 min |
+| R12 | Bloc commun de formatage 3 hotes | useAgentPrompts.ts | 30 min |
+| R13 | Clarifier tools Outlook | outlookTools.ts | 15 min |
+
+### Phase 2 - Elimination des doubles puces (~3-4h)
+
+| # | Action | Fichier(s) | Effort |
+|---|--------|---------|--------|
+| R10 | Detection puces natives PowerPoint | powerpointTools.ts | 2h |
+| R10 | Detection contexte liste Word | wordTools.ts | 1h |
+| R8 | HTML dans insertTextBox PowerPoint | powerpointTools.ts | 1h |
+
+### Phase 3 - Ameliorations du pipeline HTML (~4h)
+
+| # | Action | Fichier(s) | Effort |
+|---|--------|---------|--------|
+| R4 | Gestion des `<br>` dans les listes | officeRichText.ts | 1-2h |
+| R5 | Preserver sauts de ligne multiples | officeRichText.ts | 30 min |
+| R11 | Sous-niveaux dans insertList Word | wordTools.ts | 1h |
+| R23 | Styles code blocks + code inline | officeRichText.ts | 30 min |
+| R22 | Horizontal rules | officeRichText.ts | 15 min |
+| R21 | Plugin task lists | officeRichText.ts + package.json | 30 min |
+
+### Phase 4 - Heritage des styles + formatage avance (~5h)
+
+| # | Action | Fichier(s) | Effort |
+|---|--------|---------|--------|
+| R1 | Heritage styles du document Word | officeRichText.ts + common.ts | 2-3h |
+| R7 | Extensions Markdown-it (deflist, footnotes) | officeRichText.ts + package.json | 1h |
+| R14 | Headings -> styles Word builtin | wordTools.ts | 1h |
+| R15 | Restauration formatage complete | wordTools.ts | 1h |
+
+### Phase 5 - Fonctionnalites avancees (optionnel, ~8h)
+
+| # | Action | Fichier(s) | Effort |
+|---|--------|---------|--------|
+| R16 | Selection avec formatage Markdown | wordTools.ts + useOfficeSelection.ts | 2h |
+| R17 | Diff visuel pour corrections | Nouveau composable + lib diff | 3h |
+| R19 | Footnotes Markdown completes | officeRichText.ts + package.json | 1h |
+| R18 | Tool applyStyle | wordTools.ts | 1h |
+| R20 | Support Excel basique | Nouveau excelTools.ts | 4h+ |
+
+---
+
+## 17. CONCLUSION MISE A JOUR
+
+Au-dela des problemes de puces et de mise en forme de base, l'analyse de Redink revele **3 categories de fonctionnalites manquantes** dans KickOffice :
+
+### A. Fonctionnalites de mise en forme immediatement applicables (Phases 1-3)
+- Corrections de prompts et descriptions de tools (R2, R3, R6, R9, R12, R13)
+- Detection des puces natives (R10)
+- Styles code blocks, horizontal rules, task lists (R21, R22, R23)
+
+### B. Fonctionnalites de qualite de rendu (Phase 4)
+- Heritage des styles du document (R1)
+- Headings en styles Word builtin au lieu de tailles CSS (R14)
+- Restauration complete du formatage apres modification (R15)
+- Plugins Markdown avances - definition lists, footnotes (R7, R19)
+
+### C. Fonctionnalites avancees (Phase 5)
+- Envoi du formatage au LLM via Markdown (R16) - le LLM pourra preserver gras/italique
+- Diff visuel pour les corrections (R17) - comme Redink dans Outlook
+- Application intelligente de styles (R18)
+- Support Excel (R20) - si dans la roadmap
+
+Les Phases 1 a 3 resolvent les problemes actuels. La Phase 4 eleve la qualite au niveau de Redink. La Phase 5 ajoute des fonctionnalites differenciantes.
