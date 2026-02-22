@@ -1,5 +1,35 @@
 import { executeOfficeAction } from './officeAction'
+import DiffMatchPatch from 'diff-match-patch'
+import TurndownService from 'turndown'
+
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
+
+// R16 — Reusable TurndownService instance configured for Word-flavoured Markdown output
+const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' })
+turndownService.addRule('underline', {
+  filter: ['u'],
+  replacement: (content) => `__${content}__`,
+})
+turndownService.addRule('strikethrough', {
+  filter: ['del', 's'],
+  replacement: (content) => `~~${content}~~`,
+})
+
+// R17 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
+function generateVisualDiff(originalText: string, newText: string): string {
+  const dmp = new DiffMatchPatch()
+  const diffs = dmp.diff_main(originalText, newText)
+  dmp.diff_cleanupSemantic(diffs)
+
+  return diffs
+    .map(([op, text]) => {
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
+      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
+      return escaped
+    })
+    .join('')
+}
 
 export type WordToolName =
   | 'getSelectedText'
@@ -41,6 +71,8 @@ export type WordToolName =
   | 'setPageSetup'
   | 'getSpecificParagraph'
   | 'insertSectionBreak'
+  | 'applyStyle'
+  | 'getSelectedTextWithFormatting'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
@@ -259,11 +291,15 @@ const wordToolDefinitions = createWordTools({
           type: 'boolean',
           description: 'Keep the original font styling (name, size, color, bold, italic, underline, highlight) from the selected text. Default: true.',
         },
+        diffTracking: {
+          type: 'boolean',
+          description: 'R17: When true, instead of replacing the selection, show a visual diff: insertions in blue/underline, deletions in red/strikethrough. Useful for proofreading and corrections. Default: false.',
+        },
       },
       required: ['newText'],
     },
     executeWord: async (context, args) => {
-      const { newText, preserveFormatting = true } = args
+      const { newText, preserveFormatting = true, diffTracking = false } = args
       const range = context.document.getSelection()
       range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
       // R15: load paragraph-level spacing/alignment from first paragraph (not available on Range)
@@ -273,6 +309,14 @@ const wordToolDefinitions = createWordTools({
 
       if (!range.text || range.text.length === 0) {
         return 'Error: No text selected. Select text in the document, then try again.'
+      }
+
+      // R17: diffTracking mode — show visual diff instead of replacing directly
+      if (diffTracking) {
+        const diffHtml = generateVisualDiff(range.text, newText)
+        range.insertHtml(diffHtml, 'Replace')
+        await context.sync()
+        return 'Inserted text with visual diff: insertions shown in blue/underline, deletions in red/strikethrough.'
       }
 
       // Capture all formatting before additional syncs invalidate cached values
@@ -1719,12 +1763,86 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { location = 'After' } = args
-      
+
         const range = context.document.getSelection() as any
         range.insertBreak('SectionNext', location)
         await context.sync()
         return `Successfully inserted section break ${location.toLowerCase()} selection`
       },
+  },
+
+  applyStyle: {
+    name: 'applyStyle',
+    category: 'format',
+    description: 'Apply a Word builtin paragraph style to the current selection or paragraph. '
+      + 'Use this to set headings (Heading1-9), body text (Normal), special styles (Title, Subtitle, Quote, etc.). '
+      + 'Builtin styles work across all languages and appear in the Word Style Gallery. '
+      + 'Target "current-paragraph" to style only the paragraph containing the cursor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        styleBuiltIn: {
+          type: 'string',
+          description: 'Word builtin style name.',
+          enum: [
+            'Normal', 'Heading1', 'Heading2', 'Heading3', 'Heading4', 'Heading5',
+            'Heading6', 'Heading7', 'Heading8', 'Heading9',
+            'Title', 'Subtitle', 'Strong', 'Emphasis',
+            'ListBullet', 'ListBullet2', 'ListBullet3',
+            'ListNumber', 'ListNumber2', 'ListNumber3',
+            'Quote', 'IntenseQuote', 'SubtleEmphasis', 'IntenseEmphasis',
+            'SubtleReference', 'IntenseReference', 'BookTitle',
+            'NoSpacing', 'ListParagraph',
+          ],
+        },
+        target: {
+          type: 'string',
+          description: 'Where to apply: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
+          enum: ['selection', 'current-paragraph'],
+        },
+      },
+      required: ['styleBuiltIn'],
+    },
+    executeWord: async (context, args) => {
+      const { styleBuiltIn, target = 'selection' } = args
+      const selection = context.document.getSelection()
+
+      if (target === 'current-paragraph') {
+        const para = selection.paragraphs.getFirst()
+        para.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+      } else {
+        selection.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+      }
+
+      await context.sync()
+      return `Applied style "${styleBuiltIn}" to ${target}.`
+    },
+  },
+
+  getSelectedTextWithFormatting: {
+    name: 'getSelectedTextWithFormatting',
+    category: 'read',
+    description: 'R16: Get the currently selected text as Markdown, preserving all formatting '
+      + '(bold, italic, underline, headings, lists, hyperlinks). '
+      + 'Use this instead of getSelectedText when you need to modify text while preserving its rich formatting. '
+      + 'The LLM can edit the Markdown and pass the result back to replaceSelectedText.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    executeWord: async (context) => {
+      const selection = context.document.getSelection()
+      const htmlResult = selection.getHtml()
+      await context.sync()
+
+      if (!htmlResult.value || htmlResult.value.trim() === '') {
+        return 'No text selected or selection is empty.'
+      }
+
+      const markdown = turndownService.turndown(htmlResult.value)
+      return markdown || 'Selection contains no convertible content.'
+    },
   },
 })
 

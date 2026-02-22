@@ -161,6 +161,55 @@ function splitBrInListItems(html: string): string {
   }
 }
 
+/**
+ * R19 — Post-process markdown-it-footnote HTML output for cleaner Office rendering.
+ *
+ * The plugin generates a <section class="footnotes"> block with back-reference links.
+ * Office hosts don't render the `<section>` element natively, so we convert it to:
+ * - A horizontal-rule separator paragraph
+ * - A numbered list of footnote texts (back-reference links stripped)
+ *
+ * Inline footnote references (<sup class="footnote-ref">) are kept as superscript
+ * numbers so they remain visible in the body text.
+ */
+function processFootnotes(html: string): string {
+  if (!html.includes('class="footnotes"')) return html
+
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const section = doc.querySelector('section.footnotes')
+    if (!section) return html
+
+    // Build replacement: separator + numbered footnote list
+    const items = Array.from(section.querySelectorAll('li.footnote-item'))
+    if (items.length === 0) {
+      section.remove()
+      return doc.body.innerHTML
+    }
+
+    const separator = doc.createElement('p')
+    separator.setAttribute('style', 'border-bottom:1px solid #999; margin:12px 0;')
+    separator.innerHTML = '&nbsp;'
+
+    const ol = doc.createElement('ol')
+    ol.setAttribute('style', 'font-size:0.85em; color:#555; margin:4px 0; padding-left:1.5em;')
+
+    for (const item of items) {
+      // Strip back-reference links (<a class="footnote-backref">)
+      item.querySelectorAll('a.footnote-backref').forEach(a => a.remove())
+      const li = doc.createElement('li')
+      li.innerHTML = item.innerHTML.trim()
+      ol.appendChild(li)
+    }
+
+    section.replaceWith(separator, ol)
+    return doc.body.innerHTML
+  } catch {
+    return html
+  }
+}
+
 function normalizeUnderlineMarkdown(rawContent: string): string {
   // Many model prompts use __text__ to ask for underline. Convert it to <u>...</u>
   // before markdown parsing so Office hosts render the expected style.
@@ -283,7 +332,8 @@ export function renderOfficeRichHtml(content: string): string {
     ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'style', 'target', 'type'],
   })
 
-  return splitBrInListItems(sanitized)  // R4
+  const withFootnotes = processFootnotes(sanitized)  // R19
+  return splitBrInListItems(withFootnotes)  // R4
 }
 
 /**
