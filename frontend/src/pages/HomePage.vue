@@ -110,6 +110,7 @@ import {
   computed,
   nextTick,
   onBeforeMount,
+  onMounted,
   onUnmounted,
   ref,
   watch,
@@ -382,7 +383,13 @@ watch(userInput, () => {
   adjustTextareaHeight();
 });
 
-async function scrollToBottom() {
+type ScrollMode = 'bottom' | 'message-top' | 'auto';
+
+/**
+ * Scroll the chat container
+ * @param mode - 'bottom': scroll to very bottom, 'message-top': scroll to top of last message, 'auto': smart behavior
+ */
+async function scrollToBottom(mode: ScrollMode = 'auto') {
   await nextTick();
   const rawContainer = messageListRef.value?.containerEl;
   const container = ((rawContainer as any)?.value || rawContainer) as
@@ -395,19 +402,44 @@ async function scrollToBottom() {
     | HTMLElement
     | undefined;
 
-  if (lastMessage) {
-    const msgTop = lastMessage.offsetTop;
-    const padding = 20; // Some top padding
-    // If the message is taller than the container, keep its start visible.
-    // Otherwise, scroll organically to the bottom as it grows.
+  if (!lastMessage) {
+    container.scrollTop = container.scrollHeight;
+    return;
+  }
+
+  const msgTop = lastMessage.offsetTop;
+  const padding = 12;
+
+  if (mode === 'bottom') {
+    // Always scroll to the very bottom
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+  } else if (mode === 'message-top') {
+    // Scroll so the top of the last message is visible at the top of the container
+    container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
+  } else {
+    // Auto mode: smart behavior based on message height
+    // If the message is taller than the container, keep its start visible
+    // Otherwise, scroll to bottom as content grows
     if (lastMessage.offsetHeight > container.clientHeight) {
       container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
     } else {
       container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
     }
-  } else {
-    container.scrollTop = container.scrollHeight;
   }
+}
+
+/**
+ * Scroll to show the top of the last message (for receiving new assistant messages)
+ */
+async function scrollToMessageTop() {
+  await scrollToBottom('message-top');
+}
+
+/**
+ * Scroll to very bottom (for user sending messages and on startup)
+ */
+async function scrollToVeryBottom() {
+  await scrollToBottom('bottom');
 }
 
 const imageActions = useImageActions(t);
@@ -474,6 +506,8 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
     createDisplayMessage: imageActions.createDisplayMessage,
     adjustTextareaHeight,
     scrollToBottom,
+    scrollToMessageTop,
+    scrollToVeryBottom,
   },
 });
 
@@ -537,6 +571,15 @@ onBeforeMount(() => {
   loadSavedPrompts();
   checkBackend();
   backendCheckInterval.value = window.setInterval(checkBackend, 30000);
+});
+
+onMounted(() => {
+  // Scroll to bottom of history on initial load
+  if (history.value.length > 0) {
+    nextTick(() => {
+      scrollToVeryBottom();
+    });
+  }
 });
 
 onUnmounted(() => {

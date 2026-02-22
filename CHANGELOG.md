@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Secure Credential Persistence**: Added "Remember credentials" toggle in Settings > Account. Credentials are now stored with XOR obfuscation + Base64 encoding in localStorage when enabled, falling back to sessionStorage when disabled. Automatic migration from legacy sessionStorage format.
+- **Smart Scroll Behavior**: Improved chat scroll UX with context-aware scrolling:
+  - Scrolls to bottom when sending a user message
+  - Scrolls to the top of the assistant message when receiving a response
+  - Scrolls to bottom of history on initial page load
+- **Credential Error Detection**: API now detects 401 credential errors and displays user-friendly localized messages instead of raw technical errors.
+- **Tool Execution Success Message**: When agent tools execute successfully without text response (e.g., proofreading with comments), displays "Actions completed successfully" instead of an error.
+
+### Fixed
+
+- **Word Proofreading Empty Response**: Fixed issue where proofreading in Word displayed "empty response" error after successfully adding comments via the `addComment` tool.
+- **Outlook Reply Language Detection**: Outlook reply quick action now properly detects the language of the original email and responds in the same language, overriding the configured reply language setting.
+
 ### Changed
 
 - **DESIGN_REVIEW.md v2**: Complete fresh audit with 28 new issues identified (3 CRITICAL, 5 HIGH, 10 MEDIUM, 7 LOW, 3 BUILD). Previous v1 audit (38 issues, all resolved) preserved as reference.

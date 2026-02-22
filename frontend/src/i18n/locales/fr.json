@@ -128,6 +128,7 @@
   "darkModeDescription": "Utiliser un thème de couleurs plus sombre",
   "newChat": "Nouvelle conversation",
   "noModelResponse": "Le modèle a renvoyé une réponse vide. Réessayez ou consultez les logs du backend.",
+  "toolsExecutedSuccessfully": "Actions terminées avec succès. Vérifiez le document pour voir les modifications.",
   "polish": "Réécrire",
   "prompts": "Prompts",
   "recursionLimitExceeded": "L'agent a dépassé le nombre maximum d'itérations.",
@@ -377,5 +378,9 @@
   "litellmUserEmailPlaceholder": "votre.email{'@'}kickmaker.net",
   "litellmCredentialsInfo": "Obtenez votre clé sur",
   "litellmCredentialsConfigured": "Identifiants configurés",
-  "litellmCredentialsMissing": "Identifiants non configurés"
+  "litellmCredentialsMissing": "Identifiants non configurés",
+  "credentialsRequired": "Veuillez configurer vos identifiants dans Paramètres > Compte pour utiliser cette fonctionnalité.",
+  "credentialsRequiredTitle": "Authentification requise",
+  "rememberCredentialsLabel": "Mémoriser les identifiants",
+  "rememberCredentialsDescription": "Conserver les identifiants entre les sessions"
 }

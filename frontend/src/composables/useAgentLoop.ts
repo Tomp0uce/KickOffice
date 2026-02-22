@@ -89,6 +89,8 @@ interface AgentLoopHelpers {
   createDisplayMessage: (role: DisplayMessage['role'], content: string, imageSrc?: string) => DisplayMessage
   adjustTextareaHeight: () => void
   scrollToBottom: () => Promise<void>
+  scrollToMessageTop?: () => Promise<void>
+  scrollToVeryBottom?: () => Promise<void>
 }
 
 interface UseAgentLoopOptions {
@@ -99,6 +101,20 @@ interface UseAgentLoopOptions {
   settings: AgentLoopSettings
   actions: AgentLoopActions
   helpers: AgentLoopHelpers
+}
+
+/**
+ * Check if an error is a 401 credential error from LiteLLM
+ */
+function isCredentialError(error: any): boolean {
+  if (!error) return false
+  const message = error.message || String(error)
+  return (
+    message.includes('401') ||
+    message.includes('LiteLLM user credentials') ||
+    message.includes('X-User-Key') ||
+    message.includes('X-User-Email')
+  )
 }
 
 export function useAgentLoop(options: UseAgentLoopOptions) {
@@ -157,6 +173,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     createDisplayMessage,
     adjustTextareaHeight,
     scrollToBottom,
+    scrollToMessageTop = scrollToBottom, // fallback to scrollToBottom if not provided
+    scrollToVeryBottom = scrollToBottom, // fallback to scrollToBottom if not provided
   } = helpers
 
   const currentAction = ref('')
@@ -214,8 +232,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const maxIter = Math.min(Number(agentMaxIterations.value) || 10, 10)
     let currentMessages: ChatRequestMessage[] = [...messages]
     let lastToolSignature: string | null = null
+    let toolsWereExecuted = false // Track if any tools were successfully executed
     currentAction.value = t('agentAnalyzing')
     history.value.push(createDisplayMessage('assistant', ''))
+    await scrollToMessageTop() // Scroll to show start of assistant response
     const lastIndex = history.value.length - 1
     let abortedByUser = false
     while (iteration < maxIter) {
@@ -274,7 +294,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           messageCount: currentMessages.length,
           error: err,
         })
-        history.value[lastIndex].content = `Error: The model or API failed to respond. ${err.message || ''}`
+        // Display user-friendly message for credential errors
+        if (isCredentialError(err)) {
+          history.value[lastIndex].content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+        } else {
+          history.value[lastIndex].content = `Error: The model or API failed to respond. ${err.message || ''}`
+        }
         currentAction.value = ''
         break
       }
@@ -320,7 +345,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           } else {
             currentAction.value = getActionLabelForCategory(toolDef.category)
             await scrollToBottom()
-            try { result = await toolDef.execute(toolArgs) } catch (err: any) { console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err }); result = `Error: ${err.message}` }
+            try {
+              result = await toolDef.execute(toolArgs)
+              toolsWereExecuted = true // Mark that at least one tool was successfully executed
+            } catch (err: any) {
+              console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
+              result = `Error: ${err.message}`
+            }
             currentAction.value = ''
             lastToolSignature = currentSignature
           }
@@ -374,7 +405,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     const assistantContent = history.value[lastIndex]?.content?.trim() || ''
     if (!assistantContent) {
-      history.value[lastIndex].content = t('noModelResponse')
+      // If tools were executed successfully but no text response, that's OK (e.g., proofreading with comments)
+      if (toolsWereExecuted) {
+        history.value[lastIndex].content = t('toolsExecutedSuccessfully')
+      } else {
+        history.value[lastIndex].content = t('noModelResponse')
+      }
     }
 
     if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))
@@ -385,6 +421,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
+      await scrollToMessageTop() // Scroll to top of assistant message
       imageLoading.value = true
       try {
         const imageSrc = await generateImage({ prompt: userMessage })
@@ -396,7 +433,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       } finally {
         imageLoading.value = false
       }
-      await scrollToBottom()
+      await scrollToBottom() // Final scroll after image loads
       return
     }
     const systemPrompt = customSystemPrompt.value || agentPrompt(replyLanguage.value || 'Français')
@@ -465,7 +502,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     // If it's pure selection image, we show the selection as the user message bubble
     const displayMessageText = isImageFromSelection ? selectedText : userMessage
     history.value.push(createDisplayMessage('user', displayMessageText))
-    await scrollToBottom()
+    await scrollToVeryBottom() // Scroll to very bottom after user message
 
     try {
       // If we haven't fetched it yet and it's enabled
@@ -500,7 +537,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)
-        messageUtil.error(t('failedToResponse'))
+        if (isCredentialError(error)) {
+          messageUtil.warning(t('credentialsRequired'))
+        } else {
+          messageUtil.error(t('failedToResponse'))
+        }
       }
     } finally {
       currentAction.value = ''
@@ -603,17 +644,36 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
     } else {
       history.value.push(createDisplayMessage('assistant', ''))
-      await chatStream({
-        messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-        modelTier: resolveChatModelTier(),
-        onStream: async (text: string) => {
-          const message = history.value[history.value.length - 1]
-          message.role = 'assistant'
-          message.content = text
-          await scrollToBottom()
-        },
-        abortSignal: abortController.value?.signal,
-      })
+      await scrollToMessageTop() // Scroll to show start of assistant response
+      try {
+        await chatStream({
+          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+          modelTier: resolveChatModelTier(),
+          onStream: async (text: string) => {
+            const message = history.value[history.value.length - 1]
+            message.role = 'assistant'
+            message.content = text
+            await scrollToBottom()
+          },
+          abortSignal: abortController.value?.signal,
+        })
+        // Check for empty response
+        const lastMessage = history.value[history.value.length - 1]
+        if (!lastMessage?.content?.trim()) {
+          lastMessage.content = t('noModelResponse')
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return
+        console.error('[AgentLoop] Quick action chatStream failed', err)
+        const lastMessage = history.value[history.value.length - 1]
+        if (isCredentialError(err)) {
+          lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+          messageUtil.warning(t('credentialsRequired'))
+        } else {
+          lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
+          messageUtil.error(t('failedToResponse'))
+        }
+      }
     }
   }
 
