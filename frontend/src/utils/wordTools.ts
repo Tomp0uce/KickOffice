@@ -479,14 +479,15 @@ const wordToolDefinitions = createWordTools({
   insertList: {
     name: 'insertList',
     category: 'write',
-    description: 'Insert a bulleted or numbered list at the current position.',
+    description: 'Insert a bulleted or numbered list at the current position. Each item can be a plain string or an object {text, children} for nested sub-items.',
     inputSchema: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'Array of list item texts',
-          items: { type: 'string' },
+          description:
+            'Array of list items. Each entry is either a plain string or an object {text: string, children?: string[]} for nested sub-items.',
+          items: { type: 'object' },
         },
         listType: {
           type: 'string',
@@ -498,18 +499,26 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { items, listType } = args
-      
-        const range = context.document.getSelection()
-        
-        const markdownList = listType === 'bullet' 
-          ? items.map((i: string) => `* ${i}`).join('\n')
-          : items.map((i: string, idx: number) => `${idx + 1}. ${i}`).join('\n')
-        
-        range.insertHtml(renderOfficeRichHtml(markdownList), 'After')
+      const range = context.document.getSelection()
 
-        await context.sync()
-        return `Successfully inserted ${listType} list with ${items.length} items`
-      },
+      let topLevelIndex = 0
+      const markdownLines: string[] = []
+
+      for (const item of items) {
+        const text = typeof item === 'string' ? item : (item.text ?? '')
+        const marker = listType === 'bullet' ? '-' : `${++topLevelIndex}.`
+        markdownLines.push(`${marker} ${text}`)
+
+        const children: string[] = typeof item === 'object' && Array.isArray(item.children) ? item.children : []
+        for (const child of children) {
+          markdownLines.push(listType === 'bullet' ? `  - ${child}` : `  1. ${child}`)
+        }
+      }
+
+      range.insertHtml(renderOfficeRichHtml(markdownLines.join('\n')), 'After')
+      await context.sync()
+      return `Successfully inserted ${listType} list with ${items.length} items`
+    },
   },
 
   deleteText: {

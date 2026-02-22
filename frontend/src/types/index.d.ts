@@ -1,3 +1,6 @@
+// markdown-it-task-lists ships without TypeScript declarations
+declare module 'markdown-it-task-lists'
+
 type IStringKeyMap = Record<string, any>
 
 type insertTypes = 'replace' | 'append' | 'newLine' | 'NoAction'

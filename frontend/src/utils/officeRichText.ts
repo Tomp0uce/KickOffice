@@ -1,12 +1,13 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import markdownItTaskLists from 'markdown-it-task-lists'
 
 const officeMarkdownParser = new MarkdownIt({
   breaks: true,
   html: true,
   linkify: true,
   typographer: true,
-})
+}).use(markdownItTaskLists, { enabled: true })
 
 type StyleDefinition = {
   fontSize?: string
@@ -64,6 +65,61 @@ function styleDefinitionToInlineCss(definition: StyleDefinition): string {
   return rules.join(';')
 }
 
+/**
+ * R5 — Insert a non-breaking space on otherwise blank lines so the Markdown
+ * parser emits an explicit empty paragraph instead of silently collapsing
+ * sequences of 3+ newlines into a single paragraph break.
+ */
+function preserveMultipleLineBreaks(content: string): string {
+  return content.replace(/\n[ \t]*\n[ \t]*\n/g, '\n\n&nbsp;\n\n')
+}
+
+/**
+ * R4 — Split <br> tags that appear inside <li> or <p> elements into
+ * separate child paragraphs. Prevents Word and PowerPoint from rendering a
+ * line-break-inside-a-list-item as a plain newline that visually breaks
+ * bullet alignment.
+ *
+ * Works in all Office add-in runtimes (browser-based DOMParser).
+ */
+function splitBrInListItems(html: string): string {
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+
+    // Split <br> inside <li> into sibling <p> elements
+    doc.querySelectorAll('li').forEach((li) => {
+      if (!/<br\s*\/?>/i.test(li.innerHTML)) return
+      const segments = li.innerHTML.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean)
+      if (segments.length <= 1) return
+      li.innerHTML = '<p>' + segments.join('</p><p>') + '</p>'
+    })
+
+    // Split <br> inside <p> into sibling <p> elements
+    // Iterate over a snapshot to avoid live-collection issues
+    const paragraphs = Array.from(doc.querySelectorAll('p'))
+    for (const p of paragraphs) {
+      if (!/<br\s*\/?>/i.test(p.innerHTML)) continue
+      const segments = p.innerHTML.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean)
+      if (segments.length <= 1) continue
+      const parent = p.parentNode
+      if (!parent) continue
+      const style = p.getAttribute('style') ?? ''
+      for (const seg of segments) {
+        const newP = document.createElement('p')
+        newP.innerHTML = seg
+        if (style) newP.setAttribute('style', style)
+        parent.insertBefore(newP, p)
+      }
+      parent.removeChild(p)
+    }
+
+    return doc.body.innerHTML
+  } catch {
+    return html
+  }
+}
+
 function normalizeUnderlineMarkdown(rawContent: string): string {
   // Many model prompts use __text__ to ask for underline. Convert it to <u>...</u>
   // before markdown parsing so Office hosts render the expected style.
@@ -108,7 +164,18 @@ function normalizeNamedStyles(rawContent: string): string {
 }
 
 function applyOfficeBlockStyles(html: string): string {
-  return html
+  // Two-pass code styling: protect <code> inside <pre> from inline-code rules
+  // by temporarily marking it, then style standalone <code> separately.
+  const withPreCode = html
+    .replace(/<pre>/gi, '<pre style="font-family:Consolas,\'Courier New\',monospace; font-size:10pt; background:#f4f4f4; padding:8px; margin:6px 0; border-left:3px solid #ccc;">')
+    .replace(/(<pre[^>]*>)(<code>)/gi, '$1<code data-pre="1">')
+
+  const withCode = withPreCode
+    .replace(/<code(?! data-pre)/gi, '<code style="font-family:Consolas,\'Courier New\',monospace; font-size:0.9em; background:#f0f0f0; padding:1px 4px;">')
+    .replace(/ data-pre="1"/gi, '')
+
+  return withCode
+    .replace(/<hr\s*\/?>/gi, '<p style="border-bottom:1px solid #999; margin:8px 0;">&nbsp;</p>')
     .replace(/<h1>/gi, '<h1 style="margin:0 0 8px 0; font-size:2em; font-weight:700;">')
     .replace(/<h2>/gi, '<h2 style="margin:0 0 6px 0; font-size:1.5em; font-weight:700;">')
     .replace(/<h3>/gi, '<h3 style="margin:0 0 6px 0; font-size:1.17em; font-weight:700;">')
@@ -161,17 +228,20 @@ export function stripMarkdownListMarkers(content: string): string {
 
 export function renderOfficeRichHtml(content: string): string {
   const withStyleAliases = normalizeNamedStyles(content?.trim() ?? '')
-  const withUnderline = normalizeUnderlineMarkdown(withStyleAliases)
+  const withPreservedBreaks = preserveMultipleLineBreaks(withStyleAliases)  // R5
+  const withUnderline = normalizeUnderlineMarkdown(withPreservedBreaks)
   const normalizedContent = normalizeSuperAndSubScript(withUnderline)
   const unsafeHtml = officeMarkdownParser.render(normalizedContent)
 
-  return DOMPurify.sanitize(unsafeHtml, {
+  const sanitized = DOMPurify.sanitize(unsafeHtml, {
     ALLOWED_TAGS: [
-      'a', 'b', 'blockquote', 'br', 'code', 'del', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'li',
-      'ol', 'p', 'pre', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
+      'a', 'b', 'blockquote', 'br', 'code', 'del', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
+      'input', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
     ],
-    ALLOWED_ATTR: ['href', 'rel', 'style', 'target'],
+    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'rel', 'style', 'target', 'type'],
   })
+
+  return splitBrInListItems(sanitized)  // R4
 }
 
 /**
