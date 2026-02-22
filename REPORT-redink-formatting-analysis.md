@@ -547,3 +547,471 @@ Les problemes de mise en forme de KickOffice sont principalement dus a :
 3. **Un pipeline HTML qui n'adapte pas les styles** au contexte du document
 
 La Phase 1 (corrections de prompts et descriptions) devrait resoudre la majorite des problemes visibles en moins de 2 heures de travail, sans modification structurelle du code. Les Phases 2 et 3 apporteront des ameliorations plus profondes de qualite de rendu.
+
+---
+
+## 8. ANALYSE APPROFONDIE : DOUBLE PUCES ET INDENTATION
+
+### 8.1 Cause racine des doubles puces dans PowerPoint
+
+Le probleme de double puces dans PowerPoint vient d'un **conflit entre les puces natives des shapes et les puces HTML/Markdown**.
+
+**Scenario type :**
+1. L'utilisateur a un textbox PowerPoint avec des puces natives (bullet points configures dans le theme du slide)
+2. Le LLM genere du Markdown avec des marqueurs de liste : `- Point 1\n- Point 2`
+3. Le pipeline `renderOfficeCommonApiHtml` convertit ca en `<ul><li>Point 1</li><li>Point 2</li></ul>`
+4. Le HTML est insere via `insertHtml` ou `CoercionType.Html`
+5. **PowerPoint ajoute ses puces natives AU-DESSUS des puces HTML** = double puces
+
+**Preuve dans le code :**
+```typescript
+// powerpointTools.ts:97-115 - insertIntoPowerPoint
+const htmlContent = renderOfficeCommonApiHtml(normalizedNewlines)
+// ... tente insertHtml avec l'API moderne
+textRange.insertHtml(htmlContent, 'Replace')
+// ... puis fallback CoercionType.Html
+```
+Le HTML contient `<ul><li>` qui genere ses propres puces. Mais si le shape cible a deja un style de paragraphe avec puces natives, on obtient puce native + puce HTML.
+
+**Le fallback texte brut a aussi un probleme :**
+```typescript
+// powerpointTools.ts:142-156 - fallbackToText
+const fallbackText = stripRichFormattingSyntax(text, true) // true = strip list markers
+```
+Quand `stripListMarkers=true`, la fonction `stripMarkdownListMarkers` retire les `- ` et `1. ` mais garde l'indentation comme tabs. Resultat : texte indente sans puce visible si le shape n'a pas de puces natives, ou puces natives mais pas de hierarchie visible.
+
+### 8.2 Cause racine des doubles puces dans Word
+
+Dans Word, le probleme est similaire mais se manifeste differemment :
+
+**Scenario type :**
+1. Le LLM genere du contenu avec `<ul><li>` via le pipeline `renderOfficeRichHtml`
+2. Word.js `insertHtml()` insere le HTML
+3. Word interprete `<ul><li>` et cree un paragraphe avec le style "List Paragraph" + puce native
+4. Mais le HTML peut AUSSI contenir un caractere "bullet" unicode (U+2022) si le LLM a melange Markdown et texte brut
+5. Ou bien si le point d'insertion etait deja dans une liste, Word herite du style de liste et ajoute une puce supplementaire
+
+**Le tool `insertList` de Word confirme le probleme :**
+```typescript
+// wordTools.ts:454-467 - insertList
+const markdownList = listType === 'bullet'
+  ? items.map((i: string) => `* ${i}`).join('\n')
+  : items.map((i: string, idx: number) => `${idx + 1}. ${i}`).join('\n')
+range.insertHtml(renderOfficeRichHtml(markdownList), 'After')
+```
+Ce tool genere du Markdown (`* item`) puis le convertit en HTML (`<ul><li>`). C'est correct en soi, mais :
+- Il n'y a **aucun nettoyage du contexte de destination** (le curseur est-il deja dans une liste ?)
+- Il n'y a **aucune gestion de l'indentation/niveaux de liste** (le tool n'accepte que des items plats)
+- Les sous-listes sont impossibles via ce tool
+
+### 8.3 Cause racine de l'impossibilite d'indenter les puces
+
+**PowerPoint :**
+Le HTML `<ul>` standard ne supporte qu'un niveau. Pour les sous-listes, il faut des `<ul>` imbriques :
+```html
+<ul>
+  <li>Niveau 1
+    <ul>
+      <li>Niveau 2</li>
+    </ul>
+  </li>
+</ul>
+```
+Le pipeline `renderOfficeRichHtml` produit bien cette structure depuis du Markdown indente.
+MAIS le probleme est que :
+1. Les descriptions de tools disent au LLM que le formatage est impossible (voir Probleme 5)
+2. Le prompt PowerPoint ne mentionne pas la hierarchie des listes (voir Probleme 8)
+3. Donc le LLM ne genere jamais de listes imbriquees dans le bon format
+
+**Word :**
+L'indentation via HTML fonctionne nativement avec `<ul>` imbrique dans Word.js `insertHtml`.
+Le probleme est que le prompt Word demande du HTML brut (Probleme 9) mais le pipeline attend du Markdown.
+Si le LLM genere du Markdown avec indentation :
+```markdown
+- Point principal
+  - Sous-point
+    - Sous-sous-point
+```
+Le parser markdown-it le convertit correctement en HTML imbrique. Le probleme est donc **uniquement au niveau des prompts** qui ne guident pas le LLM.
+
+### 8.4 Comment Redink gere les listes (comparaison)
+
+Redink a une approche tres differente car il passe par le clipboard CF_HTML :
+
+1. **Conversion Markdown -> HTML** : Markdig avec `UseListExtras()` genere du HTML avec `<ol>` et `<ul>` standard
+2. **Pas de conflit avec les puces natives** : Comme Redink utilise `PasteAndFormat(wdFormatOriginalFormatting)`, Word interprete le HTML comme un collage depuis un navigateur. Les listes HTML deviennent des paragraphes Word avec le style "List Paragraph" et les puces correspondantes. Il n'y a PAS de duplication car le paste remplace completement le formatage.
+3. **Indentation preservee** : Les `<ul>` imbriques dans le HTML sont correctement convertis en niveaux de liste Word avec indentation progressive.
+
+**Point cle applicable a KickOffice** : Le vrai probleme n'est pas dans le HTML genere mais dans la **methode d'insertion**. `insertHtml` de Word.js fait essentiellement la meme chose que le paste de Redink. Le probleme vient du fait que le LLM ne genere pas le bon Markdown en amont.
+
+---
+
+## 9. ANALYSE OUTLOOK : POURQUOI CA MARCHE MIEUX
+
+### 9.1 Ce qui fonctionne dans Outlook
+
+Outlook utilise le **meme pipeline** `renderOfficeRichHtml` que Word et PowerPoint, mais avec moins de problemes. Voici pourquoi :
+
+**1. Insertion coherente via HTML :**
+```typescript
+// outlookTools.ts:216-224 - insertTextAtCursor
+const html = renderOfficeRichHtml(text)
+mailbox.item.body.setSelectedDataAsync(
+  html,
+  { coercionType: getOfficeCoercionType().Html },
+  ...
+)
+```
+- Le HTML est insere directement via `setSelectedDataAsync` avec `CoercionType.Html`
+- Outlook (etant un client email HTML) interprete nativement le HTML avec `<ul>`, `<li>`, `<strong>`, etc.
+- **Pas de conflit avec des styles natifs** : les emails n'ont pas de "shapes" ou de "styles de liste document" comme Word/PowerPoint
+
+**2. Les tools Outlook n'ont PAS de mensonge sur les capacites :**
+```typescript
+// outlookTools.ts - insertTextAtCursor
+description: 'Insert plain text at the current cursor position...'
+// Malgre le nom "plain text", le code fait du HTML via renderOfficeRichHtml
+```
+Le nom est trompeur ("plain text") mais au moins il ne dit PAS au LLM que le formatage est impossible.
+
+**3. Le prompt Outlook est certes minimal mais ne contredit rien :**
+```typescript
+// useAgentPrompts.ts:47
+const outlookAgentPrompt = (lang: string) =>
+  `# Role\nYou are a Microsoft Outlook Email Expert Agent.\n# Guidelines\n4. **Language**: ${lang}.`
+```
+Pas d'instruction contradictoire HTML vs Markdown. Le LLM genere du Markdown naturellement, le pipeline le convertit.
+
+### 9.2 Ce qui pourrait etre ameliore dans Outlook
+
+Malgre le fonctionnement correct, Outlook a les memes lacunes potentielles :
+
+1. **Pas de style inline herite** : Le HTML insere utilise des styles CSS hardcodes (`applyOfficeBlockStyles`). Si l'email a une police Calibri 11pt et le HTML insere a des styles differents, il y aura un decalage visuel.
+
+2. **Prompt trop vide** : Le prompt Outlook ne mentionne pas le formatage. Ca fonctionne par defaut car Markdown -> HTML -> email est un chemin naturel, mais des instructions explicites sur la mise en forme des listes amelioreraient la coherence.
+
+3. **Tool `insertTextAtCursor` vs `insertHtmlAtCursor` duplique** : Il y a deux tools qui font presque la meme chose :
+   - `insertTextAtCursor` : appelle `renderOfficeRichHtml(text)` puis insere en HTML
+   - `insertHtmlAtCursor` : insere du HTML brut sans passer par le pipeline Markdown
+
+   C'est confusant pour le LLM. Il devrait y avoir un seul tool d'insertion clair.
+
+---
+
+## 10. STRATEGIE D'UNIFORMISATION WORD / POWERPOINT / OUTLOOK
+
+### 10.1 Principe directeur
+
+L'objectif est de faire passer les 3 hotes par le **meme pipeline de formatage** avec des adaptations minimales par hote. Outlook fonctionne comme reference car son chemin est le plus simple et le plus efficace.
+
+### 10.2 Pipeline unifie propose
+
+```
+[LLM genere du Markdown standard]
+         |
+         v
+[renderOfficeRichHtml()] -- Pipeline commun unique
+  1. normalizeNamedStyles()       -- Tags de style personnalises
+  2. normalizeUnderlineMarkdown() -- __text__ -> <u>
+  3. normalizeSuperAndSubScript() -- ^text^ -> <sup>
+  4. markdown-it.render()         -- Markdown -> HTML brut
+  5. DOMPurify.sanitize()         -- Nettoyage securite
+         |
+         v
+[applyOfficeBlockStyles()] -- Styles CSS inline pour les blocs
+  + NEW: splitBrInListItems()  -- Eclater <br> dans les <li>
+  + NEW: normalizeListNesting() -- S'assurer que les <ul> imbriques sont propres
+         |
+         v
+   +-----+-----+-----+
+   |     |           |
+   v     v           v
+ [WORD] [POWERPOINT] [OUTLOOK]
+```
+
+### 10.3 Adaptations par hote
+
+**Word** (`wordFormatter.ts` + `wordTools.ts`) :
+- Utiliser `insertHtml()` de Word.js (deja fait)
+- **NOUVEAU** : Avant insertion, detecter si le curseur est dans une liste existante. Si oui, ne PAS envoyer de `<ul>/<ol>` wrapper, envoyer juste les `<li>` pour eviter les doubles puces
+- **NOUVEAU** : Pour le tool `insertList`, supporter les sous-niveaux
+
+**PowerPoint** (`powerpointTools.ts`) :
+- Utiliser `insertHtml()` de l'API moderne (deja fait pour `replaceSelectedText`)
+- **NOUVEAU** : Pour `insertTextBox`, creer le textbox PUIS inserer le HTML dans son textRange
+- **CRITIQUE** : Corriger les descriptions de tools pour ne plus mentir sur les capacites
+- **NOUVEAU** : Avant insertion HTML dans un shape existant, verifier si le shape a des puces natives. Si oui, utiliser le fallback text SANS strip des marqueurs pour eviter les doubles puces
+
+**Outlook** (`outlookTools.ts`) :
+- Garder l'approche actuelle (fonctionne bien)
+- **NOUVEAU** : Fusionner `insertTextAtCursor` et `insertHtmlAtCursor` ou clarifier leur role dans les descriptions
+- **NOUVEAU** : Ajouter le style inline herite si possible via `getAsync` sur le body HTML
+
+### 10.4 Detection des puces natives pour eviter les doubles puces (R10 - NOUVEAU)
+
+C'est la recommandation la plus critique pour resoudre le probleme de double puces.
+
+**Strategie pour PowerPoint :**
+```typescript
+// powerpointTools.ts - Nouvelle fonction helper
+async function hasNativeBullets(context: any, textRange: any): Promise<boolean> {
+  // Charger les proprietes de paragraphe du textRange
+  try {
+    const paragraphs = textRange.paragraphs
+    paragraphs.load('items')
+    await context.sync()
+    if (paragraphs.items.length > 0) {
+      const firstPara = paragraphs.items[0]
+      firstPara.load('bulletFormat/visible')
+      await context.sync()
+      return firstPara.bulletFormat?.visible === true
+    }
+  } catch {
+    // API non disponible, on assume pas de puces natives
+  }
+  return false
+}
+
+// Dans insertIntoPowerPoint, adapter l'insertion :
+async function insertIntoPowerPoint(text: string, useHtml = true): Promise<void> {
+  const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+
+  // Verifier si le shape cible a des puces natives
+  let targetHasNativeBullets = false
+  try {
+    await PowerPoint.run(async (context: any) => {
+      const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
+      targetHasNativeBullets = await hasNativeBullets(context, textRange)
+    })
+  } catch {}
+
+  if (targetHasNativeBullets) {
+    // Shape avec puces natives : inserer en texte brut AVEC les retours ligne
+    // mais SANS marqueurs Markdown pour eviter les doubles puces
+    // Les puces natives du shape s'appliqueront automatiquement a chaque ligne
+    const plainText = stripRichFormattingSyntax(normalizedNewlines, true)
+    // Fallback texte brut
+    await setSelectedDataAsText(plainText)
+    return
+  }
+
+  // Shape sans puces natives : inserer en HTML (le HTML apporte ses propres puces)
+  const htmlContent = renderOfficeCommonApiHtml(normalizedNewlines)
+  // ... insertion HTML comme avant
+}
+```
+
+**Strategie pour Word :**
+```typescript
+// wordTools.ts - Dans insertText et replaceSelectedText
+// Detecter si le curseur est dans un style de liste
+async function isInsertionInList(context: Word.RequestContext): Promise<boolean> {
+  const selection = context.document.getSelection()
+  const para = selection.paragraphs.getFirst()
+  para.load('style,listItem')
+  await context.sync()
+  try {
+    // Si listItem existe et n'est pas null, on est dans une liste
+    para.listItem.load('level')
+    await context.sync()
+    return true
+  } catch {
+    return false
+  }
+}
+```
+
+### 10.5 Tableau recapitulatif des problemes de puces et corrections
+
+| Probleme | Cause | Hote | Correction |
+|----------|-------|------|------------|
+| Double puces | Shape avec puces natives + HTML `<ul><li>` | PowerPoint | R10: Detecter puces natives, fallback texte brut |
+| Double puces | Curseur dans une liste + insertion `<ul>` | Word | R10: Detecter contexte liste, adapter HTML |
+| Pas d'indentation | Le LLM ne genere pas de sous-listes | PowerPoint + Word | R2+R3+R6: Corriger prompts et descriptions tools |
+| Pas d'indentation | `insertList` tool plat sans niveaux | Word | R11: Ajouter support sous-niveaux dans insertList |
+| Puces sans texte | `stripMarkdownListMarkers` retire les marqueurs | PowerPoint | R10: Ne strip que si puces natives detectees |
+| Formatage perdu | `stripRichFormattingSyntax` dans insertTextBox | PowerPoint | R8: Utiliser HTML dans insertTextBox |
+
+---
+
+## 11. RECOMMANDATIONS ADDITIONNELLES
+
+### R10. Detection des puces natives avant insertion (Priorite : TRES HAUTE)
+
+Voir section 10.4 ci-dessus. C'est LA correction qui eliminera les doubles puces.
+
+**Fichiers a modifier** :
+- `frontend/src/utils/powerpointTools.ts` - ajouter `hasNativeBullets`, modifier `insertIntoPowerPoint`
+- `frontend/src/utils/wordTools.ts` - ajouter `isInsertionInList`, adapter `insertText` et `replaceSelectedText`
+
+### R11. Supporter les sous-niveaux dans le tool insertList de Word (Priorite : MOYENNE)
+
+**Probleme actuel** : Le tool `insertList` de Word n'accepte qu'un tableau plat d'items.
+
+**Implementation** :
+```typescript
+// wordTools.ts - insertList ameliore
+inputSchema: {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      description: 'Array of list items. Each item can be a string or an object {text, children} for nested sub-items.',
+      items: {
+        oneOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            properties: {
+              text: { type: 'string' },
+              children: { type: 'array', items: { type: 'string' } }
+            }
+          }
+        ]
+      },
+    },
+    listType: { type: 'string', enum: ['bullet', 'number'] },
+  },
+  required: ['items', 'listType'],
+},
+executeWord: async (context, args) => {
+  const { items, listType } = args
+  const markdownLines: string[] = []
+  for (const item of items) {
+    if (typeof item === 'string') {
+      markdownLines.push(listType === 'bullet' ? `- ${item}` : `${markdownLines.length + 1}. ${item}`)
+    } else {
+      markdownLines.push(listType === 'bullet' ? `- ${item.text}` : `${markdownLines.length + 1}. ${item.text}`)
+      if (item.children) {
+        for (const child of item.children) {
+          markdownLines.push(listType === 'bullet' ? `  - ${child}` : `  1. ${child}`)
+        }
+      }
+    }
+  }
+  range.insertHtml(renderOfficeRichHtml(markdownLines.join('\n')), 'After')
+  await context.sync()
+  return `Successfully inserted ${listType} list with ${items.length} items`
+}
+```
+
+**Fichiers a modifier** :
+- `frontend/src/utils/wordTools.ts` - tool `insertList`
+
+### R12. Uniformiser les prompts des 3 hotes avec instructions de formatage communes (Priorite : HAUTE)
+
+**Probleme** : Chaque hote a un prompt radicalement different sur le formatage. Il faut un bloc commun.
+
+**Implementation** :
+```typescript
+// useAgentPrompts.ts - Bloc commun pour tous les hotes
+const COMMON_FORMATTING_INSTRUCTIONS = `
+## Output Formatting Rules
+When generating content that will be inserted into the document:
+- Use standard Markdown syntax exclusively. Do NOT use raw HTML tags.
+- **Bold**: Use **text** for emphasis
+- *Italic*: Use *text* for nuance
+- Bullet lists: Use "- " prefix. Each item on its own line.
+- Numbered lists: Use "1. ", "2. ", etc.
+- Nested sub-items: Indent with exactly 2 spaces before the marker:
+  - Level 1: "- Item"
+  - Level 2: "  - Sub-item"
+  - Level 3: "    - Sub-sub-item"
+- Headings: Use # for level 1, ## for level 2, etc.
+- NEVER mix bullet symbols. Use "-" consistently, never "*" or "+".
+- NEVER put an empty line between consecutive list items of the same level.`
+
+// Puis dans chaque prompt hote :
+const wordAgentPrompt = (lang: string) => `...
+${COMMON_FORMATTING_INSTRUCTIONS}
+...`
+
+const powerPointAgentPrompt = (lang: string) => `...
+${COMMON_FORMATTING_INSTRUCTIONS}
+...`
+
+const outlookAgentPrompt = (lang: string) => `...
+${COMMON_FORMATTING_INSTRUCTIONS}
+...`
+```
+
+**Fichiers a modifier** :
+- `frontend/src/composables/useAgentPrompts.ts` - ajouter `COMMON_FORMATTING_INSTRUCTIONS` et l'integrer dans les 3 prompts
+
+### R13. Clarifier les tools Outlook (insertion texte vs HTML) (Priorite : BASSE)
+
+**Probleme** : Deux tools qui font quasi la meme chose avec des noms confusants.
+- `insertTextAtCursor` : nom dit "text" mais insere du HTML (via renderOfficeRichHtml)
+- `insertHtmlAtCursor` : insere du HTML brut
+
+**Solution** : Renommer et clarifier les descriptions :
+```typescript
+insertTextAtCursor: {
+  description: 'Insert Markdown-formatted text at the cursor. '
+    + 'The text is automatically converted to rich HTML. '
+    + 'Use Markdown: **bold**, *italic*, - bullets, 1. numbers.',
+  // ...
+},
+insertHtmlAtCursor: {
+  description: 'Insert raw HTML at the cursor. Only use this for '
+    + 'pre-formatted HTML content. For normal text, prefer insertTextAtCursor.',
+  // ...
+},
+```
+
+**Fichiers a modifier** :
+- `frontend/src/utils/outlookTools.ts`
+
+---
+
+## 12. PLAN D'IMPLEMENTATION MIS A JOUR
+
+### Phase 1 - Corrections de prompts (impact immediat, ~2h)
+
+| # | Action | Fichier | Effort |
+|---|--------|---------|--------|
+| R2 | Corriger descriptions tools PowerPoint | powerpointTools.ts | 15 min |
+| R3 | Ameliorer prompt PowerPoint | useAgentPrompts.ts | 30 min |
+| R6 | Harmoniser prompt Word (Markdown) | useAgentPrompts.ts | 30 min |
+| R9 | Enrichir GLOBAL_STYLE_INSTRUCTIONS | constant.ts | 15 min |
+| R12 | Bloc commun de formatage pour les 3 hotes | useAgentPrompts.ts | 30 min |
+| R13 | Clarifier tools Outlook | outlookTools.ts | 15 min |
+
+### Phase 2 - Elimination des doubles puces (~3-4h)
+
+| # | Action | Fichier | Effort |
+|---|--------|---------|--------|
+| R10 | Detection puces natives PowerPoint | powerpointTools.ts | 2h |
+| R10 | Detection contexte liste Word | wordTools.ts | 1h |
+| R8 | HTML dans insertTextBox PowerPoint | powerpointTools.ts | 1h |
+
+### Phase 3 - Ameliorations du pipeline HTML (~3h)
+
+| # | Action | Fichier | Effort |
+|---|--------|---------|--------|
+| R4 | Gestion des `<br>` dans les listes | officeRichText.ts | 1-2h |
+| R5 | Preserver sauts de ligne multiples | officeRichText.ts | 30 min |
+| R11 | Sous-niveaux dans insertList Word | wordTools.ts | 1h |
+
+### Phase 4 - Heritage des styles (amelioration profonde, ~4h)
+
+| # | Action | Fichier | Effort |
+|---|--------|---------|--------|
+| R1 | Heritage styles du document Word | officeRichText.ts + common.ts | 2-3h |
+| R7 | Extensions Markdown-it supplementaires | officeRichText.ts + package.json | 1h |
+
+---
+
+## 13. CONCLUSION FINALE
+
+Les problemes de puces et de mise en forme dans KickOffice ont **3 couches de causes** :
+
+1. **Couche prompts** (80% du probleme visible) : Les prompts ne guident pas le LLM sur le format Markdown attendu. Le prompt PowerPoint est quasi-vide. Le prompt Word demande du HTML mais le pipeline attend du Markdown. Les descriptions de tools PowerPoint mentent sur les capacites. **La Phase 1 resout ca.**
+
+2. **Couche insertion** (15% du probleme) : Pas de detection des puces natives des shapes/paragraphes avant insertion. Le HTML `<ul><li>` s'ajoute aux puces natives au lieu de les remplacer. **La Phase 2 resout ca.**
+
+3. **Couche pipeline HTML** (5% du probleme) : Styles CSS hardcodes au lieu d'heriter du document, gestion incomplete des `<br>` dans les listes. **Les Phases 3 et 4 resolvent ca.**
+
+**Outlook fonctionne mieux** car les emails HTML n'ont pas de concept de "puces natives de shape" et le chemin HTML -> email est le plus naturel. Il sert de reference pour uniformiser Word et PowerPoint.
+
+L'approche Redink confirme que le pipeline Markdown -> HTML enrichi avec styles inline est la bonne direction. La difference cle est que Redink a un meilleur controle sur le HTML final grace a la manipulation DOM (HtmlAgilityPack) et l'heritage des styles du document, deux choses que KickOffice peut reproduire avec `DOMParser` et l'API Word.js/PowerPoint.js.
