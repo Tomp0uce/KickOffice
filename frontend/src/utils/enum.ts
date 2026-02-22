@@ -14,4 +14,5 @@ export const localStorageKey = {
   darkMode: 'darkMode',
   litellmUserKey: 'litellmUserKey',
   litellmUserEmail: 'litellmUserEmail',
+  rememberCredentials: 'rememberCredentials',
 } as const

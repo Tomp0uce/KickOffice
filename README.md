@@ -257,6 +257,8 @@ KickOffice/
 - [x] Dynamic output language matching (AI automatically replies in the language of the selected text for all quick actions)
 - [x] Auto-scrolls to the start of long AI responses for better readability
 - [x] Localized tooltips for quick actions across all hosts
+- [x] Secure credential persistence with "Remember me" option (obfuscated localStorage with session fallback)
+- [x] Smart scroll behavior: scrolls to bottom on send, to message top on receive, to bottom on startup
 
 ### Frontend - Agent Mode
 

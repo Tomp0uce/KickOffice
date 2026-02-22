@@ -70,6 +70,27 @@
             </SettingCard>
 
             <SettingCard>
+              <label
+                class="flex cursor-pointer items-center justify-between gap-2"
+              >
+                <div class="flex flex-col">
+                  <span class="text-sm font-semibold text-main">{{
+                    $t("rememberCredentialsLabel")
+                  }}</span>
+                  <span class="text-xs text-secondary">{{
+                    $t("rememberCredentialsDescription")
+                  }}</span>
+                </div>
+                <input
+                  v-model="rememberCredentials"
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer accent-accent"
+                  :aria-label="$t('rememberCredentialsLabel')"
+                />
+              </label>
+            </SettingCard>
+
+            <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
                   $t('litellmCredentialsMissing') || 'Statut'
@@ -613,7 +634,7 @@ import {
   Trash2,
   Wrench,
 } from "lucide-vue-next";
-import { computed, onBeforeMount, ref, watch } from "vue";
+import { computed, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -629,6 +650,15 @@ import {
   powerPointBuiltInPrompt,
 } from "@/utils/constant";
 import { optionLists } from "@/utils/common";
+import {
+  getUserKey,
+  setUserKey,
+  getUserEmail,
+  setUserEmail,
+  getRememberCredentials,
+  setRememberCredentials as setRememberCredentialsPersist,
+  migrateFromSessionStorage,
+} from "@/utils/credentialStorage";
 import { localStorageKey } from "@/utils/enum";
 import { getExcelToolDefinitions } from "@/utils/excelTools";
 import { getGeneralToolDefinitions } from "@/utils/generalTools";
@@ -659,8 +689,28 @@ const replyLanguage = useStorage(
   "Fran\u00e7ais",
 );
 const darkMode = useStorage(localStorageKey.darkMode, false);
-const litellmUserKey = useStorage(localStorageKey.litellmUserKey, "", sessionStorage);
-const litellmUserEmail = useStorage(localStorageKey.litellmUserEmail, "", sessionStorage);
+
+// Credential storage with secure persistence
+const litellmUserKey = ref(getUserKey());
+const litellmUserEmail = ref(getUserEmail());
+const rememberCredentials = ref(getRememberCredentials());
+
+// Watch for credential changes and persist them
+watch(litellmUserKey, (value) => {
+  setUserKey(value);
+});
+
+watch(litellmUserEmail, (value) => {
+  setUserEmail(value);
+});
+
+watch(rememberCredentials, (value) => {
+  setRememberCredentialsPersist(value);
+  // Reload credentials after migration
+  litellmUserKey.value = getUserKey();
+  litellmUserEmail.value = getUserEmail();
+});
+
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
 const AGENT_MAX_ITERATIONS_MIN = 1;
 const AGENT_MAX_ITERATIONS_MAX = 100;
@@ -1086,5 +1136,13 @@ onBeforeMount(() => {
   loadBuiltInPrompts();
   loadToolPreferences();
   checkBackend();
+});
+
+onMounted(() => {
+  // Migrate old credentials from sessionStorage if needed
+  migrateFromSessionStorage();
+  // Reload credentials after migration
+  litellmUserKey.value = getUserKey();
+  litellmUserEmail.value = getUserEmail();
 });
 </script>
