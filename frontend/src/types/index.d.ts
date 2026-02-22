@@ -1,5 +1,7 @@
 // markdown-it-task-lists ships without TypeScript declarations
 declare module 'markdown-it-task-lists'
+declare module 'markdown-it-deflist'
+declare module 'markdown-it-footnote'
 
 type IStringKeyMap = Record<string, any>
 

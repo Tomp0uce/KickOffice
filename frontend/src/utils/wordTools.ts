@@ -1,5 +1,5 @@
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
+import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -78,6 +78,84 @@ function stripOuterListTags(html: string): string {
     .replace(/<\/ol>/gi, '')
 }
 
+interface InsertionContext {
+  inList: boolean
+  styles: InheritedStyles
+}
+
+/**
+ * R1 — Read insertion-point font/spacing styles and list context in 2 syncs.
+ * Combines isInsertionInList + style capture to minimise round-trips.
+ * Note: paragraph-level spacing (spaceBefore/spaceAfter) is on Paragraph, not Range.
+ */
+async function readInsertionContext(context: Word.RequestContext): Promise<InsertionContext> {
+  // Sync 1: load font from range + spaceBefore/spaceAfter + style from first paragraph
+  const selection = context.document.getSelection()
+  selection.load('font/name,font/size,font/bold,font/italic,font/color')
+  const para = selection.paragraphs.getFirst()
+  para.load('style,spaceBefore,spaceAfter')
+  await context.sync()
+
+  const styles: InheritedStyles = {
+    fontFamily: selection.font.name || '',
+    fontSize: selection.font.size ? `${selection.font.size}pt` : '',
+    fontWeight: selection.font.bold ? 'bold' : 'normal',
+    fontStyle: selection.font.italic ? 'italic' : 'normal',
+    color: selection.font.color || '',
+    marginTop: `${para.spaceBefore ?? 0}pt`,
+    marginBottom: `${para.spaceAfter ?? 0}pt`,
+  }
+
+  // Sync 2: detect list context (throws if paragraph is not in a list)
+  let inList = false
+  try {
+    para.listItem.load('level')
+    await context.sync()
+    inList = true
+  } catch {
+    inList = false
+  }
+
+  return { inList, styles }
+}
+
+/**
+ * R14 — After inserting HTML, detect paragraphs whose font size matches heading
+ * thresholds and apply the corresponding Word builtin heading style.
+ * This ensures headings become proper Word styles (h1→Heading 1, etc.) so that
+ * features like Table of Contents work correctly.
+ * Best-effort: silently skips if the API call fails.
+ */
+async function applyHeadingBuiltinStyles(
+  context: Word.RequestContext,
+  insertedRange: Word.Range,
+  html: string,
+): Promise<void> {
+  if (!/\<h[1-6]/i.test(html)) return
+
+  try {
+    const paras = insertedRange.paragraphs
+    paras.load('items')
+    await context.sync()
+
+    for (const p of paras.items) {
+      p.load('font/size')
+    }
+    await context.sync()
+
+    for (const p of paras.items) {
+      const size = p.font.size
+      if (!size) continue
+      if (size >= 20) p.styleBuiltIn = Word.BuiltInStyleName.heading1
+      else if (size >= 15) p.styleBuiltIn = Word.BuiltInStyleName.heading2
+      else if (size >= 12.5) p.styleBuiltIn = Word.BuiltInStyleName.heading3
+    }
+    await context.sync()
+  } catch {
+    // Best-effort only — heading size detection may not be available in all runtimes
+  }
+}
+
 type WordToolTemplate = Omit<WordToolDefinition, 'execute'> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
 }
@@ -151,12 +229,17 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args) => {
       const { text, location = 'End' } = args
-      // Detect list context to avoid double-bullets
-      const inList = await isInsertionInList(context)
+      // R1: read insertion context (list detection + document styles) in 2 syncs
+      const { inList, styles } = await readInsertionContext(context)
       const html = renderOfficeRichHtml(text)
+      const adjustedHtml = inList ? stripOuterListTags(html) : html
+      // R1: inject document-level font/spacing into <p> and <li> elements
+      const styledHtml = applyInheritedStyles(adjustedHtml, styles)
       const range = context.document.getSelection()
-      range.insertHtml(inList ? stripOuterListTags(html) : html, location as any)
-      await context.sync()
+      const insertedRange = range.insertHtml(styledHtml, location as any)
+      await context.sync()  // execute the insertHtml
+      // R14: post-process headings to apply Word builtin heading styles
+      await applyHeadingBuiltinStyles(context, insertedRange, html)
       return `Successfully inserted text at ${location}`
     },
   },
@@ -183,17 +266,24 @@ const wordToolDefinitions = createWordTools({
       const { newText, preserveFormatting = true } = args
       const range = context.document.getSelection()
       range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
+      // R15: load paragraph-level spacing/alignment from first paragraph (not available on Range)
+      const firstPara = range.paragraphs.getFirst()
+      firstPara.load('alignment,spaceBefore,spaceAfter')
       await context.sync()
 
       if (!range.text || range.text.length === 0) {
         return 'Error: No text selected. Select text in the document, then try again.'
       }
 
-      // Capture font properties before additional syncs invalidate cached values
+      // Capture all formatting before additional syncs invalidate cached values
       const savedFontName = range.font.name
       const savedFontSize = range.font.size
       const savedFontColor = range.font.color
       const savedHighlightColor = range.font.highlightColor
+      // R15: paragraph-level properties (from first paragraph)
+      const savedAlignment = firstPara.alignment
+      const savedSpaceBefore = firstPara.spaceBefore
+      const savedSpaceAfter = firstPara.spaceAfter
 
       // Detect list context to avoid double-bullets
       const inList = await isInsertionInList(context)
@@ -208,7 +298,27 @@ const wordToolDefinitions = createWordTools({
         if (savedHighlightColor) insertedRange.font.highlightColor = savedHighlightColor
       }
 
-      await context.sync()
+      await context.sync()  // execute insertHtml + font restoration
+
+      // R15: restore paragraph spacing/alignment on each inserted paragraph
+      if (preserveFormatting) {
+        try {
+          const insertedParas = insertedRange.paragraphs
+          insertedParas.load('items')
+          await context.sync()
+          for (const p of insertedParas.items) {
+            if (savedAlignment) p.alignment = savedAlignment
+            if (savedSpaceBefore != null) p.spaceBefore = savedSpaceBefore
+            if (savedSpaceAfter != null) p.spaceAfter = savedSpaceAfter
+          }
+          await context.sync()
+        } catch {
+          // Best-effort: paragraph spacing restoration may fail in some runtimes
+        }
+      }
+
+      // R14: post-process headings to apply Word builtin heading styles
+      await applyHeadingBuiltinStyles(context, insertedRange, html)
       return preserveFormatting
         ? 'Successfully replaced selected text while preserving layout formatting'
         : 'Successfully replaced selected text'

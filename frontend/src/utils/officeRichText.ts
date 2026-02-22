@@ -1,5 +1,7 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import markdownItDeflist from 'markdown-it-deflist'
+import markdownItFootnote from 'markdown-it-footnote'
 import markdownItTaskLists from 'markdown-it-task-lists'
 
 const officeMarkdownParser = new MarkdownIt({
@@ -7,7 +9,46 @@ const officeMarkdownParser = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-}).use(markdownItTaskLists, { enabled: true })
+})
+  .use(markdownItTaskLists, { enabled: true })
+  .use(markdownItDeflist)
+  .use(markdownItFootnote)
+
+/**
+ * R1 — Font and spacing properties captured from the insertion point in Word.
+ * Used to inject document-level styles into generated HTML so inserted content
+ * visually matches the surrounding text.
+ */
+export interface InheritedStyles {
+  fontFamily: string
+  fontSize: string
+  fontWeight: string
+  fontStyle: string
+  color: string
+  marginTop: string
+  marginBottom: string
+}
+
+/**
+ * R1 — Inject document-level CSS into bare <p> and <li> elements so that
+ * inserted content inherits the font and spacing of the insertion context.
+ * Headings and already-styled elements are left untouched.
+ */
+export function applyInheritedStyles(html: string, styles: InheritedStyles): string {
+  const cssRules: string[] = []
+  if (styles.fontFamily) cssRules.push(`font-family:'${styles.fontFamily}'`)
+  if (styles.fontSize && styles.fontSize !== '0pt') cssRules.push(`font-size:${styles.fontSize}`)
+  if (styles.color) cssRules.push(`color:${styles.color}`)
+
+  if (cssRules.length === 0) return html
+
+  const fontCss = cssRules.join('; ')
+  const marginCss = `margin:${styles.marginTop || '0pt'} 0 ${styles.marginBottom || '0pt'} 0`
+
+  return html
+    .replace(/<p>/gi, `<p style="${fontCss}; ${marginCss}">`)
+    .replace(/<li>/gi, `<li style="${fontCss}">`)
+}
 
 type StyleDefinition = {
   fontSize?: string
@@ -235,10 +276,11 @@ export function renderOfficeRichHtml(content: string): string {
 
   const sanitized = DOMPurify.sanitize(unsafeHtml, {
     ALLOWED_TAGS: [
-      'a', 'b', 'blockquote', 'br', 'code', 'del', 'div', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
-      'input', 'li', 'ol', 'p', 'pre', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
+      'a', 'b', 'blockquote', 'br', 'code', 'dd', 'del', 'div', 'dl', 'dt', 'em',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
+      'input', 'li', 'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
     ],
-    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'rel', 'style', 'target', 'type'],
+    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'style', 'target', 'type'],
   })
 
   return splitBrInListItems(sanitized)  // R4
