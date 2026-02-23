@@ -301,66 +301,80 @@ The following architectural decisions are sound and should be maintained:
 
 The following three issues were identified during functional testing and require targeted implementation work. Each includes a detailed root-cause analysis and step-by-step implementation plan.
 
-### F1. Translation must never strip images from documents
+### F1. Quick actions strip images, formatting, and non-text elements from documents
 
 - **Severity**: HIGH
 - **Category**: Data Integrity / UX
 - **Status**: OPEN
-- **Files**: `frontend/src/composables/useOfficeSelection.ts`, `frontend/src/composables/useAgentLoop.ts:615-677`, `frontend/src/api/common.ts`, `frontend/src/utils/wordTools.ts`
+- **Scope**: ALL text-modifying quick actions (translate, polish, academic, summary, proofread, concise) across ALL hosts (Word, Outlook, PowerPoint)
+- **Files**: `frontend/src/composables/useOfficeSelection.ts`, `frontend/src/composables/useAgentLoop.ts:615-677`, `frontend/src/api/common.ts`, `frontend/src/utils/wordTools.ts`, `frontend/src/utils/constant.ts`
 
 #### Problem
 
-When translation is triggered as a quick action on Word (or PowerPoint), the current flow is:
+When ANY text-modifying quick action is triggered (translate, polish, academic, concise, etc.), the current flow is:
 
-1. `getOfficeSelection()` reads the selected content as **plain text only** (`range.load('text')` for Word, `getAsync(CoercionType.Text)` for Outlook).
-2. The plain-text selection is sent to the LLM for translation.
-3. The translated plain-text result is inserted back via `insertResult()` / `insertFormattedResult()` which uses `range.insertText()` or `range.insertHtml()` with `'Replace'` mode.
+1. `getOfficeSelection()` reads the selected content as **plain text only** (`range.load('text')` for Word, `getAsync(CoercionType.Text)` for Outlook, `getPowerPointSelection()` for PowerPoint).
+2. The plain-text selection is sent to the LLM for processing.
+3. The processed result is displayed in chat. When the user clicks "Replace", it is inserted back via `insertResult()` / `insertFormattedResult()` which overwrites the entire selection.
 
-This **replace** operation destroys any inline images, embedded objects, shapes, or rich formatting (tables, drawings) that existed in the original selection, because the LLM response is pure text and the insertion overwrites the entire range.
+This flow **destroys all non-text elements** in the original selection:
+- **Inline images** (embedded photos, diagrams, logos)
+- **Bullet points and list formatting** (indentation levels, custom bullets)
+- **Rich formatting** (tables, text boxes, shapes, drawings)
+- **Embedded objects** (charts, OLE objects)
+- **Text styling** (colors, highlights, custom fonts applied to specific runs)
+
+This affects **all hosts** (Word, Outlook, PowerPoint) and **all text-modifying quick actions**, not just translation.
 
 #### Root Cause
 
-- `useOfficeSelection.ts:56-61`: Word selection only reads `.text`, discarding image/OLE information.
-- `common.ts:14-17`: `insertResult()` uses `range.insertText(normalizedResult, 'Replace')` which replaces the entire selection (including images) with plain text.
-- The translation prompt (`constant.ts:30-48`) returns text only, with no awareness of inline images.
+- `useOfficeSelection.ts:56-61`: Word selection reads only `.text`, discarding all rich content.
+- `useOfficeSelection.ts:19`: Outlook uses `CoercionType.Text`, losing all HTML formatting and images.
+- `common.ts:14-17`: `insertResult()` uses `range.insertText(normalizedResult, 'Replace')` which replaces the entire selection with plain text.
+- All quick action prompts (`constant.ts`) produce text-only output with no awareness of non-text elements.
 
 #### Implementation Plan
 
-**Approach**: Preserve images by extracting them before translation and reinserting them after, or by translating at paragraph/run granularity while skipping non-text elements.
+**Approach**: For all text-modifying quick actions across all hosts, capture the rich content (HTML) of the selection, extract only the text for LLM processing while preserving non-text elements with placeholders, then reassemble the rich content with the LLM's processed text before insertion.
 
-**Step 1 — Add OOXML-aware selection reader for Word** (`useOfficeSelection.ts`)
-- Create a new function `getWordSelectionPreservingImages()` that:
-  - Uses `range.getHtml()` or `range.getOoxml()` to capture the full rich content including images.
-  - Parses the HTML/OOXML to separate text segments from image elements (using `<img>` tags or `<w:drawing>` / `<w:pict>` nodes).
-  - Returns a structured object: `{ segments: Array<{ type: 'text' | 'image', content: string }> }`.
-  - Text segments contain the translatable text; image segments contain the raw HTML/OOXML to preserve.
+**Step 1 — Create a `richContentPreserver` utility** (new file: `frontend/src/utils/richContentPreserver.ts`)
+- Utility to handle HTML parsing and reassembly:
+  - `extractTextFromHtml(html: string)`: Parses HTML, replaces `<img>`, `<svg>`, `<table>`, and other non-text elements with unique `{{PRESERVE_N}}` placeholders. Returns `{ cleanText: string, fragments: Map<string, string> }`.
+  - `reassembleHtml(processedText: string, fragments: Map<string, string>)`: Takes LLM-processed text and replaces `{{PRESERVE_N}}` placeholders with original HTML fragments.
+  - Handles nested structures: images inside table cells, styled lists, etc.
 
-**Step 2 — Modify translation quick action flow** (`useAgentLoop.ts:615-677`)
-- When `actionKey === 'translate'` (and host is Word or PowerPoint):
-  - Call the new OOXML-aware reader instead of `getOfficeSelection()`.
-  - Send **only the text segments** to the LLM for translation (concatenated with position markers like `[IMG_1]`, `[IMG_2]`).
-  - Add an instruction to the translation prompt: `"Preserve any [IMG_N] placeholders exactly as-is in the output. These represent images that must not be removed."`.
+**Step 2 — Add HTML-aware selection readers** (`useOfficeSelection.ts`)
+- **Word**: Add `getWordSelectionAsHtml()` using `range.getHtml()` to capture full rich content.
+- **Outlook**: Add `getOutlookMailBodyAsHtml()` using `getAsync(CoercionType.Html)` instead of `CoercionType.Text`.
+- **PowerPoint**: Verify current `getPowerPointSelection()` behavior — if it strips formatting, add HTML-aware variant.
+- Each returns raw HTML that can be fed to the `richContentPreserver`.
 
-**Step 3 — Reassemble translated content with images** (new utility or inline in `useAgentLoop.ts`)
-- After receiving the translated text from the LLM:
-  - Replace `[IMG_N]` placeholders with the original image HTML/OOXML fragments.
-  - Insert the reassembled rich content using `range.insertHtml()` or `range.insertOoxml()` instead of `range.insertText()`.
+**Step 3 — Modify quick action flow for ALL text-modifying actions** (`useAgentLoop.ts:615-677`)
+- In `applyQuickAction()`, for all non-agent quick actions on Word/Outlook/PowerPoint:
+  1. Get selection as HTML via the new HTML-aware readers.
+  2. Call `extractTextFromHtml(html)` to get clean text + preserved fragments.
+  3. Send only the clean text to the LLM (with placeholder instruction in prompt).
+  4. When LLM responds, call `reassembleHtml(llmResponse, fragments)` to produce final HTML.
+  5. Store the reassembled HTML as `richHtml` on the `DisplayMessage` for insertion.
 
-**Step 4 — Update `insertResult` / `insertFormattedResult`** (`common.ts`)
-- Add an optional parameter `richContent?: string` that, when provided, uses `range.insertHtml(richContent, 'Replace')` instead of `range.insertText()`.
-- This preserves the existing plain-text path for non-image scenarios.
+**Step 4 — Update insertion to use rich HTML when available** (`useOfficeInsert.ts`)
+- Check if the message has `richHtml` content.
+- **Word**: Use `range.insertHtml(richHtml, 'Replace')` instead of `range.insertText()`.
+- **Outlook**: Use `setSelectedDataAsync(richHtml, { coercionType: CoercionType.Html })`.
+- **PowerPoint**: Use HTML-aware insertion if available, otherwise fall back to text.
+- Preserve the existing plain-text path as fallback when no `richHtml` is available.
 
-**Step 5 — Outlook and PowerPoint considerations**
-- **Outlook**: Email body translation should similarly use `getAsync(CoercionType.Html)` instead of `CoercionType.Text` to preserve inline images. Reassemble with `setSelectedDataAsync(html, { coercionType: CoercionType.Html })`.
-- **PowerPoint**: Slide images are typically in separate shapes, not inline in text boxes. The current approach (translating only text box content) is less likely to destroy images, but verify that `insertIntoPowerPoint()` does not replace the entire slide content. If it does, apply the same segmentation strategy.
-
-**Step 6 — Update translation prompts** (`constant.ts:30-48`)
-- Add to the `buildInPrompt.translate.user` template:
+**Step 5 — Update ALL text-modifying prompts** (`constant.ts`)
+- Add to ALL quick action prompts (translate, polish, academic, summary, concise, proofread):
   ```
-  8. If the text contains image placeholders like [IMG_1], [IMG_2], etc., preserve them exactly in their original position in the translated output. Do not translate or remove them.
+  If the text contains preservation placeholders like {{PRESERVE_1}}, {{PRESERVE_2}}, etc., keep them exactly in their original position. These represent images and formatting elements that must not be removed or modified.
   ```
 
-**Estimated Impact**: Prevents data loss when translating documents containing inline images — a critical UX improvement for professional document workflows.
+**Step 6 — Add `richHtml` field to `DisplayMessage`** (`types/chat.ts`)
+- Add optional `richHtml?: string` field to `DisplayMessage` interface.
+- This stores the reassembled HTML with preserved non-text elements, ready for insertion.
+
+**Estimated Impact**: Prevents data loss across all text-modifying operations for all Office hosts. Critical for professional workflows where documents contain images, tables, styled lists, and other rich elements.
 
 ---
 
@@ -633,7 +647,7 @@ You are a highly skilled Microsoft Excel Expert Agent...
 
 | ID  | Severity | Category        | Status | File(s)                                                |
 |-----|----------|-----------------|--------|--------------------------------------------------------|
-| F1  | HIGH     | Data Integrity  | OPEN   | useOfficeSelection.ts, useAgentLoop.ts, common.ts, constant.ts |
+| F1  | HIGH     | Data Integrity  | OPEN   | useOfficeSelection.ts, useAgentLoop.ts, useOfficeInsert.ts, richContentPreserver.ts, constant.ts, chat.ts |
 | F2  | HIGH     | UX / Quality    | OPEN   | constant.ts, HomePage.vue, useAgentLoop.ts, i18n/*     |
 | F3  | HIGH     | Performance     | OPEN   | excelTools.ts, useAgentPrompts.ts, useAgentLoop.ts     |
 

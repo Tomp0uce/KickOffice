@@ -10,6 +10,7 @@ import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
 import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
+import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
@@ -178,6 +179,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   } = helpers
 
   const currentAction = ref('')
+  const pendingSmartReply = ref(false)
 
   const getActionLabelForCategory = (category?: ToolCategory) => {
     switch (category) {
@@ -207,7 +209,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     return [{ role: 'system', content: systemPrompt }, ...history.value.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))]
   }
 
-  const { getOfficeSelection } = useOfficeSelection({
+  const { getOfficeSelection, getOfficeSelectionAsHtml } = useOfficeSelection({
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
@@ -505,6 +507,56 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     await scrollToVeryBottom() // Scroll to very bottom after user message
 
     try {
+      // Smart reply interception: when user sends after clicking "Reply" quick action
+      if (pendingSmartReply.value && hostIsOutlook) {
+        pendingSmartReply.value = false
+        const replyIntent = userMessage
+        // Fetch the full email body for context
+        let emailBody = ''
+        try {
+          emailBody = await getOfficeSelection()
+        } catch (err) {
+          console.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
+        }
+        if (!emailBody) {
+          messageUtil.error(t('selectEmailPrompt'))
+          return
+        }
+        const lang = replyLanguage.value || 'Français'
+        const replyPrompt = getOutlookBuiltInPrompt()['reply']
+        const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+        const userMsg = replyPrompt.user(emailBody, lang).replace('[REPLY_INTENT]', replyIntent)
+        history.value.push(createDisplayMessage('assistant', ''))
+        await scrollToMessageTop()
+        try {
+          await chatStream({
+            messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+            modelTier: resolveChatModelTier(),
+            onStream: async (text: string) => {
+              const message = history.value[history.value.length - 1]
+              message.role = 'assistant'
+              message.content = text
+              await scrollToBottom()
+            },
+            abortSignal: abortController.value?.signal,
+          })
+          const lastMessage = history.value[history.value.length - 1]
+          if (!lastMessage?.content?.trim()) {
+            lastMessage.content = t('noModelResponse')
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') return
+          console.error('[AgentLoop] Smart reply chatStream failed', err)
+          const lastMessage = history.value[history.value.length - 1]
+          if (isCredentialError(err)) {
+            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+          } else {
+            lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
+          }
+        }
+        return
+      }
+
       // If we haven't fetched it yet and it's enabled
       if (useSelectedText.value && !isImageFromSelection) {
         let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -584,6 +636,21 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       return
     }
 
+    if (selectedOutlookQuickAction?.mode === 'smart-reply') {
+      pendingSmartReply.value = true
+      userInput.value = selectedOutlookQuickAction.prefix || ''
+      adjustTextareaHeight()
+      draftFocusGlow.value = true
+      setTimeout(() => { draftFocusGlow.value = false; }, 1500)
+      await nextTick()
+      const el = inputTextarea.value
+      if (el) {
+        el.focus()
+        const len = userInput.value.length
+        el.setSelectionRange(len, len)
+      }
+      return
+    }
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || ''
       adjustTextareaHeight()
@@ -615,6 +682,23 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
     if (!selectedText) return messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
 
+    // F1: Try to get HTML selection for rich content preservation (Word, Outlook)
+    let richContext: RichContentContext | null = null
+    const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
+    if (isTextModifyingAction) {
+      try {
+        const htmlContent = await getOfficeSelectionAsHtml()
+        if (htmlContent) {
+          richContext = extractTextFromHtml(htmlContent)
+        }
+      } catch (err) {
+        console.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
+      }
+    }
+
+    // Use text from rich context extraction if available, otherwise use plain text selection
+    const textForLlm = (richContext?.hasRichContent ? richContext.cleanText : selectedText) || selectedText
+
     let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
     let systemMsg = ''
     let userMsg = ''
@@ -631,11 +715,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (!action) return
       const lang = replyLanguage.value || 'Français'
       systemMsg = action.system(lang)
-      userMsg = action.user(selectedText, lang)
+      userMsg = action.user(textForLlm, lang)
     }
-    
+
     // Enforce global formatting constraints on all Quick Actions
     systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+
+    // F1: Add preservation instruction if rich content was detected
+    if (richContext?.hasRichContent) {
+      systemMsg += getPreservationInstruction(richContext)
+    }
 
     const actionLabel = selectedQuickAction?.label || t(actionKey)
     history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
@@ -661,6 +750,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const lastMessage = history.value[history.value.length - 1]
         if (!lastMessage?.content?.trim()) {
           lastMessage.content = t('noModelResponse')
+        }
+        // F1: Reassemble rich content with preserved fragments
+        if (richContext?.hasRichContent && lastMessage?.content) {
+          lastMessage.richHtml = reassembleWithFragments(lastMessage.content, richContext)
         }
       } catch (err: any) {
         if (err.name === 'AbortError') return

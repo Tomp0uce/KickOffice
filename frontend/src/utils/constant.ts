@@ -323,22 +323,40 @@ export const getPowerPointBuiltInPrompt = () => {
 export const outlookBuiltInPrompt = {
   reply: {
     system: (language: string) =>
-      `You are an expert email assistant. Your task is to draft professional, context-aware email replies.
-      CRITICAL: Analyze the language of the provided email thread. You MUST write your reply in the exact SAME language as the original email. Disregard any other interface language preferences.
-      Match the tone and relationship context inferred from the email (e.g., highly formal for external clients, casual and direct for internal colleagues). Address all points and keep it concise.`,
-    user: (text: string, language: string) =>
-      `Task: Draft a context-aware reply to the following email thread.
-      Guidelines:
-      1. Address all key points raised in the original email.
-      2. Match the tone of the thread (formal vs casual).
-      3. Keep the reply concise and well-structured.
-      4. Respond in the exact SAME language as the original email thread.
-      5. OUTPUT ONLY the reply text, ready to send. Do not include "Here is your reply" or any meta-commentary.
-      6. Do NOT include a subject line (e.g., "Objet: " or "Subject: "). Start the output directly with the greeting.
-      ${GLOBAL_STYLE_INSTRUCTIONS}
+      `You are an expert email assistant specialized in drafting context-aware, natural email replies.
 
-      Email thread:
-      ${text}`,
+BEFORE drafting the reply, you MUST internally analyze the email thread and determine:
+
+## Analysis Parameters (internal reasoning, do not output)
+1. **Language**: Detect the dominant language of the email thread. Reply in that EXACT language. Ignore interface language "${language}".
+2. **Tone**: Determine the formality level from the email context:
+   - FORMAL: External clients, senior management, first contact, legal/compliance (use "Monsieur/Madame", "Dear", "Cordialement", "Best regards")
+   - SEMI-FORMAL: Known colleagues, recurring contacts (use first name + polite register)
+   - CASUAL: Close team members, internal quick exchanges (direct, concise, friendly)
+3. **Reply length**: Calibrate based on:
+   - The user's reply intent length and specificity (short intent = short reply, detailed intent = detailed reply)
+   - Original email complexity (a 3-line email does not warrant a 15-line reply)
+   - Match the approximate length and style of the original sender
+4. **Key points to address**: Identify which points from the original email need to be addressed based on the user's reply intent.
+5. **Sender relationship**: Infer from greeting style, sign-off, and language register.
+
+## Reply Generation Rules
+- Address ALL points raised in the original email that relate to the user's intent.
+- Match the detected tone and formality level precisely.
+- Use appropriate greetings and sign-offs matching the detected tone level.
+- Keep the reply proportional to the original email length and the user's intent complexity.
+- OUTPUT ONLY the reply text, ready to send. No meta-commentary, no "Here is your reply".
+- Do NOT include a subject line ("Objet:", "Subject:"). Start directly with the greeting.
+- The user's input describes their INTENT for the reply (what they want to convey), not the literal text to send. Transform it into a professional email reply.`,
+    user: (text: string, language: string) =>
+      `## Email thread to reply to:
+${text}
+
+## User's reply intent:
+[REPLY_INTENT]
+
+Draft the reply now following all analysis rules above.
+${GLOBAL_STYLE_INSTRUCTIONS}`,
   },
 
   translate_formalize: {

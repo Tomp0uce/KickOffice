@@ -60,6 +60,8 @@ export type ExcelToolName =
   | 'setNamedRange'
   | 'applyConditionalFormatting'
   | 'getConditionalFormattingRules'
+  | 'batchSetCellValues'
+  | 'batchProcessRange'
 
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
@@ -1884,6 +1886,81 @@ const excelToolDefinitions = createExcelTools({
           2,
         )
       },
+  },
+
+  batchSetCellValues: {
+    name: 'batchSetCellValues',
+    category: 'write',
+    description:
+      'Set values for multiple individual cells in a single operation. Much more efficient than calling setCellValue repeatedly. Use this whenever you need to modify more than 2 cells (e.g., translating, cleaning, or transforming cell contents). Provide an array of {address, value} pairs. For ranges larger than 100 cells, process in chunks of 50-100 cells at a time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cells: {
+          type: 'array',
+          description: 'Array of cell updates. Each item has an "address" (A1 notation) and a "value" (the new cell content).',
+          items: {
+            type: 'object',
+            properties: {
+              address: { type: 'string', description: 'Cell address in A1 notation (e.g., "A1")' },
+              value: { type: 'string', description: 'New value for the cell' },
+            },
+            required: ['address', 'value'],
+          },
+        },
+      },
+      required: ['cells'],
+    },
+    executeExcel: async (context, args) => {
+      const { cells } = args
+      if (!Array.isArray(cells) || cells.length === 0) {
+        return 'Error: cells array is empty or invalid'
+      }
+      const sheet = context.workbook.worksheets.getActiveWorksheet()
+      for (const cell of cells) {
+        const range = sheet.getRange(cell.address)
+        const num = Number(cell.value)
+        range.values = [[isNaN(num) || cell.value === '' ? cell.value : num]]
+      }
+      await context.sync()
+      return `Successfully updated ${cells.length} cells`
+    },
+  },
+
+  batchProcessRange: {
+    name: 'batchProcessRange',
+    category: 'write',
+    description:
+      'Write a 2D array of values to a contiguous range in one operation. Use this for bulk transformations on contiguous ranges (translate, clean, format, etc.): first read all values with getSelectedCells or getWorksheetData, process ALL transformations at once in your response, then write ALL results back with this tool. The values 2D array must match the range dimensions exactly. For ranges larger than 100 cells, process in chunks of 50-100 cells at a time.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Target range address in A1 notation (e.g., "A1:A50", "B2:D10")',
+        },
+        values: {
+          type: 'array',
+          description: 'A 2D array of new values matching the range dimensions. Example for a single-column range of 3 rows: [["value1"],["value2"],["value3"]].',
+          items: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+      required: ['address', 'values'],
+    },
+    executeExcel: async (context, args) => {
+      const { address, values } = args
+      if (!Array.isArray(values) || values.length === 0) {
+        return 'Error: values array is empty or invalid'
+      }
+      const sheet = context.workbook.worksheets.getActiveWorksheet()
+      const range = sheet.getRange(address)
+      range.values = values
+      await context.sync()
+      return `Successfully updated range ${address} (${values.length} rows × ${values[0]?.length || 0} columns)`
+    },
   },
 })
 

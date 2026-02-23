@@ -74,7 +74,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     }
   }
 
-  async function insertToDocument(content: string, type: insertTypes) {
+  async function insertToDocument(content: string, type: insertTypes, richHtml?: string) {
     const normalizedContent = normalizeInsertionContent(content)
     if (!normalizedContent) return
 
@@ -83,6 +83,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       type,
       contentLength: normalizedContent.length,
       lineCount: normalizedContent.split('\n').length,
+      hasRichHtml: !!richHtml,
     })
 
     if (hostIsOutlook) {
@@ -90,7 +91,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         const mailbox = getOutlookMailbox()
         const item = mailbox?.item
         if (item?.body?.setSelectedDataAsync) {
-          const htmlBody = renderOfficeCommonApiHtml(normalizedContent)
+          // F1: Use rich HTML if available (preserves images/formatting), otherwise render from markdown
+          const htmlBody = richHtml || renderOfficeCommonApiHtml(normalizedContent)
           await new Promise<void>((resolve, reject) => {
             item.body.setSelectedDataAsync!(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
@@ -132,11 +134,24 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       return
     }
 
+    // Word insertion
     try {
       insertType.value = type
-      if (useWordFormatting.value) await insertFormattedResult(normalizedContent, insertType)
-      else await insertResult(normalizedContent, insertType)
-      messageUtil.success(t('inserted'))
+      // F1: Use rich HTML if available (preserves images/formatting from original selection)
+      if (richHtml) {
+        await Word.run(async (context) => {
+          const range = context.document.getSelection()
+          range.insertHtml(richHtml, type === 'newLine' ? 'After' : 'Replace')
+          await context.sync()
+        })
+        messageUtil.success(t('inserted'))
+      } else if (useWordFormatting.value) {
+        await insertFormattedResult(normalizedContent, insertType)
+        messageUtil.success(t('inserted'))
+      } else {
+        await insertResult(normalizedContent, insertType)
+        messageUtil.success(t('inserted'))
+      }
     } catch {
       await copyToClipboard(normalizedContent, true)
     }
@@ -178,7 +193,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       messageUtil.info(t('imageInsertWordOnly'))
       return
     }
-    await insertToDocument(getMessageActionPayload(message), type)
+    await insertToDocument(getMessageActionPayload(message), type, message.richHtml)
   }
 
   return { copyToClipboard, copyMessageToClipboard, insertToDocument, insertMessageToDocument }

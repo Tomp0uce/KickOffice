@@ -298,7 +298,7 @@ const outlookQuickActions: OutlookQuickAction[] = [
     key: "reply",
     label: t("outlookReply"),
     icon: Mail,
-    mode: "draft",
+    mode: "smart-reply",
     prefix: t("outlookReplyPrePrompt"),
     tooltipKey: "outlookReply_tooltip",
   },
