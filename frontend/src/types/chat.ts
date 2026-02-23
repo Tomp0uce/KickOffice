@@ -5,6 +5,7 @@ export interface DisplayMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   imageSrc?: string
+  richHtml?: string
 }
 
 export interface QuickAction {
@@ -26,7 +27,7 @@ export interface PowerPointQuickAction extends QuickAction {
 }
 
 export interface OutlookQuickAction extends QuickAction {
-  mode?: 'immediate' | 'draft'
+  mode?: 'immediate' | 'draft' | 'smart-reply'
   prefix?: string
 }
 

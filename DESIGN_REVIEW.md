@@ -297,4 +297,367 @@ The following architectural decisions are sound and should be maintained:
 
 ---
 
-*Last updated: 2026-02-22*
+## 7. New Feature Issues & Implementation Plans (v2.1)
+
+The following three issues were identified during functional testing and require targeted implementation work. Each includes a detailed root-cause analysis and step-by-step implementation plan.
+
+### F1. Quick actions strip images, formatting, and non-text elements from documents
+
+- **Severity**: HIGH
+- **Category**: Data Integrity / UX
+- **Status**: OPEN
+- **Scope**: ALL text-modifying quick actions (translate, polish, academic, summary, proofread, concise) across ALL hosts (Word, Outlook, PowerPoint)
+- **Files**: `frontend/src/composables/useOfficeSelection.ts`, `frontend/src/composables/useAgentLoop.ts:615-677`, `frontend/src/api/common.ts`, `frontend/src/utils/wordTools.ts`, `frontend/src/utils/constant.ts`
+
+#### Problem
+
+When ANY text-modifying quick action is triggered (translate, polish, academic, concise, etc.), the current flow is:
+
+1. `getOfficeSelection()` reads the selected content as **plain text only** (`range.load('text')` for Word, `getAsync(CoercionType.Text)` for Outlook, `getPowerPointSelection()` for PowerPoint).
+2. The plain-text selection is sent to the LLM for processing.
+3. The processed result is displayed in chat. When the user clicks "Replace", it is inserted back via `insertResult()` / `insertFormattedResult()` which overwrites the entire selection.
+
+This flow **destroys all non-text elements** in the original selection:
+- **Inline images** (embedded photos, diagrams, logos)
+- **Bullet points and list formatting** (indentation levels, custom bullets)
+- **Rich formatting** (tables, text boxes, shapes, drawings)
+- **Embedded objects** (charts, OLE objects)
+- **Text styling** (colors, highlights, custom fonts applied to specific runs)
+
+This affects **all hosts** (Word, Outlook, PowerPoint) and **all text-modifying quick actions**, not just translation.
+
+#### Root Cause
+
+- `useOfficeSelection.ts:56-61`: Word selection reads only `.text`, discarding all rich content.
+- `useOfficeSelection.ts:19`: Outlook uses `CoercionType.Text`, losing all HTML formatting and images.
+- `common.ts:14-17`: `insertResult()` uses `range.insertText(normalizedResult, 'Replace')` which replaces the entire selection with plain text.
+- All quick action prompts (`constant.ts`) produce text-only output with no awareness of non-text elements.
+
+#### Implementation Plan
+
+**Approach**: For all text-modifying quick actions across all hosts, capture the rich content (HTML) of the selection, extract only the text for LLM processing while preserving non-text elements with placeholders, then reassemble the rich content with the LLM's processed text before insertion.
+
+**Step 1 — Create a `richContentPreserver` utility** (new file: `frontend/src/utils/richContentPreserver.ts`)
+- Utility to handle HTML parsing and reassembly:
+  - `extractTextFromHtml(html: string)`: Parses HTML, replaces `<img>`, `<svg>`, `<table>`, and other non-text elements with unique `{{PRESERVE_N}}` placeholders. Returns `{ cleanText: string, fragments: Map<string, string> }`.
+  - `reassembleHtml(processedText: string, fragments: Map<string, string>)`: Takes LLM-processed text and replaces `{{PRESERVE_N}}` placeholders with original HTML fragments.
+  - Handles nested structures: images inside table cells, styled lists, etc.
+
+**Step 2 — Add HTML-aware selection readers** (`useOfficeSelection.ts`)
+- **Word**: Add `getWordSelectionAsHtml()` using `range.getHtml()` to capture full rich content.
+- **Outlook**: Add `getOutlookMailBodyAsHtml()` using `getAsync(CoercionType.Html)` instead of `CoercionType.Text`.
+- **PowerPoint**: Verify current `getPowerPointSelection()` behavior — if it strips formatting, add HTML-aware variant.
+- Each returns raw HTML that can be fed to the `richContentPreserver`.
+
+**Step 3 — Modify quick action flow for ALL text-modifying actions** (`useAgentLoop.ts:615-677`)
+- In `applyQuickAction()`, for all non-agent quick actions on Word/Outlook/PowerPoint:
+  1. Get selection as HTML via the new HTML-aware readers.
+  2. Call `extractTextFromHtml(html)` to get clean text + preserved fragments.
+  3. Send only the clean text to the LLM (with placeholder instruction in prompt).
+  4. When LLM responds, call `reassembleHtml(llmResponse, fragments)` to produce final HTML.
+  5. Store the reassembled HTML as `richHtml` on the `DisplayMessage` for insertion.
+
+**Step 4 — Update insertion to use rich HTML when available** (`useOfficeInsert.ts`)
+- Check if the message has `richHtml` content.
+- **Word**: Use `range.insertHtml(richHtml, 'Replace')` instead of `range.insertText()`.
+- **Outlook**: Use `setSelectedDataAsync(richHtml, { coercionType: CoercionType.Html })`.
+- **PowerPoint**: Use HTML-aware insertion if available, otherwise fall back to text.
+- Preserve the existing plain-text path as fallback when no `richHtml` is available.
+
+**Step 5 — Update ALL text-modifying prompts** (`constant.ts`)
+- Add to ALL quick action prompts (translate, polish, academic, summary, concise, proofread):
+  ```
+  If the text contains preservation placeholders like {{PRESERVE_1}}, {{PRESERVE_2}}, etc., keep them exactly in their original position. These represent images and formatting elements that must not be removed or modified.
+  ```
+
+**Step 6 — Add `richHtml` field to `DisplayMessage`** (`types/chat.ts`)
+- Add optional `richHtml?: string` field to `DisplayMessage` interface.
+- This stores the reassembled HTML with preserved non-text elements, ready for insertion.
+
+**Estimated Impact**: Prevents data loss across all text-modifying operations for all Office hosts. Critical for professional workflows where documents contain images, tables, styled lists, and other rich elements.
+
+---
+
+### F2. Outlook "Reply" quick action produces low-quality, wrong-language responses
+
+- **Severity**: HIGH
+- **Category**: UX / Quality
+- **Status**: OPEN
+- **Files**: `frontend/src/utils/constant.ts:323-342`, `frontend/src/pages/HomePage.vue:272-305`, `frontend/src/composables/useAgentLoop.ts:587-599`, `frontend/src/i18n/locales/fr.json:268`, `frontend/src/i18n/locales/en.json:263`
+
+#### Problem
+
+The Outlook "Reply" quick action (`reply` key) currently operates in **draft mode**: it pre-fills the chat input with a short prefix (`"Rédige une réponse à ce mail en disant que : "` / `"Draft a reply to this email saying that: "`) and waits for the user to type a brief intent. The user then presses Send, which triggers the normal `sendMessage()` flow.
+
+The result is a poor-quality reply because:
+
+1. **Insufficient context**: The email thread body is only included as `[Email body: "..."]` context appended by `sendMessage()` via `useSelectedText`. There is no structured analysis of the previous email's tone, formality level, or language.
+2. **Wrong language**: The reply prompt (`outlookBuiltInPrompt.reply`) contains language detection instructions, but these are in the **built-in prompt** which is only used when the action is NOT in draft mode. In draft mode, the user's message goes through `processChat()` with the generic `agentPrompt()`, which uses `replyLanguage` setting (defaulting to `Français`) instead of detecting the email language.
+3. **No tone analysis**: The generic agent prompt does not analyze the email thread to determine if the tone should be formal (external client) or casual (internal colleague).
+4. **No message length calibration**: Short user input like "dis oui" should generate a brief reply, while "explique en détail pourquoi on ne peut pas faire ça" should generate a longer response. There's no instruction for this.
+
+#### Root Cause
+
+- Draft mode (`mode: 'draft'` in `HomePage.vue:301`) bypasses the `outlookBuiltInPrompt.reply` prompt entirely. It only pre-fills the chat input, then `sendMessage()` uses the generic Outlook agent prompt.
+- The generic Outlook agent prompt (`useAgentPrompts.ts:120-136`) has basic reply language instructions but no structured email analysis framework.
+- The user's brief reply intent (e.g., "dis oui") provides no tone, length, or language guidance.
+
+#### Implementation Plan
+
+**Approach**: Replace the draft mode with a two-phase "smart reply" flow that first analyzes the email thread, then generates a calibrated response.
+
+**Step 1 — Change reply action from draft mode to a new "smart reply" mode** (`HomePage.vue:297-304`)
+- Change `mode: 'draft'` to `mode: 'smart-reply'` (new mode).
+- Remove the `prefix` property; it's no longer needed as a pre-fill.
+- Instead, the smart reply will: (1) open a small inline prompt for the user to describe their reply intent, (2) automatically fetch and analyze the email body.
+
+**Step 2 — Create a dedicated smart reply system prompt** (`constant.ts`)
+- Add a new `outlookBuiltInPrompt.smartReply` prompt with a comprehensive analysis framework:
+
+```typescript
+smartReply: {
+  system: (language: string) =>
+    `You are an expert email assistant specialized in drafting context-aware, natural email replies.
+
+BEFORE drafting the reply, you MUST analyze the email thread and determine these parameters:
+
+## Analysis Parameters (internal, do not output these)
+1. **Language**: Detect the dominant language of the email thread. Reply in that EXACT language. Ignore interface language "${language}".
+2. **Tone**: Determine the formality level from the email context:
+   - FORMAL: External clients, senior management, first contact, legal/compliance (use "Monsieur/Madame", "Dear", "Cordialement", "Best regards")
+   - SEMI-FORMAL: Known colleagues, recurring contacts (use first name + polite register)
+   - CASUAL: Close team members, internal quick exchanges (direct, concise, friendly)
+3. **Reply length**: Calibrate based on:
+   - User's input length and specificity (short input = short reply, detailed input = detailed reply)
+   - Original email complexity (a 3-line email doesn't warrant a 15-line reply)
+   - Match the approximate length of the original sender's style
+4. **Key points to address**: Identify which points from the original email need to be addressed in the reply.
+5. **Sender relationship**: Infer from greeting style, sign-off, and language register.
+
+## Reply Generation Rules
+- Address ALL points raised in the original email that relate to the user's intent.
+- Match the detected tone and formality level precisely.
+- Use appropriate greetings and sign-offs for the detected tone level.
+- Keep the reply proportional to the original email's length and the user's intent complexity.
+- OUTPUT ONLY the reply text, ready to send. No meta-commentary, no "Here is your reply".
+- Do NOT include a subject line ("Objet:", "Subject:"). Start directly with the greeting.
+- The user's input is their INTENT for the reply (what they want to say), not the literal text to send.`,
+  user: (text: string, language: string) =>
+    `## Email thread to reply to:
+${text}
+
+## User's reply intent:
+[REPLY_INTENT]
+
+Draft the reply now following all analysis rules above.
+${GLOBAL_STYLE_INSTRUCTIONS}`,
+}
+```
+
+**Step 3 — Implement the smart-reply flow in `useAgentLoop.ts`**
+- Add handling for `mode === 'smart-reply'` in `applyQuickAction()`:
+  1. Pre-fill the chat input with a contextual prompt (keep the existing prefix UX for user intent input).
+  2. When the user presses Send, intercept the flow (detect that a smart-reply was pending).
+  3. Fetch the full email body via `getOfficeSelection()`.
+  4. Build the smart reply prompt by:
+     - Using `outlookBuiltInPrompt.smartReply.system(lang)` as the system prompt.
+     - Replacing `[REPLY_INTENT]` in the user prompt with the user's typed intent.
+     - Replacing `${text}` with the full email body.
+  5. Stream the response directly (non-agent mode, no tools needed).
+
+**Step 4 — Add email metadata enrichment** (`useOfficeSelection.ts` or `outlookTools.ts`)
+- When building the smart reply context, also fetch:
+  - `getEmailSender()` — to determine the sender's name and relationship.
+  - `getEmailDate()` — for temporal context.
+  - `getEmailSubject()` — for topic context.
+- Prepend this metadata to the email thread text:
+  ```
+  From: {sender}
+  Date: {date}
+  Subject: {subject}
+
+  {body}
+  ```
+- This gives the LLM better context for tone and formality analysis.
+
+**Step 5 — Update i18n strings** (`fr.json`, `en.json`)
+- Update the reply pre-prompt to be more descriptive:
+  - FR: `"Décrivez brièvement ce que vous voulez répondre : "`
+  - EN: `"Briefly describe what you want to reply: "`
+- Add new i18n keys for smart reply status messages:
+  - `smartReplyAnalyzing`: `"Analyzing email tone and language..."` / `"Analyse du ton et de la langue du mail..."`
+
+**Step 6 — Alternative: Keep draft mode but inject smart prompt at send time**
+- If the UX of draft mode (user types in chat input) is preferred, then instead of changing the mode:
+  - Keep `mode: 'draft'` and `prefix`.
+  - In `sendMessage()`, detect that the message starts with the reply prefix.
+  - If so, strip the prefix, treat the rest as the reply intent, and route to the smart reply flow from Step 3.
+  - This preserves the existing UX while improving the backend prompt quality.
+
+**Estimated Impact**: Dramatically improves reply quality by ensuring correct language detection, tone matching, and proportional response length. The current implementation produces replies that feel generic and robotic; this fix makes them contextually aware and natural.
+
+---
+
+### F3. Excel agent mode processes cells one-by-one with individual LLM calls — extremely inefficient
+
+- **Severity**: HIGH
+- **Category**: Performance / Cost
+- **Status**: OPEN
+- **Files**: `frontend/src/composables/useAgentLoop.ts:224-418`, `frontend/src/utils/excelTools.ts:99-141` (`setCellValue`), `frontend/src/composables/useAgentPrompts.ts:92`
+
+#### Problem
+
+When a user asks the Excel agent to translate, transform, or modify multiple cells (e.g., "translate all cells in column A from French to English"), the agent loop processes each cell individually:
+
+1. The LLM generates one `setCellValue` tool call per cell.
+2. Each tool call is executed, and the result is appended to the message history.
+3. The updated history is sent back to the LLM for the next iteration.
+4. The LLM generates the next `setCellValue` call for the next cell.
+
+For 50 cells, this produces **50+ LLM round-trips** (each iteration often yields only 1-2 tool calls), consuming enormous amounts of tokens and taking a very long time. The `setCellValue` tool already supports multi-cell writes via JSON 2D arrays, but the LLM is not instructed to batch operations.
+
+#### Root Cause
+
+1. **Agent prompt lacks batching instructions** (`useAgentPrompts.ts:92`): The Excel agent prompt says `"Tool First"` and `"use fillFormulaDown when applying same formula across rows"` but has no instruction to batch `setCellValue` calls for multi-cell text transformations.
+2. **No batch-oriented tool**: While `setCellValue` accepts a 2D array, there's no dedicated "batch transform" tool that would let the LLM send all transformations in a single call.
+3. **LLM behavior**: Without explicit batching instructions, the model defaults to the most "reliable" pattern: one cell at a time, verify, next cell. This is safe but extremely wasteful.
+4. **Agent loop design**: The loop processes tool calls sequentially within an iteration, but the LLM typically generates only 1-3 tool calls per response for cell modifications.
+
+#### Implementation Plan
+
+**Approach**: Two-pronged fix: (1) add a dedicated batch cell operation tool, (2) update the agent prompt to strongly prefer batching.
+
+**Step 1 — Add `batchSetCellValues` tool** (`excelTools.ts`)
+- Create a new tool designed for bulk cell transformations:
+
+```typescript
+batchSetCellValues: {
+  name: 'batchSetCellValues',
+  category: 'write',
+  description:
+    'Set values for multiple individual cells in a single operation. This is much more efficient than calling setCellValue repeatedly. Use this tool whenever you need to modify more than 2 cells. Provide an array of {address, value} pairs.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      cells: {
+        type: 'array',
+        description: 'Array of cell updates. Each item has an "address" (A1 notation) and a "value" (the new cell content).',
+        items: {
+          type: 'object',
+          properties: {
+            address: { type: 'string', description: 'Cell address in A1 notation (e.g., "A1")' },
+            value: { type: 'string', description: 'New value for the cell' },
+          },
+          required: ['address', 'value'],
+        },
+      },
+    },
+    required: ['cells'],
+  },
+  executeExcel: async (context, args) => {
+    const { cells } = args
+    const sheet = context.workbook.worksheets.getActiveWorksheet()
+    for (const cell of cells) {
+      const range = sheet.getRange(cell.address)
+      const num = Number(cell.value)
+      range.values = [[isNaN(num) ? cell.value : num]]
+    }
+    await context.sync()
+    return `Successfully updated ${cells.length} cells`
+  },
+}
+```
+
+**Step 2 — Add `batchProcessCells` tool for LLM-powered transformations** (`excelTools.ts`)
+- This is an alternative/complementary approach: a tool that reads a range, sends all values for transformation in one shot, and writes back:
+
+```typescript
+batchProcessRange: {
+  name: 'batchProcessRange',
+  category: 'write',
+  description:
+    'Read all values from a range, apply the same transformation to each cell, and write the results back in one operation. Use this for translations, text cleanup, formatting, or any uniform transformation across multiple cells. You provide the range address and the transformed values as a 2D array matching the range dimensions.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      address: {
+        type: 'string',
+        description: 'Range address to process (e.g., "A1:A50", "B2:D10")',
+      },
+      values: {
+        type: 'array',
+        description: 'A 2D array of new values matching the range dimensions. Example: [["translated1"],["translated2"]] for a single-column range.',
+        items: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    },
+    required: ['address', 'values'],
+  },
+  executeExcel: async (context, args) => {
+    const { address, values } = args
+    const sheet = context.workbook.worksheets.getActiveWorksheet()
+    const range = sheet.getRange(address)
+    range.values = values
+    await context.sync()
+    return `Successfully updated range ${address} (${values.length} rows × ${values[0]?.length || 0} columns)`
+  },
+}
+```
+
+**Step 3 — Update the Excel agent prompt** (`useAgentPrompts.ts:92`)
+- Add strong batching instructions to the Excel agent prompt:
+
+```typescript
+const excelAgentPrompt = (lang: string) => `# Role
+You are a highly skilled Microsoft Excel Expert Agent...
+
+# Guidelines
+1. **Tool First**
+2. **Read First**: Always read the data before modifying it.
+3. **BATCH OPERATIONS (CRITICAL)**: When modifying multiple cells:
+   - NEVER use setCellValue in a loop to modify cells one by one.
+   - For text transformations (translate, clean, format, etc.): use getSelectedCells or getWorksheetData to read ALL values first, then process ALL transformations in your response, and use batchSetCellValues or batchProcessRange to write ALL results in ONE tool call.
+   - For formula application: use fillFormulaDown instead of calling insertFormula per row.
+   - Example: To translate 50 cells, read all 50 values, translate them all in one response, then write all 50 translated values using batchProcessRange.
+4. **Accuracy**
+5. **Conciseness**
+6. **Language**: You must communicate entirely in ${lang}.
+7. **Formula locale**: ${excelFormulaLanguageInstruction()}
+8. **Formula duplication**: use fillFormulaDown when applying same formula across rows.`
+```
+
+**Step 4 — Add `ExcelToolName` entries** (`excelTools.ts:23-63`)
+- Add `'batchSetCellValues'` and `'batchProcessRange'` to the `ExcelToolName` union type.
+
+**Step 5 — Consider token budget for large ranges**
+- For very large ranges (100+ cells), the LLM might not be able to process all values in a single response due to output token limits.
+- Add a note in the tool description: `"For ranges larger than 100 cells, process in chunks of 50-100 cells at a time."`.
+- Alternatively, implement a chunking strategy in the tool itself that splits the range into manageable batches.
+
+**Step 6 — Update tool preferences migration** (`toolStorage.ts`)
+- Ensure the new tool names are added to the default enabled set so existing users see them immediately without needing to manually enable them in settings.
+
+**Estimated Impact**: Reduces token consumption by **10-50x** for multi-cell operations. A 50-cell translation that currently takes 50+ LLM round-trips would be reduced to 2-3 (read, process, write). This directly impacts API cost and user wait time.
+
+---
+
+## 8. Updated Tracking Matrix (v2.1 additions)
+
+| ID  | Severity | Category        | Status | File(s)                                                |
+|-----|----------|-----------------|--------|--------------------------------------------------------|
+| F1  | HIGH     | Data Integrity  | OPEN   | useOfficeSelection.ts, useAgentLoop.ts, useOfficeInsert.ts, richContentPreserver.ts, constant.ts, chat.ts |
+| F2  | HIGH     | UX / Quality    | OPEN   | constant.ts, HomePage.vue, useAgentLoop.ts, i18n/*     |
+| F3  | HIGH     | Performance     | OPEN   | excelTools.ts, useAgentPrompts.ts, useAgentLoop.ts     |
+
+### Updated Implementation Priority
+
+Insert between Phase 1 and Phase 2 as **Phase 1.5 — Functional quality**:
+1. **F2** — Outlook smart reply (highest user-facing quality impact, prompt-only change for quick win)
+2. **F3** — Excel batch cell processing (highest cost/performance impact, new tools + prompt change)
+3. **F1** — Translation image preservation (requires OOXML/HTML parsing, most complex implementation)
+
+---
+
+*Last updated: 2026-02-23*
