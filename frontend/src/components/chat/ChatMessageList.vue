@@ -36,6 +36,7 @@
     <div
       v-for="item in historyWithSegments"
       :key="item.key"
+      data-message
       class="group flex items-end gap-4 [.user]:flex-row-reverse"
       :class="item.message.role === 'assistant' ? 'assistant' : 'user'"
     >

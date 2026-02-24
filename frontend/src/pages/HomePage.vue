@@ -406,7 +406,7 @@ async function scrollToBottom(mode: ScrollMode = 'auto') {
     | undefined;
   if (!container) return;
 
-  const messageElements = container.querySelectorAll(".group");
+  const messageElements = container.querySelectorAll("[data-message]");
   const lastMessage = messageElements[messageElements.length - 1] as
     | HTMLElement
     | undefined;
@@ -559,6 +559,7 @@ function loadSelectedPrompt() {
 }
 
 async function checkBackend() {
+  if (document.visibilityState === "hidden") return;
   backendOnline.value = await healthCheck();
   if (!backendOnline.value) return;
   try {

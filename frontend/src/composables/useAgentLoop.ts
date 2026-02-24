@@ -335,7 +335,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           toolArgs = JSON.parse(toolCall.function.arguments)
         } catch (parseErr) {
           console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
-          toolResults.push({ tool_call_id: toolCall.id, content: `Error: malformed tool arguments — JSON parse failed` })
+          toolResults.push({ tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed` })
           continue
         }
         let result = ''
@@ -352,7 +352,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
               toolsWereExecuted = true // Mark that at least one tool was successfully executed
             } catch (err: any) {
               console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
-              result = `Error: ${err.message}`
+              result = `Error in ${toolName}: ${err.message}`
             }
             currentAction.value = ''
             lastToolSignature = currentSignature

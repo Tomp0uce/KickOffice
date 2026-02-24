@@ -147,7 +147,8 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     throw new Error(`Chat API error ${res.status}: ${err}`)
   }
 
-  const reader = res.body!.getReader()
+  if (!res.body) throw new Error('Empty response body')
+  const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let fullContent = ''
   let buffer = ''

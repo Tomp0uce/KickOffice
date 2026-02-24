@@ -97,7 +97,7 @@
             <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t('litellmCredentialsMissing') || 'Statut'
+                  $t('litellmCredentialsMissing')
                 }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
