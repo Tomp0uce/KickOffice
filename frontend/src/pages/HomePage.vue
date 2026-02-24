@@ -172,7 +172,16 @@ const currentHost = hostIsWord
       : hostIsOutlook
         ? "outlook"
         : "unknown";
+const MAX_HISTORY_MESSAGES = 100;
 const history = useStorage<DisplayMessage[]>(`chatHistory_${currentHost}`, []);
+watch(
+  () => history.value.length,
+  (len) => {
+    if (len > MAX_HISTORY_MESSAGES) {
+      history.value = history.value.slice(len - MAX_HISTORY_MESSAGES);
+    }
+  },
+);
 const userInput = ref("");
 const loading = ref(false);
 const imageLoading = ref(false);

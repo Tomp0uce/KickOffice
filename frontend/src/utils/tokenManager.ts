@@ -16,7 +16,11 @@ function truncateToBudget(content: string, budget: number): string {
 }
 
 function getMessageContentLength(message: ChatRequestMessage): number {
-  return message.content.length
+  let length = message.content.length
+  if ('tool_calls' in message && message.tool_calls) {
+    length += JSON.stringify(message.tool_calls).length
+  }
+  return length
 }
 
 export function prepareMessagesForContext(allMessages: ChatRequestMessage[], systemPrompt: string): ChatRequestMessage[] {

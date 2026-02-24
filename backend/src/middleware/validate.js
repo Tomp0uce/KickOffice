@@ -185,7 +185,7 @@ function validateChatRequest({ messages, modelTier = 'standard', temperature, ma
 
   const requiresReasoningSafeParams = isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort
   if (requiresReasoningSafeParams && temperature !== undefined) {
-    return { error: 'temperature is only supported for GPT-5 models when reasoning effort is none' }
+    return { error: 'temperature is not supported for GPT-5 models when reasoning effort is enabled' }
   }
 
   const parsedTools = validateTools(tools)
