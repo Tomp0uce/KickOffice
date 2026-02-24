@@ -1,6 +1,6 @@
 import { nextTick, ref, type Ref } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, chatStream, chatSync, generateImage } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, chatStream, generateImage } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -81,7 +81,7 @@ interface AgentLoopSettings {
 
 interface AgentLoopActions {
   quickActions: Ref<QuickAction[]>
-  outlookQuickActions?: Ref<OutlookQuickAction[]>
+  outlookQuickActions?: OutlookQuickAction[]
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: PowerPointQuickAction[]
 }
@@ -231,7 +231,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
     const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
     let iteration = 0
-    const maxIter = Math.min(Number(agentMaxIterations.value) || 10, 10)
+    const maxIter = Number(agentMaxIterations.value) || 10
     let currentMessages: ChatRequestMessage[] = [...messages]
     let lastToolSignature: string | null = null
     let toolsWereExecuted = false // Track if any tools were successfully executed
@@ -335,7 +335,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           toolArgs = JSON.parse(toolCall.function.arguments)
         } catch (parseErr) {
           console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
-          toolResults.push({ tool_call_id: toolCall.id, content: `Error: malformed tool arguments — JSON parse failed` })
+          toolResults.push({ tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed` })
           continue
         }
         let result = ''
@@ -352,7 +352,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
               toolsWereExecuted = true // Mark that at least one tool was successfully executed
             } catch (err: any) {
               console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
-              result = `Error: ${err.message}`
+              result = `Error in ${toolName}: ${err.message}`
             }
             currentAction.value = ''
             lastToolSignature = currentSignature
@@ -442,11 +442,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
-    try {
-      await runAgentLoop(messages, modelTier)
-    } catch (error) {
-      throw error
-    }
+    await runAgentLoop(messages, modelTier)
   }
 
   async function sendMessage(payload?: unknown) {
@@ -608,8 +604,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       ? excelQuickActions.value.find(a => a.key === actionKey)
       : hostIsPowerPoint
         ? powerPointQuickActions.find(a => a.key === actionKey)
-        : hostIsOutlook && outlookQuickActions?.value
-          ? outlookQuickActions.value.find(a => a.key === actionKey)
+        : hostIsOutlook && outlookQuickActions
+          ? outlookQuickActions.find(a => a.key === actionKey)
           : quickActions.value.find(a => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
@@ -679,94 +675,106 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
       return
     }
-    const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
-    if (!selectedText) return messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
+    if (loading.value) return
+    loading.value = true
+    abortController.value = new AbortController()
 
-    // F1: Try to get HTML selection for rich content preservation (Word, Outlook)
-    let richContext: RichContentContext | null = null
-    const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
-    if (isTextModifyingAction) {
-      try {
-        const htmlContent = await getOfficeSelectionAsHtml()
-        if (htmlContent) {
-          richContext = extractTextFromHtml(htmlContent)
-        }
-      } catch (err) {
-        console.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
+    try {
+      const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
+      if (!selectedText) {
+        messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
+        return
       }
-    }
 
-    // Use text from rich context extraction if available, otherwise use plain text selection
-    const textForLlm = (richContext?.hasRichContent ? richContext.cleanText : selectedText) || selectedText
-
-    let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
-    let systemMsg = ''
-    let userMsg = ''
-    if (hostIsOutlook) action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt]
-    else if (hostIsPowerPoint) action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt]
-    else if (hostIsExcel) {
-      if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
-        systemMsg = selectedExcelQuickAction.systemPrompt
-        userMsg = `Selection:\n${selectedText}`
-      } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
-    } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
-    if (!systemMsg || !userMsg) {
-      if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
-      if (!action) return
-      const lang = replyLanguage.value || 'Français'
-      systemMsg = action.system(lang)
-      userMsg = action.user(textForLlm, lang)
-    }
-
-    // Enforce global formatting constraints on all Quick Actions
-    systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
-
-    // F1: Add preservation instruction if rich content was detected
-    if (richContext?.hasRichContent) {
-      systemMsg += getPreservationInstruction(richContext)
-    }
-
-    const actionLabel = selectedQuickAction?.label || t(actionKey)
-    history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
-
-    if (selectedQuickAction?.executeWithAgent) {
-      await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
-    } else {
-      history.value.push(createDisplayMessage('assistant', ''))
-      await scrollToMessageTop() // Scroll to show start of assistant response
-      try {
-        await chatStream({
-          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-          modelTier: resolveChatModelTier(),
-          onStream: async (text: string) => {
-            const message = history.value[history.value.length - 1]
-            message.role = 'assistant'
-            message.content = text
-            await scrollToBottom()
-          },
-          abortSignal: abortController.value?.signal,
-        })
-        // Check for empty response
-        const lastMessage = history.value[history.value.length - 1]
-        if (!lastMessage?.content?.trim()) {
-          lastMessage.content = t('noModelResponse')
-        }
-        // F1: Reassemble rich content with preserved fragments
-        if (richContext?.hasRichContent && lastMessage?.content) {
-          lastMessage.richHtml = reassembleWithFragments(lastMessage.content, richContext)
-        }
-      } catch (err: any) {
-        if (err.name === 'AbortError') return
-        console.error('[AgentLoop] Quick action chatStream failed', err)
-        const lastMessage = history.value[history.value.length - 1]
-        if (isCredentialError(err)) {
-          lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
-          messageUtil.warning(t('credentialsRequired'))
-        } else {
-          lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
-          messageUtil.error(t('failedToResponse'))
+      // F1: Try to get HTML selection for rich content preservation (Word, Outlook)
+      let richContext: RichContentContext | null = null
+      const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
+      if (isTextModifyingAction) {
+        try {
+          const htmlContent = await getOfficeSelectionAsHtml()
+          if (htmlContent) {
+            richContext = extractTextFromHtml(htmlContent)
+          }
+        } catch (err) {
+          console.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
         }
       }
+
+      // Use text from rich context extraction if available, otherwise use plain text selection
+      const textForLlm = (richContext?.hasRichContent ? richContext.cleanText : selectedText) || selectedText
+
+      let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
+      let systemMsg = ''
+      let userMsg = ''
+      if (hostIsOutlook) action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt]
+      else if (hostIsPowerPoint) action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt]
+      else if (hostIsExcel) {
+        if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
+          systemMsg = selectedExcelQuickAction.systemPrompt
+          userMsg = `Selection:\n${selectedText}`
+        } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
+      } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+      if (!systemMsg || !userMsg) {
+        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+        if (!action) return
+        const lang = replyLanguage.value || 'Français'
+        systemMsg = action.system(lang)
+        userMsg = action.user(textForLlm, lang)
+      }
+
+      // Enforce global formatting constraints on all Quick Actions
+      systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+
+      // F1: Add preservation instruction if rich content was detected
+      if (richContext?.hasRichContent) {
+        systemMsg += getPreservationInstruction(richContext)
+      }
+
+      const actionLabel = selectedQuickAction?.label || t(actionKey)
+      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
+
+      if (selectedQuickAction?.executeWithAgent) {
+        await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
+      } else {
+        history.value.push(createDisplayMessage('assistant', ''))
+        await scrollToMessageTop() // Scroll to show start of assistant response
+        try {
+          await chatStream({
+            messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+            modelTier: resolveChatModelTier(),
+            onStream: async (text: string) => {
+              const message = history.value[history.value.length - 1]
+              message.role = 'assistant'
+              message.content = text
+              await scrollToBottom()
+            },
+            abortSignal: abortController.value?.signal,
+          })
+          // Check for empty response
+          const lastMessage = history.value[history.value.length - 1]
+          if (!lastMessage?.content?.trim()) {
+            lastMessage.content = t('noModelResponse')
+          }
+          // F1: Reassemble rich content with preserved fragments
+          if (richContext?.hasRichContent && lastMessage?.content) {
+            lastMessage.richHtml = reassembleWithFragments(lastMessage.content, richContext)
+          }
+        } catch (err: any) {
+          if (err.name === 'AbortError') return
+          console.error('[AgentLoop] Quick action chatStream failed', err)
+          const lastMessage = history.value[history.value.length - 1]
+          if (isCredentialError(err)) {
+            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+            messageUtil.warning(t('credentialsRequired'))
+          } else {
+            lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
+            messageUtil.error(t('failedToResponse'))
+          }
+        }
+      }
+    } finally {
+      loading.value = false
+      abortController.value = null
     }
   }
 

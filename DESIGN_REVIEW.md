@@ -37,18 +37,21 @@ All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD)
 - **Issue**: The Settings UI allows `agentMaxIterations` between 1 and 100, but `useAgentLoop.ts` hardcodes `Math.min(Number(agentMaxIterations.value) || 10, 10)` — capping the effective maximum at **10 iterations** regardless of user setting.
 - **Impact**: The settings UI misleads users. Setting iterations to 25 (the default) or 100 has no effect; the agent always stops at 10. For complex multi-step tasks this is a significant functional limitation.
 - **Fix**: Replace the hardcoded `10` with the setting value: `Math.min(Number(agentMaxIterations.value) || 10, agentMaxIterations.value)`, or more simply use the setting value directly with a reasonable cap (e.g. 50).
+- **Status**: ✅ Fixed 2026-02-24 — Removed `Math.min(..., 10)` cap; `useAgentLoop.ts` now uses `Number(agentMaxIterations.value) || 10` directly, respecting the full user-configured range.
 
 #### C2. `.env.example` still contains invalid `reasoning_effort=none`
 - **File**: `backend/.env.example:27`
 - **Issue**: `MODEL_STANDARD_REASONING_EFFORT=none` is present in the example env file. The v1 audit (C2) fixed the code default from `'none'` to `undefined`, but the `.env.example` was not updated. Since `models.js:21` reads `process.env.MODEL_STANDARD_REASONING_EFFORT || undefined`, the string `'none'` is truthy and passes through, ultimately sending `reasoning_effort: 'none'` to the OpenAI API.
 - **Impact**: Any deployment following the `.env.example` template will send an invalid API parameter, causing empty responses when tools are used with GPT-5 models.
 - **Fix**: Change line 27 to `MODEL_STANDARD_REASONING_EFFORT=` (empty, meaning "omit the parameter") and add a comment explaining valid values.
+- **Status**: ✅ Fixed 2026-02-24 — Replaced the invalid `MODEL_STANDARD_REASONING_EFFORT=none` with a commented-out placeholder documenting valid values (`low`, `medium`, `high`).
 
 #### C3. Quick actions bypass loading/abort state management
 - **Files**: `frontend/src/composables/useAgentLoop.ts:512-617`
 - **Issue**: `applyQuickAction()` calls `chatStream` and `runAgentLoop` without setting `loading.value = true` or creating an `AbortController`. The stop button doesn't work during quick actions.
 - **Impact**: Users cannot abort a running quick action. If a quick action is triggered while another is running, concurrent stream writes corrupt the chat history. The UI gives no visual feedback that a quick action is in progress.
 - **Fix**: Wrap the quick action execution in the same loading/abort pattern as `sendMessage()`.
+- **Status**: ✅ Fixed 2026-02-24 — `applyQuickAction()` now sets `loading.value = true` and creates a fresh `AbortController` before any async LLM work, with a `try/finally` block ensuring cleanup on completion or abort.
 
 ---
 
@@ -59,30 +62,35 @@ All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD)
 - **Issue**: `useStorage<DisplayMessage[]>('chatHistory_word', [])` has no size limit. Each message (especially tool results with full document content) can be several KB. Long agent sessions can produce hundreds of messages.
 - **Impact**: `localStorage` has a ~5-10 MB limit per origin. When exceeded, `QuotaExceededError` is thrown silently (Vue `useStorage` swallows it), causing data loss or broken persistence.
 - **Fix**: Implement a max history size (e.g. 100 messages or 1 MB). Prune oldest messages when the limit is reached. Consider a warning toast when approaching the limit.
+- **Status**: ✅ Fixed 2026-02-24 — Added `MAX_HISTORY_MESSAGES = 100` constant and a watcher in `HomePage.vue` that trims `history.value` to the last 100 messages whenever the array grows beyond that.
 
 #### H2. Token manager uses character count instead of token count
 - **File**: `frontend/src/utils/tokenManager.ts:3`
 - **Issue**: `MAX_CONTEXT_CHARS = 100_000` uses character count as a proxy for token count. The function name `prepareMessagesForContext` and the variable name suggest token management, but no tokenization occurs.
 - **Impact**: For CJK text (1-2 chars per token), the budget is ~2x too generous, risking API token limit errors. For English (~4 chars per token), 100k chars ≈ 25k tokens, which is acceptable but imprecise. Additionally, `getMessageContentLength()` does not account for `tool_calls` JSON payload in assistant messages, leading to budget underestimation in tool-heavy conversations.
 - **Fix**: Either rename to `MAX_CONTEXT_CHARS` (already done) and document the approximation, or integrate a lightweight tokenizer (e.g. `tiktoken` WASM build) for accurate counting. At minimum, include `tool_calls` serialized length in the budget calculation.
+- **Status**: ✅ Fixed 2026-02-24 — `getMessageContentLength()` in `tokenManager.ts` now adds `JSON.stringify(message.tool_calls).length` to the budget when `tool_calls` is present on an assistant message.
 
 #### H3. Validation error message references invalid `none` value
 - **File**: `backend/src/middleware/validate.js:189`
 - **Issue**: Error message says `"temperature is only supported for GPT-5 models when reasoning effort is none"`. The value `'none'` is no longer valid (removed in v1 C2 fix). The correct phrasing is "when reasoning effort is not set".
 - **Impact**: Confusing error message for API consumers. Could lead developers to set `reasoning_effort=none` based on this message.
 - **Fix**: Change to `"temperature is not supported for GPT-5 models when reasoning effort is enabled"`.
+- **Status**: ✅ Fixed 2026-02-24 — Error message in `validate.js:189` updated to correctly describe the constraint without referencing the invalid `'none'` value.
 
 #### H4. `chatSync` function is exported but unused (dead code)
 - **File**: `frontend/src/api/backend.ts:228-249`
 - **Issue**: The `chatSync()` function is still fully implemented and exported, but the agent loop was migrated to use `chatStream()` with `onToolCallDelta` instead. No code path calls `chatSync`.
 - **Impact**: Dead code increases maintenance burden and confusion. The function also contains a useless `try { ... } catch (error) { throw error }` wrapper.
 - **Fix**: Remove the `chatSync` function, its interface `ChatSyncOptions`, and the unused import in any consuming file. If kept as future API surface, mark it with a `@deprecated` comment.
+- **Status**: ✅ Fixed 2026-02-24 — Removed `chatSync()`, `ChatSyncOptions`, and `OpenAIChatCompletion` interfaces from `backend.ts`; cleaned up the unused import in `useAgentLoop.ts`.
 
 #### H5. README model defaults do not match actual code
 - **Files**: `README.md:47-49`, `backend/src/config/models.js:17,26,33`, `backend/.env.example:23,30,37`
 - **Issue**: README documents default models as `gpt-5.2` and `gpt-image-1.5`, but actual code defaults are `gpt-5.1` and `gpt-image-1`. The `.env.example` correctly shows `gpt-5.1` and `gpt-image-1`.
 - **Impact**: Documentation mismatch causes confusion during deployment.
 - **Fix**: Update README to match actual defaults (`gpt-5.1`, `gpt-image-1`).
+- **Status**: ✅ Fixed 2026-02-24 — README already showed `gpt-5.1` and `gpt-image-1`; no change needed.
 
 ---
 
@@ -93,60 +101,70 @@ All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD)
 - **Issue**: `startNewChat()` immediately clears all history without confirmation. One accidental click destroys the entire conversation.
 - **Impact**: Users lose conversation data with no recovery path.
 - **Fix**: Add a confirmation prompt before clearing, or implement undo functionality.
+- **Status**: ✅ Fixed 2026-02-24 — `startNewChat()` now guards with `window.confirm(t("newChatConfirm"))` when history is non-empty; i18n key added to both `en.json` and `fr.json`.
 
 #### M2. `processChat` has useless try/catch wrapper
 - **File**: `frontend/src/composables/useAgentLoop.ts:406-410`
 - **Issue**: `try { await runAgentLoop(messages, modelTier) } catch (error) { throw error }` catches and immediately re-throws without transformation.
 - **Impact**: Dead code that adds noise. The catch block does nothing useful.
 - **Fix**: Remove the try/catch, call `runAgentLoop` directly.
+- **Status**: ✅ Fixed 2026-02-24 — Removed the `try { await runAgentLoop() } catch(e) { throw e }` wrapper in `processChat()`; `runAgentLoop()` is now called directly.
 
 #### M3. Inconsistent quick action type definitions
 - **Files**: `frontend/src/pages/HomePage.vue:271,305`, `frontend/src/composables/useAgentLoop.ts:83-86`
 - **Issue**: `outlookQuickActions` is a plain array, `excelQuickActions` is a `computed`, `powerPointQuickActions` is a plain array, and `wordQuickActions` is a plain array. The `AgentLoopActions` interface expects `outlookQuickActions` as `Ref<OutlookQuickAction[]>` (optional) and `powerPointQuickActions` as a plain array. Then `HomePage.vue:469` wraps `outlookQuickActions` in `computed(() => outlookQuickActions)` to satisfy the ref requirement.
 - **Impact**: Unnecessary complexity and inconsistent patterns make the code harder to understand.
 - **Fix**: Standardize all quick action arrays to the same type (either all `computed` or all plain arrays) and update the interface accordingly.
+- **Status**: ✅ Fixed 2026-02-24 — Changed `AgentLoopActions.outlookQuickActions` from `Ref<OutlookQuickAction[]>` to `OutlookQuickAction[]`; removed the `computed(() => outlookQuickActions)` wrapper in `HomePage.vue`, passing the plain array directly.
 
 #### M4. Missing accessibility (ARIA) attributes
 - **Files**: `frontend/src/pages/SettingsPage.vue`, `frontend/src/components/chat/ChatInput.vue`
 - **Issue**: Settings tabs lack `role="tablist"` / `role="tab"` / `role="tabpanel"` attributes. Tool checkboxes have no `aria-label`. The chat input textarea has no `aria-label`.
 - **Impact**: Screen reader users cannot properly navigate the UI. May not meet corporate accessibility requirements (WCAG 2.1 AA).
 - **Fix**: Add ARIA roles and labels to interactive elements.
+- **Status**: ✅ Fixed 2026-02-24 — Added `role="tablist"` to settings nav, `role="tab"` + `:aria-selected` to `CustomButton` tabs, `role="tabpanel"` to all 5 settings panels, and `aria-label` to the chat input textarea.
 
 #### M5. Built-in prompts serialization uses fragile interpolation
 - **Files**: `frontend/src/pages/SettingsPage.vue:968-971,986-987,997-1001`
 - **Issue**: Custom built-in prompts are serialized with `${language}` and `${text}` placeholders but the editor UI uses `[LANGUAGE]` and `[TEXT]`. The bidirectional translation works but is fragile. If a user types a literal `${text}` in the editor, it would be interpreted as a replacement variable during deserialization.
 - **Impact**: Edge case data corruption. The dual-format approach is a maintenance risk.
 - **Fix**: Standardize on a single placeholder format (prefer `[LANGUAGE]`/`[TEXT]` since that's what the user sees) and use it for both serialization and deserialization.
+- **Status**: ✅ Fixed 2026-02-24 — `saveBuiltInPrompts()` now serializes with `[LANGUAGE]`/`[TEXT]`; `loadBuiltInPrompts()` regex updated to match the new format. Both directions use a single consistent placeholder format.
 
 #### M6. `useOfficeInsert.ts` uses `any` for message parameters
 - **File**: `frontend/src/composables/useOfficeInsert.ts:20-21,145,153`
 - **Issue**: `shouldTreatMessageAsImage: (message: any) => boolean`, `copyMessageToClipboard(message: any)`, `insertMessageToDocument(message: any)` all use `any` type.
 - **Impact**: No TypeScript type safety. Callers could pass incorrect objects without compile-time errors.
 - **Fix**: Use `DisplayMessage` type from `@/types/chat`.
+- **Status**: ✅ Fixed 2026-02-24 — Replaced all three `message: any` signatures in `useOfficeInsert.ts` with `message: DisplayMessage`; added the required `import type { DisplayMessage }` from `@/types/chat`.
 
 #### M7. No TypeScript on backend
 - **Files**: All `backend/src/*.js` files
 - **Issue**: The entire backend is plain JavaScript with no JSDoc type annotations or TypeScript. Request bodies, model configs, and API responses have no type definitions.
 - **Impact**: As the project grows, refactoring becomes risky. Runtime type errors are caught late. IDE support (autocomplete, refactoring) is limited.
 - **Fix**: Consider migrating to TypeScript incrementally, starting with `config/models.js` and `middleware/validate.js` which handle the most complex data shapes. At minimum, add JSDoc types.
+- **Status**: ✅ Fixed 2026-02-24 — Added `@typedef` blocks for `ModelTier`, `ModelConfig`, `ChatBodyParams` in `models.js` and `@param`/`@returns` JSDoc to all public functions in both `models.js` and `validate.js`.
 
 #### M8. Missing `Content-Type` enforcement on backend
 - **File**: `backend/src/server.js:87`
 - **Issue**: `express.json({ limit: '4mb' })` silently ignores requests without `Content-Type: application/json`. A POST with `text/plain` body will pass through with an empty `req.body`.
 - **Impact**: Potentially confusing error messages when content type is wrong (validation says "messages array is required" instead of "invalid content type").
 - **Fix**: Add middleware that rejects POST requests without `application/json` content type.
+- **Status**: ✅ Fixed 2026-02-24 — Added middleware in `server.js` that returns HTTP 415 for POST/PUT/PATCH requests missing `Content-Type: application/json`, placed after `express.json()` parsing.
 
 #### M9. Docker Compose `version` field is deprecated
 - **File**: `docker-compose.yml:1`
 - **Issue**: `version: "3.8"` is deprecated in Docker Compose v2. It's silently ignored but generates warnings.
 - **Impact**: Build-time warning noise.
 - **Fix**: Remove the `version` line.
+- **Status**: ✅ Fixed 2026-02-24 — Removed the deprecated `version: "3.8"` field from `docker-compose.yml`; Docker Compose v2 does not require it.
 
 #### M10. `officeRichText.ts` markdown parser has `html: true`
 - **File**: `frontend/src/utils/officeRichText.ts:9`
 - **Issue**: The Office markdown parser has `html: true`, allowing raw HTML pass-through before DOMPurify sanitization. While the sanitization step (line 326-333) properly filters tags, the `ALLOWED_ATTR` list includes `style` attribute, which can carry CSS injection payloads (e.g., `expression()` in older IE, `url()` for data exfiltration).
 - **Impact**: Low risk in modern browsers/Office webviews, but the `style` attribute in the allow list is broader than needed. Since the input comes from AI responses (not direct user input), exploitation requires prompt injection.
 - **Fix**: Consider using DOMPurify's `FORBID_ATTR: ['style']` or a CSS sanitizer for the `style` attribute values if stricter security is needed.
+- **Status**: ✅ Fixed 2026-02-24 — Removed `style` from `ALLOWED_ATTR` and added `FORBID_ATTR: ['style']` to the DOMPurify configuration in `officeRichText.ts`, eliminating the CSS injection vector.
 
 ---
 
@@ -156,36 +174,43 @@ All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD)
 - **File**: `frontend/src/pages/HomePage.vue:393`
 - **Issue**: `container.querySelectorAll('.group')` uses the Tailwind `.group` utility class as a DOM selector. A Tailwind version upgrade or class rename would silently break auto-scroll.
 - **Fix**: Use a `data-*` attribute or dedicated CSS class for message identification.
+- **Status**: ✅ Fixed 2026-02-24 — Added `data-message` attribute to the message `<div>` in `ChatMessageList.vue`; updated `scrollToBottom` selector from `'.group'` to `'[data-message]'`.
 
 #### L2. Custom `debounce` reimplemented despite `@vueuse/core` dependency
 - **File**: `frontend/src/main.ts:15-25`
 - **Issue**: A custom debounce function is written inline, but `@vueuse/core` (already imported in the same file) provides `useDebounceFn`.
 - **Fix**: Replace with `useDebounceFn` from VueUse.
+- **Status**: ✅ Fixed 2026-02-24 — Replaced the custom 10-line inline debounce in `main.ts` with `useDebounceFn(callback, 16)` from `@vueuse/core`, which was already imported in the same file.
 
 #### L3. Backend polling interval is fixed at 30 seconds
 - **File**: `frontend/src/pages/HomePage.vue:539`
 - **Issue**: `window.setInterval(checkBackend, 30000)` polls regardless of user activity. No exponential backoff when backend is down, no pause when the add-in is backgrounded.
 - **Fix**: Use `document.visibilityState` check to pause polling when the tab is hidden. Consider backoff when offline.
+- **Status**: ✅ Fixed 2026-02-24 — Added `if (document.visibilityState === 'hidden') return` early exit at the top of `checkBackend()` in `HomePage.vue`.
 
 #### L4. `backend.ts:148` non-null assertion on response body
 - **File**: `frontend/src/api/backend.ts:148`
 - **Issue**: `res.body!.getReader()` uses a non-null assertion. While a 200 response always has a body, a defensive check would prevent crashes on unexpected responses.
 - **Fix**: Add a null check: `if (!res.body) throw new Error('Empty response body')`.
+- **Status**: ✅ Fixed 2026-02-24 — Replaced `res.body!.getReader()` with an explicit null check that throws `new Error('Empty response body')`, then calls `.getReader()` safely.
 
 #### L5. Undocumented frontend environment variables
 - **Files**: `frontend/src/composables/useOfficeInsert.ts:9`, `frontend/src/api/backend.ts:7`
 - **Issue**: `VITE_VERBOSE_LOGGING` and `VITE_REQUEST_TIMEOUT_MS` are used in the frontend but not documented in the README's environment variables section or in any `.env.example`.
 - **Fix**: Add these to the frontend environment variables table in README.
+- **Status**: ✅ Fixed 2026-02-24 — Both `VITE_VERBOSE_LOGGING` and `VITE_REQUEST_TIMEOUT_MS` were already documented in the README frontend environment variables section; no change needed.
 
 #### L6. SettingsPage status label has hardcoded French fallback
 - **File**: `frontend/src/pages/SettingsPage.vue:75`
 - **Issue**: `$t('litellmCredentialsMissing') || 'Statut'` contains a hardcoded French fallback string. This pattern was identified and fixed in the v1 audit (L2) for other instances, but this one was missed.
 - **Fix**: Remove the `|| 'Statut'` fallback; the i18n system handles missing keys.
+- **Status**: ✅ Fixed 2026-02-24 — Removed the `|| 'Statut'` hardcoded French fallback from `SettingsPage.vue`; the i18n call is now clean.
 
 #### L7. Inconsistent error message format in agent tool execution
 - **File**: `frontend/src/composables/useAgentLoop.ts:311,323`
 - **Issue**: Parse errors return `"Error: malformed tool arguments — JSON parse failed"` while execution errors return `"Error: ${err.message}"`. The first format includes context, the second doesn't include the tool name.
 - **Fix**: Standardize error messages to include tool name and error type: `"Error in ${toolName}: ${description}"`.
+- **Status**: ✅ Fixed 2026-02-24 — Both error paths in `useAgentLoop.ts` now use the `Error in ${toolName}: ...` prefix: JSON parse failures say `Error in ${toolName}: malformed tool arguments — JSON parse failed` and execution errors say `Error in ${toolName}: ${err.message}`.
 
 ---
 
@@ -214,36 +239,36 @@ All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD)
 
 ## 4. Tracking Matrix
 
-| ID  | Severity | Category       | Status | File(s)                                   |
-|-----|----------|----------------|--------|-------------------------------------------|
-| C1  | CRITICAL | Correctness    | OPEN   | useAgentLoop.ts, SettingsPage.vue         |
-| C2  | CRITICAL | Configuration  | OPEN   | .env.example, models.js                   |
-| C3  | CRITICAL | UX / Stability | OPEN   | useAgentLoop.ts                           |
-| H1  | HIGH     | Data Integrity | OPEN   | HomePage.vue                              |
-| H2  | HIGH     | Architecture   | OPEN   | tokenManager.ts                           |
-| H3  | HIGH     | Correctness    | OPEN   | validate.js                               |
-| H4  | HIGH     | Quality        | OPEN   | backend.ts                                |
-| H5  | HIGH     | Documentation  | OPEN   | README.md, models.js                      |
-| M1  | MEDIUM   | UX             | OPEN   | HomePage.vue                              |
-| M2  | MEDIUM   | Quality        | OPEN   | useAgentLoop.ts                           |
-| M3  | MEDIUM   | Architecture   | OPEN   | HomePage.vue, useAgentLoop.ts             |
-| M4  | MEDIUM   | Accessibility  | OPEN   | SettingsPage.vue, ChatInput.vue           |
-| M5  | MEDIUM   | Quality        | OPEN   | SettingsPage.vue                          |
-| M6  | MEDIUM   | Type Safety    | OPEN   | useOfficeInsert.ts                        |
-| M7  | MEDIUM   | Architecture   | OPEN   | backend/src/*.js                          |
-| M8  | MEDIUM   | Validation     | OPEN   | server.js                                 |
-| M9  | MEDIUM   | Config         | OPEN   | docker-compose.yml                        |
-| M10 | MEDIUM   | Security       | OPEN   | officeRichText.ts                         |
-| L1  | LOW      | Quality        | OPEN   | HomePage.vue                              |
-| L2  | LOW      | Quality        | OPEN   | main.ts                                   |
-| L3  | LOW      | Performance    | OPEN   | HomePage.vue                              |
-| L4  | LOW      | Resilience     | OPEN   | backend.ts                                |
-| L5  | LOW      | Documentation  | OPEN   | README.md                                 |
-| L6  | LOW      | i18n           | OPEN   | SettingsPage.vue                          |
-| L7  | LOW      | Quality        | OPEN   | useAgentLoop.ts                           |
-| B1  | BUILD    | Testing        | OPEN   | (no test framework)                       |
-| B2  | BUILD    | Tooling        | OPEN   | (no lint config)                          |
-| B3  | BUILD    | CI/CD          | OPEN   | .github/workflows/                        |
+| ID  | Severity | Category       | Status              | File(s)                                   |
+|-----|----------|----------------|---------------------|-------------------------------------------|
+| C1  | CRITICAL | Correctness    | ✅ FIXED 2026-02-24 | useAgentLoop.ts, SettingsPage.vue         |
+| C2  | CRITICAL | Configuration  | ✅ FIXED 2026-02-24 | .env.example, models.js                   |
+| C3  | CRITICAL | UX / Stability | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
+| H1  | HIGH     | Data Integrity | ✅ FIXED 2026-02-24 | HomePage.vue                              |
+| H2  | HIGH     | Architecture   | ✅ FIXED 2026-02-24 | tokenManager.ts                           |
+| H3  | HIGH     | Correctness    | ✅ FIXED 2026-02-24 | validate.js                               |
+| H4  | HIGH     | Quality        | ✅ FIXED 2026-02-24 | backend.ts                                |
+| H5  | HIGH     | Documentation  | ✅ FIXED 2026-02-24 | README.md, models.js                      |
+| M1  | MEDIUM   | UX             | ✅ FIXED 2026-02-24 | HomePage.vue                              |
+| M2  | MEDIUM   | Quality        | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
+| M3  | MEDIUM   | Architecture   | ✅ FIXED 2026-02-24 | HomePage.vue, useAgentLoop.ts             |
+| M4  | MEDIUM   | Accessibility  | ✅ FIXED 2026-02-24 | SettingsPage.vue, ChatInput.vue           |
+| M5  | MEDIUM   | Quality        | ✅ FIXED 2026-02-24 | SettingsPage.vue                          |
+| M6  | MEDIUM   | Type Safety    | ✅ FIXED 2026-02-24 | useOfficeInsert.ts                        |
+| M7  | MEDIUM   | Architecture   | ✅ FIXED 2026-02-24 | backend/src/*.js                          |
+| M8  | MEDIUM   | Validation     | ✅ FIXED 2026-02-24 | server.js                                 |
+| M9  | MEDIUM   | Config         | ✅ FIXED 2026-02-24 | docker-compose.yml                        |
+| M10 | MEDIUM   | Security       | ✅ FIXED 2026-02-24 | officeRichText.ts                         |
+| L1  | LOW      | Quality        | ✅ FIXED 2026-02-24 | HomePage.vue, ChatMessageList.vue         |
+| L2  | LOW      | Quality        | ✅ FIXED 2026-02-24 | main.ts                                   |
+| L3  | LOW      | Performance    | ✅ FIXED 2026-02-24 | HomePage.vue                              |
+| L4  | LOW      | Resilience     | ✅ FIXED 2026-02-24 | backend.ts                                |
+| L5  | LOW      | Documentation  | ✅ FIXED 2026-02-24 | README.md (already present)               |
+| L6  | LOW      | i18n           | ✅ FIXED 2026-02-24 | SettingsPage.vue                          |
+| L7  | LOW      | Quality        | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
+| B1  | BUILD    | Testing        | OPEN                | (no test framework)                       |
+| B2  | BUILD    | Tooling        | OPEN                | (no lint config)                          |
+| B3  | BUILD    | CI/CD          | OPEN                | .github/workflows/                        |
 
 ---
 

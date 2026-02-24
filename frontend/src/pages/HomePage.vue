@@ -172,7 +172,16 @@ const currentHost = hostIsWord
       : hostIsOutlook
         ? "outlook"
         : "unknown";
+const MAX_HISTORY_MESSAGES = 100;
 const history = useStorage<DisplayMessage[]>(`chatHistory_${currentHost}`, []);
+watch(
+  () => history.value.length,
+  (len) => {
+    if (len > MAX_HISTORY_MESSAGES) {
+      history.value = history.value.slice(len - MAX_HISTORY_MESSAGES);
+    }
+  },
+);
 const userInput = ref("");
 const loading = ref(false);
 const imageLoading = ref(false);
@@ -397,7 +406,7 @@ async function scrollToBottom(mode: ScrollMode = 'auto') {
     | undefined;
   if (!container) return;
 
-  const messageElements = container.querySelectorAll(".group");
+  const messageElements = container.querySelectorAll("[data-message]");
   const lastMessage = messageElements[messageElements.length - 1] as
     | HTMLElement
     | undefined;
@@ -498,7 +507,7 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   },
   actions: {
     quickActions,
-    outlookQuickActions: computed(() => outlookQuickActions),
+    outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
   },
@@ -522,6 +531,7 @@ function goToSettings() {
 }
 
 function startNewChat() {
+  if (history.value.length > 0 && !window.confirm(t("newChatConfirm"))) return;
   if (loading.value) stopGeneration();
   userInput.value = "";
   history.value = [];
@@ -549,6 +559,7 @@ function loadSelectedPrompt() {
 }
 
 async function checkBackend() {
+  if (document.visibilityState === "hidden") return;
   backendOnline.value = await healthCheck();
   if (!backendOnline.value) return;
   try {

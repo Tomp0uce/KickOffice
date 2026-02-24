@@ -85,6 +85,15 @@ app.use((req, res, next) => {
 })
 
 app.use(express.json({ limit: '4mb' }))
+
+// Reject POST/PUT/PATCH requests that don't declare application/json to avoid silent empty bodies
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
+    return res.status(415).json({ error: 'Content-Type must be application/json' })
+  }
+  next()
+})
+
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
 
 app.use(infoLimiter, healthRouter)

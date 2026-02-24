@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 
+import type { DisplayMessage } from '@/types/chat'
 import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
@@ -17,8 +18,8 @@ interface UseOfficeInsertOptions {
   useWordFormatting: Ref<boolean>
   insertType: Ref<insertTypes>
   t: (key: string) => string
-  shouldTreatMessageAsImage: (message: any) => boolean
-  getMessageActionPayload: (message: any) => string
+  shouldTreatMessageAsImage: (message: DisplayMessage) => boolean
+  getMessageActionPayload: (message: DisplayMessage) => string
   copyImageToClipboard: (imageSrc: string, fallback?: boolean) => Promise<void>
   insertImageToWord: (imageSrc: string, type: insertTypes) => Promise<void>
   insertImageToPowerPoint: (imageSrc: string, type: insertTypes) => Promise<void>
@@ -157,7 +158,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     }
   }
 
-  async function copyMessageToClipboard(message: any, fallback = false) {
+  async function copyMessageToClipboard(message: DisplayMessage, fallback = false) {
     if (shouldTreatMessageAsImage(message) && message.imageSrc) {
       await copyImageToClipboard(message.imageSrc, fallback)
       return
@@ -165,7 +166,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     await copyToClipboard(getMessageActionPayload(message), fallback)
   }
 
-  async function insertMessageToDocument(message: any, type: insertTypes) {
+  async function insertMessageToDocument(message: DisplayMessage, type: insertTypes) {
     if (shouldTreatMessageAsImage(message) && message.imageSrc) {
       if (hostIsWord) {
         try {

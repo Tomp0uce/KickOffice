@@ -147,7 +147,8 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     throw new Error(`Chat API error ${res.status}: ${err}`)
   }
 
-  const reader = res.body!.getReader()
+  if (!res.body) throw new Error('Empty response body')
+  const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let fullContent = ''
   let buffer = ''
@@ -187,13 +188,6 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
   }
 }
 
-export interface ChatSyncOptions {
-  messages: ChatRequestMessage[]
-  modelTier: ModelTier
-  tools?: ToolDefinition[]
-  abortSignal?: AbortSignal
-}
-
 export interface ToolDefinition {
   type: 'function'
   function: {
@@ -201,52 +195,6 @@ export interface ToolDefinition {
     description?: string
     parameters: Record<string, unknown>
     strict?: boolean
-  }
-}
-
-export interface OpenAIChatCompletion {
-  id: string
-  object: 'chat.completion'
-  created: number
-  model: string
-  choices: Array<{
-    index: number
-    finish_reason: string | null
-    message: {
-      role: 'assistant'
-      content: string | null
-      tool_calls?: Array<{
-        id: string
-        type: 'function'
-        function: {
-          name: string
-          arguments: string
-        }
-      }>
-    }
-  }>
-}
-
-export async function chatSync(options: ChatSyncOptions): Promise<OpenAIChatCompletion> {
-  const { messages, modelTier, tools, abortSignal } = options
-
-  try {
-    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
-      body: JSON.stringify({ messages, modelTier, tools }),
-      signal: abortSignal,
-    })
-
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`Chat sync API error ${res.status}: ${err}`)
-    }
-
-    const json = await res.json()
-    return json
-  } catch (error) {
-    throw error
   }
 }
 

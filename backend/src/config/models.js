@@ -1,3 +1,26 @@
+/** @typedef {'standard'|'reasoning'|'image'} ModelTier */
+
+/**
+ * @typedef {Object} ModelConfig
+ * @property {string} id - Model identifier
+ * @property {string} label - Display label
+ * @property {'chat'|'image'} type - Model type
+ * @property {number} [maxTokens] - Max output tokens
+ * @property {number} [temperature] - Sampling temperature
+ * @property {string|undefined} [reasoningEffort] - Reasoning effort level (low/medium/high)
+ */
+
+/**
+ * @typedef {Object} ChatBodyParams
+ * @property {ModelTier} modelTier
+ * @property {ModelConfig} modelConfig
+ * @property {Array<object>} messages
+ * @property {number|undefined} [temperature]
+ * @property {number|undefined} [maxTokens]
+ * @property {boolean} stream
+ * @property {Array<object>|undefined} [tools]
+ */
+
 const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://litellm.kickmaker.net/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
@@ -36,14 +59,17 @@ const models = {
   },
 }
 
+/** @param {string} modelId @returns {boolean} */
 function isGpt5Model(modelId = '') {
   return modelId.toLowerCase().startsWith('gpt-5')
 }
 
+/** @param {string} modelId @returns {boolean} */
 function isChatGptModel(modelId = '') {
   return modelId.toLowerCase().startsWith('chatgpt-')
 }
 
+/** @returns {Record<string, {id: string, label: string, type: string}>} */
 function getPublicModels() {
   const publicModels = {}
   for (const [tier, config] of Object.entries(models)) {
@@ -56,6 +82,11 @@ function getPublicModels() {
   return publicModels
 }
 
+/**
+ * Builds the request body for the LLM API.
+ * @param {ChatBodyParams} params
+ * @returns {Record<string, unknown>}
+ */
 function buildChatBody({ modelTier, modelConfig, messages, temperature, maxTokens, stream, tools }) {
   const modelId = modelConfig.id
   const supportsLegacyParams = !isChatGptModel(modelId)

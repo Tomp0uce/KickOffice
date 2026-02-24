@@ -1,6 +1,6 @@
 import './index.css'
 
-import { useStorage } from '@vueuse/core'
+import { useDebounceFn, useStorage } from '@vueuse/core'
 import { createApp, watch } from 'vue'
 
 import App from './App.vue'
@@ -12,23 +12,10 @@ import { detectOfficeHost } from './utils/hostDetection'
 window.Office.onReady(() => {
   detectOfficeHost()
   const app = createApp(App)
-  const debounce = (fn: (...args: any[]) => void, delay?: number) => {
-    let timer: number | null = null
-    return function (this: unknown, ...args: any[]) {
-      const context = this
-
-      if (timer !== null) clearTimeout(timer)
-      timer = window.setTimeout(() => {
-        fn.apply(context, args)
-      }, delay)
-    }
-  }
-
   const _ResizeObserver = window.ResizeObserver
   window.ResizeObserver = class ResizeObserver extends _ResizeObserver {
     constructor(callback: ResizeObserverCallback) {
-      callback = debounce(callback, 16)
-      super(callback)
+      super(useDebounceFn(callback, 16))
     }
   }
 
