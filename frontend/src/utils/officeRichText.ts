@@ -329,7 +329,8 @@ export function renderOfficeRichHtml(content: string): string {
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
       'input', 'li', 'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
     ],
-    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'style', 'target', 'type'],
+    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'target', 'type'],
+    FORBID_ATTR: ['style'],
   })
 
   const withFootnotes = processFootnotes(sanitized)  // R19

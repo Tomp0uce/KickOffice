@@ -81,7 +81,7 @@ interface AgentLoopSettings {
 
 interface AgentLoopActions {
   quickActions: Ref<QuickAction[]>
-  outlookQuickActions?: Ref<OutlookQuickAction[]>
+  outlookQuickActions?: OutlookQuickAction[]
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: PowerPointQuickAction[]
 }
@@ -442,11 +442,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
-    try {
-      await runAgentLoop(messages, modelTier)
-    } catch (error) {
-      throw error
-    }
+    await runAgentLoop(messages, modelTier)
   }
 
   async function sendMessage(payload?: unknown) {
@@ -608,8 +604,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       ? excelQuickActions.value.find(a => a.key === actionKey)
       : hostIsPowerPoint
         ? powerPointQuickActions.find(a => a.key === actionKey)
-        : hostIsOutlook && outlookQuickActions?.value
-          ? outlookQuickActions.value.find(a => a.key === actionKey)
+        : hostIsOutlook && outlookQuickActions
+          ? outlookQuickActions.find(a => a.key === actionKey)
           : quickActions.value.find(a => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined

@@ -1,9 +1,14 @@
 import { isChatGptModel, isGpt5Model, MAX_TOOLS, models } from '../config/models.js'
 
+/** @param {unknown} value @returns {boolean} */
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/**
+ * @param {unknown} value
+ * @returns {{ value: number|undefined }|{ error: string }}
+ */
 function validateTemperature(value) {
   if (value === undefined) return { value: undefined }
   if (!Number.isFinite(value)) return { error: 'temperature must be a finite number' }
@@ -11,6 +16,10 @@ function validateTemperature(value) {
   return { value }
 }
 
+/**
+ * @param {unknown} value
+ * @returns {{ value: number|undefined }|{ error: string }}
+ */
 function validateMaxTokens(value) {
   if (value === undefined) return { value: undefined }
   if (!Number.isInteger(value)) return { error: 'maxTokens must be an integer' }
@@ -18,6 +27,10 @@ function validateMaxTokens(value) {
   return { value }
 }
 
+/**
+ * @param {unknown} tools
+ * @returns {{ value: Array<object>|undefined }|{ error: string }}
+ */
 function validateTools(tools) {
   if (tools === undefined) return { value: undefined }
   if (!Array.isArray(tools)) return { error: 'tools must be an array' }
@@ -58,6 +71,10 @@ function validateTools(tools) {
   return { value: sanitizedTools }
 }
 
+/**
+ * @param {{ prompt?: unknown, size?: unknown, quality?: unknown, n?: unknown }} [payload]
+ * @returns {{ value: { prompt: string, size: string, quality: string, n: number } }|{ error: string }}
+ */
 function validateImagePayload(payload = {}) {
   const { prompt, size = '1024x1024', quality = 'auto', n = 1 } = payload
 

@@ -40,6 +40,7 @@
       <textarea
         ref="textareaEl"
         :value="modelValue"
+        :aria-label="inputPlaceholder"
         class="placeholder:text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs"
         :placeholder="inputPlaceholder"
         rows="1"

@@ -127,6 +127,7 @@
   "darkModeLabel": "Mode sombre",
   "darkModeDescription": "Utiliser un thème de couleurs plus sombre",
   "newChat": "Nouvelle conversation",
+  "newChatConfirm": "Ceci effacera la conversation en cours. Continuer ?",
   "noModelResponse": "Le modèle a renvoyé une réponse vide. Réessayez ou consultez les logs du backend.",
   "toolsExecutedSuccessfully": "Actions terminées avec succès. Vérifiez le document pour voir les modifications.",
   "polish": "Réécrire",

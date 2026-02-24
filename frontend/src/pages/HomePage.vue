@@ -507,7 +507,7 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   },
   actions: {
     quickActions,
-    outlookQuickActions: computed(() => outlookQuickActions),
+    outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
   },
@@ -531,6 +531,7 @@ function goToSettings() {
 }
 
 function startNewChat() {
+  if (history.value.length > 0 && !window.confirm(t("newChatConfirm"))) return;
   if (loading.value) stopGeneration();
   userInput.value = "";
   history.value = [];

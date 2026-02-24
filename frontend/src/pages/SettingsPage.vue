@@ -27,11 +27,14 @@
 
       <!-- Tab Navigation -->
       <div
+        role="tablist"
         class="flex w-full justify-between rounded-2xl border border-border-secondary p-0"
       >
         <CustomButton
           v-for="tab in tabs"
           :key="tab.id"
+          role="tab"
+          :aria-selected="currentTab === tab.id"
           text=""
           :type="currentTab === tab.id ? 'primary' : 'secondary'"
           :title="$t(tab.label) || tab.defaultLabel"
@@ -50,6 +53,7 @@
           <!-- Account Settings (LiteLLM credentials) -->
           <div
             v-show="currentTab === 'account'"
+            role="tabpanel"
             class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
           >
             <SettingCard>
@@ -132,6 +136,7 @@
           <!-- General Settings -->
           <div
             v-show="currentTab === 'general'"
+            role="tabpanel"
             class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
           >
             <SettingCard>
@@ -334,6 +339,7 @@
           <!-- Prompts Settings -->
           <div
             v-show="currentTab === 'prompts'"
+            role="tabpanel"
             class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1"
           >
             <div
@@ -451,6 +457,7 @@
           <!-- Built-in Prompts Settings -->
           <div
             v-show="currentTab === 'builtinPrompts'"
+            role="tabpanel"
             class="flex w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1"
           >
             <div
@@ -564,6 +571,7 @@
           <!-- Tools Settings -->
           <div
             v-show="currentTab === 'tools'"
+            role="tabpanel"
             class="w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1"
           >
             <div
@@ -1015,11 +1023,11 @@ function loadBuiltInPrompts() {
         if (builtInPromptsData.value[key]) {
           builtInPromptsData.value[key] = {
             system: (language: string) =>
-              customPrompts[key].system.replace(/\$\{language\}/g, language),
+              customPrompts[key].system.replace(/\[LANGUAGE\]/g, language),
             user: (text: string, language: string) =>
               customPrompts[key].user
-                .replace(/\$\{text\}/g, text)
-                .replace(/\$\{language\}/g, language),
+                .replace(/\[TEXT\]/g, text)
+                .replace(/\[LANGUAGE\]/g, language),
           };
         }
       });
@@ -1033,8 +1041,8 @@ function saveBuiltInPrompts() {
   const customPrompts: Record<string, { system: string; user: string }> = {};
   Object.keys(builtInPromptsData.value).forEach((key) => {
     customPrompts[key] = {
-      system: builtInPromptsData.value[key].system("${language}"),
-      user: builtInPromptsData.value[key].user("${text}", "${language}"),
+      system: builtInPromptsData.value[key].system("[LANGUAGE]"),
+      user: builtInPromptsData.value[key].user("[TEXT]", "[LANGUAGE]"),
     };
   });
   localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));

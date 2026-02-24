@@ -125,6 +125,7 @@
   "darkModeLabel": "Dark Mode",
   "darkModeDescription": "Use a darker color theme",
   "newChat": "New Chat",
+  "newChatConfirm": "This will clear the current conversation. Continue?",
   "noModelResponse": "The model returned an empty response. Try again or check the backend logs.",
   "toolsExecutedSuccessfully": "Actions completed successfully. Check the document for changes.",
   "polish": "Polish",
