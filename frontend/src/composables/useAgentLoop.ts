@@ -561,7 +561,27 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           const timeoutPromise = new Promise<string>((_, reject) => {
             timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
           })
-          selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+          
+          if (!hostIsExcel) {
+            // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
+            const htmlPromise = new Promise<string>((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000)
+            })
+            
+            try {
+              const htmlContent = await Promise.race([getOfficeSelectionAsHtml({ includeOutlookSelectedText: true }), htmlPromise])
+              if (htmlContent) {
+                 const richContext = extractTextFromHtml(htmlContent)
+                 selectedText = richContext.cleanText || selectedText
+              } else {
+                 selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+              }
+            } catch {
+              selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+            }
+          } else {
+            selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+          }
         } catch (error) {
           console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
         } finally {
