@@ -10,6 +10,7 @@
  */
 
 import type { InheritedStyles } from './officeRichText'
+import { htmlToMarkdown } from './officeRichText'
 
 const PLACEHOLDER_PREFIX = '{{PRESERVE_'
 const PLACEHOLDER_SUFFIX = '}}'
@@ -118,7 +119,9 @@ export function extractTextFromHtml(html: string): RichContentContext {
 
     processNode(doc.body)
 
-    const cleanText = doc.body.textContent || ''
+    // Instead of stripping all formatting via textContent, explicitly convert tags to Markdown 
+    // so the LLM knows what styling to re-apply.
+    const cleanText = htmlToMarkdown(doc.body.innerHTML) || ''
 
     return {
       cleanText,

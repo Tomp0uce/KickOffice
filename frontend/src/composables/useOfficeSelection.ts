@@ -58,13 +58,13 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         if (selected) return selected
       }
       
-      // Prevent proofread from falling back to the entire thread.
-      // The user must select the text they want to proofread to avoid overwriting the full history.
-      if (selectionOptions?.actionKey === 'proofread') {
-        return ''
+      // Only the 'reply' quick action is allowed to fall back to reading the entire thread.
+      // All other actions (proofread, formal, polite, etc.) require an active text selection.
+      if (selectionOptions?.actionKey === 'reply') {
+        return getOutlookMailBody()
       }
       
-      return getOutlookMailBody()
+      return ''
     }
     if (hostIsPowerPoint) return getPowerPointSelection()
     if (hostIsExcel) {
