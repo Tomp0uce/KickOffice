@@ -272,7 +272,7 @@
   "outlookExtract": "Extraire tâches",
   "outlookReplyPrePrompt": "Décrivez brièvement votre réponse : ",
   "emptySubtitleOutlook": "Ouvrez un email et laissez-moi vous aider à rédiger, résumer ou extraire les tâches",
-  "includeSelectionLabelOutlook": "Inclure le corps du mail",
+  "includeSelectionLabelOutlook": "Envoyer la sélection",
   "selectEmailPrompt": "Veuillez d'abord ouvrir un email",
   "insertedToEmail": "Inséré dans l'email",
   "pptBullets": "Puces",

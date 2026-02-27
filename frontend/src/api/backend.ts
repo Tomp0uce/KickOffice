@@ -61,7 +61,8 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
         throw error
       }
 
-      const shouldRetry = attempt < RETRY_DELAYS_MS.length && isRetryableError(error)
+      const isPost = init.method?.toUpperCase() === 'POST'
+      const shouldRetry = attempt < RETRY_DELAYS_MS.length && isRetryableError(error) && !isPost
       if (!shouldRetry) {
         throw error
       }

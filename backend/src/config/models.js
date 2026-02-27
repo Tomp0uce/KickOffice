@@ -91,7 +91,7 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
   const modelId = modelConfig.id
   const supportsLegacyParams = !isChatGptModel(modelId)
   const reasoningEffort = isGpt5Model(modelId) ? (modelConfig.reasoningEffort || undefined) : undefined
-  const canUseSamplingParams = !isGpt5Model(modelId) || !reasoningEffort
+  const canUseSamplingParams = !isGpt5Model(modelId)
   const body = {
     model: modelId,
     messages,
