@@ -13,6 +13,7 @@
   "builtinPrompts": "Prompts intégrés",
   "builtinPromptsDescription": "Personnalisez les prompts système et utilisateur pour les outils intégrés (Traduction, Réécriture, Académique, Résumé, Grammaire). Utilisez {language} pour la langue cible et {text} pour le texte sélectionné.",
   "cancel": "Annuler",
+  "clearChat": "Effacer le contexte du chat",
   "configuredModels": "Modèles configurés",
   "copied": "Copié dans le presse-papiers",
   "copiedFallback": "Copié dans le presse-papiers (insertion cellule indisponible)",

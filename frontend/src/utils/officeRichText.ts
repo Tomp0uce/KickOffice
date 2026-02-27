@@ -16,13 +16,35 @@ turndownService.addRule('strikethrough', {
   replacement: (content) => `~~${content}~~`,
 })
 
-/**
- * Convert HTML to Office-flavored Markdown.
- * Used to preserve formatting when sending selected text to the LLM.
- */
 export function htmlToMarkdown(html: string): string {
   if (!html) return ''
-  return turndownService.turndown(html)
+  
+  try {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    
+    // Pre-process inline styles to semantic tags for better Markdown conversion
+    const styledElements = doc.querySelectorAll('[style]')
+    styledElements.forEach((node) => {
+      const style = node.getAttribute('style') || ''
+      let wrapStart = ''
+      let wrapEnd = ''
+      
+      if (/font-weight:\s*(bold|[7-9]\d{2})/i.test(style)) { wrapStart += '<b>'; wrapEnd = '</b>' + wrapEnd }
+      if (/font-style:\s*italic/i.test(style)) { wrapStart += '<i>'; wrapEnd = '</i>' + wrapEnd }
+      if (/text-decoration(?:-line)?:\s*underline/i.test(style)) { wrapStart += '<u>'; wrapEnd = '</u>' + wrapEnd }
+      if (/text-decoration(?:-line)?:\s*line-through/i.test(style)) { wrapStart += '<s>'; wrapEnd = '</s>' + wrapEnd }
+      
+      if (wrapStart && node.innerHTML) {
+        node.innerHTML = wrapStart + node.innerHTML + wrapEnd
+      }
+    })
+    
+    return turndownService.turndown(doc.body.innerHTML)
+  } catch (err) {
+    console.warn('[htmlToMarkdown] DOM parsing failed, falling back to raw html', err)
+    return turndownService.turndown(html)
+  }
 }
 
 const officeMarkdownParser = new MarkdownIt({

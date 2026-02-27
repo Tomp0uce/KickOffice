@@ -4,7 +4,7 @@
   >
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
-        :new-chat-title="t('newChat')"
+        :clear-chat-title="t('clearChat')"
         :settings-title="t('settings')"
         @new-chat="startNewChat"
         @settings="goToSettings"
@@ -392,13 +392,13 @@ watch(userInput, () => {
   adjustTextareaHeight();
 });
 
-type ScrollMode = 'bottom' | 'message-top' | 'auto';
+type ScrollMode = "bottom" | "message-top" | "auto";
 
 /**
  * Scroll the chat container
  * @param mode - 'bottom': scroll to very bottom, 'message-top': scroll to top of last message, 'auto': smart behavior
  */
-async function scrollToBottom(mode: ScrollMode = 'auto') {
+async function scrollToBottom(mode: ScrollMode = "auto") {
   await nextTick();
   const rawContainer = messageListRef.value?.containerEl;
   const container = ((rawContainer as any)?.value || rawContainer) as
@@ -419,10 +419,10 @@ async function scrollToBottom(mode: ScrollMode = 'auto') {
   const msgTop = lastMessage.offsetTop;
   const padding = 12;
 
-  if (mode === 'bottom') {
+  if (mode === "bottom") {
     // Always scroll to the very bottom
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  } else if (mode === 'message-top') {
+  } else if (mode === "message-top") {
     // Scroll so the top of the last message is visible at the top of the container
     container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
   } else {
@@ -441,14 +441,14 @@ async function scrollToBottom(mode: ScrollMode = 'auto') {
  * Scroll to show the top of the last message (for receiving new assistant messages)
  */
 async function scrollToMessageTop() {
-  await scrollToBottom('message-top');
+  await scrollToBottom("message-top");
 }
 
 /**
  * Scroll to very bottom (for user sending messages and on startup)
  */
 async function scrollToVeryBottom() {
-  await scrollToBottom('bottom');
+  await scrollToBottom("bottom");
 }
 
 const imageActions = useImageActions(t);

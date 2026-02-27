@@ -152,7 +152,7 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
           else if (safeText === '>') safeText = '&gt;'
           else if (safeText === '&') safeText = '&amp;'
           
-          // Re-evaluate styles. If any formatting changes (or line break), close all and reopen to maintain perfectly valid HTML tree hierarchy.
+          // If formatting changes, close currently open tags before opening new ones
           if (isStrike !== strike || isUnderline !== underline || isItalic !== italic || isBold !== bold || isLineBreak) {
              if (isStrike) html += '</s>'
              if (isUnderline) html += '</u>'
@@ -162,11 +162,12 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
           }
           
           if (!isLineBreak) {
-            if (bold && !isBold) { html += '<b>'; isBold = true }
-            if (italic && !isItalic) { html += '<i>'; isItalic = true }
-            if (underline && !isUnderline) { html += '<u>'; isUnderline = true }
-            if (strike && !isStrike) { html += '<s>'; isStrike = true }
-            html += safeText
+             // Open tags that are required but not yet open
+             if (bold && !isBold) { html += '<b>'; isBold = true }
+             if (italic && !isItalic) { html += '<i>'; isItalic = true }
+             if (underline && !isUnderline) { html += '<u>'; isUnderline = true }
+             if (strike && !isStrike) { html += '<s>'; isStrike = true }
+             html += safeText
           } else {
              html += '<br/>'
           }
