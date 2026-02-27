@@ -7,7 +7,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers } from './officeRichText'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './officeRichText'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -104,6 +104,23 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
         await PowerPoint.run(async (context: any) => {
           const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
 
+          let styles: InheritedStyles | null = null
+          try {
+            textRange.font.load('name,size,color')
+            await context.sync()
+            styles = {
+              fontFamily: textRange.font.name || '',
+              fontSize: textRange.font.size ? `${textRange.font.size}pt` : '',
+              fontWeight: 'normal',
+              fontStyle: 'normal',
+              color: textRange.font.color || '',
+              marginTop: '0pt',
+              marginBottom: '0pt',
+            }
+          } catch (e) {
+            // Ignore if font loading fails
+          }
+
           // Check for native bullets to prevent double-bullet rendering
           const nativeBullets = await hasNativeBullets(context, textRange)
 
@@ -114,7 +131,9 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
             textRange.text = stripRichFormattingSyntax(normalizedNewlines, true)
           } else {
             // No native bullets: insert rich HTML (brings its own list styling)
-            textRange.insertHtml(renderOfficeCommonApiHtml(normalizedNewlines), 'Replace')
+            let html = renderOfficeCommonApiHtml(normalizedNewlines)
+            if (styles) html = applyInheritedStyles(html, styles)
+            textRange.insertHtml(html, 'Replace')
           }
 
           await context.sync()
