@@ -117,7 +117,7 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
         if (len === 0) return ''
         
         // Cap length to prevent huge latency on massive selections
-        const maxLen = Math.min(len, 3000) 
+        const maxLen = Math.min(len, 100000) 
         
         const charRanges = []
         for (let i = 0; i < maxLen; i++) {
