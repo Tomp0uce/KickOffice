@@ -595,7 +595,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (isImageFromSelection) {
         fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
       } else if (selectedText && !isImageFromSelection) {
-        const selectionLabel = hostIsOutlook ? 'Email body' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
+        const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
         fullMessage = `${userMessage}
 
 [${selectionLabel}: "${selectedText}"]`
