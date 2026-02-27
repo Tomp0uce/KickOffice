@@ -224,17 +224,18 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
           // Check for native bullets to prevent double-bullet rendering
           const nativeBullets = await hasNativeBullets(context, textRange)
 
+          let finalMarkdown = normalizedNewlines
           if (nativeBullets) {
-            // Shape has native bullets: insert plain text so the shape's bullet
-            // style applies without conflict. List markers are stripped so they
-            // don't appear as literal characters alongside the native bullets.
-            textRange.text = stripRichFormattingSyntax(normalizedNewlines, true)
-          } else {
-            // No native bullets: insert rich HTML (brings its own list styling)
-            let html = renderOfficeCommonApiHtml(normalizedNewlines)
-            if (styles) html = applyInheritedStyles(html, styles)
-            textRange.insertHtml(html, 'Replace')
+            // Shape has native bullets: strip markdown list markers (-, *, 1.) from the LLM response
+            // so they don't get rendered as HTML <ul>/<li> tags, which would cause double-bullets.
+            // But we STILL use insertHtml to preserve inline formatting like **bold** and *italic*.
+            finalMarkdown = stripMarkdownListMarkers(normalizedNewlines)
           }
+
+          let html = renderOfficeCommonApiHtml(finalMarkdown)
+          if (styles) html = applyInheritedStyles(html, styles)
+          
+          textRange.insertHtml(html, 'Replace')
 
           await context.sync()
         })
