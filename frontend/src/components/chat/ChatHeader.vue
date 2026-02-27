@@ -1,7 +1,13 @@
 <template>
-  <div class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1">
+  <div
+    class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1"
+  >
     <div class="flex flex-1 items-center gap-2 text-accent">
-      <img src="/Logo.png" alt="KickAI logo" class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5" />
+      <img
+        src="/Logo.png"
+        alt="KickAI logo"
+        class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5"
+      />
       <div class="flex flex-col leading-none">
         <span class="text-sm font-semibold text-main">KickOffice</span>
         <span class="text-[10px] text-[#33ABC6]">AI Office Assistant</span>
@@ -13,17 +19,33 @@
       <span class="h-2 w-2 rounded-full border border-black/30 bg-white" />
     </div>
     <div class="flex items-center gap-1 rounded-md border border-accent/10">
-      <CustomButton :title="newChatTitle" :icon="Plus" text="" type="secondary" class="border-none p-1!" :icon-size="18" @click="$emit('new-chat')" />
-      <CustomButton :title="settingsTitle" :icon="Settings" text="" type="secondary" class="border-none p-1!" :icon-size="18" @click="$emit('settings')" />
+      <CustomButton
+        :title="clearChatTitle"
+        :icon="Eraser"
+        text=""
+        type="secondary"
+        class="border-none p-1!"
+        :icon-size="18"
+        @click="$emit('new-chat')"
+      />
+      <CustomButton
+        :title="settingsTitle"
+        :icon="Settings"
+        text=""
+        type="secondary"
+        class="border-none p-1!"
+        :icon-size="18"
+        @click="$emit('settings')"
+      />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { Plus, Settings } from 'lucide-vue-next'
+import { Eraser, Settings } from "lucide-vue-next";
 
-import CustomButton from '@/components/CustomButton.vue'
+import CustomButton from "@/components/CustomButton.vue";
 
-defineProps<{ newChatTitle: string, settingsTitle: string }>()
-defineEmits<{ (e: 'new-chat'): void, (e: 'settings'): void }>()
+defineProps<{ clearChatTitle: string; settingsTitle: string }>();
+defineEmits<{ (e: "new-chat"): void; (e: "settings"): void }>();
 </script>

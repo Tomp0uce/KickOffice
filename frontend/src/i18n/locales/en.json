@@ -13,6 +13,7 @@
   "builtinPrompts": "Built-in Prompts",
   "builtinPromptsDescription": "Customize the system and user prompts for built-in tools like Translate, Polish, Academic, Summary, and Grammar. Use {language} for the target language placeholder and {text} for the selected text placeholder.",
   "cancel": "Cancel",
+  "clearChat": "Clear chat context",
   "configuredModels": "Configured Models",
   "copied": "Copied to clipboard",
   "copiedFallback": "Copied to clipboard (cell insertion unavailable)",
