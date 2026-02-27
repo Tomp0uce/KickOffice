@@ -200,9 +200,9 @@ function validateChatRequest({ messages, modelTier = 'standard', temperature, ma
     return { error: 'temperature and maxTokens are not supported for ChatGPT models' }
   }
 
-  const requiresReasoningSafeParams = isGpt5Model(modelConfig.id) && modelConfig.reasoningEffort
+  const requiresReasoningSafeParams = isGpt5Model(modelConfig.id)
   if (requiresReasoningSafeParams && temperature !== undefined) {
-    return { error: 'temperature is not supported for GPT-5 models when reasoning effort is enabled' }
+    return { error: 'temperature is not supported for GPT-5 models' }
   }
 
   const parsedTools = validateTools(tools)

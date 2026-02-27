@@ -511,7 +511,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         // Fetch the full email body for context
         let emailBody = ''
         try {
-          emailBody = await getOfficeSelection()
+          emailBody = await getOfficeSelection({ actionKey: 'reply' })
         } catch (err) {
           console.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
         }
@@ -561,7 +561,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           const timeoutPromise = new Promise<string>((_, reject) => {
             timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
           })
-          selectedText = await Promise.race([getOfficeSelection(), timeoutPromise])
+          selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
         } catch (error) {
           console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
         } finally {
