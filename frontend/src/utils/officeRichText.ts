@@ -16,6 +16,31 @@ turndownService.addRule('strikethrough', {
   replacement: (content) => `~~${content}~~`,
 })
 
+// Turndown rule to convert color styles into custom markup [color:#HEX]text[/color]
+turndownService.addRule('color', {
+  filter: (node: HTMLElement) => {
+    return (
+      node.nodeType === 1 &&
+      (node.getAttribute('style')?.includes('color:') || node.hasAttribute('color'))
+    )
+  },
+  replacement: (content: string, node: any) => {
+    let color = '';
+    const style = (node as HTMLElement).getAttribute('style') || '';
+    const match = style.match(/color:\s*([^;"]+)/i); // Added " to avoid matching until end of style
+    if (match) {
+      color = match[1].trim();
+    } else {
+      color = (node as HTMLElement).getAttribute('color') || '';
+    }
+    // Only wrap if it's an actual hex or named color and content is not empty
+    if (color && content.trim()) {
+      return `[color:${color}]${content}[/color]`;
+    }
+    return content;
+  }
+})
+
 export function htmlToMarkdown(html: string): string {
   if (!html) return ''
   
@@ -306,8 +331,11 @@ function applyOfficeBlockStyles(html: string): string {
   const withCode = withPreCode
     .replace(/<code(?! data-pre)/gi, '<code style="font-family:Consolas,\'Courier New\',monospace; font-size:0.9em; background:#f0f0f0; padding:1px 4px;">')
     .replace(/ data-pre="1"/gi, '')
+    
+  // Transform [color:HEX]text[/color] syntax into <span style="color:HEX">text</span>
+  const withColor = withCode.replace(/\[color:\s*([^\]]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
 
-  return withCode
+  return withColor
     .replace(/<hr\s*\/?>/gi, '<p style="border-bottom:1px solid #999; margin:8px 0;">&nbsp;</p>')
     .replace(/<h1>/gi, '<h1 style="margin:0 0 8px 0; font-size:2em; font-weight:700;">')
     .replace(/<h2>/gi, '<h2 style="margin:0 0 6px 0; font-size:1.5em; font-weight:700;">')
@@ -372,8 +400,7 @@ export function renderOfficeRichHtml(content: string): string {
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
       'input', 'li', 'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
     ],
-    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'target', 'type'],
-    FORBID_ATTR: ['style'],
+    ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'target', 'type', 'style'],
   })
 
   const withFootnotes = processFootnotes(sanitized)  // R19

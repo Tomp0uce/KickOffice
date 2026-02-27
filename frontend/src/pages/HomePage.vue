@@ -533,11 +533,10 @@ function goToSettings() {
 function startNewChat() {
   if (history.value.length > 0 && !window.confirm(t("newChatConfirm"))) return;
   if (loading.value) stopGeneration();
-  userInput.value = "";
-  history.value = [];
-  customSystemPrompt.value = "";
-  selectedPromptId.value = "";
-  adjustTextareaHeight();
+
+  // Hard reload the component by leveraging vue-router to replace the current route or by simply window.location.reload()
+  // This is the safest way to ensure all states (agentLoop history, selected prompt, input, etc.) are perfectly cleared.
+  window.location.reload();
 }
 
 function loadSavedPrompts() {
