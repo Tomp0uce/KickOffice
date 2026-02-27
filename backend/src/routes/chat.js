@@ -4,6 +4,7 @@ import { buildChatBody } from '../config/models.js'
 import { validateChatRequest } from '../middleware/validate.js'
 import { chatCompletion, handleErrorResponse } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
+import { systemLog } from '../utils/logger.js'
 
 const chatRouter = Router()
 const VERBOSE_LOGGING_ENABLED = process.env.VERBOSE_LOGGING === 'true'
@@ -43,6 +44,11 @@ chatRouter.post('/', async (req, res) => {
       hasReasoningEffort: Object.prototype.hasOwnProperty.call(body, 'reasoning_effort'),
       hasTemperature: Object.prototype.hasOwnProperty.call(body, 'temperature'),
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
+    })
+
+    systemLog('INFO', `POST /api/chat upstream request initiated`, {
+      url: '/v1/chat/completions',
+      body,
     })
 
     const response = await chatCompletion({
@@ -88,8 +94,10 @@ chatRouter.post('/', async (req, res) => {
       if (finalChunk && !clientDisconnected) {
         res.write(finalChunk)
       }
+      systemLog('INFO', 'POST /api/chat stream completed successfully')
     } catch (streamError) {
       if (!clientDisconnected) {
+        systemLog('ERROR', 'POST /api/chat stream error', streamError)
         console.error('Stream error:', streamError)
       }
     } finally {
@@ -99,8 +107,10 @@ chatRouter.post('/', async (req, res) => {
     }
   } catch (error) {
     if (error.name === 'AbortError') {
+      systemLog('ERROR', 'POST /api/chat LLM API request timeout')
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat')
     }
+    systemLog('ERROR', 'POST /api/chat Chat proxy error', error)
     console.error('Chat proxy error:', error)
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat')
   }
@@ -142,6 +152,11 @@ chatRouter.post('/sync', async (req, res) => {
       hasReasoningEffort: Object.prototype.hasOwnProperty.call(body, 'reasoning_effort'),
       hasTemperature: Object.prototype.hasOwnProperty.call(body, 'temperature'),
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
+    })
+
+    systemLog('INFO', `POST /api/chat/sync upstream request initiated`, {
+      url: '/v1/chat/completions',
+      body,
     })
 
     const response = await chatCompletion({
@@ -191,11 +206,15 @@ chatRouter.post('/sync', async (req, res) => {
       hasContent: !!data?.choices?.[0]?.message?.content,
       toolCallCount: data?.choices?.[0]?.message?.tool_calls?.length || 0,
     })
+    
+    systemLog('INFO', 'POST /api/chat/sync upstream response completed', data)
     res.json(data)
   } catch (error) {
     if (error.name === 'AbortError') {
+      systemLog('ERROR', 'POST /api/chat/sync LLM API request timeout')
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
+    systemLog('ERROR', 'POST /api/chat/sync Chat sync proxy error', error)
     console.error('Chat sync proxy error', { modelTier, error })
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
   }

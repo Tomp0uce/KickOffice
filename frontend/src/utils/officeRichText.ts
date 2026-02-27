@@ -3,6 +3,27 @@ import MarkdownIt from 'markdown-it'
 import markdownItDeflist from 'markdown-it-deflist'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItTaskLists from 'markdown-it-task-lists'
+import TurndownService from 'turndown'
+
+// R16 — Reusable TurndownService instance configured for Office markdown output
+const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' })
+turndownService.addRule('underline', {
+  filter: ['u', 'ins'],
+  replacement: (content) => `__${content}__`,
+})
+turndownService.addRule('strikethrough', {
+  filter: ['del', 's', 'strike'],
+  replacement: (content) => `~~${content}~~`,
+})
+
+/**
+ * Convert HTML to Office-flavored Markdown.
+ * Used to preserve formatting when sending selected text to the LLM.
+ */
+export function htmlToMarkdown(html: string): string {
+  if (!html) return ''
+  return turndownService.turndown(html)
+}
 
 const officeMarkdownParser = new MarkdownIt({
   breaks: true,

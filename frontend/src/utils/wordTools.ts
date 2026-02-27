@@ -1,19 +1,7 @@
 import { executeOfficeAction } from './officeAction'
 import DiffMatchPatch from 'diff-match-patch'
-import TurndownService from 'turndown'
 
-import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
-
-// R16 — Reusable TurndownService instance configured for Word-flavoured Markdown output
-const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' })
-turndownService.addRule('underline', {
-  filter: ['u'],
-  replacement: (content) => `__${content}__`,
-})
-turndownService.addRule('strikethrough', {
-  filter: ['del', 's'],
-  replacement: (content) => `~~${content}~~`,
-})
+import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './officeRichText'
 
 // R17 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
 function generateVisualDiff(originalText: string, newText: string): string {
@@ -1842,7 +1830,7 @@ const wordToolDefinitions = createWordTools({
         return 'No text selected or selection is empty.'
       }
 
-      const markdown = turndownService.turndown(htmlResult.value)
+      const markdown = htmlToMarkdown(htmlResult.value)
       return markdown || 'Selection contains no convertible content.'
     },
   },
