@@ -11,6 +11,7 @@ import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
 import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
+import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/officeRichText'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
@@ -680,7 +681,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     abortController.value = new AbortController()
 
     try {
-      const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true })
+      const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true, actionKey })
       if (!selectedText) {
         messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
         return
@@ -755,9 +756,19 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           if (!lastMessage?.content?.trim()) {
             lastMessage.content = t('noModelResponse')
           }
-          // F1: Reassemble rich content with preserved fragments
-          if (richContext?.hasRichContent && lastMessage?.content) {
-            lastMessage.richHtml = reassembleWithFragments(lastMessage.content, richContext)
+          // F1: Reassemble rich content with preserved fragments and inject native styles
+          if (lastMessage?.content) {
+            let finalHtml = ''
+            if (richContext?.hasRichContent) {
+              finalHtml = reassembleWithFragments(lastMessage.content, richContext)
+            }
+            if (richContext?.extractedStyles && hostIsOutlook) {
+              if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content)
+              finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles)
+            }
+            if (finalHtml) {
+              lastMessage.richHtml = finalHtml
+            }
           }
         } catch (err: any) {
           if (err.name === 'AbortError') return

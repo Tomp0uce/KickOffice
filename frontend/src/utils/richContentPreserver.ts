@@ -9,6 +9,8 @@
  * to prevent data loss when processing rich content.
  */
 
+import type { InheritedStyles } from './officeRichText'
+
 const PLACEHOLDER_PREFIX = '{{PRESERVE_'
 const PLACEHOLDER_SUFFIX = '}}'
 const PLACEHOLDER_REGEX = /\{\{PRESERVE_(\d+)\}\}/g
@@ -51,6 +53,8 @@ export interface RichContentContext {
   originalHtml: string
   /** Whether any non-text elements were found */
   hasRichContent: boolean
+  /** Extracted inline styles if present in the HTML (useful for Outlook) */
+  extractedStyles?: InheritedStyles
 }
 
 /**
@@ -69,6 +73,25 @@ export function extractTextFromHtml(html: string): RichContentContext {
   try {
     const parser = new DOMParser()
     const doc = parser.parseFromString(html, 'text/html')
+
+    let extractedStyles: InheritedStyles | undefined
+    const firstStyledElement = doc.querySelector('[style*="font-family"], [style*="font-size"]')
+    if (firstStyledElement) {
+      const styleAttr = firstStyledElement.getAttribute('style') || ''
+      const matchFamily = styleAttr.match(/font-family:\s*([^;]+)/i)
+      const matchSize = styleAttr.match(/font-size:\s*([^;]+)/i)
+      const matchColor = styleAttr.match(/(?:^|;)\s*color:\s*([^;]+)/i)
+      extractedStyles = {
+        fontFamily: matchFamily ? matchFamily[1].trim().replace(/['"]/g, '') : '',
+        fontSize: matchSize ? matchSize[1].trim() : '',
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        color: matchColor ? matchColor[1].trim() : '',
+        marginTop: '0pt',
+        marginBottom: '0pt',
+      }
+    }
+
     let counter = 0
 
     // Walk the DOM and replace non-text elements with placeholders
@@ -102,6 +125,7 @@ export function extractTextFromHtml(html: string): RichContentContext {
       fragments,
       originalHtml: html,
       hasRichContent: fragments.size > 0,
+      extractedStyles,
     }
   } catch (err) {
     console.warn('[RichContentPreserver] Failed to parse HTML, falling back to plain text', err)

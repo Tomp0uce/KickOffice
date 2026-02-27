@@ -324,6 +324,7 @@ const wordToolDefinitions = createWordTools({
       const savedFontSize = range.font.size
       const savedFontColor = range.font.color
       const savedHighlightColor = range.font.highlightColor
+      const savedStyleBuiltIn = range.styleBuiltIn
       // R15: paragraph-level properties (from first paragraph)
       const savedAlignment = firstPara.alignment
       const savedSpaceBefore = firstPara.spaceBefore
@@ -351,6 +352,7 @@ const wordToolDefinitions = createWordTools({
           insertedParas.load('items')
           await context.sync()
           for (const p of insertedParas.items) {
+            if (savedStyleBuiltIn && savedStyleBuiltIn !== 'Normal') p.styleBuiltIn = savedStyleBuiltIn as any
             if (savedAlignment) p.alignment = savedAlignment
             if (savedSpaceBefore != null) p.spaceBefore = savedSpaceBefore
             if (savedSpaceAfter != null) p.spaceAfter = savedSpaceAfter

@@ -51,12 +51,19 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
     ])
   }
 
-  async function getOfficeSelection(selectionOptions?: { includeOutlookSelectedText?: boolean }): Promise<string> {
+  async function getOfficeSelection(selectionOptions?: { includeOutlookSelectedText?: boolean, actionKey?: string }): Promise<string> {
     if (hostIsOutlook) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText()
         if (selected) return selected
       }
+      
+      // Prevent proofread from falling back to the entire thread.
+      // The user must select the text they want to proofread to avoid overwriting the full history.
+      if (selectionOptions?.actionKey === 'proofread') {
+        return ''
+      }
+      
       return getOutlookMailBody()
     }
     if (hostIsPowerPoint) return getPowerPointSelection()
