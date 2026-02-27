@@ -91,6 +91,106 @@ export function getPowerPointSelection(): Promise<string> {
 }
 
 /**
+ * Reads the current PowerPoint selection and manually reconstructs basic HTML formatting
+ * (bold, italic, underline, strikethrough) by inspecting the TextRange recursively.
+ * Used to preserve formatting when sending text to the LLM, as PowerPoint lacks a native getHtml API.
+ */
+export async function getPowerPointSelectionAsHtml(): Promise<string> {
+  if (!isPowerPointApiSupported('1.5')) {
+    return getPowerPointSelection()
+  }
+  
+  try {
+    const htmlOut = await executeOfficeAction(async () => {
+      return PowerPoint.run(async (context: any) => {
+        const textRanges = context.presentation.getSelectedTextRanges()
+        textRanges.load('items')
+        await context.sync()
+        
+        if (textRanges.items.length === 0) return ''
+        
+        const range = textRanges.items[0]
+        range.load(['text', 'length'])
+        await context.sync()
+        
+        const len = range.length
+        if (len === 0) return ''
+        
+        // Cap length to prevent huge latency on massive selections
+        const maxLen = Math.min(len, 3000) 
+        
+        const charRanges = []
+        for (let i = 0; i < maxLen; i++) {
+          const charRange = range.getSubstring(i, 1)
+          charRange.load('text')
+          charRange.font.load(['bold', 'italic', 'underline', 'strikethrough'])
+          charRanges.push(charRange)
+        }
+        
+        await context.sync()
+        
+        let html = ''
+        let isBold = false
+        let isItalic = false
+        let isUnderline = false
+        let isStrike = false
+        
+        for (let i = 0; i < maxLen; i++) {
+          const charRange = charRanges[i]
+          const text = charRange.text
+          const font = charRange.font
+          
+          const isLineBreak = text === '\r' || text === '\n' || text === '\v'
+          
+          const bold = font.bold === true
+          const italic = font.italic === true
+          const underline = font.underline !== 'None' && font.underline !== null
+          const strike = font.strikethrough === true
+          
+          let safeText = text
+          if (safeText === '<') safeText = '&lt;'
+          else if (safeText === '>') safeText = '&gt;'
+          else if (safeText === '&') safeText = '&amp;'
+          
+          // Re-evaluate styles. If any formatting changes (or line break), close all and reopen to maintain perfectly valid HTML tree hierarchy.
+          if (isStrike !== strike || isUnderline !== underline || isItalic !== italic || isBold !== bold || isLineBreak) {
+             if (isStrike) html += '</s>'
+             if (isUnderline) html += '</u>'
+             if (isItalic) html += '</i>'
+             if (isBold) html += '</b>'
+             isStrike = isUnderline = isItalic = isBold = false
+          }
+          
+          if (!isLineBreak) {
+            if (bold && !isBold) { html += '<b>'; isBold = true }
+            if (italic && !isItalic) { html += '<i>'; isItalic = true }
+            if (underline && !isUnderline) { html += '<u>'; isUnderline = true }
+            if (strike && !isStrike) { html += '<s>'; isStrike = true }
+            html += safeText
+          } else {
+             html += '<br/>'
+          }
+        }
+        
+        // Close dangling tags
+        if (isStrike) html += '</s>'
+        if (isUnderline) html += '</u>'
+        if (isItalic) html += '</i>'
+        if (isBold) html += '</b>'
+        
+        return html
+      })
+    })
+    
+    return htmlOut || getPowerPointSelection()
+  } catch (err) {
+    console.warn('Failed to extract PowerPoint HTML selection manually:', err)
+    return getPowerPointSelection()
+  }
+}
+
+
+/**
  * Replace the current text selection inside the active PowerPoint shape
  * with the provided text.
  */
