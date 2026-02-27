@@ -1,4 +1,4 @@
-import { getPowerPointSelection } from '@/utils/powerpointTools'
+import { getPowerPointSelection, getPowerPointSelectionAsHtml } from '@/utils/powerpointTools'
 import { getOfficeTextCoercionType, getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 
 export interface UseOfficeSelectionOptions {
@@ -51,6 +51,21 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
     ])
   }
 
+  const getOutlookSelectedHtml = (): Promise<string> => {
+    return Promise.race([
+      new Promise<string>((resolve) => {
+        try {
+          const mailbox = getOutlookMailbox()
+          if (!mailbox?.item || typeof mailbox.item.getSelectedDataAsync !== 'function') return resolve('')
+          const htmlType = getOfficeHtmlCoercionType()
+          if (!htmlType) return resolve('')
+          mailbox.item.getSelectedDataAsync(htmlType, (result: OfficeAsyncResult<{ data?: string }>) => resolve(isOfficeAsyncSucceeded(result.status) && result.value?.data ? result.value.data : ''))
+        } catch { resolve('') }
+      }),
+      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
+    ])
+  }
+
   async function getOfficeSelection(selectionOptions?: { includeOutlookSelectedText?: boolean, actionKey?: string }): Promise<string> {
     if (hostIsOutlook) {
       if (selectionOptions?.includeOutlookSelectedText) {
@@ -88,18 +103,26 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
    * Falls back to plain text if HTML is not available.
    * Used by quick actions to preserve non-text elements during LLM processing.
    */
-  async function getOfficeSelectionAsHtml(): Promise<string> {
+  async function getOfficeSelectionAsHtml(selectionOptions?: { includeOutlookSelectedText?: boolean, actionKey?: string }): Promise<string> {
     if (hostIsOutlook) {
-      const html = await getOutlookMailBodyAsHtml()
-      return html || getOutlookMailBody()
+      if (selectionOptions?.includeOutlookSelectedText) {
+        const selectedHtml = await getOutlookSelectedHtml()
+        if (selectedHtml) return selectedHtml
+      }
+      
+      if (selectionOptions?.actionKey === 'reply') {
+        const html = await getOutlookMailBodyAsHtml()
+        return html || getOutlookMailBody()
+      }
+      
+      return ''
     }
     if (hostIsExcel) {
       // Excel cells don't have meaningful HTML content
       return ''
     }
     if (hostIsPowerPoint) {
-      // PowerPoint text boxes: plain text is sufficient, images are separate shapes
-      return ''
+      return getPowerPointSelectionAsHtml()
     }
     // Word: get selection as HTML
     try {

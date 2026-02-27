@@ -692,7 +692,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
       if (isTextModifyingAction) {
         try {
-          const htmlContent = await getOfficeSelectionAsHtml()
+          const htmlContent = await getOfficeSelectionAsHtml({ includeOutlookSelectedText: true, actionKey })
           if (htmlContent) {
             richContext = extractTextFromHtml(htmlContent)
           }
@@ -701,8 +701,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       }
 
-      // Use text from rich context extraction if available, otherwise use plain text selection
-      const textForLlm = (richContext?.hasRichContent ? richContext.cleanText : selectedText) || selectedText
+      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
+      const textForLlm = richContext ? richContext.cleanText : selectedText
 
       let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
       let systemMsg = ''
