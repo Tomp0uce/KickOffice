@@ -214,7 +214,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
               fontSize: textRange.font.size ? `${textRange.font.size}pt` : '',
               fontWeight: 'normal',
               fontStyle: 'normal',
-              color: textRange.font.color || '',
+              color: '', // Do NOT force the original color here, let PowerPoint default to it or let inline HTML override it
               marginTop: '0pt',
               marginBottom: '0pt',
             }
