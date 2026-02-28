@@ -1,5 +1,6 @@
 import { executeOfficeAction } from './officeAction'
 import { localStorageKey } from './enum'
+import { sandboxedEval } from './sandbox'
 
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
@@ -62,6 +63,12 @@ export type ExcelToolName =
   | 'getConditionalFormattingRules'
   | 'batchSetCellValues'
   | 'batchProcessRange'
+  | 'eval_officejs'
+  | 'findData'
+  | 'duplicateWorksheet'
+  | 'hideUnhideRowColumn'
+  | 'getAllObjects'
+  | 'modifyObject'
 
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
@@ -1901,6 +1908,7 @@ const excelToolDefinitions = createExcelTools({
           description: 'Array of cell updates. Each item has an "address" (A1 notation) and a "value" (the new cell content).',
           items: {
             type: 'object',
+            // @ts-expect-error ToolProperty doesn't natively support nested array items schema
             properties: {
               address: { type: 'string', description: 'Cell address in A1 notation (e.g., "A1")' },
               value: { type: 'string', description: 'New value for the cell' },
@@ -1930,8 +1938,7 @@ const excelToolDefinitions = createExcelTools({
   batchProcessRange: {
     name: 'batchProcessRange',
     category: 'write',
-    description:
-      'Write a 2D array of values to a contiguous range in one operation. Use this for bulk transformations on contiguous ranges (translate, clean, format, etc.): first read all values with getSelectedCells or getWorksheetData, process ALL transformations at once in your response, then write ALL results back with this tool. The values 2D array must match the range dimensions exactly. For ranges larger than 100 cells, process in chunks of 50-100 cells at a time.',
+    description: 'BETA: Process an entire contiguous range in one go (like A1:C5). Provide a 2D array of values. Empty arrays or nulls will skip the cell update or clear it. OVERWRITE NOTE: Be careful to read the cells first if you are unsure whether they are empty, as this will overwrite any existing data in the specified range.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1961,6 +1968,177 @@ const excelToolDefinitions = createExcelTools({
       await context.sync()
       return `Successfully updated range ${address} (${values.length} rows × ${values[0]?.length || 0} columns)`
     },
+  },
+
+  findData: {
+    name: 'findData',
+    category: 'read',
+    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        searchTerm: { type: 'string', description: 'The text or pattern to search for' },
+        matchCase: { type: 'boolean', description: 'Case sensitive. Default: false' },
+        matchEntireCell: { type: 'boolean', description: 'Match entire cell content. Default: false' },
+        useRegex: { type: 'boolean', description: 'Use regex pattern. Default: false' },
+      },
+      required: ['searchTerm'],
+    },
+    executeExcel: async (context, args) => {
+      const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args
+      const sheets = context.workbook.worksheets
+      sheets.load('items')
+      await context.sync()
+
+      const pattern = useRegex ? new RegExp(searchTerm, matchCase ? '' : 'i') : null
+      const matches: any[] = []
+
+      for (const sheet of sheets.items) {
+        if (matches.length > 200) break // limit
+        sheet.load('name')
+        const usedRange = sheet.getUsedRangeOrNullObject()
+        usedRange.load('values,address,rowCount,columnCount')
+        await context.sync()
+
+        if (usedRange.isNullObject) continue
+
+        const startMatch = usedRange.address.split('!')[1]?.match(/([A-Z]+)(\d+)/)
+        const startCol = startMatch ? startMatch[1].split('').reduce((acc: number, c: string) => acc * 26 + c.charCodeAt(0) - 64, 0) - 1 : 0
+        const startRow = startMatch ? parseInt(startMatch[2], 10) - 1 : 0
+        const colLetter = (idx: number) => {
+          let letter = ''; let temp = idx;
+          while (temp >= 0) { letter = String.fromCharCode((temp % 26) + 65) + letter; temp = Math.floor(temp / 26) - 1; }
+          return letter
+        }
+
+        for (let r = 0; r < usedRange.rowCount; r++) {
+         if (matches.length > 200) break
+          for (let c = 0; c < usedRange.columnCount; c++) {
+            const val = usedRange.values[r][c]
+            const target = String(val ?? '')
+            let isMatch = false
+            if (pattern) {
+              isMatch = pattern.test(target)
+            } else {
+              const compVal = matchCase ? target : target.toLowerCase()
+              const compTerm = matchCase ? searchTerm : searchTerm.toLowerCase()
+              isMatch = matchEntireCell ? compVal === compTerm : compVal.includes(compTerm)
+            }
+            if (isMatch) {
+              matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
+            }
+          }
+        }
+      }
+      return JSON.stringify(matches, null, 2)
+    },
+  },
+
+  duplicateWorksheet: {
+    name: 'duplicateWorksheet',
+    category: 'write',
+    description: 'Duplicate an existing worksheet.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceName: { type: 'string', description: 'Name of the sheet to duplicate' },
+        newName: { type: 'string', description: 'Name for the new copied sheet' }
+      },
+      required: ['sourceName'],
+    },
+    executeExcel: async (context, args) => {
+      const { sourceName, newName } = args
+      const sheet = context.workbook.worksheets.getItem(sourceName)
+      const copy = sheet.copy()
+      if (newName) copy.name = newName
+      await context.sync()
+      return `Successfully duplicated worksheet ${sourceName}${newName ? ' to ' + newName : ''}`
+    }
+  },
+
+  hideUnhideRowColumn: {
+    name: 'hideUnhideRowColumn',
+    category: 'format',
+    description: 'Hide or unhide specific rows or columns.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dimension: { type: 'string', enum: ['rows', 'columns'], description: 'Whether to modify rows or columns' },
+        reference: { type: 'string', description: 'Row number(s) e.g. "5:10" or "5", or column letter(s) e.g. "C" or "C:E"' },
+        action: { type: 'string', enum: ['hide', 'unhide'], description: 'Action to perform' }
+      },
+      required: ['dimension', 'reference', 'action']
+    },
+    executeExcel: async (context, args) => {
+      const { dimension, reference, action } = args
+      const sheet = context.workbook.worksheets.getActiveWorksheet()
+      const isRow = dimension === 'rows'
+      
+      let refStr = String(reference)
+      if (!refStr.includes(':')) refStr = `${refStr}:${refStr}`
+
+      const range = sheet.getRange(refStr)
+      if (isRow) {
+        range.rowHidden = action === 'hide'
+      } else {
+        range.columnHidden = action === 'hide'
+      }
+      await context.sync()
+      return `Successfully ${action}d ${dimension} ${reference}`
+    }
+  },
+
+  getAllObjects: {
+    name: 'getAllObjects',
+    category: 'read',
+    description: 'Get all charts and pivot tables on the active worksheet.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    },
+    executeExcel: async (context) => {
+      const sheet = context.workbook.worksheets.getActiveWorksheet()
+      const charts = sheet.charts
+      const pivotTables = sheet.pivotTables
+      charts.load('items/name, items/id')
+      pivotTables.load('items/name, items/id')
+      await context.sync()
+
+      const result = {
+        charts: charts.items.map(c => ({ name: c.name, id: c.id })),
+        pivotTables: pivotTables.items.map(p => ({ name: p.name, id: p.id }))
+      }
+      return JSON.stringify(result, null, 2)
+    }
+  },
+
+  modifyObject: {
+    name: 'modifyObject',
+    category: 'write',
+    description: 'Delete a chart or pivot table by its name or ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        objectType: { type: 'string', enum: ['chart', 'pivotTable'], description: 'The type of object' },
+        name: { type: 'string', description: 'The name of the object to delete' }
+      },
+      required: ['objectType', 'name']
+    },
+    executeExcel: async (context, args) => {
+      const { objectType, name } = args
+      const sheet = context.workbook.worksheets.getActiveWorksheet()
+      
+      if (objectType === 'chart') {
+        const chart = sheet.charts.getItem(name)
+        chart.delete()
+      } else {
+        const pivot = sheet.pivotTables.getItem(name)
+        pivot.delete()
+      }
+      await context.sync()
+      return `Successfully deleted ${objectType} ${name}`
+    }
   },
 })
 

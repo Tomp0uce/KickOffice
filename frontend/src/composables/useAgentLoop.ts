@@ -1,6 +1,6 @@
 import { nextTick, ref, type Ref } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, chatStream, generateImage } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, chatStream, generateImage, uploadFile } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -446,7 +446,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     await runAgentLoop(messages, modelTier)
   }
 
-  async function sendMessage(payload?: unknown) {
+  async function sendMessage(payload?: unknown, files?: File[]) {
     let textToSend = ''
 
     if (typeof payload === 'string') {
@@ -590,19 +590,37 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       let fullMessage = displayMessageText
+      let extractedFilesContext = ''
+
+      if (files && files.length > 0) {
+        currentAction.value = t('agentUploadingFiles') || 'Extraction des fichiers...'
+        try {
+           for (const file of files) {
+             const result = await uploadFile(file)
+             extractedFilesContext += `\n\n[Contenu extrait du fichier "${result.filename}"]:\n${result.extractedText}\n[Fin du fichier]`
+           }
+        } catch (uploadObjErr: any) {
+           console.error('[AgentLoop] File upload/extraction failed', uploadObjErr)
+           messageUtil.error('Erreur lors de l’extraction du fichier.')
+           return
+        }
+      }
 
       // Only append context to standard text chats, not pure image generations
       if (isImageFromSelection) {
         fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
-      } else if (selectedText && !isImageFromSelection) {
-        const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-        fullMessage = `${userMessage}
-
-[${selectionLabel}: "${selectedText}"]`
-        history.value[history.value.length - 1].content = fullMessage
+      } else {
+        if (selectedText) {
+           const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
+           fullMessage += `\n\n[${selectionLabel}: "${selectedText}"]`
+        }
+        if (extractedFilesContext) {
+           fullMessage += extractedFilesContext
+        }
+        history.value[history.value.length - 1].content = fullMessage.trim()
       }
 
-      await processChat(fullMessage)
+      await processChat(fullMessage.trim())
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)

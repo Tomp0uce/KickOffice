@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
   - Scrolls to the top of the assistant message when receiving a response
   - Scrolls to bottom of history on initial page load
 - **Credential Error Detection**: API now detects 401 credential errors and displays user-friendly localized messages instead of raw technical errors.
+- **Secure Dynamic Code Execution**: Integrated `ses` (Secure ECMAScript) sandbox to allow the AI to safely execute custom JavaScript code via new escape-hatch tools (`eval_officejs`, `eval_wordjs`, `eval_powerpointjs`, `eval_outlookjs`) across all Office applications.
+- **Agent File Processing**: Added a new `/api/upload` backend endpoint to process file uploads (PDF, DOCX, XLSX, CSV). Uploaded files are now attached to the AI prompt (`<attachments>`) and can be read by the AI using the `read` tool, enabling multi-modal data analysis.
+- **Extended Excel Tools (OpenExcel Port)**: Ported advanced Excel manipulation tools from the OpenExcel project: `findData` (regex/case search), `duplicateWorksheet`, `hideUnhideRowColumn`, `getAllObjects` (charts/pivot tables), and `modifyObject` (delete charts/pivots).
+- **Prompt Optimizations**: Enhanced prompt system in `useAgentPrompts.ts` to instruct the AI to leverage batch operations (`batchProcessRange`) instead of iterative cell updates, drastically improving performance for large data tasks. Improved overwrite protection documentation in the tool schemas.
 - **Tool Execution Success Message**: When agent tools execute successfully without text response (e.g., proofreading with comments), displays "Actions completed successfully" instead of an error.
 
 ### Fixed

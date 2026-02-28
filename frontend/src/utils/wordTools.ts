@@ -1,5 +1,6 @@
 import { executeOfficeAction } from './officeAction'
 import DiffMatchPatch from 'diff-match-patch'
+import { sandboxedEval } from './sandbox'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './officeRichText'
 
@@ -61,6 +62,7 @@ export type WordToolName =
   | 'insertSectionBreak'
   | 'applyStyle'
   | 'getSelectedTextWithFormatting'
+  | 'eval_wordjs'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
@@ -1847,6 +1849,35 @@ const wordToolDefinitions = createWordTools({
 
       const markdown = htmlToMarkdown(htmlResult.value)
       return markdown || 'Selection contains no convertible content.'
+    },
+  },
+
+  eval_wordjs: {
+    name: 'eval_wordjs',
+    category: 'write',
+    description: "Execute arbitrary Office.js code within a Word.run context. Use this as an escape hatch when existing tools don't cover your use case. The code runs inside `Word.run(async (context) => { ... })` with `context` available. Return a value to get it back as the result. Always call `await context.sync()` before returning.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: "JavaScript code to execute. Has access to `context` (Word.RequestContext). Must be valid async code. Return a value to get it as result. Example: `const doc = context.document; const paras = doc.paragraphs; paras.load('text'); await context.sync(); return paras.items[0].text;`",
+        },
+        explanation: {
+          type: 'string',
+          description: 'Brief explanation of what this code does',
+        },
+      },
+      required: ['code'],
+    },
+    executeWord: async (context, args) => {
+      const { code } = args
+      try {
+        const result = await sandboxedEval(code, { context, Word: typeof Word !== 'undefined' ? Word : undefined })
+        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+      } catch (err: any) {
+        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+      }
     },
   },
 })

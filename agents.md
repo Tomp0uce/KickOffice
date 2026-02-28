@@ -9,11 +9,11 @@ This document provides operational guidance for AI coding agents working in this
 
 ### Companion documents
 
-| File                                   | Purpose                                                                                     |
-| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| File                                   | Purpose                                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality audit v2 — 28 open issues by severity (CRITICAL/HIGH/MEDIUM/LOW/BUILD) |
-| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority (HIGH/MEDIUM/LOW)                           |
-| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions                                |
+| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority (HIGH/MEDIUM/LOW)                                           |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions                                                |
 
 ## 2) Product and Architecture Snapshot
 
@@ -48,7 +48,8 @@ backend/src/
 │   ├── chat.js            # POST /api/chat (streaming, supports tools), POST /api/chat/sync (synchronous fallback)
 │   ├── health.js          # GET /health
 │   ├── image.js           # POST /api/image
-│   └── models.js          # GET /api/models
+│   ├── models.js          # GET /api/models
+│   └── upload.js          # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
 ├── services/
 │   └── llmClient.js       # Centralized LLM API client (chatCompletion, imageGeneration, handleErrorResponse)
 └── utils/
@@ -129,10 +130,10 @@ Any contract change should update both backend and frontend in the same change s
 
 Current host/tool landscape (keep in mind for tool/agent changes):
 
-- Word tools: 39 tools (high-count set) + 2 general tools used in agent mode.
-- Excel tools: 39 tools (high-count set) + 2 general tools used in agent mode.
-- PowerPoint tools: 14 tools (slides, shapes, notes, modify) + 2 general tools.
-- Outlook tools: 13 tools (mail compose/read helpers) + 2 general tools.
+- Word tools: 40 tools (high-count set, including `eval_wordjs` via SES sandbox) + 2 general tools.
+- Excel tools: 45 tools (high-count set, including `eval_officejs` and OpenExcel ports) + 2 general tools.
+- PowerPoint tools: 15 tools (slides, shapes, notes, modify, and `eval_powerpointjs`) + 2 general tools.
+- Outlook tools: 14 tools (mail compose/read helpers and `eval_outlookjs`) + 2 general tools.
 
 ## 6) Backend Editing Guidelines
 
