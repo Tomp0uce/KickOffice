@@ -141,7 +141,8 @@ KickOffice/
 │       │   ├── chat.js       # POST /api/chat (streaming), POST /api/chat/sync (agent tool loop)
 │       │   ├── health.js     # GET /health
 │       │   ├── image.js      # POST /api/image
-│       │   └── models.js     # GET /api/models
+│       │   ├── models.js     # GET /api/models
+│       │   └── upload.js     # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
 │       ├── services/
 │       │   └── llmClient.js  # Centralized LLM API client (chat, image, error handling)
 │       └── utils/
@@ -194,12 +195,12 @@ KickOffice/
 │           ├── constant.ts           # Built-in prompts (Word, Excel, PowerPoint, Outlook)
 │           ├── enum.ts               # localStorage keys
 │           ├── generalTools.ts       # 2 general tools: getCurrentDate, calculateMath
-│           ├── excelTools.ts         # 39 Excel API tools (for agent)
+│           ├── excelTools.ts         # 45 Excel API tools (for agent, inc. eval_officejs)
 │           ├── hostDetection.ts      # isWord, isExcel, isPowerPoint, isOutlook
-│           ├── outlookTools.ts       # 13 Outlook API tools (for agent)
-│           ├── powerpointTools.ts    # 14 PowerPoint tools (slides, shapes, notes, modify)
+│           ├── outlookTools.ts       # 14 Outlook API tools (for agent, inc. eval_outlookjs)
+│           ├── powerpointTools.ts    # 15 PowerPoint tools (slides, shapes, modify, eval_powerpointjs)
 │           ├── wordFormatter.ts      # Markdown-to-Word conversion engine
-│           ├── wordTools.ts          # 39 Word API tools (for agent)
+│           ├── wordTools.ts          # 40 Word API tools (for agent, inc. eval_wordjs)
 │           ├── officeAction.ts       # Office.js error handling wrapper
 │           ├── officeOutlook.ts      # Outlook-specific API helpers
 │           ├── savedPrompts.ts       # Custom prompt management (localStorage)
@@ -267,10 +268,12 @@ KickOffice/
 - [x] OpenAI function-calling format for tool definitions
 - [x] Tool execution status display in chat
 - [x] Max iterations limit (configurable)
-- [x] 39 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak
-- [x] 39 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules
-- [x] 14 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage, deleteSlide, getShapes, deleteShape, setShapeFill, moveResizeShape, getAllSlidesOverview
-- [x] 13 Outlook tools: getEmailBody, getSelectedText, setEmailBody, insertTextAtCursor, setEmailBodyHtml, getEmailSubject, setEmailSubject, getEmailRecipients, addRecipient, getEmailSender, getEmailDate, getAttachments, insertHtmlAtCursor
+- [x] Secure `ses` sandbox for dynamic JS execution (`eval_officejs`, `eval_wordjs`, `eval_powerpointjs`, `eval_outlookjs`)
+- [x] File processing for agent mode (PDF, DOCX, XLSX, CSV uploads via `/api/upload`)
+- [x] 40 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak, eval_wordjs
+- [x] 45 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules, eval_officejs, findData, duplicateWorksheet, hideUnhideRowColumn, getAllObjects, modifyObject
+- [x] 15 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage, deleteSlide, getShapes, deleteShape, setShapeFill, moveResizeShape, getAllSlidesOverview, eval_powerpointjs
+- [x] 14 Outlook tools: getEmailBody, getSelectedText, setEmailBody, insertTextAtCursor, setEmailBodyHtml, getEmailSubject, setEmailSubject, getEmailRecipients, addRecipient, getEmailSender, getEmailDate, getAttachments, insertHtmlAtCursor, eval_outlookjs
 - [x] 2 General tools: getCurrentDate, calculateMath
 
 ### Frontend - Quick Actions (Word)
@@ -312,7 +315,7 @@ KickOffice/
 - [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
 - [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
 - [x] Text insertion via Common API (`setSelectedDataAsync` with `CoercionType.Html` to preserve bullets/formatting)
-- [x] 14 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`, `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview`)
+- [x] 15 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`, `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview`, `eval_powerpointjs`)
 - [x] Requirement-set-aware behavior (`PowerPointApi 1.4+` check for speaker notes)
 - [x] PowerPoint-specific agent prompt (slide-first, concise, visual-oriented)
 - [x] PowerPoint-specific built-in prompts (customizable)
@@ -377,18 +380,18 @@ KickOffice/
 
 See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) (v2, 2026-02-22) for the full audit with 28 open issues organized by severity.
 
-| Priority | Issue                                                                | Status  |
-| -------- | -------------------------------------------------------------------- | ------- |
-| CRITICAL | Agent max iterations setting silently capped at 10                   | ❌ TODO |
-| CRITICAL | `.env.example` contains invalid `reasoning_effort=none`              | ❌ TODO |
-| CRITICAL | Quick actions bypass loading/abort state                             | ❌ TODO |
-| HIGH     | Chat history grows unbounded in localStorage                         | ❌ TODO |
-| HIGH     | Token manager uses character count instead of token count            | ❌ TODO |
-| MEDIUM   | Accessibility (ARIA attributes) incomplete                           | ❌ TODO |
-| MEDIUM   | No confirmation dialog for "New Chat"                                | ❌ TODO |
-| BUILD    | No unit test infrastructure (vitest)                                 | ❌ TODO |
-| BUILD    | No linting/formatting configuration (ESLint + Prettier)              | ❌ TODO |
-| BUILD    | No CI pipeline for automated testing on PRs                          | ❌ TODO |
+| Priority | Issue                                                     | Status  |
+| -------- | --------------------------------------------------------- | ------- |
+| CRITICAL | Agent max iterations setting silently capped at 10        | ❌ TODO |
+| CRITICAL | `.env.example` contains invalid `reasoning_effort=none`   | ❌ TODO |
+| CRITICAL | Quick actions bypass loading/abort state                  | ❌ TODO |
+| HIGH     | Chat history grows unbounded in localStorage              | ❌ TODO |
+| HIGH     | Token manager uses character count instead of token count | ❌ TODO |
+| MEDIUM   | Accessibility (ARIA attributes) incomplete                | ❌ TODO |
+| MEDIUM   | No confirmation dialog for "New Chat"                     | ❌ TODO |
+| BUILD    | No unit test infrastructure (vitest)                      | ❌ TODO |
+| BUILD    | No linting/formatting configuration (ESLint + Prettier)   | ❌ TODO |
+| BUILD    | No CI pipeline for automated testing on PRs               | ❌ TODO |
 
 ### Not Yet Implemented
 
@@ -463,11 +466,11 @@ docker compose up -d --build
 
 #### Frontend (`frontend/.env`)
 
-| Variable                 | Description                                          | Default                 |
-| ------------------------ | ---------------------------------------------------- | ----------------------- |
-| `VITE_BACKEND_URL`       | Backend URL (build-time)                             | `http://localhost:3003` |
-| `VITE_REQUEST_TIMEOUT_MS`| HTTP request timeout in milliseconds (build-time)    | `45000`                 |
-| `VITE_VERBOSE_LOGGING`   | Enable verbose console logging (`true` / `false`)    | (disabled)              |
+| Variable                  | Description                                       | Default                 |
+| ------------------------- | ------------------------------------------------- | ----------------------- |
+| `VITE_BACKEND_URL`        | Backend URL (build-time)                          | `http://localhost:3003` |
+| `VITE_REQUEST_TIMEOUT_MS` | HTTP request timeout in milliseconds (build-time) | `45000`                 |
+| `VITE_VERBOSE_LOGGING`    | Enable verbose console logging (`true` / `false`) | (disabled)              |
 
 ---
 

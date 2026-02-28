@@ -1,5 +1,11 @@
 <template>
-  <div class="flex flex-col gap-1 rounded-md">
+  <div
+    class="flex flex-col gap-1 rounded-md transition-colors"
+    :class="{ 'ring-2 ring-accent border-accent': isDragOver }"
+    @dragover.prevent="handleDragOver"
+    @dragleave.prevent="handleDragLeave"
+    @drop.prevent="handleDrop"
+  >
     <div class="flex items-center justify-between gap-2 overflow-hidden">
       <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         <label
@@ -25,6 +31,25 @@
         </select>
       </div>
     </div>
+
+    <!-- Zone d'affichage des fichiers attachés -->
+    <div v-if="attachedFiles.length > 0" class="flex flex-wrap gap-2 px-1">
+      <div
+        v-for="(file, index) in attachedFiles"
+        :key="index"
+        class="flex items-center gap-1 rounded-sm bg-accent/20 px-2 py-1 text-[10px] text-accent font-medium truncate max-w-full"
+      >
+        <span class="truncate">{{ file.name }}</span>
+        <button
+          class="cursor-pointer hover:text-danger ml-1 opacity-70 hover:opacity-100"
+          @click="removeFile(index)"
+          title="Retirer le fichier"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
+
     <div
       class="card-base flex min-w-12 items-center gap-2 focus-within:border-accent"
       :class="{
@@ -47,6 +72,25 @@
         @keydown.enter.exact.prevent="triggerSubmit()"
         @input="handleInput"
       />
+
+      <!-- Bouton trombone pour ajouter un fichier -->
+      <button
+        class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent hover:bg-surface text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+        title="Attacher un document (PDF, DOCX, XLSX)"
+        :disabled="loading || attachedFiles.length >= 3"
+        @click="triggerFileInput"
+      >
+        <Paperclip :size="16" />
+      </button>
+      <input
+        type="file"
+        ref="fileInputEl"
+        class="hidden"
+        accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md"
+        multiple
+        @change="onFileSelected"
+      />
+
       <button
         v-if="loading"
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-danger text-white"
@@ -60,7 +104,9 @@
         v-else
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50"
         :title="sendLabel"
-        :disabled="!modelValue.trim() || !backendOnline"
+        :disabled="
+          (!modelValue.trim() && attachedFiles.length === 0) || !backendOnline
+        "
         :aria-label="sendLabel"
         @click="triggerSubmit()"
       >
@@ -100,7 +146,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Send, Square } from "lucide-vue-next";
+import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
 
 const props = defineProps<{
@@ -126,10 +172,14 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
   (e: "update:useWordFormatting", value: boolean): void;
   (e: "update:useSelectedText", value: boolean): void;
-  (e: "submit", value: string): void;
+  (e: "submit", value: string, files?: File[]): void;
   (e: "stop"): void;
   (e: "input"): void;
 }>();
+
+const isDragOver = ref(false);
+const attachedFiles = ref<File[]>([]);
+const fileInputEl = ref<HTMLInputElement>();
 
 const handleModelTierChange = (event: Event) => {
   emit("update:selectedModelTier", (event.target as HTMLSelectElement).value);
@@ -141,12 +191,83 @@ const handleInput = (event: Event) => {
   emit("input");
 };
 
+// --- FILE UPLOAD LOGIC ---
+const allowedTypes = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "text/plain",
+  "text/markdown",
+];
+
+const handleDragOver = (e: DragEvent) => {
+  if (e.dataTransfer?.types.includes("Files")) {
+    isDragOver.value = true;
+  }
+};
+
+const handleDragLeave = (e: DragEvent) => {
+  isDragOver.value = false;
+};
+
+const handleDrop = (e: DragEvent) => {
+  isDragOver.value = false;
+  const files = e.dataTransfer?.files;
+  if (files) processFiles(files);
+};
+
+const triggerFileInput = () => {
+  fileInputEl.value?.click();
+};
+
+const onFileSelected = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (target.files) processFiles(target.files);
+  // Reset input so the same file can be selected again if removed
+  if (fileInputEl.value) fileInputEl.value.value = "";
+};
+
+const processFiles = (fileList: FileList) => {
+  // Check for allowed extensions if mime type misses
+  const allowedExtensions = [".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"];
+
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i];
+
+    // Limits: Max 3 files, Max 10MB per file
+    if (attachedFiles.value.length >= 3) {
+      break;
+    }
+
+    const isExtensionOk = allowedExtensions.some((ext) =>
+      file.name.toLowerCase().endsWith(ext),
+    );
+    if (
+      (allowedTypes.includes(file.type) || isExtensionOk) &&
+      file.size <= 10 * 1024 * 1024
+    ) {
+      // Avoid duplicate by name
+      if (!attachedFiles.value.some((f) => f.name === file.name)) {
+        attachedFiles.value.push(file);
+      }
+    }
+  }
+};
+
+const removeFile = (index: number) => {
+  attachedFiles.value.splice(index, 1);
+};
+// -------------------------
+
 const triggerSubmit = () => {
-  if (!props.modelValue || !props.modelValue.trim()) {
+  if (!props.modelValue.trim() && attachedFiles.value.length === 0) {
     return;
   }
 
-  emit("submit", props.modelValue);
+  // Pass a copy of the files to prevent issues, then clear immediately
+  emit("submit", props.modelValue, [...attachedFiles.value]);
+  attachedFiles.value = [];
 };
 
 const handleStop = () => {

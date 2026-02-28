@@ -8,6 +8,7 @@
 
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './officeRichText'
+import { sandboxedEval } from './sandbox'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -53,6 +54,7 @@ export type PowerPointToolName =
   | 'setShapeFill'
   | 'moveResizeShape'
   | 'getAllSlidesOverview'
+  | 'eval_powerpointjs'
 
 /**
  * Keep list markers in plain text to preserve bullets/numbered lists when
@@ -338,6 +340,36 @@ const powerpointToolDefinitions = createPowerPointTools({
       required: [],
     },
     executeCommon: async () => getPowerPointSelection(),
+  },
+
+  eval_powerpointjs: {
+    name: 'eval_powerpointjs',
+    category: 'write',
+    description: "Execute arbitrary Office.js code within a PowerPoint.run context (requires PowerPointApi 1.4+). Use this as an escape hatch when existing tools don't cover your use case. The code runs inside `PowerPoint.run(async (context) => { ... })` with `context` available. Return a value to get it back as the result. Always call `await context.sync()` before returning.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: "JavaScript code to execute. Has access to `context`. Must be valid async code. Return a value to get it as result.",
+        },
+        explanation: {
+          type: 'string',
+          description: 'Brief explanation of what this code does',
+        },
+      },
+      required: ['code'],
+    },
+    executePowerPoint: async (context: any, args: any) => {
+      ensurePowerPointRunAvailable()
+      const { code } = args
+      try {
+        const result = await sandboxedEval(code, { context, PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined })
+        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+      } catch (err: any) {
+        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+      }
+    },
   },
 
   replaceSelectedText: {

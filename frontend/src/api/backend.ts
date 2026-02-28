@@ -230,3 +230,21 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
 
   return ''
 }
+
+export async function uploadFile(file: File): Promise<{ filename: string; extractedText: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/upload`, {
+    method: 'POST',
+    headers: { ...getUserCredentialHeaders() },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`File upload error ${res.status}: ${err}`)
+  }
+
+  return res.json()
+}

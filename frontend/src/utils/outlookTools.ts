@@ -2,6 +2,7 @@ import DiffMatchPatch from 'diff-match-patch'
 
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './officeRichText'
+import { sandboxedEval } from './sandbox'
 
 // R17 — Visual diff helper shared with Word (blue/underline = inserted, red/strikethrough = deleted)
 function generateVisualDiff(originalText: string, newText: string): string {
@@ -32,6 +33,7 @@ export type OutlookToolName =
   | 'getEmailDate'
   | 'getAttachments'
   | 'insertHtmlAtCursor'
+  | 'eval_outlookjs'
 
 type OutlookToolDefinition = WordToolDefinition
 
@@ -529,6 +531,35 @@ const outlookToolDefinitions = createOutlookTools({
           },
         )
       })
+    },
+  },
+
+  eval_outlookjs: {
+    name: 'eval_outlookjs',
+    category: 'write',
+    description: "Execute arbitrary Office.js code within the Outlook mailbox context. Use this as an escape hatch when existing tools don't cover your use case. The code runs inside an async context with `mailbox` available, representing `Office.context.mailbox`. Return a value to get it back as the result.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: "JavaScript code to execute. Has access to `mailbox` (Office.context.mailbox). Must be valid async code. Return a value to get it as result. Example: `return new Promise((resolve) => { mailbox.item.subject.getAsync((res) => resolve(res.value)); })`",
+        },
+        explanation: {
+          type: 'string',
+          description: 'Brief explanation of what this code does',
+        },
+      },
+      required: ['code'],
+    },
+    executeOutlook: async (mailbox, args) => {
+      const { code } = args
+      try {
+        const result = await sandboxedEval(code, { mailbox, Office: typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined })
+        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+      } catch (err: any) {
+        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+      }
     },
   },
 })

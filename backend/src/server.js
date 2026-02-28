@@ -23,6 +23,7 @@ import { chatRouter } from './routes/chat.js'
 import { healthRouter } from './routes/health.js'
 import { imageRouter } from './routes/image.js'
 import { modelsRouter } from './routes/models.js'
+import { uploadRouter } from './routes/upload.js'
 import { logAndRespond } from './utils/http.js'
 
 const app = express()
@@ -100,6 +101,7 @@ app.use(infoLimiter, healthRouter)
 app.use(infoLimiter, modelsRouter)
 app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRouter)
 app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
+app.use('/api/upload', ensureUserCredentials, uploadRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

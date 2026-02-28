@@ -33,3 +33,6 @@ backend-data/
 
 # LiteLLM proxy credentials (contient des secrets)
 litellm-local-proxy/.auth.env
+
+# OpenExcel reference code
+Open_Excel/
