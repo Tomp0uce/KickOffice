@@ -403,7 +403,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         if (isCredentialError(err)) {
           currentAssistantMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
         } else {
-          currentAssistantMessage.content = `Error: The model or API failed to respond. Please try again.`
+          currentAssistantMessage.content = t('failedToResponse')
           console.error('[AgentLoop] chatStream error details:', err)
         }
         currentAction.value = ''
@@ -526,7 +526,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (isCredentialError(err)) {
         lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
       } else {
-        lastMessage.content = `Error: The model or API failed to respond. Please try again.`
+        lastMessage.content = t('failedToResponse')
       }
     }
   }
@@ -537,13 +537,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     try {
       const timeoutPromise = new Promise<string>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
-      })
+      }).catch(() => '') as Promise<string>
       
       if (!hostIsExcel) {
         // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
         const htmlPromise = new Promise<string>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000)
-        })
+        }).catch(() => '') as Promise<string>
         
         try {
           const htmlContent = await Promise.race([getOfficeSelectionAsHtml({ includeOutlookSelectedText: true }), htmlPromise])

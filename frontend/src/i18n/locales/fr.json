@@ -144,7 +144,6 @@
   "recursionLimitExceeded": "L'agent a dépassé le nombre maximum d'itérations.",
   "responseTruncated": "La réponse a été tronquée par la limite de tokens. Essayez d'augmenter la limite ou de reformuler la demande.",
   "replaceSelectedText": "Remplacer",
-  "replyLanguageLabel": "Répondre en",
   "reset": "Réinitialiser",
   "save": "Enregistrer",
   "savedPrompts": "Prompts enregistrés",

@@ -166,27 +166,6 @@
             </SettingCard>
 
             <SettingCard>
-              <SingleSelect
-                v-model="replyLanguage"
-                :tight="false"
-                :key-list="replyLanguageOptions.map((item) => item.value)"
-                :title="t('replyLanguageLabel')"
-                :fronticon="false"
-                :placeholder="
-                  replyLanguageOptions.find((o) => o.value === replyLanguage)
-                    ?.label || replyLanguage
-                "
-              >
-                <template #item="{ item }">
-                  {{
-                    replyLanguageOptions.find((o) => o.value === item)?.label ||
-                    item
-                  }}
-                </template>
-              </SingleSelect>
-            </SettingCard>
-
-            <SettingCard>
               <label
                 class="flex cursor-pointer items-center justify-between gap-2"
               >
@@ -293,9 +272,7 @@
                     class="h-2 w-2 rounded-full"
                     :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
                   />
-                  {{
-                    backendOnline ? t("backendOnline") : t("backendOffline")
-                  }}
+                  {{ backendOnline ? t("backendOnline") : t("backendOffline") }}
                 </div>
               </div>
             </SettingCard>
@@ -633,7 +610,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from '@/types'
+import type { ModelInfo } from "@/types";
 import { useStorage } from "@vueuse/core";
 import {
   ArrowLeft,
@@ -704,10 +681,6 @@ const currentTab = ref("account");
 
 // Settings
 const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
-const replyLanguage = useStorage(
-  localStorageKey.replyLanguage,
-  "Fran\u00e7ais",
-);
 const darkMode = useStorage(localStorageKey.darkMode, false);
 
 // Credential storage with secure persistence
@@ -753,7 +726,7 @@ const excelFormulaLanguage = useStorage(
 );
 
 const localLanguageOptions = optionLists.localLanguageList;
-const replyLanguageOptions = optionLists.replyLanguageList;
+
 const excelFormulaLanguageOptions = [
   { label: t("excelFormulaLanguageEnglish"), value: "en" },
   { label: t("excelFormulaLanguageFrench"), value: "fr" },
@@ -976,10 +949,12 @@ function savePromptsToStorage() {
   try {
     localStorage.setItem("savedPrompts", JSON.stringify(savedPrompts.value));
   } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[SettingsPage] localStorage quota exceeded — saved prompts not persisted')
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      console.warn(
+        "[SettingsPage] localStorage quota exceeded — saved prompts not persisted",
+      );
     } else {
-      throw e
+      throw e;
     }
   }
 }
@@ -1059,12 +1034,17 @@ function saveBuiltInPrompts() {
     };
   });
   try {
-    localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
+    localStorage.setItem(
+      builtInPromptsStorageKey,
+      JSON.stringify(customPrompts),
+    );
   } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[SettingsPage] localStorage quota exceeded — built-in prompts not persisted')
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      console.warn(
+        "[SettingsPage] localStorage quota exceeded — built-in prompts not persisted",
+      );
     } else {
-      throw e
+      throw e;
     }
   }
 }
