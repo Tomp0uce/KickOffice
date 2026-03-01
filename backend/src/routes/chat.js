@@ -19,20 +19,20 @@ chatRouter.post('/', async (req, res) => {
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  const validation = validateChatRequest(req.body, 'POST /api/chat')
+  const validation = validateChatRequest(req.body)
   if (validation.error) {
     return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat')
   }
 
-  const { modelConfig, parsedTools } = validation
+  const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
 
   try {
     const body = buildChatBody({
       modelTier,
       modelConfig,
       messages,
-      temperature,
-      maxTokens,
+      temperature: validTemp,
+      maxTokens: validMaxTokens,
       stream: true,
       tools: parsedTools.value,
     })
@@ -139,20 +139,20 @@ chatRouter.post('/sync', async (req, res) => {
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  const validation = validateChatRequest(req.body, 'POST /api/chat/sync')
+  const validation = validateChatRequest(req.body)
   if (validation.error) {
     return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat/sync')
   }
 
-  const { modelConfig, parsedTools } = validation
+  const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
 
   try {
     const body = buildChatBody({
       modelTier,
       modelConfig,
       messages,
-      temperature,
-      maxTokens,
+      temperature: validTemp,
+      maxTokens: validMaxTokens,
       stream: false,
       tools: parsedTools.value,
     })

@@ -97,7 +97,7 @@
             <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t('litellmCredentialsMissing')
+                  $t("litellmCredentialsMissing")
                 }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
@@ -109,12 +109,14 @@
                 >
                   <div
                     class="h-2 w-2 rounded-full"
-                    :class="litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'"
+                    :class="
+                      litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'
+                    "
                   />
                   {{
                     litellmConfigured
-                      ? $t('litellmCredentialsConfigured')
-                      : $t('litellmCredentialsMissing')
+                      ? $t("litellmCredentialsConfigured")
+                      : $t("litellmCredentialsMissing")
                   }}
                 </div>
               </div>
@@ -122,13 +124,16 @@
 
             <SettingCard>
               <div class="flex flex-col gap-1">
-                <span class="text-xs text-secondary">{{ $t('litellmCredentialsInfo') }}</span>
+                <span class="text-xs text-secondary">{{
+                  $t("litellmCredentialsInfo")
+                }}</span>
                 <a
                   href="https://getkey.ai.kickmaker.net/"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-accent underline"
-                >https://getkey.ai.kickmaker.net/</a>
+                  >https://getkey.ai.kickmaker.net/</a
+                >
               </div>
             </SettingCard>
           </div>
@@ -187,17 +192,17 @@
               >
                 <div class="flex flex-col">
                   <span class="text-sm font-semibold text-main">{{
-                    $t("darkModeLabel") || "Dark mode"
+                    $t("darkModeLabel")
                   }}</span>
                   <span class="text-xs text-secondary">{{
-                    $t("darkModeDescription") || "Use a darker color theme"
+                    $t("darkModeDescription")
                   }}</span>
                 </div>
                 <input
                   v-model="darkMode"
                   type="checkbox"
                   class="h-4 w-4 cursor-pointer accent-accent"
-                  :aria-label="$t('darkModeLabel') || 'Dark mode'"
+                  :aria-label="$t('darkModeLabel')"
                 />
               </label>
             </SettingCard>
@@ -467,7 +472,7 @@
                 class="rounded-md border border-border-secondary p-1 shadow-sm"
               >
                 <h3 class="text-center text-sm font-semibold text-accent/70">
-                  {{ t("builtinPrompts") || "Built-in Prompts" }}
+                  {{ t("builtinPrompts") }}
                 </h3>
               </div>
               <div
@@ -670,7 +675,13 @@ import {
 import { localStorageKey } from "@/utils/enum";
 import { getExcelToolDefinitions } from "@/utils/excelTools";
 import { getGeneralToolDefinitions } from "@/utils/generalTools";
-import { isExcel, isOutlook, isPowerPoint } from "@/utils/hostDetection";
+import {
+  isExcel,
+  isOutlook,
+  isPowerPoint,
+  isWord,
+  forHost,
+} from "@/utils/hostDetection";
 import {
   loadSavedPromptsFromStorage,
   type SavedPrompt,
@@ -768,31 +779,29 @@ const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
 // Tools - switch based on host
-const appToolsList = hostIsOutlook
-  ? getOutlookToolDefinitions()
-  : hostIsExcel
-    ? getExcelToolDefinitions()
-    : hostIsPowerPoint
-      ? getPowerPointToolDefinitions()
-      : getWordToolDefinitions();
+const appToolsList =
+  forHost({
+    outlook: getOutlookToolDefinitions(),
+    excel: getExcelToolDefinitions(),
+    powerpoint: getPowerPointToolDefinitions(),
+    word: getWordToolDefinitions(),
+  }) || [];
 const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList];
 const enabledTools = ref<Set<string>>(new Set());
 
-const toolDescriptionKey = hostIsOutlook
-  ? "outlookToolsDescription"
-  : hostIsExcel
-    ? "excelToolsDescription"
-    : hostIsPowerPoint
-      ? "powerpointToolsDescription"
-      : "wordToolsDescription";
+const toolDescriptionKey = forHost({
+  outlook: "outlookToolsDescription",
+  excel: "excelToolsDescription",
+  powerpoint: "powerpointToolsDescription",
+  word: "wordToolsDescription",
+}) as string;
 
-const toolTranslationPrefix = hostIsOutlook
-  ? "outlookTool"
-  : hostIsExcel
-    ? "excelTool"
-    : hostIsPowerPoint
-      ? "powerpointTool"
-      : "wordTool";
+const toolTranslationPrefix = forHost({
+  outlook: "outlookTool",
+  excel: "excelTool",
+  powerpoint: "powerpointTool",
+  word: "wordTool",
+}) as string;
 
 // Prompt management
 const savedPrompts = ref<SavedPrompt[]>([]);
@@ -884,23 +893,19 @@ const outlookBuiltInPromptsData: Record<
   extract: { ...outlookBuiltInPrompt.extract },
 };
 
-const selectedBuiltInPromptsData: Record<string, BuiltinPromptConfig> =
-  hostIsOutlook
-    ? { ...outlookBuiltInPromptsData }
-    : hostIsExcel
-      ? { ...excelBuiltInPromptsData }
-      : hostIsPowerPoint
-        ? { ...powerPointBuiltInPromptsData }
-        : { ...wordBuiltInPromptsData };
+const selectedBuiltInPromptsData = forHost({
+  outlook: { ...outlookBuiltInPromptsData },
+  excel: { ...excelBuiltInPromptsData },
+  powerpoint: { ...powerPointBuiltInPromptsData },
+  word: { ...wordBuiltInPromptsData },
+}) as Record<string, BuiltinPromptConfig>;
 
-const selectedOriginalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
-  hostIsOutlook
-    ? { ...outlookBuiltInPrompt }
-    : hostIsExcel
-      ? { ...excelBuiltInPrompt }
-      : hostIsPowerPoint
-        ? { ...powerPointBuiltInPrompt }
-        : { ...buildInPrompt };
+const selectedOriginalBuiltInPrompts = forHost({
+  outlook: { ...outlookBuiltInPrompt },
+  excel: { ...excelBuiltInPrompt },
+  powerpoint: { ...powerPointBuiltInPrompt },
+  word: { ...buildInPrompt },
+}) as Record<string, BuiltinPromptConfig>;
 
 const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(
   selectedBuiltInPromptsData,
@@ -913,13 +918,12 @@ const editingBuiltinPrompt = ref<{ system: string; user: string }>({
 });
 const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
   selectedOriginalBuiltInPrompts;
-const builtInPromptsStorageKey = hostIsOutlook
-  ? "customOutlookBuiltInPrompts"
-  : hostIsExcel
-    ? "customExcelBuiltInPrompts"
-    : hostIsPowerPoint
-      ? "customPowerPointBuiltInPrompts"
-      : "customBuiltInPrompts";
+const builtInPromptsStorageKey = forHost({
+  outlook: "customOutlookBuiltInPrompts",
+  excel: "customExcelBuiltInPrompts",
+  powerpoint: "customPowerPointBuiltInPrompts",
+  word: "customBuiltInPrompts",
+}) as string;
 
 const tabs = [
   { id: "account", label: "account", defaultLabel: "Account", icon: KeyRound },

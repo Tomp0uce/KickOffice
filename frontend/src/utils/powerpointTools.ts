@@ -57,15 +57,6 @@ export type PowerPointToolName =
   | 'eval_powerpointjs'
 
 /**
- * Keep list markers in plain text to preserve bullets/numbered lists when
- * the target shape is not already configured as a native bullet paragraph.
- */
-export function normalizePowerPointListText(text: string): string {
-  const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  return stripMarkdownListMarkers(normalizedNewlines)
-}
-
-/**
  * Read the currently selected text inside a PowerPoint shape / text box.
  * Returns an empty string when nothing is selected or the selection is
  * not a text range (e.g. an entire slide is selected).
@@ -944,10 +935,6 @@ const powerpointToolDefinitions = createPowerPointTools({
 
 export function getPowerPointToolDefinitions(): PowerPointToolDefinition[] {
   return Object.values(powerpointToolDefinitions)
-}
-
-export function getPowerPointTool(name: PowerPointToolName): PowerPointToolDefinition | undefined {
-  return powerpointToolDefinitions[name]
 }
 
 export { powerpointToolDefinitions }

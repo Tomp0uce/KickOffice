@@ -6,8 +6,8 @@ import type { DisplayMessage, RenderSegment } from '@/types/chat'
 
 const THINK_TAG = '<think>'
 const THINK_TAG_END = '</think>'
-// Cached regex for think tag removal (compiled once at module load)
-const THINK_TAG_REGEX = new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
+// Get a fresh regex instance each time to avoid stateful lastIndex issues (CH7)
+const getThinkTagRegex = () => new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
 
 export function useImageActions(t: (key: string) => string) {
   function splitThinkSegments(text: string): RenderSegment[] {
@@ -38,7 +38,7 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   function cleanContent(content: string): string {
-    return content.replace(THINK_TAG_REGEX, '').trim()
+    return content.replace(getThinkTagRegex(), '').trim()
   }
 
   function getMessageActionPayload(message: DisplayMessage): string {
@@ -52,6 +52,23 @@ export function useImageActions(t: (key: string) => string) {
 
   async function copyImageToClipboard(imageSrc: string, fallback = false) {
     const notifySuccess = () => messageUtil.success(t(fallback ? 'copiedFallback' : 'copied'))
+    
+    // Validate imageSrc is a safe URL (HTTP/HTTPS or data URL) to prevent XSS/SSRF
+    try {
+      if (imageSrc.startsWith('data:image/')) {
+        // Safe data URL
+      } else {
+        const url = new URL(imageSrc)
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          throw new Error('Invalid URL protocol')
+        }
+      }
+    } catch (err) {
+      console.error('Invalid imageSrc URL:', err)
+      messageUtil.error('Invalid image URL')
+      return
+    }
+
     try {
       const response = await fetch(imageSrc)
       const blob = await response.blob()
@@ -109,6 +126,8 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   async function insertImageToPowerPoint(imageSrc: string, type: insertTypes) {
+    if (type === 'NoAction') return
+
     const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim()
     if (!base64Payload) throw new Error('Image base64 payload is empty')
 

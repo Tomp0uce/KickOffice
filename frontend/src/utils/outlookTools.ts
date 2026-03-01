@@ -6,20 +6,7 @@ import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './officeRichText'
 import { sandboxedEval } from './sandbox'
 
-// R17 — Visual diff helper shared with Word (blue/underline = inserted, red/strikethrough = deleted)
-function generateVisualDiff(originalText: string, newText: string): string {
-  const dmp = new DiffMatchPatch()
-  const diffs = dmp.diff_main(originalText, newText)
-  dmp.diff_cleanupSemantic(diffs)
-  return diffs
-    .map(([op, text]) => {
-      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
-      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
-      return escaped
-    })
-    .join('')
-}
+import { generateVisualDiff } from './common'
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -568,10 +555,6 @@ const outlookToolDefinitions = createOutlookTools({
 
 export function getOutlookToolDefinitions(): OutlookToolDefinition[] {
   return Object.values(outlookToolDefinitions)
-}
-
-export function getOutlookTool(name: OutlookToolName): OutlookToolDefinition | undefined {
-  return outlookToolDefinitions[name]
 }
 
 export { outlookToolDefinitions }

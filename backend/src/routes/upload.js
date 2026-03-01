@@ -14,6 +14,8 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fields: 10,
+    fieldSize: 1024, // 1KB per non-file field
   }
 })
 
@@ -55,7 +57,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
       filename.toLowerCase().endsWith('.csv')
     ) {
       const workbook = xlsx.read(file.buffer, { type: 'buffer' })
-      let allCsv = []
+      const allCsv = []
       
       for (const sheetName of workbook.SheetNames) {
         const sheet = workbook.Sheets[sheetName]
@@ -86,7 +88,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     // 50k chars is rough 10-15k tokens
     const MAX_CHARS = 100000 
     if (extractedText.length > MAX_CHARS) {
-        extractedText = extractedText.substring(0, MAX_CHARS) + '\n\n... [Contenu tronqué en raison de la taille du fichier]'
+        extractedText = extractedText.substring(0, MAX_CHARS) + '\n\n... [Content truncated due to file size]'
     }
 
     res.json({

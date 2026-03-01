@@ -146,7 +146,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     isOutlook: hostIsOutlook,
     isPowerPoint: hostIsPowerPoint,
     isExcel: hostIsExcel,
-    isWord: hostIsWord,
   } = host
 
   // Destructure settings
@@ -201,11 +200,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
-    hostIsWord,
   })
 
   function buildChatMessages(systemPrompt: string): ChatMessage[] {
-    return [{ role: 'system', content: systemPrompt }, ...history.value.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))]
+    return [{ role: 'system', content: systemPrompt }, ...history.value.map(m => ({ role: m.role, content: m.content }))]
   }
 
   const { getOfficeSelection, getOfficeSelectionAsHtml } = useOfficeSelection({
@@ -220,6 +218,54 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
 
 
+
+
+async function executeToolCall(toolCall: any, enabledToolDefs: any[]) {
+    const toolName = toolCall.function.name
+    let toolArgs: Record<string, any> = {}
+    try {
+      toolArgs = JSON.parse(toolCall.function.arguments)
+    } catch (parseErr) {
+      console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
+      return { tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed`, success: false }
+    }
+
+    const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
+    if (!toolDef) {
+      return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
+    }
+
+    const signature = `${toolName}${JSON.stringify(toolArgs)}`
+    let result = ''
+    let success = false
+
+    currentAction.value = getActionLabelForCategory(toolDef.category)
+    await scrollToBottom()
+    try {
+      result = await toolDef.execute(toolArgs)
+      success = true
+    } catch (err: unknown) {
+      console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      result = `Error in ${toolName}: ${errorMessage}`
+    }
+    currentAction.value = ''
+
+    let safeContent = ''
+    if (result === null || result === undefined) {
+      safeContent = ''
+    } else if (typeof result === 'object') {
+      try {
+        safeContent = JSON.stringify(result)
+      } catch {
+        safeContent = String(result)
+      }
+    } else {
+      safeContent = String(result)
+    }
+
+    return { tool_call_id: toolCall.id, content: safeContent, success, signature }
+  }
 
 
 async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
@@ -237,7 +283,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     currentAction.value = t('agentAnalyzing')
     history.value.push(createDisplayMessage('assistant', ''))
     await scrollToMessageTop() // Scroll to show start of assistant response
-    const lastIndex = history.value.length - 1
+    const currentAssistantMessage = history.value[history.value.length - 1]
     let abortedByUser = false
     while (iteration < maxIter) {
       if (abortController.value?.signal.aborted) {
@@ -262,7 +308,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
               streamStarted = true
               currentAction.value = ''
             }
-            history.value[lastIndex].content = text
+            currentAssistantMessage.content = text
             response.choices[0].message.content = text
             scrollToBottom().catch(console.error)
           },
@@ -297,9 +343,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         })
         // Display user-friendly message for credential errors
         if (isCredentialError(err)) {
-          history.value[lastIndex].content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+          currentAssistantMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
         } else {
-          history.value[lastIndex].content = `Error: The model or API failed to respond. ${err.message || ''}`
+          currentAssistantMessage.content = `Error: The model or API failed to respond. Please try again.`
+          console.error('[AgentLoop] chatStream error details:', err)
         }
         currentAction.value = ''
         break
@@ -312,7 +359,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         content: assistantMsg.content || '',
         tool_calls: assistantMsg.tool_calls,
       })
-      if (assistantMsg.content) history.value[lastIndex].content = assistantMsg.content
+      if (assistantMsg.content) currentAssistantMessage.content = assistantMsg.content
       if (!assistantMsg.tool_calls?.length) {
         currentAction.value = ''
         break
@@ -328,56 +375,14 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           break
         }
 
-        const toolName = toolCall.function.name
-        let toolArgs: Record<string, any> = {}
-        try {
-          toolArgs = JSON.parse(toolCall.function.arguments)
-        } catch (parseErr) {
-          console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
-          toolResults.push({ tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed` })
-          continue
-        }
-        let result = ''
-        const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
-        if (toolDef) {
-          const currentSignature = `${toolName}${JSON.stringify(toolArgs)}`
-          if (currentSignature === lastToolSignature) {
-            result = 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.'
-          } else {
-            currentAction.value = getActionLabelForCategory(toolDef.category)
-            await scrollToBottom()
-            try {
-              result = await toolDef.execute(toolArgs)
-              toolsWereExecuted = true // Mark that at least one tool was successfully executed
-            } catch (err: any) {
-              console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
-              result = `Error in ${toolName}: ${err.message}`
-            }
-            currentAction.value = ''
-            lastToolSignature = currentSignature
-          }
-        }
-
-        // Check abort after tool execution
-        if (abortController.value?.signal.aborted) {
-          toolLoopAborted = true
-          break
-        }
-
-        let safeContent = ''
-        if (result === null || result === undefined) {
-          safeContent = ''
-        } else if (typeof result === 'object') {
-          try {
-            safeContent = JSON.stringify(result)
-          } catch {
-            safeContent = String(result)
-          }
+        const toolResult = await executeToolCall(toolCall, enabledToolDefs)
+        if (toolResult.signature === lastToolSignature) {
+          toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.' })
         } else {
-          safeContent = String(result)
+          lastToolSignature = toolResult.signature || lastToolSignature
+          if (toolResult.success) toolsWereExecuted = true
+          toolResults.push({ tool_call_id: toolResult.tool_call_id, content: toolResult.content })
         }
-
-        toolResults.push({ tool_call_id: toolCall.id, content: safeContent })
       }
 
       // If aborted mid-tool-loop, rollback partial state by removing incomplete assistant message
@@ -404,18 +409,104 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       return
     }
 
-    const assistantContent = history.value[lastIndex]?.content?.trim() || ''
+    const assistantContent = currentAssistantMessage?.content?.trim() || ''
     if (!assistantContent) {
       // If tools were executed successfully but no text response, that's OK (e.g., proofreading with comments)
       if (toolsWereExecuted) {
-        history.value[lastIndex].content = t('toolsExecutedSuccessfully')
+        currentAssistantMessage.content = t('toolsExecutedSuccessfully')
       } else {
-        history.value[lastIndex].content = t('noModelResponse')
+        currentAssistantMessage.content = t('noModelResponse')
       }
     }
 
     if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))
     currentAction.value = ''
+  }
+
+  async function handleSmartReply(userMessage: string) {
+    pendingSmartReply.value = false
+    const replyIntent = userMessage
+    // Fetch the full email body for context
+    let emailBody = ''
+    try {
+      emailBody = await getOfficeSelection({ actionKey: 'reply' })
+    } catch (err) {
+      console.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
+    }
+    if (!emailBody) {
+      messageUtil.error(t('selectEmailPrompt'))
+      return
+    }
+    const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
+    const replyPrompt = getOutlookBuiltInPrompt()['reply']
+    const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+    const sanitizedEmail = '\\n<email_content>\\n' + emailBody.replace(new RegExp('</?email_content>', 'g'), '') + '\\n<'+'/email_content>\\n'
+    const sanitizedIntent = '\\n<user_intent>\\n' + replyIntent.replace(new RegExp('</?user_intent>', 'g'), '') + '\\n<'+'/user_intent>\\n'
+    const userMsg = replyPrompt.user(sanitizedEmail, lang).replace('[REPLY_INTENT]', sanitizedIntent)
+    history.value.push(createDisplayMessage('assistant', ''))
+    await scrollToMessageTop()
+    try {
+      await chatStream({
+        messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+        modelTier: resolveChatModelTier(),
+        onStream: async (text: string) => {
+          const message = history.value[history.value.length - 1]
+          message.role = 'assistant'
+          message.content = text
+          await scrollToBottom()
+        },
+        abortSignal: abortController.value?.signal,
+      })
+      const lastMessage = history.value[history.value.length - 1]
+      if (!lastMessage?.content?.trim()) {
+        lastMessage.content = t('noModelResponse')
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      console.error('[AgentLoop] Smart reply chatStream failed', err)
+      const lastMessage = history.value[history.value.length - 1]
+      if (isCredentialError(err)) {
+        lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
+      } else {
+        lastMessage.content = `Error: The model or API failed to respond. Please try again.`
+      }
+    }
+  }
+
+  async function fetchSelectionWithTimeout() {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let localSelectedText = ''
+    try {
+      const timeoutPromise = new Promise<string>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
+      })
+      
+      if (!hostIsExcel) {
+        // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
+        const htmlPromise = new Promise<string>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000)
+        })
+        
+        try {
+          const htmlContent = await Promise.race([getOfficeSelectionAsHtml({ includeOutlookSelectedText: true }), htmlPromise])
+          if (htmlContent) {
+             const richContext = extractTextFromHtml(htmlContent)
+             localSelectedText = richContext.cleanText || localSelectedText
+          } else {
+             localSelectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+          }
+        } catch {
+          localSelectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+        }
+      } else {
+        localSelectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
+      }
+    } catch (error) {
+      console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+    return localSelectedText
   }
 
   async function processChat(userMessage: string) {
@@ -492,7 +583,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
       if (wordCount < 5) {
         loading.value = false
-        return messageUtil.error(t('imageSelectionTooShort'))
+        return messageUtil.error(t('fileExtractError'))
       }
       isImageFromSelection = true
     }
@@ -507,89 +598,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     try {
       // Smart reply interception: when user sends after clicking "Reply" quick action
       if (pendingSmartReply.value && hostIsOutlook) {
-        pendingSmartReply.value = false
-        const replyIntent = userMessage
-        // Fetch the full email body for context
-        let emailBody = ''
-        try {
-          emailBody = await getOfficeSelection({ actionKey: 'reply' })
-        } catch (err) {
-          console.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
-        }
-        if (!emailBody) {
-          messageUtil.error(t('selectEmailPrompt'))
-          return
-        }
-        const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-        const replyPrompt = getOutlookBuiltInPrompt()['reply']
-        const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
-        const sanitizedEmail = '\\n<email_content>\\n' + emailBody.replace(new RegExp('</?email_content>', 'g'), '') + '\\n<'+'/email_content>\\n'
-        const sanitizedIntent = '\\n<user_intent>\\n' + replyIntent.replace(new RegExp('</?user_intent>', 'g'), '') + '\\n<'+'/user_intent>\\n'
-        const userMsg = replyPrompt.user(sanitizedEmail, lang).replace('[REPLY_INTENT]', sanitizedIntent)
-        history.value.push(createDisplayMessage('assistant', ''))
-        await scrollToMessageTop()
-        try {
-          await chatStream({
-            messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-            modelTier: resolveChatModelTier(),
-            onStream: async (text: string) => {
-              const message = history.value[history.value.length - 1]
-              message.role = 'assistant'
-              message.content = text
-              await scrollToBottom()
-            },
-            abortSignal: abortController.value?.signal,
-          })
-          const lastMessage = history.value[history.value.length - 1]
-          if (!lastMessage?.content?.trim()) {
-            lastMessage.content = t('noModelResponse')
-          }
-        } catch (err: any) {
-          if (err.name === 'AbortError') return
-          console.error('[AgentLoop] Smart reply chatStream failed', err)
-          const lastMessage = history.value[history.value.length - 1]
-          if (isCredentialError(err)) {
-            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
-          } else {
-            lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
-          }
-        }
+        await handleSmartReply(userMessage)
         return
       }
 
       // If we haven't fetched it yet and it's enabled
       if (useSelectedText.value && !isImageFromSelection) {
-        let timeoutId: ReturnType<typeof setTimeout> | null = null
-        try {
-          const timeoutPromise = new Promise<string>((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000)
-          })
-          
-          if (!hostIsExcel) {
-            // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
-            const htmlPromise = new Promise<string>((_, reject) => {
-              timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000)
-            })
-            
-            try {
-              const htmlContent = await Promise.race([getOfficeSelectionAsHtml({ includeOutlookSelectedText: true }), htmlPromise])
-              if (htmlContent) {
-                 const richContext = extractTextFromHtml(htmlContent)
-                 selectedText = richContext.cleanText || selectedText
-              } else {
-                 selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
-              }
-            } catch {
-              selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
-            }
-          } else {
-            selectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
-          }
-        } catch (error) {
-          console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
-        } finally {
-          if (timeoutId) clearTimeout(timeoutId)
-        }
+        selectedText = await fetchSelectionWithTimeout()
       }
 
       let fullMessage = displayMessageText
@@ -604,7 +619,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
            }
         } catch (uploadObjErr: any) {
            console.error('[AgentLoop] File upload/extraction failed', uploadObjErr)
-           messageUtil.error('Erreur lors de l’extraction du fichier.')
+           messageUtil.error(t('somethingWentWrong'))
            return
         }
       }

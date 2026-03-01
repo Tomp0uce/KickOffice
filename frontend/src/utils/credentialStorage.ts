@@ -37,17 +37,6 @@ function deobfuscate(encoded: string): string {
 
 const STORAGE_PREFIX = 'ko_cred_'
 
-export interface CredentialStorage {
-  getUserKey: () => string
-  setUserKey: (value: string) => void
-  getUserEmail: () => string
-  setUserEmail: (value: string) => void
-  getRememberCredentials: () => boolean
-  setRememberCredentials: (value: boolean) => void
-  clearCredentials: () => void
-  migrateFromSessionStorage: () => void
-}
-
 /**
  * Get credential from the appropriate storage
  */
@@ -166,15 +155,4 @@ export function migrateFromSessionStorage(): void {
       sessionStorage.removeItem('litellmUserEmail')
     }
   }
-}
-
-export const credentialStorage: CredentialStorage = {
-  getUserKey,
-  setUserKey,
-  getUserEmail,
-  setUserEmail,
-  getRememberCredentials,
-  setRememberCredentials,
-  clearCredentials,
-  migrateFromSessionStorage,
 }

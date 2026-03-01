@@ -2165,8 +2165,4 @@ export function getExcelToolDefinitions(): ExcelToolDefinition[] {
   return Object.values(excelToolDefinitions)
 }
 
-export function getExcelTool(name: ExcelToolName): ExcelToolDefinition | undefined {
-  return excelToolDefinitions[name]
-}
-
 export { excelToolDefinitions }

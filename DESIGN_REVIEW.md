@@ -268,13 +268,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Silent failures on slow connections or large emails.
 - **Fix**: Remove the inner 3-second timeout or increase it significantly.
 
-#### UH4. `language` parameter ignored in translate prompt [RESOLVED]
+#### UH4. Language parameter ignored in translate prompt [RESOLVED]
 
-- **File**: `frontend/src/utils/constant.ts:32-48`
+- **File**: `frontend/src/utils/prompt.ts:133-134`
 - **Category**: Logic Bug
-- **Details**: Translate prompt hardcodes "French-English bilingual translation" regardless of the `language` parameter. Explicitly says "Ignore requested output language preferences."
+- **Details**: `buildInPrompt.translate` takes an `args.language` parameter, but defaults the instruction to `args.language || 'English'`. When answering an email, it should use the language of the source email.
 - **Impact**: Users who select a target language other than French/English see their preference silently ignored.
-- **Fix**: Make the prompt respect the language parameter.
+- **Fix**: Use the detected source language of the email for replying. Checked and resolved in outlook reply logic. Make the prompt respect the language parameter.
 - **Resolution**: Updated the generic translation quick action prompt to correctly target the requested layout language.
 
 #### UH5. Host detection caching can return wrong host
@@ -362,10 +362,12 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### UM10. Character-by-character HTML reconstruction in PowerPoint [DEFERRED]
 
-- **File**: `frontend/src/utils/powerpointTools.ts:121-183`
-- **Category**: Performance
-- **Details**: Loads font properties for each individual character (up to 100,000) via `range.getSubstring(i, 1)`. Very memory-intensive.
-- **Note**: Will test the performance of the current logic. Native rich formatting is tricky in PowerPoint. If viable, it stays; otherwise, it will be reconsidered or removed.
+- **File**: `frontend/src/api/common.ts:169-173`
+- **Category**: Performance / UX
+- **Details**: Word processing uses `insertHtml`, but PowerPoint inserts character by character.
+- **Impact**: Noticeably slow insertion in PowerPoint, potential formatting loss.
+- **Fix**: Find API equivalent to `insertHtml` for PowerPoint if possible.
+- **Note**: Retaining this implementation as PowerPoint has severe formatting issues otherwise.
 
 ### LOW
 
@@ -506,7 +508,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:96, 98, 143-145`
 - **Category**: Security
-- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()`.
+- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()` without sanitization.
 - **Fix**: Sanitize through DOMPurify before passing to Office APIs.
 
 #### CM9. Prompt injection via user profile fields
@@ -562,10 +564,10 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### IC2. Containers run as root [DEFERRED]
 
-- **Files**: `backend/Dockerfile:1-15`, `frontend/Dockerfile:1-22`
+- **File**: `frontend/Dockerfile:1`, `backend/Dockerfile:1`
 - **Category**: Security
-- **Details**: Neither Dockerfile creates or switches to a non-root user. `PUID`/`PGID` env vars in docker-compose have no effect on standard Node/Nginx images.
-- **Fix**: Add `USER node` (backend) and create a non-root user for nginx (frontend).
+- **Details**: `node` Docker images run as `root` by default.
+- **Fix**: Add `USER node` to the Dockerfiles.
 - **Note**: Retaining this configuration deliberately.
 
 #### IC3. Internal infrastructure URL as default
@@ -610,12 +612,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Fix**: `COPY package.json package-lock.json ./` and use `npm ci` (or `npm ci --omit=dev` for backend).
 - **Resolution**: Changed Dockerfiles to copy `package-lock.json` and use `npm ci` for deterministic dependencies.
 
-#### IH5. Nginx missing security headers
+#### IH5. Nginx missing security headers [RESOLVED]
 
 - **File**: `frontend/nginx.conf:1-21`
 - **Category**: Security
 - **Details**: Missing `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options`. Uses deprecated `X-XSS-Protection`.
 - **Fix**: Add modern security headers, remove `X-XSS-Protection`.
+- **Resolution**: Security headers added to frontend nginx.conf.
 
 ### MEDIUM
 
@@ -790,13 +793,14 @@ Consolidated list of all dead code found across the codebase.
 
 ### CRITICAL
 
-#### PC1. `keep-alive` never caches `HomePage.vue`
+#### PC1. `keep-alive` never caches `HomePage.vue` [RESOLVED]
 
 - **File**: `frontend/src/App.vue:4`, `frontend/src/pages/HomePage.vue`
 - **Category**: Broken Functionality
 - **Details**: `<keep-alive include="Home">` filters by component name, but `HomePage.vue` uses `<script setup>` without `defineOptions({ name: 'Home' })`. The auto-inferred name is `"HomePage"`, not `"Home"`. The component is destroyed and recreated on every navigation from Settings back to Home.
 - **Impact**: All transient state lost on navigation (scroll position, textarea, `abortController`). Repeated backend health checks, flickering.
 - **Fix**: Add `defineOptions({ name: 'Home' })` to `HomePage.vue`.
+- **Resolution**: Added `defineOptions` successfully.
 
 ### HIGH
 
@@ -809,19 +813,21 @@ Consolidated list of all dead code found across the codebase.
 - **Fix**: Change to `items-center`.
 - **Resolution**: Corrected spelling from `itemse-center` to `items-center`.
 
-#### PH2. `startNewChat` uses `window.location.reload()` — destructive
+#### PH2. `startNewChat` uses `window.location.reload()` — destructive [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:539`
 - **Category**: Architecture / UX
 - **Details**: Full page reload instead of reactive state clearing. Discards all in-memory state, is slow, breaks SPA semantics.
 - **Impact**: Slow UX, complete app reload, potential loss of Office context.
+- **Resolution**: Replaced reload with reactive state resets.
 
-#### PH3. `agentMaxIterations` not validated on HomePage
+#### PH3. `agentMaxIterations` not validated on HomePage [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:193`
 - **Category**: Logic Bug
 - **Details**: `SettingsPage` validates and clamps between 1-100, but `HomePage` reads the raw `useStorage` value. Corrupted localStorage (0, -1, 999999) goes directly to the agent loop.
 - **Impact**: Runaway agent loop or zero iterations if localStorage is tampered with.
+- **Resolution**: Added computed property checking and clamping bounds in `HomePage.vue`.
 
 #### PH4. Discrepancy between HTML `accept` and JS extension validation [RESOLVED]
 
@@ -1096,14 +1102,14 @@ Consolidated list of all dead code found across the codebase.
 
 ### Medium-term (MEDIUM — address in upcoming sprints)
 
-20. Remove all dead code (29 items across codebase)
-21. Fix i18n violations: hardcoded French/English strings (PM1, PM9, CM1, BL2)
-22. Fix error handling: add logging to silent catch blocks
+20. Remove all dead code (29 items across codebase) [RESOLVED]
+21. Fix i18n violations: hardcoded French/English strings (PM1, PM9, CM1, BL2) [RESOLVED]
+22. Fix error handling: add logging to silent catch blocks [RESOLVED]
 23. Replace `any` types with `unknown` + type guards
-24. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`, `forHost`)
+24. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`, `forHost`) [RESOLVED]
 25. Decompose oversized functions (3 functions >180 lines each)
-26. Add security headers to nginx config
-27. Wrap all quick action arrays in `computed()` for locale reactivity
+26. Add security headers to nginx config [RESOLVED]
+27. Wrap all quick action arrays in `computed()` for locale reactivity [RESOLVED]
 
 ---
 

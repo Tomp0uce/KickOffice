@@ -154,11 +154,14 @@ function validateMessage(message, index) {
 
 /**
  * Validates chat request parameters (shared between /api/chat and /api/chat/sync).
- * Returns { error: string } on failure, or { modelConfig, parsedTools } on success.
+ * Returns { error: string } on failure, or { modelConfig, parsedTools, temperature, maxTokens } on success.
  */
-function validateChatRequest({ messages, modelTier = 'standard', temperature, maxTokens, tools }, routeName) {
+const validateChatRequest = (body) => {
+  const { messages, modelTier, tools, temperature, maxTokens } = body
+
+  // Check required fields
   if (!messages || !Array.isArray(messages)) {
-    return { error: 'messages array is required' }
+    return { error: 'messages is required and must be an array' }
   }
 
   if (messages.length === 0) {
@@ -186,6 +189,11 @@ function validateChatRequest({ messages, modelTier = 'standard', temperature, ma
     return { error: 'Use /api/image for image generation' }
   }
 
+  const parsedTools = validateTools(tools)
+  if (parsedTools.error) {
+    return { error: parsedTools.error }
+  }
+
   const parsedTemperature = validateTemperature(temperature)
   if (parsedTemperature.error) {
     return { error: parsedTemperature.error }
@@ -196,27 +204,15 @@ function validateChatRequest({ messages, modelTier = 'standard', temperature, ma
     return { error: parsedMaxTokens.error }
   }
 
-  if (isChatGptModel(modelConfig.id) && (temperature !== undefined || maxTokens !== undefined)) {
-    return { error: 'temperature and maxTokens are not supported for ChatGPT models' }
+  return { 
+    modelConfig, 
+    parsedTools,
+    temperature: parsedTemperature.value,
+    maxTokens: parsedMaxTokens.value
   }
-
-  const requiresReasoningSafeParams = isGpt5Model(modelConfig.id)
-  if (requiresReasoningSafeParams && temperature !== undefined) {
-    return { error: 'temperature is not supported for GPT-5 models' }
-  }
-
-  const parsedTools = validateTools(tools)
-  if (parsedTools.error) {
-    return { error: parsedTools.error }
-  }
-
-  return { modelConfig, parsedTools }
 }
 
-export {
+module.exports = {
   validateChatRequest,
-  validateImagePayload,
-  validateMaxTokens,
-  validateTemperature,
-  validateTools,
+  validateImagePayload
 }

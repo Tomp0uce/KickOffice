@@ -10,8 +10,34 @@ export interface UseOfficeSelectionOptions {
 export function useOfficeSelection(options: UseOfficeSelectionOptions) {
   const { hostIsOutlook, hostIsPowerPoint, hostIsExcel } = options
 
+  function withTimeout<T>(promise: Promise<T>, ms: number, fallbackValue: T): Promise<T> {
+    return new Promise((resolve) => {
+      let resolved = false
+      const timeoutId = setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          resolve(fallbackValue)
+        }
+      }, ms)
+      
+      promise.then((val) => {
+        if (!resolved) {
+          resolved = true
+          clearTimeout(timeoutId)
+          resolve(val)
+        }
+      }).catch(() => {
+        if (!resolved) {
+          resolved = true
+          clearTimeout(timeoutId)
+          resolve(fallbackValue)
+        }
+      })
+    })
+  }
+
   const getOutlookMailBody = (): Promise<string> => {
-    return Promise.race([
+    return withTimeout(
       new Promise<string>((resolve) => {
         try {
           const mailbox = getOutlookMailbox()
@@ -19,12 +45,13 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           mailbox.item.body.getAsync(getOfficeTextCoercionType(), (result: OfficeAsyncResult<string>) => resolve(isOfficeAsyncSucceeded(result.status) ? (result.value || '') : ''))
         } catch { resolve('') }
       }),
-      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
-    ])
+      3000,
+      ''
+    )
   }
 
   const getOutlookMailBodyAsHtml = (): Promise<string> => {
-    return Promise.race([
+    return withTimeout(
       new Promise<string>((resolve) => {
         try {
           const mailbox = getOutlookMailbox()
@@ -34,12 +61,13 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           mailbox.item.body.getAsync(htmlType, (result: OfficeAsyncResult<string>) => resolve(isOfficeAsyncSucceeded(result.status) ? (result.value || '') : ''))
         } catch { resolve('') }
       }),
-      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
-    ])
+      3000,
+      ''
+    )
   }
 
   const getOutlookSelectedText = (): Promise<string> => {
-    return Promise.race([
+    return withTimeout(
       new Promise<string>((resolve) => {
         try {
           const mailbox = getOutlookMailbox()
@@ -47,12 +75,13 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           mailbox.item.getSelectedDataAsync(getOfficeTextCoercionType(), (result: OfficeAsyncResult<{ data?: string }>) => resolve(isOfficeAsyncSucceeded(result.status) && result.value?.data ? result.value.data : ''))
         } catch { resolve('') }
       }),
-      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
-    ])
+      3000,
+      ''
+    )
   }
 
   const getOutlookSelectedHtml = (): Promise<string> => {
-    return Promise.race([
+    return withTimeout(
       new Promise<string>((resolve) => {
         try {
           const mailbox = getOutlookMailbox()
@@ -62,8 +91,9 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           mailbox.item.getSelectedDataAsync(htmlType, (result: OfficeAsyncResult<{ data?: string }>) => resolve(isOfficeAsyncSucceeded(result.status) && result.value?.data ? result.value.data : ''))
         } catch { resolve('') }
       }),
-      new Promise<string>(resolve => setTimeout(() => resolve(''), 3000))
-    ])
+      3000,
+      ''
+    )
   }
 
   async function getOfficeSelection(selectionOptions?: { includeOutlookSelectedText?: boolean, actionKey?: string }): Promise<string> {
@@ -87,7 +117,18 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         const range = ctx.workbook.getSelectedRange()
         range.load('values, address')
         await ctx.sync()
-        return `[${range.address}]\n${range.values.map((row: any[]) => row.join('\t')).join('\n')}`
+        
+        // Escape tabs and newlines in cell values to prevent ambiguous output
+        const escapeCell = (val: any) => {
+          if (val === null || val === undefined) return ''
+          const str = String(val)
+          if (str.includes('\t') || str.includes('\n') || str.includes('\r')) {
+            return `"${str.replace(/"/g, '""')}"`
+          }
+          return str
+        }
+        
+        return `[${range.address}]\n${range.values.map((row: any[]) => row.map(escapeCell).join('\t')).join('\n')}`
       })
     }
     return Word.run(async (ctx) => {
@@ -132,7 +173,8 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         await ctx.sync()
         return htmlResult.value || ''
       })
-    } catch {
+    } catch (err) {
+      console.warn('[useOfficeSelection] Word getHtml failed', err)
       return ''
     }
   }

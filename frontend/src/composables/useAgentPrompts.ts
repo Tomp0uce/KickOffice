@@ -10,7 +10,6 @@ export interface UseAgentPromptsOptions {
   hostIsOutlook: boolean
   hostIsPowerPoint: boolean
   hostIsExcel: boolean
-  hostIsWord: boolean
 }
 
 export function useAgentPrompts(options: UseAgentPromptsOptions) {
@@ -23,7 +22,6 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
-    hostIsWord,
   } = options
 
   const excelFormulaLanguageInstruction = () => excelFormulaLanguage.value === 'fr'
@@ -31,8 +29,10 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
     : 'Excel interface locale: English. Use English function names and standard English formula syntax.'
 
   const userProfilePromptBlock = () => {
-    const firstName = userFirstName.value.trim()
-    const lastName = userLastName.value.trim()
+    // Sanitize user input to prevent prompt injection
+    const sanitize = (str: string) => str.replace(/[<-]/g, '')
+    const firstName = sanitize(userFirstName.value).trim()
+    const lastName = sanitize(userLastName.value).trim()
     const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName')
     const genderMap: Record<string, string> = {
       female: t('userGenderFemale'), male: t('userGenderMale'), nonbinary: t('userGenderNonBinary'), unspecified: t('userGenderUnspecified'),
