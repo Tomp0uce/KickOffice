@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { createStream } from 'rotating-file-stream'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -11,7 +12,59 @@ if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true })
 }
 
-const LOG_FILE = path.join(LOGS_DIR, 'kickoffice.log')
+// Create a rotating write stream
+const accessLogStream = createStream('kickoffice.log', {
+  size: '10M', // rotate every 10 MegaBytes written
+  interval: '1d', // rotate daily
+  compress: 'gzip', // compress rotated files
+  path: LOGS_DIR,
+  maxFiles: 30 // Keep up to 30 rotated log files
+})
+
+function redactData(data) {
+  if (!data) return data;
+  if (typeof data !== 'object') return data;
+  
+  // Clone the object to avoid mutating the original
+  let redacted;
+  try {
+    redacted = JSON.parse(JSON.stringify(data));
+  } catch (e) {
+    return '[Unserializable Data]';
+  }
+
+  const redactMessages = (obj) => {
+    if (obj.messages && Array.isArray(obj.messages)) {
+      obj.messages = obj.messages.map(msg => ({
+        ...msg,
+        content: '[REDACTED_FOR_PRIVACY]'
+      }));
+    }
+    if (obj.body && obj.body.messages && Array.isArray(obj.body.messages)) {
+      obj.body.messages = obj.body.messages.map(msg => ({
+        ...msg,
+        content: '[REDACTED_FOR_PRIVACY]'
+      }));
+    }
+  };
+
+  const redactChoices = (obj) => {
+    if (obj.choices && Array.isArray(obj.choices)) {
+      obj.choices = obj.choices.map(choice => {
+        const c = { ...choice };
+        if (c.message && c.message.content) {
+          c.message.content = '[REDACTED_FOR_PRIVACY]';
+        }
+        return c;
+      });
+    }
+  };
+
+  redactMessages(redacted);
+  redactChoices(redacted);
+
+  return redacted;
+}
 
 /**
  * Custom file logger to capture detailed payloads and responses.
@@ -25,7 +78,8 @@ export function systemLog(level, message, data = null) {
   let dataStr = ''
   if (data !== null) {
     try {
-      dataStr = '\n' + JSON.stringify(data, null, 2)
+      const safeData = redactData(data);
+      dataStr = '\n' + JSON.stringify(safeData, null, 2)
     } catch (err) {
       dataStr = '\n[Unserializable Data]'
     }
@@ -40,8 +94,6 @@ export function systemLog(level, message, data = null) {
     process.stdout.write(logEntry)
   }
 
-  // Append to log file
-  fs.appendFile(LOG_FILE, logEntry, (err) => {
-    if (err) console.error('Failed to write to system log file:', err)
-  })
+  // Append to log rotating file stream
+  accessLogStream.write(logEntry)
 }

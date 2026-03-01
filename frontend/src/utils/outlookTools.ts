@@ -1,5 +1,7 @@
 import DiffMatchPatch from 'diff-match-patch'
 
+import DOMPurify from 'dompurify'
+
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './officeRichText'
 import { sandboxedEval } from './sandbox'
@@ -280,7 +282,7 @@ const outlookToolDefinitions = createOutlookTools({
 
       return new Promise<string>((resolve) => {
         mailbox.item.body.setAsync(
-          html,
+          DOMPurify.sanitize(html),
           { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
             resolve(resolveAsyncResult(result, () => 'Successfully set HTML email body.'))
@@ -524,7 +526,7 @@ const outlookToolDefinitions = createOutlookTools({
 
       return new Promise<string>((resolve) => {
         mailbox.item.body.setSelectedDataAsync(
-          html,
+          DOMPurify.sanitize(html),
           { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
             resolve(resolveAsyncResult(result, () => 'Successfully inserted HTML at cursor.'))

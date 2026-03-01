@@ -17,6 +17,7 @@
     "morgan": "^1.10.1",
     "multer": "^2.1.0",
     "pdf-parse": "^2.4.5",
+    "rotating-file-stream": "^3.2.9",
     "xlsx": "^0.18.5"
   },
   "engines": {

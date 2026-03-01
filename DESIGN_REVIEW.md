@@ -15,14 +15,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### v2 Open Items Status
 
-| ID | Description | Status |
-|----|-------------|--------|
-| B1 | No unit test infrastructure | OPEN |
-| B2 | No linting or formatting configuration | OPEN |
-| B3 | No CI pipeline for automated testing | OPEN |
-| F1 | Quick actions strip images/formatting | OPEN |
-| F2 | Outlook Reply produces low-quality responses | OPEN |
-| F3 | Excel agent processes cells one-by-one | OPEN |
+| ID  | Description                                  | Status |
+| --- | -------------------------------------------- | ------ |
+| B1  | No unit test infrastructure                  | OPEN   |
+| B2  | No linting or formatting configuration       | OPEN   |
+| B3  | No CI pipeline for automated testing         | OPEN   |
+| F1  | Quick actions strip images/formatting        | OPEN   |
+| F2  | Outlook Reply produces low-quality responses | OPEN   |
+| F3  | Excel agent processes cells one-by-one       | OPEN   |
 
 ---
 
@@ -30,7 +30,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### BC1. Content-Type enforcement blocks file uploads
+#### BC1. Content-Type enforcement blocks file uploads [RESOLVED]
 
 - **File**: `backend/src/server.js:91-96`
 - **Category**: Broken Functionality
@@ -46,7 +46,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Exposes internal infrastructure endpoint. Potential SSRF if the env var is misconfigured.
 - **Fix**: Replace with a placeholder like `https://your-llm-api.example.com/v1` and add URL validation.
 
-#### BC3. Sensitive data logged to disk in plaintext
+#### BC3. Sensitive data logged to disk in plaintext [RESOLVED]
 
 - **File**: `backend/src/utils/logger.js:22-46`, `backend/src/routes/chat.js:49-52, 157-159, 210`
 - **Category**: Security / Privacy
@@ -230,7 +230,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Any XSS vulnerability allows immediate credential theft. The obfuscation creates a false sense of security.
 - **Fix**: Document the limitation clearly. Consider using session-only storage or backend-managed tokens.
 
-#### UC3. Unsanitized HTML injection in Outlook tools
+#### UC3. Unsanitized HTML injection in Outlook tools [RESOLVED]
 
 - **File**: `frontend/src/utils/outlookTools.ts:505-534` (insertHtmlAtCursor), `outlookTools.ts:261-291` (setEmailBodyHtml)
 - **Category**: Security / XSS
@@ -546,7 +546,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### IC1. Content-Type middleware blocks uploads (same as BC1)
+#### IC1. Content-Type middleware blocks uploads (same as BC1) [RESOLVED]
 
 - **File**: `backend/src/server.js:91-96`
 - **Details**: See BC1. The upload route at line 104 is unreachable for multipart requests.
@@ -690,61 +690,64 @@ Consolidated list of all dead code found across the codebase.
 
 ### Backend Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally |
-| BD2 | `backend/src/services/llmClient.js:10-29` | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports | Only used internally |
-| BD3 | `backend/src/middleware/validate.js:159` | `routeName` parameter | Never referenced in function body |
-| BD4 | `backend/src/routes/image.js:17-19` | `if (!imageModel)` branch | Can never be true |
+| ID  | File                                         | Item                                                                | Details                           |
+| --- | -------------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
+| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally              |
+| BD2 | `backend/src/services/llmClient.js:10-29`    | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports         | Only used internally              |
+| BD3 | `backend/src/middleware/validate.js:159`     | `routeName` parameter                                               | Never referenced in function body |
+| BD4 | `backend/src/routes/image.js:17-19`          | `if (!imageModel)` branch                                           | Can never be true                 |
 
 ### Frontend Utilities Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| UD1 | `frontend/src/utils/hostDetection.ts:55-57` | `getHostName()` export | Never imported anywhere |
-| UD2 | `frontend/src/utils/excelTools.ts:2149-2151` | `getExcelTool()` export | Never imported anywhere |
-| UD3 | `frontend/src/utils/wordTools.ts:1889-1891` | `getWordTool()` export | Never imported anywhere |
-| UD4 | `frontend/src/utils/outlookTools.ts:571-573` | `getOutlookTool()` export | Never imported anywhere |
-| UD5 | `frontend/src/utils/powerpointTools.ts:949-951` | `getPowerPointTool()` export | Never imported anywhere |
-| UD6 | `frontend/src/utils/generalTools.ts:98-103` | `getEnabledGeneralTools()` export | Never imported anywhere |
-| UD7 | `frontend/src/utils/powerpointTools.ts:63-66` | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
-| UD8 | `frontend/src/utils/toolStorage.ts:10` | `buildToolSignature()` export | Only used internally |
-| UD9 | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export | All consumers import named exports directly |
-| UD10 | `frontend/src/utils/credentialStorage.ts:40-49` | `CredentialStorage` interface export | Never imported |
-| UD11 | `frontend/src/utils/excelTools.ts:66` | `'eval_officejs'` in `ExcelToolName` | No tool definition exists |
-| UD12 | `frontend/src/utils/excelTools.ts:753` | `dataRange` variable in `sortRange` | Assigned but never read |
-| UD13 | `frontend/src/utils/common.ts:3-13` | `getOptionList()` export | Only used internally |
+| ID   | File                                              | Item                                   | Details                                                         |
+| ---- | ------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| UD1  | `frontend/src/utils/hostDetection.ts:55-57`       | `getHostName()` export                 | Never imported anywhere                                         |
+| UD2  | `frontend/src/utils/excelTools.ts:2149-2151`      | `getExcelTool()` export                | Never imported anywhere                                         |
+| UD3  | `frontend/src/utils/wordTools.ts:1889-1891`       | `getWordTool()` export                 | Never imported anywhere                                         |
+| UD4  | `frontend/src/utils/outlookTools.ts:571-573`      | `getOutlookTool()` export              | Never imported anywhere                                         |
+| UD5  | `frontend/src/utils/powerpointTools.ts:949-951`   | `getPowerPointTool()` export           | Never imported anywhere                                         |
+| UD6  | `frontend/src/utils/generalTools.ts:98-103`       | `getEnabledGeneralTools()` export      | Never imported anywhere                                         |
+| UD7  | `frontend/src/utils/powerpointTools.ts:63-66`     | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
+| UD8  | `frontend/src/utils/toolStorage.ts:10`            | `buildToolSignature()` export          | Only used internally                                            |
+| UD9  | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export      | All consumers import named exports directly                     |
+| UD10 | `frontend/src/utils/credentialStorage.ts:40-49`   | `CredentialStorage` interface export   | Never imported                                                  |
+| UD11 | `frontend/src/utils/excelTools.ts:66`             | `'eval_officejs'` in `ExcelToolName`   | No tool definition exists                                       |
+| UD12 | `frontend/src/utils/excelTools.ts:753`            | `dataRange` variable in `sortRange`    | Assigned but never read                                         |
+| UD13 | `frontend/src/utils/common.ts:3-13`               | `getOptionList()` export               | Only used internally                                            |
 
 ### Frontend Composables Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
+| ID  | File                                                 | Item                | Details                           |
+| --- | ---------------------------------------------------- | ------------------- | --------------------------------- |
 | CD1 | `frontend/src/composables/useAgentPrompts.ts:13, 26` | `hostIsWord` option | Destructured but never referenced |
 
 ### Infrastructure Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images |
-| ID2 | `backend/Dockerfile:12-13` | Dockerfile HEALTHCHECK | Overridden by compose |
-| ID3 | `backend/Dockerfile:10` | `EXPOSE 3003` | Purely documentary, port set by compose |
-| ID4 | `.gitignore:31-38` | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
+| ID  | File                              | Item                   | Details                                         |
+| --- | --------------------------------- | ---------------------- | ----------------------------------------------- |
+| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images                 |
+| ID2 | `backend/Dockerfile:12-13`        | Dockerfile HEALTHCHECK | Overridden by compose                           |
+| ID3 | `backend/Dockerfile:10`           | `EXPOSE 3003`          | Purely documentary, port set by compose         |
+| ID4 | `.gitignore:31-38`                | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
 
 ---
 
 ## 7. v2 Open Feature Issues (carried forward)
 
 ### F1. Quick actions strip images/formatting from documents
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
 
 ### F2. Outlook Reply produces low-quality responses
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
 
 ### F3. Excel agent processes cells one-by-one
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
@@ -754,12 +757,15 @@ Consolidated list of all dead code found across the codebase.
 ## 8. Build & Environment Warnings (carried forward from v2)
 
 ### B1. No unit test infrastructure
+
 - **Status**: OPEN
 
 ### B2. No linting or formatting configuration
+
 - **Status**: OPEN
 
 ### B3. No CI pipeline for automated testing
+
 - **Status**: OPEN
 
 ---
@@ -1015,28 +1021,28 @@ Consolidated list of all dead code found across the codebase.
 
 ### Pages/Components Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| PD1 | `frontend/src/pages/HomePage.vue:92` | `Briefcase` import | Never used in template or script |
-| PD2 | `frontend/src/pages/HomePage.vue:94` | `CheckCircle` import | Never used anywhere |
-| PD3 | `frontend/src/components/SettingSection.vue` | Entire component file | Never imported or used |
-| PD4 | `frontend/src/components/chat/ChatInput.vue:210` | `handleDragLeave` param `e` | Declared but never read |
-| PD5 | `frontend/src/components/chat/ChatInput.vue:177, 191` | `"input"` emit | Emitted but no consumer listens |
-| PD6 | `frontend/src/components/SettingCard.vue:2` | `p1` prop | Never passed by any consumer |
-| PD7 | `frontend/src/App.vue:11` | Empty `<script>` block | No code inside |
+| ID  | File                                                  | Item                        | Details                          |
+| --- | ----------------------------------------------------- | --------------------------- | -------------------------------- |
+| PD1 | `frontend/src/pages/HomePage.vue:92`                  | `Briefcase` import          | Never used in template or script |
+| PD2 | `frontend/src/pages/HomePage.vue:94`                  | `CheckCircle` import        | Never used anywhere              |
+| PD3 | `frontend/src/components/SettingSection.vue`          | Entire component file       | Never imported or used           |
+| PD4 | `frontend/src/components/chat/ChatInput.vue:210`      | `handleDragLeave` param `e` | Declared but never read          |
+| PD5 | `frontend/src/components/chat/ChatInput.vue:177, 191` | `"input"` emit              | Emitted but no consumer listens  |
+| PD6 | `frontend/src/components/SettingCard.vue:2`           | `p1` prop                   | Never passed by any consumer     |
+| PD7 | `frontend/src/App.vue:11`                             | Empty `<script>` block      | No code inside                   |
 
 ---
 
 ## 10. Summary Statistics
 
-| Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
-|------|----------|------|--------|-----|-----------|-------|
-| Backend | 4 | 7 | 10 | 4 | 4 | 29 |
-| Frontend Utils | 3 | 7 | 10 | 4 | 13 | 37 |
-| Composables | 2 | 7 | 11 | 5 | 1 | 26 |
-| Infrastructure | 3 | 5 | 8 | 7 | 4 | 27 |
-| Pages/Components/API | 1 | 8 | 19 | 8 | 7 | 43 |
-| **Total** | **13** | **34** | **58** | **28** | **29** | **162** |
+| Area                 | CRITICAL | HIGH   | MEDIUM | LOW    | Dead Code | Total   |
+| -------------------- | -------- | ------ | ------ | ------ | --------- | ------- |
+| Backend              | 4        | 7      | 10     | 4      | 4         | 29      |
+| Frontend Utils       | 3        | 7      | 10     | 4      | 13        | 37      |
+| Composables          | 2        | 7      | 11     | 5      | 1         | 26      |
+| Infrastructure       | 3        | 5      | 8      | 7      | 4         | 27      |
+| Pages/Components/API | 1        | 8      | 19     | 8      | 7         | 43      |
+| **Total**            | **13**   | **34** | **58** | **28** | **29**    | **162** |
 
 ---
 
@@ -1080,4 +1086,4 @@ Consolidated list of all dead code found across the codebase.
 
 ---
 
-*Last updated: 2026-03-01*
+_Last updated: 2026-03-01_
