@@ -11,11 +11,10 @@ This document provides operational guidance for AI coding agents working in this
 
 | File                                   | Purpose                                                                                                     |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Architecture, security, code quality audit v2 — 28 open issues by severity (CRITICAL/HIGH/MEDIUM/LOW/BUILD) |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Code audit v3 — 162 issues across backend, frontend, infra (13 CRITICAL, 34 HIGH, 58 MEDIUM, 28 LOW, 29 dead code) |
 | [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority (HIGH/MEDIUM/LOW)                                           |
 | [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions                                                |
 | [REPORT-openexcel-kickoffice-comparison.md](./REPORT-openexcel-kickoffice-comparison.md) | OpenExcel vs KickOffice feature comparison — chat UX, conversation management, tool status, stats bar |
-| [REPORT-composables-audit.md](./REPORT-composables-audit.md) | Frontend composables deep audit — 41 issues (2 CRITICAL, 7 HIGH, 22 MEDIUM, 10 LOW) across 5 files |
 
 ## 2) Product and Architecture Snapshot
 
