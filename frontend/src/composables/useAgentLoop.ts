@@ -1,7 +1,7 @@
 import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
-import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -812,9 +812,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           systemMsg = selectedExcelQuickAction.systemPrompt
           userMsg = `Selection:\n${selectedText}`
         } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
-      } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+      } else action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
       if (!systemMsg || !userMsg) {
-        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
         if (!action) return
         const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
         systemMsg = action.system(lang)

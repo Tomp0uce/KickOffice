@@ -20,7 +20,7 @@ function insertHtmlWithCommonApi(html: string): Promise<void> {
 }
 
 class WordFormatter {
-  static async insertFormattedResult(result: string, insertType: Ref): Promise<void> {
+  static async insertFormattedResult(result: string, insertType: Ref<string>): Promise<void> {
     if (!result || !result.trim()) return
 
     const html = renderOfficeRichHtml(result)
@@ -51,7 +51,7 @@ class WordFormatter {
     })
   }
 
-  static async insertPlainResult(result: string, insertType: Ref): Promise<void> {
+  static async insertPlainResult(result: string, insertType: Ref<string>): Promise<void> {
     const normalizedResult = stripRichFormattingSyntax(result.replace(/\r\n/g, '\n').replace(/\r/g, '\n'))
 
     if (!normalizedResult.trim()) return

@@ -27,7 +27,7 @@ CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
 - For emphasis, use **bold** (not CAPS or underlining)
 - For document structure, use Markdown headings (# ## ###)`
 
-export const buildInPrompt = {
+export const builtInPrompt = {
   translate: {
     system: (language: string) =>
       `You are an expert polyglot translator. Your task is to translate the provided text into ${language}.
@@ -491,15 +491,15 @@ export const getExcelBuiltInPrompt = () => {
 export const getBuiltInPrompt = () => {
   const stored = localStorage.getItem('customBuiltInPrompts')
   if (!stored) {
-    return buildInPrompt
+    return builtInPrompt
   }
 
   try {
     const customPrompts = JSON.parse(stored)
-    const result = { ...buildInPrompt }
+    const result = { ...builtInPrompt }
 
     Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof buildInPrompt
+      const typedKey = key as keyof typeof builtInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
           system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
@@ -512,6 +512,6 @@ export const getBuiltInPrompt = () => {
     return result
   } catch (error) {
     console.error('Error loading custom built-in prompts:', error)
-    return buildInPrompt
+    return builtInPrompt
   }
 }

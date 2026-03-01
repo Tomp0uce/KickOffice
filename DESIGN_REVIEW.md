@@ -219,23 +219,17 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### UM5. `Ref` without type parameter in WordFormatter [OPEN]
+#### UM5. `Ref` without type parameter in WordFormatter [RESOLVED]
 
-- **File**: `frontend/src/utils/wordFormatter.ts:23, 54`
-- **Category**: Type Safety
-- **Details**: `insertType: Ref` (bare, unparameterized). Value is typed as `unknown`, requiring implicit `any` comparisons.
+> **Status**: Implemented. `insertType: Ref` changed to `insertType: Ref<string>` in both method signatures.
 
-#### UM6. `searchAndReplace` tools labeled as category `'read'` [OPEN]
+#### UM6. `searchAndReplace` tools labeled as category `'read'` [RESOLVED]
 
-- **Files**: `excelTools.ts:1365`, `wordTools.ts:517`
-- **Category**: Inconsistency
-- **Details**: Both perform write operations (replacing text/values) but are categorized as `'read'`.
+> **Status**: Implemented. Category changed to `'write'` in both excelTools.ts and wordTools.ts.
 
-#### UM7. Redundant Set + Array checks in toolStorage [OPEN]
+#### UM7. Redundant Set + Array checks in toolStorage [RESOLVED]
 
-- **File**: `frontend/src/utils/toolStorage.ts:47`
-- **Category**: Code Quality
-- **Details**: `!storedEnabledSet.has(name) && !storedEnabledNames.includes(name)` — the Set was created from the same array, so these checks are redundant.
+> **Status**: Implemented. Redundant `.includes()` check removed — only `storedEnabledSet.has()` retained.
 
 #### UM8. No `QuotaExceededError` handling for localStorage [OPEN]
 
@@ -258,10 +252,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### LOW
 
-#### UL1. Typo in export name `buildInPrompt` [OPEN]
+#### UL1. Typo in export name `buildInPrompt` [RESOLVED]
 
-- **File**: `frontend/src/utils/constant.ts:30`
-- **Details**: Should be `builtInPrompt`.
+> **Status**: Implemented. Renamed to `builtInPrompt` across constant.ts, SettingsPage.vue, and useAgentLoop.ts.
 
 #### UL2. `deleteText` reports success when no text selected [RESOLVED]
 
@@ -488,25 +481,22 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### IL2. `@types/diff-match-patch` in dependencies instead of devDependencies [OPEN]
+#### IL2. `@types/diff-match-patch` in dependencies instead of devDependencies [RESOLVED]
 
-- **File**: `frontend/package.json:15`
+> **Status**: Implemented. Moved to devDependencies in frontend/package.json.
 
 #### IL3. `chunkSizeWarningLimit` raised to suppress warnings [OPEN]
 
 - **File**: `frontend/vite.config.js:56-57`
 - **Details**: Masks bundle-size regressions.
 
-#### IL4. Obsolete IE meta tag [OPEN]
+#### IL4. Obsolete IE meta tag [RESOLVED]
 
-- **File**: `frontend/index.html:5`
-- **Details**: `<meta http-equiv="X-UA-Compatible" content="IE=edge" />` is inert.
+> **Status**: Implemented. `<meta http-equiv="X-UA-Compatible" content="IE=edge" />` removed from index.html.
 
-#### IL5. Unused PUID/PGID env vars in docker-compose [OPEN]
+#### IL5. Unused PUID/PGID env vars in docker-compose [RESOLVED]
 
-- **File**: `docker-compose.yml:31-32, 66-67`
-- **Category**: Dead Code
-- **Details**: Not consumed by standard Docker images.
+> **Status**: Implemented. PUID/PGID removed from both backend and frontend services in docker-compose.yml.
 
 #### IL6. Dockerfile HEALTHCHECK overridden by compose [RESOLVED]
 
@@ -605,11 +595,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### PM9. `ChatHeader.vue` hardcoded English string [OPEN]
+#### PM9. `ChatHeader.vue` hardcoded English string [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatHeader.vue:13`
-- **Category**: i18n
-- **Details**: `"AI Office Assistant"` hardcoded. Not translatable.
+> **Status**: Implemented. Now uses `t("appSubtitle")` — existing i18n key with EN/FR translations.
 
 #### PM10. Mixed `t()` and `$t()` usage [OPEN]
 
@@ -827,13 +815,13 @@ _Last updated: 2026-03-01_
 | 🔴 Remaining   | UM2  | Pervasive `any` types in tool definitions                             |
 | 🟢 Implemented | UM3  | Duplicated `generateVisualDiff` function                              |
 | 🟢 Implemented | UM4  | Duplicated Office API helpers                                         |
-| 🔴 Remaining   | UM5  | `Ref` without type parameter in WordFormatter                         |
-| 🔴 Remaining   | UM6  | `searchAndReplace` tools labeled as category `'read'`                 |
-| 🔴 Remaining   | UM7  | Redundant Set + Array checks in toolStorage                           |
+| 🟢 Implemented | UM5  | `Ref` without type parameter in WordFormatter                         |
+| 🟢 Implemented | UM6  | `searchAndReplace` tools labeled as category `'read'`                 |
+| 🟢 Implemented | UM7  | Redundant Set + Array checks in toolStorage                           |
 | 🔴 Remaining   | UM8  | No `QuotaExceededError` handling for localStorage                     |
 | 🟢 Implemented | UM9  | `tokenManager.ts` mutates input messages                              |
 | 🟡 Deferred    | UM10 | Character-by-character HTML reconstruction in PowerPoint              |
-| 🔴 Remaining   | UL1  | Typo in export name `buildInPrompt`                                   |
+| 🟢 Implemented | UL1  | Typo in export name `buildInPrompt`                                   |
 | 🟢 Implemented | UL2  | `deleteText` reports success when no text selected                    |
 | 🔴 Remaining   | UL3  | Inconsistent error handling strategy across tools                     |
 | 🔴 Remaining   | UL4  | `markdown.ts` vs `officeRichText.ts` naming confusion                 |
@@ -879,10 +867,10 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | IM7  | Outlook manifest missing AppDomains                                   |
 | 🔴 Remaining   | IM8  | CI infinite-loop guard fragile                                        |
 | 🟢 Implemented | IL1  | Vite config uses `.js` extension                                      |
-| 🔴 Remaining   | IL2  | `@types/diff-match-patch` in dependencies instead of devDependencies  |
+| 🟢 Implemented | IL2  | `@types/diff-match-patch` in dependencies instead of devDependencies  |
 | 🔴 Remaining   | IL3  | `chunkSizeWarningLimit` raised to suppress warnings                   |
-| 🔴 Remaining   | IL4  | Obsolete IE meta tag                                                  |
-| 🔴 Remaining   | IL5  | Unused PUID/PGID env vars in docker-compose                           |
+| 🟢 Implemented | IL4  | Obsolete IE meta tag                                                  |
+| 🟢 Implemented | IL5  | Unused PUID/PGID env vars in docker-compose                           |
 | 🟢 Implemented | IL6  | Dockerfile HEALTHCHECK overridden by compose                          |
 | 🟢 Implemented | IL7  | Legacy entries in .gitignore                                          |
 | 🟢 Implemented | PC1  | `keep-alive` never caches `HomePage.vue`                              |
@@ -902,7 +890,7 @@ _Last updated: 2026-03-01_
 | 🔴 Remaining   | PM6  | Dual emit pattern in `SingleSelect`                                   |
 | 🟢 Implemented | PM7  | `SettingCard` prop `p1` never used by any consumer                    |
 | 🟢 Implemented | PM8  | `Message.vue` setTimeout without cleanup                              |
-| 🔴 Remaining   | PM9  | `ChatHeader.vue` hardcoded English string                             |
+| 🟢 Implemented | PM9  | `ChatHeader.vue` hardcoded English string                             |
 | 🔴 Remaining   | PM10 | Mixed `t()` and `$t()` usage                                          |
 | 🟢 Implemented | PM11 | `expandedThoughts` grows unbounded                                    |
 | 🟢 Implemented | AM1  | Import statement in middle of file                                    |

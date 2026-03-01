@@ -657,7 +657,7 @@ import CustomInput from "@/components/CustomInput.vue";
 import SettingCard from "@/components/SettingCard.vue";
 import SingleSelect from "@/components/SingleSelect.vue";
 import {
-  buildInPrompt,
+  builtInPrompt,
   excelBuiltInPrompt,
   outlookBuiltInPrompt,
   powerPointBuiltInPrompt,
@@ -853,11 +853,11 @@ const wordBuiltInPromptsData: Record<
   WordBuiltinPromptKey,
   BuiltinPromptConfig
 > = {
-  translate: { ...buildInPrompt.translate },
-  polish: { ...buildInPrompt.polish },
-  academic: { ...buildInPrompt.academic },
-  summary: { ...buildInPrompt.summary },
-  proofread: { ...buildInPrompt.proofread },
+  translate: { ...builtInPrompt.translate },
+  polish: { ...builtInPrompt.polish },
+  academic: { ...builtInPrompt.academic },
+  summary: { ...builtInPrompt.summary },
+  proofread: { ...builtInPrompt.proofread },
 };
 
 const excelBuiltInPromptsData: Record<
@@ -904,7 +904,7 @@ const selectedOriginalBuiltInPrompts = forHost({
   outlook: { ...outlookBuiltInPrompt },
   excel: { ...excelBuiltInPrompt },
   powerpoint: { ...powerPointBuiltInPrompt },
-  word: { ...buildInPrompt },
+  word: { ...builtInPrompt },
 }) as Record<string, BuiltinPromptConfig>;
 
 const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(

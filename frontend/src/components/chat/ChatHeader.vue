@@ -10,9 +10,7 @@
       />
       <div class="flex flex-col leading-none">
         <span class="text-sm font-semibold text-main">{{ t("appTitle") }}</span>
-        <span class="text-[10px] text-[#33ABC6]">{{
-          t("aiOfficeAssistant", "AI Office Assistant")
-        }}</span>
+        <span class="text-[10px] text-[#33ABC6]">{{ t("appSubtitle") }}</span>
       </div>
     </div>
 

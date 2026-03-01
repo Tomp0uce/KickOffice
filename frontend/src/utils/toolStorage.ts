@@ -44,7 +44,7 @@ function migrateToolPreferences(
 
   // New tools (not in stored set) are enabled by default
   for (const name of allToolNames) {
-    if (!storedEnabledSet.has(name) && !storedEnabledNames.includes(name)) {
+    if (!storedEnabledSet.has(name)) {
       // This is a new tool - check if it was explicitly disabled or just new
       // Since we don't track disabled tools, we enable new tools by default
       migratedEnabled.add(name)
