@@ -1,7 +1,8 @@
 import type { ToolInputSchema, ToolCategory } from '@/types'
 import { evaluate } from 'mathjs'
+import { getBash, writeFile as vfsWrite, readFile as vfsRead, listUploads } from '@/utils/vfs'
 
-export type GeneralToolName = 'getCurrentDate' | 'calculateMath'
+export type GeneralToolName = 'getCurrentDate' | 'calculateMath' | 'executeBash' | 'vfsWriteFile' | 'vfsReadFile' | 'vfsListFiles'
 
 export interface GeneralToolDefinition {
   name: GeneralToolName
@@ -87,6 +88,107 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
         return `${expression} = ${result}`
       } catch (error: any) {
         return `Error evaluating expression: ${error.message}`
+      }
+    },
+  },
+  {
+    name: 'executeBash',
+    category: 'write',
+    description:
+      'Execute a bash command in a sandboxed in-memory shell (VFS). Use this for data processing, scripting, and shell tasks. The shell is stateful within a session. You can write custom reusable bash functions to /home/user/scripts/ (using vfsWriteFile) and call them here. Available utilities include: ls, cat, grep, awk, sed, find, sort, uniq, wc, cut, head, tail, and base64.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        command: {
+          type: 'string',
+          description: 'The bash command to execute. Examples: "ls /home/user/uploads", "cat data.txt | grep error", "source /home/user/scripts/my_tool.sh && my_tool arg"',
+        },
+      },
+      required: ['command'],
+    },
+    execute: async (args) => {
+      const { command } = args as { command: string }
+      try {
+        const shell = getBash()
+        const result = await shell.exec(command)
+        const output = [result.stdout, result.stderr].filter(Boolean).join('\n')
+        return output || '(no output)'
+      } catch (error: any) {
+        return `Shell error: ${error.message}`
+      }
+    },
+  },
+  {
+    name: 'vfsWriteFile',
+    category: 'write',
+    description:
+      'Write text content to a file in the sandboxed virtual filesystem (VFS). Best used to create custom tools by writing reusable bash scripts to /home/user/scripts/<name>.sh, or processing output to /home/user/uploads/.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'File path (e.g., "/home/user/scripts/extract.sh" or "output.txt")',
+        },
+        content: {
+          type: 'string',
+          description: 'Text content to write to the file',
+        },
+      },
+      required: ['path', 'content'],
+    },
+    execute: async (args) => {
+      const { path, content } = args as { path: string; content: string }
+      try {
+        await vfsWrite(path, content)
+        const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`
+        return `File written successfully to ${fullPath}`
+      } catch (error: any) {
+        return `Error writing file: ${error.message}`
+      }
+    },
+  },
+  {
+    name: 'vfsReadFile',
+    category: 'read',
+    description:
+      'Read text content from a file in the sandboxed virtual filesystem (VFS).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description: 'File path to read (e.g., "data.csv" or "/home/user/uploads/data.csv")',
+        },
+      },
+      required: ['path'],
+    },
+    execute: async (args) => {
+      const { path } = args as { path: string }
+      try {
+        return await vfsRead(path)
+      } catch (error: any) {
+        return `Error reading file: ${error.message}`
+      }
+    },
+  },
+  {
+    name: 'vfsListFiles',
+    category: 'read',
+    description:
+      'List all files available in the sandboxed virtual filesystem uploads directory.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async () => {
+      try {
+        const files = await listUploads()
+        if (files.length === 0) return 'No files in VFS uploads directory.'
+        return `Files in /home/user/uploads/:\n${files.map(f => `  - ${f}`).join('\n')}`
+      } catch (error: any) {
+        return `Error listing files: ${error.message}`
       }
     },
   },

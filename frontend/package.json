@@ -15,6 +15,7 @@
     "@vueuse/core": "^14.1.0",
     "diff-match-patch": "^1.0.5",
     "dompurify": "^3.3.1",
+    "just-bash": "^2.11.6",
     "lucide-vue-next": "^0.563.0",
     "markdown-it": "^14.1.1",
     "markdown-it-deflist": "^3.0.0",

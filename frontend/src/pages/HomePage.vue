@@ -86,13 +86,14 @@
       <StatsBar
         :session-stats="sessionStats"
         :model-name="selectedModelInfo?.id ?? selectedModelTier"
+        :current-action="currentAction"
       />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import type { InsertType, ModelTier, ModelInfo } from '@/types'
+import type { InsertType, ModelTier, ModelInfo } from "@/types";
 defineOptions({ name: "Home" });
 import {
   ref,

@@ -1,15 +1,35 @@
 <template>
   <div
-    v-if="hasStats || modelName"
+    v-if="hasStats || modelName || currentAction"
     class="flex items-center justify-between border-t border-border-secondary bg-bg-secondary px-2 py-1 text-[10px] text-secondary"
-    style="font-family: monospace;"
+    style="font-family: monospace"
   >
+    <!-- Shell activity indicator -->
+    <div
+      v-if="currentAction"
+      class="flex items-center gap-1.5 text-accent"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-accent"
+      />
+      <Terminal :size="9" />
+      <span class="truncate max-w-[120px]">{{ currentAction }}</span>
+    </div>
+
     <!-- Token counts -->
-    <div class="flex items-center gap-2">
-      <span v-if="hasStats" :title="`Input tokens: ${sessionStats.inputTokens}`">
+    <div v-else class="flex items-center gap-2">
+      <span
+        v-if="hasStats"
+        :title="`Input tokens: ${sessionStats.inputTokens}`"
+      >
         ↑{{ formatTokens(sessionStats.inputTokens) }}
       </span>
-      <span v-if="hasStats" :title="`Output tokens: ${sessionStats.outputTokens}`">
+      <span
+        v-if="hasStats"
+        :title="`Output tokens: ${sessionStats.outputTokens}`"
+      >
         ↓{{ formatTokens(sessionStats.outputTokens) }}
       </span>
       <span
@@ -28,32 +48,38 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed } from "vue";
+import { Terminal } from "lucide-vue-next";
 
 interface TokenStats {
-  inputTokens: number
-  outputTokens: number
-  totalTokens: number
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
 }
 
 const props = defineProps<{
-  sessionStats: TokenStats
-  modelName?: string
-  contextWindowTokens?: number
-}>()
+  sessionStats: TokenStats;
+  modelName?: string;
+  contextWindowTokens?: number;
+  currentAction?: string;
+}>();
 
-const hasStats = computed(() =>
-  props.sessionStats.inputTokens > 0 || props.sessionStats.outputTokens > 0
-)
+const hasStats = computed(
+  () =>
+    props.sessionStats.inputTokens > 0 || props.sessionStats.outputTokens > 0,
+);
 
 const contextPct = computed(() => {
-  if (!props.contextWindowTokens || props.contextWindowTokens === 0) return '0'
-  return ((props.sessionStats.inputTokens / props.contextWindowTokens) * 100).toFixed(1)
-})
+  if (!props.contextWindowTokens || props.contextWindowTokens === 0) return "0";
+  return (
+    (props.sessionStats.inputTokens / props.contextWindowTokens) *
+    100
+  ).toFixed(1);
+});
 
 function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
-  return n.toString()
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toString();
 }
 </script>
