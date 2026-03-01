@@ -172,10 +172,6 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ---
 
-## 3. Frontend Utilities Findings
-
-### CRITICAL
-
 #### UC1. Prompt injection via custom prompt templates [RESOLVED]
 
 > **Status**: Implemented.
@@ -313,10 +309,6 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ---
 
-## 4. Frontend Composables Findings
-
-### CRITICAL
-
 #### CC1. Prompt injection via unsanitized document selection [RESOLVED]
 
 > **Status**: Implemented.
@@ -451,10 +443,6 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ---
 
-## 5. Infrastructure Findings
-
-### CRITICAL
-
 #### IC1. Content-Type middleware blocks uploads (same as BC1) [RESOLVED]
 
 > **Status**: Implemented.
@@ -576,96 +564,6 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: References to `word-GPT-Plus-master.zip`, `litellm-local-proxy/.auth.env`, `Open_Excel/`.
 
 ---
-
-## 6. Dead Code Registry
-
-Consolidated list of all dead code found across the codebase.
-
-### Backend Dead Code
-
-| ID  | File                                         | Item                                                                | Details                           |
-| --- | -------------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
-| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally              |
-| BD2 | `backend/src/services/llmClient.js:10-29`    | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports         | Only used internally              |
-| BD3 | `backend/src/middleware/validate.js:159`     | `routeName` parameter                                               | Never referenced in function body |
-| BD4 | `backend/src/routes/image.js:17-19`          | `if (!imageModel)` branch                                           | Can never be true                 |
-
-### Frontend Utilities Dead Code
-
-| ID   | File                                              | Item                                   | Details                                                         |
-| ---- | ------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
-| UD1  | `frontend/src/utils/hostDetection.ts:55-57`       | `getHostName()` export                 | Never imported anywhere                                         |
-| UD2  | `frontend/src/utils/excelTools.ts:2149-2151`      | `getExcelTool()` export                | Never imported anywhere                                         |
-| UD3  | `frontend/src/utils/wordTools.ts:1889-1891`       | `getWordTool()` export                 | Never imported anywhere                                         |
-| UD4  | `frontend/src/utils/outlookTools.ts:571-573`      | `getOutlookTool()` export              | Never imported anywhere                                         |
-| UD5  | `frontend/src/utils/powerpointTools.ts:949-951`   | `getPowerPointTool()` export           | Never imported anywhere                                         |
-| UD6  | `frontend/src/utils/generalTools.ts:98-103`       | `getEnabledGeneralTools()` export      | Never imported anywhere                                         |
-| UD7  | `frontend/src/utils/powerpointTools.ts:63-66`     | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
-| UD8  | `frontend/src/utils/toolStorage.ts:10`            | `buildToolSignature()` export          | Only used internally                                            |
-| UD9  | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export      | All consumers import named exports directly                     |
-| UD10 | `frontend/src/utils/credentialStorage.ts:40-49`   | `CredentialStorage` interface export   | Never imported                                                  |
-| UD11 | `frontend/src/utils/excelTools.ts:66`             | `'eval_officejs'` in `ExcelToolName`   | No tool definition exists                                       |
-| UD12 | `frontend/src/utils/excelTools.ts:753`            | `dataRange` variable in `sortRange`    | Assigned but never read                                         |
-| UD13 | `frontend/src/utils/common.ts:3-13`               | `getOptionList()` export               | Only used internally                                            |
-
-### Frontend Composables Dead Code
-
-| ID  | File                                                 | Item                | Details                           |
-| --- | ---------------------------------------------------- | ------------------- | --------------------------------- |
-| CD1 | `frontend/src/composables/useAgentPrompts.ts:13, 26` | `hostIsWord` option | Destructured but never referenced |
-
-### Infrastructure Dead Code
-
-| ID  | File                              | Item                   | Details                                         |
-| --- | --------------------------------- | ---------------------- | ----------------------------------------------- |
-| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images                 |
-| ID2 | `backend/Dockerfile:12-13`        | Dockerfile HEALTHCHECK | Overridden by compose                           |
-| ID3 | `backend/Dockerfile:10`           | `EXPOSE 3003`          | Purely documentary, port set by compose         |
-| ID4 | `.gitignore:31-38`                | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
-
----
-
-## 7. v2 Open Feature Issues (carried forward)
-
-### F1. Quick actions strip images/formatting from documents
-
-- **Status**: OPEN
-- **Severity**: HIGH
-- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
-
-### F2. Outlook Reply produces low-quality responses
-
-- **Status**: OPEN
-- **Severity**: HIGH
-- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
-
-### F3. Excel agent processes cells one-by-one
-
-- **Status**: OPEN
-- **Severity**: HIGH
-- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
-
----
-
-## 8. Build & Environment Warnings (carried forward from v2)
-
-### B1. No unit test infrastructure
-
-- **Status**: OPEN
-
-### B2. No linting or formatting configuration
-
-- **Status**: OPEN
-
-### B3. No CI pipeline for automated testing
-
-- **Status**: OPEN
-
----
-
-## 9. Pages, Components, API Layer & Types Findings
-
-### CRITICAL
 
 #### PC1. `keep-alive` never caches `HomePage.vue` [RESOLVED]
 
@@ -896,15 +794,16 @@ Consolidated list of all dead code found across the codebase.
 
 ## 10. Summary Statistics
 
-| Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
-|---|---|---|---|---|---|---|
-| Backend | 3/4 | 3/7 | 5/10 | 2/4 | - | **13/25** |
-| Frontend Utils | 2/3 | 5/7 | 3/10 | 0/4 | - | **10/24** |
-| Composables | 2/2 | 4/7 | 2/11 | 0/5 | - | **8/25** |
-| Infrastructure | 2/3 | 3/5 | 4/8 | 2/7 | - | **11/23** |
-| Pages/Components/API | 1/1 | 6/7 | 2/15 | 2/6 | - | **11/29** |
-| Types/Misc | 0/0 | 0/1 | 0/6 | 1/2 | - | **1/9** |
-| **Total** | **10/13** | **21/34** | **16/60** | **7/28** | - | **54/135** |
+| Area                 | CRITICAL  | HIGH      | MEDIUM    | LOW      | Dead Code | Total      |
+| -------------------- | --------- | --------- | --------- | -------- | --------- | ---------- |
+| Backend              | 3/4       | 3/7       | 5/10      | 2/4      | -         | **13/25**  |
+| Frontend Utils       | 2/3       | 5/7       | 3/10      | 0/4      | -         | **10/24**  |
+| Composables          | 2/2       | 4/7       | 2/11      | 0/5      | -         | **8/25**   |
+| Infrastructure       | 2/3       | 3/5       | 4/8       | 2/7      | -         | **11/23**  |
+| Pages/Components/API | 1/1       | 6/7       | 2/15      | 2/6      | -         | **11/29**  |
+| Types/Misc           | 0/0       | 0/1       | 0/6       | 1/2      | -         | **1/9**    |
+| **Total**            | **10/13** | **21/34** | **16/60** | **7/28** | -         | **54/135** |
+
 ---
 
 ## 11. Priority Recommendations
