@@ -893,10 +893,11 @@ const editingBuiltinPrompt = ref<{ system: string; user: string }>({
 const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
   selectedOriginalBuiltInPrompts;
 const builtInPromptsStorageKey = forHost({
-  outlook: "customOutlookBuiltInPrompts",
-  excel: "customExcelBuiltInPrompts",
-  powerpoint: "customPowerPointBuiltInPrompts",
-  word: "customBuiltInPrompts",
+  default: "ki_Settings_BuiltInPrompts_v5",
+  powerpoint: "ki_Settings_BuiltInPrompts_ppt_v5",
+  outlook: "ki_Settings_BuiltInPrompts_outlook_v5",
+  word: "ki_Settings_BuiltInPrompts_word_v5",
+  excel: "ki_Settings_BuiltInPrompts_excel_v5",
 }) as string;
 
 const tabs = [

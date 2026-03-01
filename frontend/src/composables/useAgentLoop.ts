@@ -847,9 +847,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
       let systemMsg = ''
       let userMsg = ''
-      if (hostIsOutlook) action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt]
-      else if (hostIsPowerPoint) action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt]
-      else if (hostIsExcel) {
+      if (hostIsOutlook) {
+        action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+      } else if (hostIsPowerPoint) {
+        action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+      } else if (hostIsExcel) {
         if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
           systemMsg = selectedExcelQuickAction.systemPrompt
           userMsg = `Selection:\n${selectedText}`

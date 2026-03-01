@@ -22,48 +22,8 @@ const accessLogStream = createStream('kickoffice.log', {
 })
 
 function redactData(data) {
-  if (!data) return data;
-  if (typeof data !== 'object') return data;
-  
-  // Clone the object to avoid mutating the original
-  let redacted;
-  try {
-    redacted = JSON.parse(JSON.stringify(data));
-  } catch (e) {
-    return '[Unserializable Data]';
-  }
-
-  const redactMessages = (obj) => {
-    if (obj.messages && Array.isArray(obj.messages)) {
-      obj.messages = obj.messages.map(msg => ({
-        ...msg,
-        content: '[REDACTED_FOR_PRIVACY]'
-      }));
-    }
-    if (obj.body && obj.body.messages && Array.isArray(obj.body.messages)) {
-      obj.body.messages = obj.body.messages.map(msg => ({
-        ...msg,
-        content: '[REDACTED_FOR_PRIVACY]'
-      }));
-    }
-  };
-
-  const redactChoices = (obj) => {
-    if (obj.choices && Array.isArray(obj.choices)) {
-      obj.choices = obj.choices.map(choice => {
-        const c = { ...choice };
-        if (c.message && c.message.content) {
-          c.message.content = '[REDACTED_FOR_PRIVACY]';
-        }
-        return c;
-      });
-    }
-  };
-
-  redactMessages(redacted);
-  redactChoices(redacted);
-
-  return redacted;
+  // Disabled redaction to allow full debugging of prompts and responses
+  return data
 }
 
 /**
@@ -78,8 +38,12 @@ export function systemLog(level, message, data = null) {
   let dataStr = ''
   if (data !== null) {
     try {
-      const safeData = redactData(data);
-      dataStr = '\n' + JSON.stringify(safeData, null, 2)
+      if (data instanceof Error) {
+        dataStr = '\n' + (data.stack || data.message || String(data))
+      } else {
+        const safeData = redactData(data);
+        dataStr = '\n' + JSON.stringify(safeData, null, 2)
+      }
     } catch (err) {
       dataStr = '\n[Unserializable Data]'
     }
