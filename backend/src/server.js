@@ -68,6 +68,10 @@ app.use(cors({
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  // Office add-ins load inside an iframe inside Outlook/Word/Excel/PowerPoint.
+  // helmet's default frameguard sets X-Frame-Options: SAMEORIGIN which blocks that iframe.
+  // framing protection is handled by CSP frame-ancestors in nginx.conf instead.
+  frameguard: false,
   // Enable HSTS in production for HTTPS enforcement
   strictTransportSecurity: isProduction ? {
     maxAge: 31536000, // 1 year
