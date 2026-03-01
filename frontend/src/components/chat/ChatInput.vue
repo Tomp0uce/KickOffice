@@ -148,7 +148,7 @@
 <script lang="ts" setup>
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
-import { messageUtil } from "@/utils/message";
+import { message as messageUtil } from "@/utils/message";
 
 const props = defineProps<{
   availableModels: Record<string, ModelInfo>;
