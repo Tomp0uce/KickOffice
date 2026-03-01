@@ -84,6 +84,7 @@
 
 <script lang="ts" setup>
 defineOptions({ name: "Home" });
+import { ref, computed, watch, nextTick, onBeforeMount, onMounted, onUnmounted } from "vue";
 import { useStorage } from "@vueuse/core";
 import {
   BookOpen,
