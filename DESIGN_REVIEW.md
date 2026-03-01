@@ -764,7 +764,270 @@ Consolidated list of all dead code found across the codebase.
 
 ---
 
-## 9. Summary Statistics
+## 9. Pages, Components, API Layer & Types Findings
+
+### CRITICAL
+
+#### PC1. `keep-alive` never caches `HomePage.vue`
+
+- **File**: `frontend/src/App.vue:4`, `frontend/src/pages/HomePage.vue`
+- **Category**: Broken Functionality
+- **Details**: `<keep-alive include="Home">` filters by component name, but `HomePage.vue` uses `<script setup>` without `defineOptions({ name: 'Home' })`. The auto-inferred name is `"HomePage"`, not `"Home"`. The component is destroyed and recreated on every navigation from Settings back to Home.
+- **Impact**: All transient state lost on navigation (scroll position, textarea, `abortController`). Repeated backend health checks, flickering.
+- **Fix**: Add `defineOptions({ name: 'Home' })` to `HomePage.vue`.
+
+### HIGH
+
+#### PH1. CSS typo — `itemse-center` instead of `items-center`
+
+- **File**: `frontend/src/pages/HomePage.vue:3`
+- **Category**: UI Bug
+- **Details**: Tailwind class `"itemse-center"` is silently ignored. Container cross-axis alignment not applied.
+- **Impact**: Broken vertical centering on the home page root container.
+- **Fix**: Change to `items-center`.
+
+#### PH2. `startNewChat` uses `window.location.reload()` — destructive
+
+- **File**: `frontend/src/pages/HomePage.vue:539`
+- **Category**: Architecture / UX
+- **Details**: Full page reload instead of reactive state clearing. Discards all in-memory state, is slow, breaks SPA semantics.
+- **Impact**: Slow UX, complete app reload, potential loss of Office context.
+
+#### PH3. `agentMaxIterations` not validated on HomePage
+
+- **File**: `frontend/src/pages/HomePage.vue:193`
+- **Category**: Logic Bug
+- **Details**: `SettingsPage` validates and clamps between 1-100, but `HomePage` reads the raw `useStorage` value. Corrupted localStorage (0, -1, 999999) goes directly to the agent loop.
+- **Impact**: Runaway agent loop or zero iterations if localStorage is tampered with.
+
+#### PH4. File upload `.xls` accepted by HTML but rejected by JS
+
+- **File**: `frontend/src/components/chat/ChatInput.vue:89` vs `ChatInput.vue:233`
+- **Category**: Logic Bug
+- **Details**: HTML `accept` attribute includes `.xls`, but `allowedExtensions` in `processFiles()` does not. Users select `.xls` files, they are silently dropped.
+- **Impact**: Silent data loss — user thinks file is attached but it is discarded.
+
+#### PH5. File rejection is completely silent
+
+- **File**: `frontend/src/components/chat/ChatInput.vue:231-256`
+- **Category**: UX
+- **Details**: When a file exceeds 10MB, has wrong type, or exceeds 3-file limit, no feedback is shown. File is simply not added to `attachedFiles`.
+- **Impact**: Users don't know why their file was not attached.
+- **Fix**: Show a toast with the rejection reason.
+
+#### AH1. `fetchModels()` missing credential headers
+
+- **File**: `frontend/src/api/backend.ts:90-94`
+- **Category**: Security / Logic Bug
+- **Details**: `fetchModels()` does not include `getUserCredentialHeaders()`, unlike all other API calls. Will fail if the backend requires authentication.
+- **Impact**: Models endpoint may return errors or incomplete data.
+- **Fix**: Add `...getUserCredentialHeaders()` to the headers.
+
+#### AH2. `healthCheck()` missing credential headers
+
+- **File**: `frontend/src/api/backend.ts:96-103`
+- **Category**: Security / Logic Bug
+- **Details**: Same as AH1 — no credential headers on health check.
+- **Impact**: Backend appears permanently offline if authentication required.
+
+#### XH1. No CSRF protection on API calls
+
+- **File**: `frontend/src/api/backend.ts` (all POST endpoints)
+- **Category**: Security
+- **Details**: POST requests include credential headers but no CSRF token. Custom headers provide partial CORS-based protection, but no explicit CSRF defense.
+- **Impact**: Potential exploitation if backend uses cookie-based sessions alongside custom headers.
+
+### MEDIUM
+
+#### PM1. Hardcoded French strings in ChatInput
+
+- **File**: `frontend/src/components/chat/ChatInput.vue:47, 79`
+- **Category**: i18n
+- **Details**: `"Retirer le fichier"` and `"Attacher un document (PDF, DOCX, XLSX)"` hardcoded in French.
+- **Fix**: Use `t()` with i18n keys.
+
+#### PM2. Hardcoded English strings with fallback pattern in SettingsPage
+
+- **File**: `frontend/src/pages/SettingsPage.vue:190-193, 200, 470`
+- **Category**: i18n
+- **Details**: `$t("darkModeLabel") || "Dark mode"` pattern suggests missing i18n keys. Fallbacks mask the issue.
+
+#### PM3. `CustomInput` type flash on mount
+
+- **File**: `frontend/src/components/CustomInput.vue:50-76`
+- **Category**: UI Bug
+- **Details**: `type` ref initialized to `'text'`, then overridden in `onMounted`. Brief flash where a number input appears as text.
+- **Fix**: Initialize from prop: `const type = ref(isPassword ? 'password' : inputType)`.
+
+#### PM4. `CustomInput` model has `any` type
+
+- **File**: `frontend/src/components/CustomInput.vue:36`
+- **Category**: Type Safety
+- **Details**: `defineModel<any>()` loses all type safety.
+
+#### PM5. `SingleSelect` dropdown positioning without scroll listener
+
+- **File**: `frontend/src/components/SingleSelect.vue:65-96`
+- **Category**: UI Bug
+- **Details**: Dropdown uses `position: fixed` calculated on toggle, but no scroll/resize recalculation.
+- **Impact**: Mispositioned dropdown when settings page is scrolled while open.
+
+#### PM6. Dual emit pattern in `SingleSelect`
+
+- **File**: `frontend/src/components/SingleSelect.vue:42, 48-52`
+- **Category**: Code Quality
+- **Details**: Both `update:modelValue` and `change` emitted. Redundant and error-prone.
+
+#### PM7. `SettingCard` prop `p1` never used by any consumer
+
+- **File**: `frontend/src/components/SettingCard.vue:2, 9-10`
+- **Category**: Dead Code
+
+#### PM8. `Message.vue` setTimeout without cleanup
+
+- **File**: `frontend/src/components/Message.vue:38-45`
+- **Category**: Resource Leak
+- **Details**: Two `setTimeout` calls in `onMounted` never cleared. Callbacks fire on unmounted components.
+
+#### PM9. `ChatHeader.vue` hardcoded English string
+
+- **File**: `frontend/src/components/chat/ChatHeader.vue:13`
+- **Category**: i18n
+- **Details**: `"AI Office Assistant"` hardcoded. Not translatable.
+
+#### PM10. Mixed `t()` and `$t()` usage
+
+- **Files**: `HomePage.vue`, `SettingsPage.vue`
+- **Category**: Consistency
+- **Details**: Inconsistent use of composition API `t()` vs global `$t()` in templates.
+
+#### PM11. `expandedThoughts` grows unbounded
+
+- **File**: `frontend/src/components/chat/ChatMessageList.vue:164`
+- **Category**: Memory
+- **Details**: Record keyed by message+segment index. Old entries never cleaned up.
+
+#### AM1. Import statement in middle of file
+
+- **File**: `frontend/src/api/backend.ts:79`
+- **Category**: Style
+- **Details**: `import { getUserKey, getUserEmail }` appears after function definitions.
+
+#### AM2. `chatStream` silently swallows JSON parse errors
+
+- **File**: `frontend/src/api/backend.ts:185-187`
+- **Category**: Error Handling
+- **Details**: Empty `catch {}` block drops malformed SSE data without logging.
+
+#### AM3. `chatStream` discards remaining buffer after stream ends
+
+- **File**: `frontend/src/api/backend.ts:157-189`
+- **Category**: Logic Bug
+- **Details**: When `done` is true, final buffer content without trailing newline is lost.
+- **Impact**: Potential loss of last streamed token.
+
+#### AM4. Duplicate `ToolDefinition` interface
+
+- **Files**: `frontend/src/api/backend.ts:192-200`, `frontend/src/types/index.d.ts:61-67`
+- **Category**: Type Safety
+- **Details**: Two different interfaces with the same name — API wire format vs internal tool definition. Name collision causes confusion.
+
+#### TM1. Global ambient types without explicit imports
+
+- **File**: `frontend/src/types/index.d.ts:32-74`
+- **Category**: Type Safety
+- **Details**: All types declared ambient (no `export`), available everywhere without imports. Bypasses module boundaries.
+
+#### TM2. `OfficeHostType` declared in two files
+
+- **Files**: `frontend/src/types/index.d.ts:74`, `frontend/src/utils/hostDetection.ts:1`
+- **Category**: Inconsistency
+- **Details**: Two sources of truth for the same type.
+
+#### EM1. `useStorage` called outside Vue component context
+
+- **File**: `frontend/src/main.ts:22`
+- **Category**: Code Quality
+- **Details**: VueUse composable called in `Office.onReady` callback, outside any component `setup()`. May break with future VueUse versions.
+
+#### EM2. Global `ResizeObserver` monkey-patching
+
+- **File**: `frontend/src/main.ts:15-19`
+- **Category**: Code Quality
+- **Details**: Global `window.ResizeObserver` replaced with debounced version. Affects all code including third-party libraries.
+
+#### XM1. Deeply nested ternary chains repeated 10+ times
+
+- **Files**: `HomePage.vue:31-38, 67-73, 166-174, 355-361`, `SettingsPage.vue:771-777, 781-787, 789-795, 887-894, 896-903, 916-922`
+- **Category**: Code Quality / DRY
+- **Details**: `hostIsOutlook ? ... : hostIsPowerPoint ? ... : hostIsExcel ? ... : ...` repeated throughout.
+- **Fix**: Extract into a utility function `forHost({ outlook, powerpoint, excel, word })`.
+
+#### XM2. Quick action arrays not reactive to locale changes
+
+- **File**: `frontend/src/pages/HomePage.vue:206-351`
+- **Category**: i18n / Reactivity
+- **Details**: `wordQuickActions`, `outlookQuickActions`, `powerPointQuickActions` are plain arrays with `t()` at setup time. Only `excelQuickActions` uses `computed()`. Labels won't update on locale change.
+- **Fix**: Wrap all quick action arrays in `computed()`.
+
+### LOW
+
+#### PL1. `SettingSection.vue` component never imported or used
+
+- **File**: `frontend/src/components/SettingSection.vue`
+- **Category**: Dead Code / Dead File
+
+#### PL2. `CustomButton` `icon` prop typed as `any`
+
+- **File**: `frontend/src/components/CustomButton.vue:43`
+- **Details**: Should be `Component | null`.
+
+#### PL3. `SingleSelect` multiple props typed as `any`
+
+- **File**: `frontend/src/components/SingleSelect.vue:44, 107, 117, 119`
+- **Details**: `modelValue`, `placeholder`, `icon`, `customFrontIcon` all `any`.
+
+#### PL4. `ChatInput` emits `"input"` event nobody listens to
+
+- **File**: `frontend/src/components/chat/ChatInput.vue:177, 191`
+- **Category**: Dead Code
+
+#### PL5. `App.vue` has empty `<script>` block
+
+- **File**: `frontend/src/App.vue:11`
+- **Category**: Dead Code
+
+#### AL1. `api/common.ts` is misplaced — contains Word-specific Office logic
+
+- **File**: `frontend/src/api/common.ts`
+- **Category**: Architecture
+- **Details**: Contains `Word.run`, `insertText`, `insertParagraph` and WordFormatter dependency. Not a generic API utility.
+
+#### TL1. Tool type aliases add no value
+
+- **File**: `frontend/src/types/index.d.ts:69-72`
+- **Details**: `WordToolDefinition = ToolDefinition`, `ExcelToolDefinition = ToolDefinition`, etc. — zero differentiation.
+
+#### TL2. `insertTypes` uses lowercase, plural name
+
+- **File**: `frontend/src/types/index.d.ts:34`
+- **Details**: Should be `InsertType` (PascalCase, singular) per TypeScript conventions.
+
+### Pages/Components Dead Code
+
+| ID | File | Item | Details |
+|----|------|------|---------|
+| PD1 | `frontend/src/pages/HomePage.vue:92` | `Briefcase` import | Never used in template or script |
+| PD2 | `frontend/src/pages/HomePage.vue:94` | `CheckCircle` import | Never used anywhere |
+| PD3 | `frontend/src/components/SettingSection.vue` | Entire component file | Never imported or used |
+| PD4 | `frontend/src/components/chat/ChatInput.vue:210` | `handleDragLeave` param `e` | Declared but never read |
+| PD5 | `frontend/src/components/chat/ChatInput.vue:177, 191` | `"input"` emit | Emitted but no consumer listens |
+| PD6 | `frontend/src/components/SettingCard.vue:2` | `p1` prop | Never passed by any consumer |
+| PD7 | `frontend/src/App.vue:11` | Empty `<script>` block | No code inside |
+
+---
+
+## 10. Summary Statistics
 
 | Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
 |------|----------|------|--------|-----|-----------|-------|
@@ -772,13 +1035,12 @@ Consolidated list of all dead code found across the codebase.
 | Frontend Utils | 3 | 7 | 10 | 4 | 13 | 37 |
 | Composables | 2 | 7 | 11 | 5 | 1 | 26 |
 | Infrastructure | 3 | 5 | 8 | 7 | 4 | 27 |
-| **Total** | **12** | **26** | **39** | **20** | **22** | **119** |
-
-*Note: Pages/Components and API layer audit pending — will be added as Section 10.*
+| Pages/Components/API | 1 | 8 | 19 | 8 | 7 | 43 |
+| **Total** | **13** | **34** | **58** | **28** | **29** | **162** |
 
 ---
 
-## 10. Priority Recommendations
+## 11. Priority Recommendations
 
 ### Immediate (CRITICAL — fix now)
 
@@ -789,25 +1051,32 @@ Consolidated list of all dead code found across the codebase.
 5. **UC1** — Use function replacement in `String.replace()` (data corruption)
 6. **BC2/IC3** — Replace internal URL with placeholder in `.env.example`
 7. **IC2** — Add non-root users to Dockerfiles
+8. **PC1** — Add `defineOptions({ name: 'Home' })` to fix keep-alive caching
 
 ### Short-term (HIGH — fix before next release)
 
-8. **UH1** — Add or remove `eval_officejs` from ExcelToolName
-9. **UH2** — Fix column letter arithmetic for multi-char columns
-10. **BH1** — Fix drain event listener leak in streaming
-11. **BH2** — Check `res.headersSent` before error response
-12. **CH1** — Fix `sendMessage` race condition
-13. **IH1** — Standardize Node.js version
-14. **IH4** — Copy lock files in Dockerfiles, use `npm ci`
+9. **PH1** — Fix CSS typo `itemse-center` → `items-center`
+10. **UH1** — Add or remove `eval_officejs` from ExcelToolName
+11. **UH2** — Fix column letter arithmetic for multi-char columns
+12. **BH1** — Fix drain event listener leak in streaming
+13. **BH2** — Check `res.headersSent` before error response
+14. **CH1** — Fix `sendMessage` race condition
+15. **AH1/AH2** — Add credential headers to `fetchModels()` and `healthCheck()`
+16. **PH4** — Synchronize `.xls` between HTML accept and JS validation
+17. **PH5** — Add user feedback when files are rejected
+18. **IH1** — Standardize Node.js version
+19. **IH4** — Copy lock files in Dockerfiles, use `npm ci`
 
 ### Medium-term (MEDIUM — address in upcoming sprints)
 
-15. Remove all dead code (22 items across codebase)
-16. Fix error handling: add logging to silent catch blocks
-17. Replace `any` types with `unknown` + type guards
-18. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`)
-19. Decompose oversized functions (3 functions >180 lines each)
-20. Add security headers to nginx config
+20. Remove all dead code (29 items across codebase)
+21. Fix i18n violations: hardcoded French/English strings (PM1, PM9, CM1, BL2)
+22. Fix error handling: add logging to silent catch blocks
+23. Replace `any` types with `unknown` + type guards
+24. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`, `forHost`)
+25. Decompose oversized functions (3 functions >180 lines each)
+26. Add security headers to nginx config
+27. Wrap all quick action arrays in `computed()` for locale reactivity
 
 ---
 
