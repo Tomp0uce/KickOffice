@@ -16,8 +16,6 @@ import {
   PUBLIC_FRONTEND_URL,
 } from './config/env.js'
 
-const isProduction = process.env.NODE_ENV === 'production'
-const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '600000', 10) // 10 minutes default
 import { ensureLlmApiKey, ensureUserCredentials } from './middleware/auth.js'
 import { chatRouter } from './routes/chat.js'
 import { healthRouter } from './routes/health.js'
@@ -25,6 +23,9 @@ import { imageRouter } from './routes/image.js'
 import { modelsRouter } from './routes/models.js'
 import { uploadRouter } from './routes/upload.js'
 import { logAndRespond } from './utils/http.js'
+
+const isProduction = process.env.NODE_ENV === 'production'
+const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '600000', 10) // 10 minutes default
 
 const app = express()
 
