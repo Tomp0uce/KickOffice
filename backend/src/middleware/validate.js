@@ -212,7 +212,7 @@ const validateChatRequest = (body) => {
   }
 }
 
-module.exports = {
+export {
   validateChatRequest,
   validateImagePayload
 }
