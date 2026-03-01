@@ -83,6 +83,10 @@
         @submit="sendMessage"
         @stop="stopGeneration"
       />
+      <StatsBar
+        :session-stats="sessionStats"
+        :model-name="selectedModelInfo?.label ?? selectedModelTier"
+      />
     </div>
   </div>
 </template>
@@ -117,6 +121,7 @@ import ChatHeader from "@/components/chat/ChatHeader.vue";
 import ChatInput from "@/components/chat/ChatInput.vue";
 import ChatMessageList from "@/components/chat/ChatMessageList.vue";
 import QuickActionsBar from "@/components/chat/QuickActionsBar.vue";
+import StatsBar from "@/components/chat/StatsBar.vue";
 import { useAgentLoop } from "@/composables/useAgentLoop";
 import { useImageActions } from "@/composables/useImageActions";
 import { useOfficeInsert } from "@/composables/useOfficeInsert";
@@ -458,7 +463,7 @@ const officeInsert = useOfficeInsert({
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
 });
 
-const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
+const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } = useAgentLoop({
   t,
   refs: {
     history,
@@ -519,6 +524,7 @@ function goToSettings() {
 async function startNewChat() {
   if (loading.value) stopGeneration();
   await sessionManager.newSession();
+  resetSessionStats();
   userInput.value = "";
   customSystemPrompt.value = "";
   selectedPromptId.value = "";
@@ -530,6 +536,7 @@ async function startNewChat() {
 async function handleSwitchSession(sessionId: string) {
   if (loading.value) return;
   await sessionManager.switchSession(sessionId);
+  resetSessionStats();
   await nextTick();
   scrollToVeryBottom();
 }

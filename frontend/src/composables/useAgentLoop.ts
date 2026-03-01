@@ -1,6 +1,6 @@
 import { nextTick, ref, type Ref } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, chatStream, generateImage, uploadFile } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -179,6 +179,22 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const currentAction = ref('')
   const pendingSmartReply = ref(false)
 
+  const sessionStats = ref({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+  })
+
+  function resetSessionStats() {
+    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  }
+
+  function accumulateUsage(usage: TokenUsage) {
+    sessionStats.value.inputTokens += usage.promptTokens
+    sessionStats.value.outputTokens += usage.completionTokens
+    sessionStats.value.totalTokens += usage.totalTokens
+  }
+
   const getActionLabelForCategory = (category?: ToolCategory) => {
     switch (category) {
       case 'read':
@@ -349,7 +365,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                 response.choices[0].message.tool_calls[idx].function.arguments += delta.function.arguments
               }
             }
-          }
+          },
+          onUsage: accumulateUsage,
         })
         response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
       } catch (err: any) {
@@ -870,5 +887,5 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
   }
 
-  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction }
+  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction, sessionStats, resetSessionStats }
 }
