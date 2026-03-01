@@ -98,6 +98,10 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
     stream,
   }
 
+  if (stream) {
+    body.stream_options = { include_usage: true }
+  }
+
   if (supportsLegacyParams) {
     const resolvedMaxTokens = maxTokens ?? modelConfig.maxTokens
     if (resolvedMaxTokens) {

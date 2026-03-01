@@ -460,7 +460,6 @@
                 >
                   {{
                     t("builtinPromptsDescription", {
-                      language: "[LANGUAGE]",
                       text: "[TEXT]",
                     })
                   }}
