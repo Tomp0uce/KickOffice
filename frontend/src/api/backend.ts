@@ -88,14 +88,18 @@ function getUserCredentialHeaders(): Record<string, string> {
 }
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`)
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`, {
+    headers: { ...getUserCredentialHeaders() }
+  })
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
   return res.json()
 }
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/health`)
+    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/health`, {
+      headers: { ...getUserCredentialHeaders() }
+    })
     return res.ok
   } catch {
     return false

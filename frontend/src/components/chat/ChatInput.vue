@@ -148,6 +148,7 @@
 <script lang="ts" setup>
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
+import { messageUtil } from "@/utils/message";
 
 const props = defineProps<{
   availableModels: Record<string, ModelInfo>;
@@ -230,28 +231,55 @@ const onFileSelected = (e: Event) => {
 
 const processFiles = (fileList: FileList) => {
   // Check for allowed extensions if mime type misses
-  const allowedExtensions = [".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"];
+  const allowedExtensions = [
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".xls",
+    ".csv",
+    ".txt",
+    ".md",
+  ];
+  let rejectedCount = 0;
+  let oversizedCount = 0;
 
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
 
-    // Limits: Max 3 files, Max 10MB per file
+    // Limits: Max 3 files
     if (attachedFiles.value.length >= 3) {
+      messageUtil.warning("Maximum 3 fichiers autorisés.");
       break;
     }
 
     const isExtensionOk = allowedExtensions.some((ext) =>
       file.name.toLowerCase().endsWith(ext),
     );
-    if (
-      (allowedTypes.includes(file.type) || isExtensionOk) &&
-      file.size <= 10 * 1024 * 1024
-    ) {
+
+    if (file.size > 10 * 1024 * 1024) {
+      oversizedCount++;
+      continue;
+    }
+
+    if (allowedTypes.includes(file.type) || isExtensionOk) {
       // Avoid duplicate by name
       if (!attachedFiles.value.some((f) => f.name === file.name)) {
         attachedFiles.value.push(file);
       }
+    } else {
+      rejectedCount++;
     }
+  }
+
+  if (oversizedCount > 0) {
+    messageUtil.error(
+      `${oversizedCount} fichier(s) ignoré(s) : taille > 10MB.`,
+    );
+  }
+  if (rejectedCount > 0) {
+    messageUtil.error(
+      `${rejectedCount} fichier(s) ignoré(s) : format non supporté.`,
+    );
   }
 };
 

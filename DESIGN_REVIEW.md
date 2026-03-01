@@ -576,12 +576,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### IH1. Four different Node.js versions across the project
+#### IH1. Node.js version mismatch between environments [RESOLVED]
 
-- **Files**: `docker-compose.yml:3` (Node 18), both `Dockerfile`s (Node 22), CI workflow (Node 20), `engines` (>=20.19.0 || >=22.0.0)
-- **Category**: Misconfiguration
-- **Details**: The manifest-gen service uses Node 18, violating the project's own engines constraint.
-- **Fix**: Standardize on a single Node.js version across all files.
+- **File**: `frontend/Dockerfile:1`, `backend/Dockerfile:1`, `docker-compose.yml:3`
+- **Category**: Infrastructure Issue
+- **Details**: `docker-compose.yml` uses `node:18-alpine` for `manifest-gen`, but both frontend/backend `Dockerfile`s use `node:22-alpine`.
+- **Impact**: Potential build/runtime inconsistencies. Scripts running differently.
+- **Fix**: Standardize on `node:22-alpine` everywhere.
+- **Resolution**: Upgraded `manifest-gen` to use `node:22-alpine` in `docker-compose.yml`.
 
 #### IH2. Private IP baked into frontend Docker build [DEFERRED]
 
@@ -599,12 +601,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Fix**: Comment them out or use clearly fake placeholders.
 - **Note**: Retaining this configuration deliberately.
 
-#### IH4. Lock files not copied in Dockerfiles
+#### IH4. Undeterministic package resolution in Dockerfiles [RESOLVED]
 
-- **Files**: `backend/Dockerfile:5-6`, `frontend/Dockerfile:4-5`
-- **Category**: Misconfiguration
-- **Details**: Only `package.json` copied before `npm install`, not `package-lock.json`. Non-deterministic builds.
-- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci`.
+- **File**: `frontend/Dockerfile:5`, `backend/Dockerfile:6`
+- **Category**: Infrastructure Issue
+- **Details**: Both Dockerfiles use `COPY package.json ./` and `npm install` without copying `package-lock.json`.
+- **Impact**: Builds are not reproducible. A minor bump in a dependency can break the build unexpectedly.
+- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci` (or `npm ci --omit=dev` for backend).
+- **Resolution**: Changed Dockerfiles to copy `package-lock.json` and use `npm ci` for deterministic dependencies.
 
 #### IH5. Nginx missing security headers
 
@@ -819,28 +823,32 @@ Consolidated list of all dead code found across the codebase.
 - **Details**: `SettingsPage` validates and clamps between 1-100, but `HomePage` reads the raw `useStorage` value. Corrupted localStorage (0, -1, 999999) goes directly to the agent loop.
 - **Impact**: Runaway agent loop or zero iterations if localStorage is tampered with.
 
-#### PH4. File upload `.xls` accepted by HTML but rejected by JS
+#### PH4. Discrepancy between HTML `accept` and JS extension validation [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:89` vs `ChatInput.vue:233`
-- **Category**: Logic Bug
-- **Details**: HTML `accept` attribute includes `.xls`, but `allowedExtensions` in `processFiles()` does not. Users select `.xls` files, they are silently dropped.
-- **Impact**: Silent data loss — user thinks file is attached but it is discarded.
+- **File**: `frontend/src/components/chat/ChatInput.vue:89, 233`
+- **Category**: UI Bug
+- **Details**: The `<input type="file" accept="... .xls ...">` allows `.xls` files, but the `allowedExtensions` array in `processFiles` does not include `.xls`, only `.xlsx`.
+- **Impact**: Users can select `.xls` files in the dialog, but they are silently dropped by the JS validation.
+- **Fix**: Add `.xls` to `allowedExtensions`.
+- **Resolution**: Added `.xls` to `allowedExtensions` in JS validation.
 
-#### PH5. File rejection is completely silent
+#### PH5. Silent failure when files exceed limits or have wrong type [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:231-256`
-- **Category**: UX
-- **Details**: When a file exceeds 10MB, has wrong type, or exceeds 3-file limit, no feedback is shown. File is simply not added to `attachedFiles`.
-- **Impact**: Users don't know why their file was not attached.
-- **Fix**: Show a toast with the rejection reason.
+- **File**: `frontend/src/components/chat/ChatInput.vue:239-247`
+- **Category**: UX Issue
+- **Details**: If a user drags >3 files, or a file >10MB, or an unsupported file, the code just skips it without any UI feedback.
+- **Impact**: User confusion ("Why didn't my file attach?").
+- **Fix**: Use `messageUtil.error()` or `messageUtil.warning()` to inform the user when files are rejected.
+- **Resolution**: Added `messageUtil` integration to show feedback for files dropped due to size limits or unknown types.
 
-#### AH1. `fetchModels()` missing credential headers
+#### AH1. Missing credential headers in `fetchModels` [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:90-94`
-- **Category**: Security / Logic Bug
-- **Details**: `fetchModels()` does not include `getUserCredentialHeaders()`, unlike all other API calls. Will fail if the backend requires authentication.
-- **Impact**: Models endpoint may return errors or incomplete data.
-- **Fix**: Add `...getUserCredentialHeaders()` to the headers.
+- **File**: `frontend/src/api/backend.ts:90`
+- **Category**: Security / Bug
+- **Details**: `fetchModels` calls `/api/models` without `X-User-Key` or `X-User-Email` headers. If the backend requires authentication for models, this will fail.
+- **Impact**: Feature completely broken or unauthorized access errors when launching the app.
+- **Fix**: Add `...getUserCredentialHeaders()` to the fetch options.
+- **Resolution**: Added `getUserCredentialHeaders()` to `fetchModels()` to ensure proper authentication.
 
 #### AH2. `healthCheck()` missing credential headers
 
