@@ -1,8 +1,11 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
-import pdf from 'pdf-parse'
+import { createRequire } from 'module'
 import mammoth from 'mammoth'
+
+const require = createRequire(import.meta.url)
+const pdf = require('pdf-parse')
 import * as xlsx from 'xlsx'
 import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'

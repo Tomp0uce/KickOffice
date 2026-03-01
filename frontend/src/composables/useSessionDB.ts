@@ -1,14 +1,22 @@
 /**
  * Lightweight IndexedDB helper for KickOffice session management.
  * Adapted from OpenExcel's db.ts (open-excel-main).
+ * Includes per-session VFS (Virtual File System) persistence.
  */
 import type { DisplayMessage } from '@/types/chat'
+import { snapshotVfs, restoreVfs } from '@/utils/vfs'
+
+export interface VfsFile {
+  path: string
+  data: Uint8Array
+}
 
 export interface ChatSession {
   id: string
   hostType: string
   name: string
   messages: DisplayMessage[]
+  vfsFiles?: VfsFile[]
   createdAt: number
   updatedAt: number
 }
@@ -124,7 +132,16 @@ export async function createSession(hostType: string, name?: string): Promise<Ch
 export async function getSession(sessionId: string): Promise<ChatSession | undefined> {
   const db = await openDB()
   const tx = db.transaction(SESSIONS_STORE, 'readonly')
-  return idbGet<ChatSession>(tx.objectStore(SESSIONS_STORE), sessionId)
+  const session = await idbGet<ChatSession>(tx.objectStore(SESSIONS_STORE), sessionId)
+  if (session) {
+    // Restore VFS state for this session
+    try {
+      await restoreVfs(session.vfsFiles || [])
+    } catch (e) {
+      console.warn('[SessionDB] Failed to restore VFS for session', sessionId, e)
+    }
+  }
+  return session
 }
 
 export async function saveSession(sessionId: string, messages: DisplayMessage[]): Promise<void> {
@@ -136,8 +153,14 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
   // Deep-clone to strip Vue reactive proxies — IDB's structured clone algorithm cannot serialize them
   const plainMessages: DisplayMessage[] = JSON.parse(JSON.stringify(messages))
   const newName = (session.name === 'New Chat') ? formatSessionDate(session.createdAt) : session.name
-  await idbPut(store, { ...session, messages: plainMessages, name: newName, updatedAt: Date.now() })
-
+  // Snapshot VFS state for this session
+  let vfsFiles: VfsFile[] = []
+  try {
+    vfsFiles = await snapshotVfs()
+  } catch (e) {
+    console.warn('[SessionDB] Failed to snapshot VFS', e)
+  }
+  await idbPut(store, { ...session, messages: plainMessages, vfsFiles, name: newName, updatedAt: Date.now() })
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
