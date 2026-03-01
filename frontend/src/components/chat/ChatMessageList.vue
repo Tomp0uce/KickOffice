@@ -185,6 +185,19 @@ const liveAnnouncement = ref("");
 watch(
   () => props.history.length,
   (nextLength, previousLength = 0) => {
+    // Clean up expandedThoughts for removed messages to prevent memory leaks (PM11)
+    if (nextLength < previousLength) {
+      const currentKeys = new Set(
+        props.historyWithSegments.map((item) => item.key),
+      );
+      for (const key of Object.keys(expandedThoughts.value)) {
+        const itemKey = key.split("-")[0];
+        if (!currentKeys.has(itemKey)) {
+          delete expandedThoughts.value[key];
+        }
+      }
+    }
+
     if (nextLength <= previousLength || nextLength === 0) return;
     const latestMessage = props.history[nextLength - 1];
     if (!latestMessage) return;

@@ -30,20 +30,14 @@ CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
 export const buildInPrompt = {
   translate: {
     system: (language: string) =>
-      `You are an expert polyglot translator focused on French-English bilingual translation.
+      `You are an expert polyglot translator. Your task is to translate the provided text into ${language}.
       Maintain formatting, keep the original tone, and ensure the output is idiomatic and elegant.`,
     user: (text: string, language: string) =>
-      `Task: Translate the following text with automatic French-English direction detection.
+      `Task: Translate the following text into ${language}.
       Constraints:
-      1. If the source text is mostly French, translate it to natural English.
-      2. If the source text is mostly English, translate it to natural French.
-      3. If the source text is mixed, choose the dominant language and translate to the other (French <-> English).
-      4. Ignore requested output language preferences and always apply this bilingual rule.
-      5. Preserve formatting, numbers, and names.
-      6. If no translation is needed, return the original text unchanged.
-      7. OUTPUT ONLY the translated text. Do not include explanations.
-
-      Optional user language setting (for context only): ${language}
+      1. Translate the source text accurately to natural ${language}.
+      2. Preserve all formatting (like bold, italic, lists), numbers, and proper names exactly as they are.
+      3. OUTPUT ONLY the translated text. Do not include explanations.
 
       Text: ${text}`,
   },
@@ -306,9 +300,9 @@ export const getPowerPointBuiltInPrompt = () => {
       const typedKey = key as keyof typeof powerPointBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
         }
       }
     })
@@ -452,9 +446,9 @@ export const getOutlookBuiltInPrompt = () => {
       const typedKey = key as keyof typeof outlookBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
         }
       }
     })
@@ -480,9 +474,9 @@ export const getExcelBuiltInPrompt = () => {
       const typedKey = key as keyof typeof excelBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
         }
       }
     })
@@ -508,9 +502,9 @@ export const getBuiltInPrompt = () => {
       const typedKey = key as keyof typeof buildInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, language),
+          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, text).replace(/\$\{language\}/g, language),
+            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
         }
       }
     })

@@ -1,23 +1,12 @@
 import DiffMatchPatch from 'diff-match-patch'
 
+import DOMPurify from 'dompurify'
+
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './officeRichText'
 import { sandboxedEval } from './sandbox'
 
-// R17 — Visual diff helper shared with Word (blue/underline = inserted, red/strikethrough = deleted)
-function generateVisualDiff(originalText: string, newText: string): string {
-  const dmp = new DiffMatchPatch()
-  const diffs = dmp.diff_main(originalText, newText)
-  dmp.diff_cleanupSemantic(diffs)
-  return diffs
-    .map(([op, text]) => {
-      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
-      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
-      return escaped
-    })
-    .join('')
-}
+import { generateVisualDiff } from './common'
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -280,7 +269,7 @@ const outlookToolDefinitions = createOutlookTools({
 
       return new Promise<string>((resolve) => {
         mailbox.item.body.setAsync(
-          html,
+          DOMPurify.sanitize(html),
           { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
             resolve(resolveAsyncResult(result, () => 'Successfully set HTML email body.'))
@@ -524,7 +513,7 @@ const outlookToolDefinitions = createOutlookTools({
 
       return new Promise<string>((resolve) => {
         mailbox.item.body.setSelectedDataAsync(
-          html,
+          DOMPurify.sanitize(html),
           { coercionType: getOfficeCoercionType().Html },
           (result: any) => {
             resolve(resolveAsyncResult(result, () => 'Successfully inserted HTML at cursor.'))
@@ -566,10 +555,6 @@ const outlookToolDefinitions = createOutlookTools({
 
 export function getOutlookToolDefinitions(): OutlookToolDefinition[] {
   return Object.values(outlookToolDefinitions)
-}
-
-export function getOutlookTool(name: OutlookToolName): OutlookToolDefinition | undefined {
-  return outlookToolDefinitions[name]
 }
 
 export { outlookToolDefinitions }

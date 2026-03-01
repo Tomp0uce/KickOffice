@@ -14,9 +14,6 @@ imageRouter.post('/', async (req, res) => {
   }
 
   const imageModel = models.image
-  if (!imageModel) {
-    return logAndRespond(res, 500, { error: 'Image model not configured' }, 'POST /api/image')
-  }
 
   try {
     const response = await imageGeneration({

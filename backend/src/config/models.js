@@ -46,7 +46,7 @@ const models = {
   },
   reasoning: {
     id: process.env.MODEL_REASONING || 'gpt-5.1',
-    label: process.env.MODEL_REASONING_LABEL || 'Raisonnement',
+    label: process.env.MODEL_REASONING_LABEL || 'Reasoning',
     maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '8192', 10),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
     reasoningEffort: process.env.MODEL_REASONING_EFFORT || 'high',

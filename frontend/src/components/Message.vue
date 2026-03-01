@@ -11,39 +11,50 @@
           </div>
           <span class="toast-text">{{ message }}</span>
         </div>
-        <div class="toast-progress" :style="{ animationDuration: `${duration}ms` }"></div>
+        <div
+          class="toast-progress"
+          :style="{ animationDuration: `${duration}ms` }"
+        ></div>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script lang="ts" setup>
-import { AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { AlertCircle, AlertTriangle, CheckCircle, Info } from "lucide-vue-next";
+import { onMounted, ref } from "vue";
 
 interface Props {
-  message: string
-  type?: 'error' | 'success' | 'info' | 'warning'
-  duration?: number
+  message: string;
+  type?: "error" | "success" | "info" | "warning";
+  duration?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  type: 'info',
+  type: "info",
   duration: 3000,
-})
+});
 
-const visible = ref(false)
-const emit = defineEmits(['close'])
+const visible = ref(false);
+const emit = defineEmits(["close"]);
+
+let hideTimeout: number;
+let closeTimeout: number;
 
 onMounted(() => {
-  visible.value = true
+  visible.value = true;
   if (props.duration > 0) {
-    setTimeout(() => {
-      visible.value = false
-      setTimeout(() => emit('close'), 300)
-    }, props.duration)
+    hideTimeout = window.setTimeout(() => {
+      visible.value = false;
+      closeTimeout = window.setTimeout(() => emit("close"), 300);
+    }, props.duration);
   }
-})
+});
+
+onUnmounted(() => {
+  clearTimeout(hideTimeout);
+  clearTimeout(closeTimeout);
+});
 </script>
 
 <style scoped>
@@ -118,7 +129,11 @@ onMounted(() => {
 .toast-error {
   border: 1px solid rgb(252 165 165 / 80%);
   color: #991b1b;
-  background: linear-gradient(135deg, rgb(254 226 226 / 98%) 0%, rgb(254 226 226 / 95%) 100%);
+  background: linear-gradient(
+    135deg,
+    rgb(254 226 226 / 98%) 0%,
+    rgb(254 226 226 / 95%) 100%
+  );
 }
 
 .toast-error .toast-icon svg {
@@ -132,7 +147,11 @@ onMounted(() => {
 .toast-success {
   border: 1px solid rgb(134 239 172 / 80%);
   color: #14532d;
-  background: linear-gradient(135deg, rgb(220 252 231 / 98%) 0%, rgb(220 252 231 / 95%) 100%);
+  background: linear-gradient(
+    135deg,
+    rgb(220 252 231 / 98%) 0%,
+    rgb(220 252 231 / 95%) 100%
+  );
 }
 
 .toast-success .toast-icon svg {
@@ -146,7 +165,11 @@ onMounted(() => {
 .toast-info {
   border: 1px solid rgb(147 197 253 / 80%);
   color: #1e3a8a;
-  background: linear-gradient(135deg, rgb(224 242 254 / 98%) 0%, rgb(224 242 254 / 95%) 100%);
+  background: linear-gradient(
+    135deg,
+    rgb(224 242 254 / 98%) 0%,
+    rgb(224 242 254 / 95%) 100%
+  );
 }
 
 .toast-info .toast-icon svg {
@@ -160,7 +183,11 @@ onMounted(() => {
 .toast-warning {
   border: 1px solid rgb(252 211 77 / 80%);
   color: #78350f;
-  background: linear-gradient(135deg, rgb(254 243 199 / 98%) 0%, rgb(254 243 199 / 95%) 100%);
+  background: linear-gradient(
+    135deg,
+    rgb(254 243 199 / 98%) 0%,
+    rgb(254 243 199 / 95%) 100%
+  );
 }
 
 .toast-warning .toast-icon svg {

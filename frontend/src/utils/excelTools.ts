@@ -63,7 +63,6 @@ export type ExcelToolName =
   | 'getConditionalFormattingRules'
   | 'batchSetCellValues'
   | 'batchProcessRange'
-  | 'eval_officejs'
   | 'findData'
   | 'duplicateWorksheet'
   | 'hideUnhideRowColumn'
@@ -74,6 +73,24 @@ export type ExcelToolName =
 function getExcelFormulaLanguage(): 'en' | 'fr' {
   const configured = localStorage.getItem(localStorageKey.excelFormulaLanguage)
   return configured === 'fr' ? 'fr' : 'en'
+}
+
+function colToInt(col: string): number {
+  let num = 0
+  for (let i = 0; i < col.length; i++) {
+    num = num * 26 + (col.charCodeAt(i) - 64)
+  }
+  return num
+}
+
+function intToCol(num: number): string {
+  let col = ''
+  while (num > 0) {
+    const mod = (num - 1) % 26
+    col = String.fromCharCode(65 + mod) + col
+    num = Math.floor((num - mod) / 26)
+  }
+  return col
 }
 
 const excelToolDefinitions = createExcelTools({
@@ -1152,7 +1169,8 @@ const excelToolDefinitions = createExcelTools({
       const { columnLetter, count = 1 } = args
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const endCol = String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)
+        const startColNum = colToInt(columnLetter.toUpperCase())
+        const endCol = intToCol(startColNum + count - 1)
         const range = sheet.getRange(`${columnLetter}:${endCol}`)
         range.insert(Excel.InsertShiftDirection.right)
         await context.sync()
@@ -1211,7 +1229,8 @@ const excelToolDefinitions = createExcelTools({
       const { columnLetter, count = 1 } = args
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const endCol = String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)
+        const startColNum = colToInt(columnLetter.toUpperCase())
+        const endCol = intToCol(startColNum + count - 1)
         const range = sheet.getRange(`${columnLetter}:${endCol}`)
         range.delete(Excel.DeleteShiftDirection.left)
         await context.sync()
@@ -2144,10 +2163,6 @@ const excelToolDefinitions = createExcelTools({
 
 export function getExcelToolDefinitions(): ExcelToolDefinition[] {
   return Object.values(excelToolDefinitions)
-}
-
-export function getExcelTool(name: ExcelToolName): ExcelToolDefinition | undefined {
-  return excelToolDefinitions[name]
 }
 
 export { excelToolDefinitions }

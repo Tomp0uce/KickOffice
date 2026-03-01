@@ -43,7 +43,7 @@
         <button
           class="cursor-pointer hover:text-danger ml-1 opacity-70 hover:opacity-100"
           @click="removeFile(index)"
-          title="Retirer le fichier"
+          :title="$t('removeFile')"
         >
           &times;
         </button>
@@ -76,7 +76,7 @@
       <!-- Bouton trombone pour ajouter un fichier -->
       <button
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent hover:bg-surface text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-        title="Attacher un document (PDF, DOCX, XLSX)"
+        :title="$t('attachDocument')"
         :disabled="loading || attachedFiles.length >= 3"
         @click="triggerFileInput"
       >
@@ -148,6 +148,7 @@
 <script lang="ts" setup>
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
+import { messageUtil } from "@/utils/message";
 
 const props = defineProps<{
   availableModels: Record<string, ModelInfo>;
@@ -174,7 +175,6 @@ const emit = defineEmits<{
   (e: "update:useSelectedText", value: boolean): void;
   (e: "submit", value: string, files?: File[]): void;
   (e: "stop"): void;
-  (e: "input"): void;
 }>();
 
 const isDragOver = ref(false);
@@ -188,7 +188,6 @@ const handleModelTierChange = (event: Event) => {
 const handleInput = (event: Event) => {
   const val = (event.target as HTMLTextAreaElement).value;
   emit("update:modelValue", val);
-  emit("input");
 };
 
 // --- FILE UPLOAD LOGIC ---
@@ -202,13 +201,18 @@ const allowedTypes = [
 ];
 
 const handleDragOver = (e: DragEvent) => {
+  e.preventDefault(); // Ensure default behavior is prevented
   if (e.dataTransfer?.types.includes("Files")) {
+    dragCounter.value++;
     isDragOver.value = true;
   }
 };
 
-const handleDragLeave = (e: DragEvent) => {
-  isDragOver.value = false;
+const handleDragLeave = () => {
+  dragCounter.value--;
+  if (dragCounter.value === 0) {
+    isDragOver.value = false;
+  }
 };
 
 const handleDrop = (e: DragEvent) => {
@@ -230,28 +234,55 @@ const onFileSelected = (e: Event) => {
 
 const processFiles = (fileList: FileList) => {
   // Check for allowed extensions if mime type misses
-  const allowedExtensions = [".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"];
+  const allowedExtensions = [
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".xls",
+    ".csv",
+    ".txt",
+    ".md",
+  ];
+  let rejectedCount = 0;
+  let oversizedCount = 0;
 
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
 
-    // Limits: Max 3 files, Max 10MB per file
+    // Limits: Max 3 files
     if (attachedFiles.value.length >= 3) {
+      messageUtil.warning("Maximum 3 fichiers autorisés.");
       break;
     }
 
     const isExtensionOk = allowedExtensions.some((ext) =>
       file.name.toLowerCase().endsWith(ext),
     );
-    if (
-      (allowedTypes.includes(file.type) || isExtensionOk) &&
-      file.size <= 10 * 1024 * 1024
-    ) {
+
+    if (file.size > 10 * 1024 * 1024) {
+      oversizedCount++;
+      continue;
+    }
+
+    if (allowedTypes.includes(file.type) || isExtensionOk) {
       // Avoid duplicate by name
       if (!attachedFiles.value.some((f) => f.name === file.name)) {
         attachedFiles.value.push(file);
       }
+    } else {
+      rejectedCount++;
     }
+  }
+
+  if (oversizedCount > 0) {
+    messageUtil.error(
+      `${oversizedCount} fichier(s) ignoré(s) : taille > 10MB.`,
+    );
+  }
+  if (rejectedCount > 0) {
+    messageUtil.error(
+      `${rejectedCount} fichier(s) ignoré(s) : format non supporté.`,
+    );
   }
 };
 

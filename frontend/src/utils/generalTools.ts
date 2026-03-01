@@ -94,10 +94,3 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
 export function getGeneralToolDefinitions(): GeneralToolDefinition[] {
   return generalToolDefinitions
 }
-
-export function getEnabledGeneralTools(enabledTools?: GeneralToolName[]): GeneralToolDefinition[] {
-  if (!enabledTools || enabledTools.length === 0) {
-    return generalToolDefinitions
-  }
-  return generalToolDefinitions.filter(def => enabledTools.includes(def.name))
-}

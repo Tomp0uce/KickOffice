@@ -1,11 +1,12 @@
-import type { Ref } from 'vue'
+import { type Ref, ref } from 'vue'
 
 import type { DisplayMessage } from '@/types/chat'
 import { insertFormattedResult, insertResult } from '@/api/common'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { insertIntoPowerPoint } from '@/utils/powerpointTools'
-import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from '@/utils/officeRichText'
+import { renderOfficeCommonApiHtml } from '@/utils/officeRichText'
+import DOMPurify from 'dompurify'
 
 const VERBOSE_LOGGING_ENABLED = import.meta.env.VITE_VERBOSE_LOGGING === 'true'
 const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-INSERT]') : () => {}
@@ -93,7 +94,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         const item = mailbox?.item
         if (item?.body?.setSelectedDataAsync) {
           // F1: Use rich HTML if available (preserves images/formatting), otherwise render from markdown
-          const htmlBody = richHtml || renderOfficeCommonApiHtml(normalizedContent)
+          const rawHtmlBody = richHtml || renderOfficeCommonApiHtml(normalizedContent)
+          const htmlBody = DOMPurify.sanitize(rawHtmlBody, { USE_PROFILES: { html: true } })
           await new Promise<void>((resolve, reject) => {
             item.body.setSelectedDataAsync!(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
               if (isOfficeAsyncSucceeded(result.status)) resolve()
@@ -104,7 +106,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         } else {
           await copyToClipboard(content, true)
         }
-      } catch {
+      } catch (err) {
+        console.warn('[useOfficeInsert] Outlook error/fallback to clipboard', err)
         await copyToClipboard(content, true)
       }
       return
@@ -114,7 +117,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       try {
         await insertIntoPowerPoint(normalizedContent)
         messageUtil.success(t('insertedToSlide'))
-      } catch {
+      } catch (err) {
+        console.warn('[useOfficeInsert] PowerPoint error/fallback to clipboard', err)
         await copyToClipboard(normalizedContent, true)
       }
       return
@@ -129,7 +133,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
           await ctx.sync()
         })
         messageUtil.success(t('insertedToCell'))
-      } catch {
+      } catch (err) {
+        console.warn('[useOfficeInsert] Excel error/fallback to clipboard', err)
         await copyToClipboard(normalizedContent, true)
       }
       return
@@ -137,23 +142,24 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
 
     // Word insertion
     try {
-      insertType.value = type
       // F1: Use rich HTML if available (preserves images/formatting from original selection)
       if (richHtml) {
+        const sanitizedHtml = DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } })
         await Word.run(async (context) => {
           const range = context.document.getSelection()
-          range.insertHtml(richHtml, type === 'newLine' ? 'After' : 'Replace')
+          range.insertHtml(sanitizedHtml, type === 'newLine' ? 'After' : 'Replace')
           await context.sync()
         })
         messageUtil.success(t('inserted'))
       } else if (useWordFormatting.value) {
-        await insertFormattedResult(normalizedContent, insertType)
+        await insertFormattedResult(normalizedContent, ref(type))
         messageUtil.success(t('inserted'))
       } else {
-        await insertResult(normalizedContent, insertType)
+        await insertResult(normalizedContent, ref(type))
         messageUtil.success(t('inserted'))
       }
-    } catch {
+    } catch (err) {
+      console.warn('[useOfficeInsert] Word error/fallback to clipboard', err)
       await copyToClipboard(normalizedContent, true)
     }
   }

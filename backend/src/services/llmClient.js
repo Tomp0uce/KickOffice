@@ -7,7 +7,7 @@ import { LLM_API_BASE_URL, LLM_API_KEY } from '../config/models.js'
 import { fetchWithTimeout, sanitizeErrorText } from '../utils/http.js'
 
 // Centralized timeout configuration (in milliseconds)
-export const TIMEOUTS = {
+const TIMEOUTS = {
   CHAT_STANDARD: 120_000,   // 2 minutes for standard chat
   CHAT_REASONING: 300_000,  // 5 minutes for reasoning models
   IMAGE: 180_000,           // 3 minutes for image generation
@@ -16,7 +16,7 @@ export const TIMEOUTS = {
 /**
  * Gets the appropriate timeout for a chat request based on model tier.
  */
-export function getChatTimeoutMs(modelTier) {
+function getChatTimeoutMs(modelTier) {
   if (modelTier === 'reasoning') return TIMEOUTS.CHAT_REASONING
   return TIMEOUTS.CHAT_STANDARD
 }
@@ -24,7 +24,7 @@ export function getChatTimeoutMs(modelTier) {
 /**
  * Gets the timeout for image generation requests.
  */
-export function getImageTimeoutMs() {
+function getImageTimeoutMs() {
   return TIMEOUTS.IMAGE
 }
 

@@ -15,14 +15,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### v2 Open Items Status
 
-| ID | Description | Status |
-|----|-------------|--------|
-| B1 | No unit test infrastructure | OPEN |
-| B2 | No linting or formatting configuration | OPEN |
-| B3 | No CI pipeline for automated testing | OPEN |
-| F1 | Quick actions strip images/formatting | OPEN |
-| F2 | Outlook Reply produces low-quality responses | OPEN |
-| F3 | Excel agent processes cells one-by-one | OPEN |
+| ID  | Description                                  | Status |
+| --- | -------------------------------------------- | ------ |
+| B1  | No unit test infrastructure                  | OPEN   |
+| B2  | No linting or formatting configuration       | OPEN   |
+| B3  | No CI pipeline for automated testing         | OPEN   |
+| F1  | Quick actions strip images/formatting        | OPEN   |
+| F2  | Outlook Reply produces low-quality responses | OPEN   |
+| F3  | Excel agent processes cells one-by-one       | OPEN   |
 
 ---
 
@@ -30,7 +30,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### BC1. Content-Type enforcement blocks file uploads
+#### BC1. Content-Type enforcement blocks file uploads [RESOLVED]
 
 - **File**: `backend/src/server.js:91-96`
 - **Category**: Broken Functionality
@@ -46,7 +46,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Exposes internal infrastructure endpoint. Potential SSRF if the env var is misconfigured.
 - **Fix**: Replace with a placeholder like `https://your-llm-api.example.com/v1` and add URL validation.
 
-#### BC3. Sensitive data logged to disk in plaintext
+#### BC3. Sensitive data logged to disk in plaintext [RESOLVED]
 
 - **File**: `backend/src/utils/logger.js:22-46`, `backend/src/routes/chat.js:49-52, 157-159, 210`
 - **Category**: Security / Privacy
@@ -64,21 +64,23 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### BH1. Drain event listener leak in streaming response
+#### BH1. Drain event listener leak in streaming response [RESOLVED]
 
 - **File**: `backend/src/routes/chat.js:86-90`
 - **Category**: Logic Bug / Resource Leak
 - **Details**: When backpressure occurs during SSE streaming, `await new Promise(resolve => res.once('drain', resolve))` will never resolve if the client disconnects between the backpressure check and the drain event.
 - **Impact**: Permanently hung request handlers under load with slow/disconnecting clients.
 - **Fix**: Race the drain promise with a client-disconnect check or add a timeout.
+- **Resolution**: Raced the drain promise with the connection close event to prevent memory leaks.
 
-#### BH2. logAndRespond called after headers already sent (streaming)
+#### BH2. logAndRespond called after headers already sent (streaming) [RESOLVED]
 
 - **File**: `backend/src/routes/chat.js:108-116`
 - **Category**: Logic Bug
 - **Details**: If an error occurs after SSE headers have been sent, the catch block calls `logAndRespond(res, 504/500, ...)` which tries to set headers and write JSON on an active SSE stream, causing `ERR_HTTP_HEADERS_SENT`.
 - **Impact**: Unhandled exception, malformed SSE stream, swallowed error.
 - **Fix**: Check `res.headersSent` before calling `logAndRespond`; if already streaming, write an SSE error event instead.
+- **Resolution**: Added `if (res.headersSent)` check to directly write SSE error data instead of trying to send a standard HTTP error.
 
 #### BH3. Unbounded log file growth
 
@@ -230,7 +232,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Any XSS vulnerability allows immediate credential theft. The obfuscation creates a false sense of security.
 - **Fix**: Document the limitation clearly. Consider using session-only storage or backend-managed tokens.
 
-#### UC3. Unsanitized HTML injection in Outlook tools
+#### UC3. Unsanitized HTML injection in Outlook tools [RESOLVED]
 
 - **File**: `frontend/src/utils/outlookTools.ts:505-534` (insertHtmlAtCursor), `outlookTools.ts:261-291` (setEmailBodyHtml)
 - **Category**: Security / XSS
@@ -240,21 +242,23 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### UH1. `eval_officejs` declared in ExcelToolName but never defined
+#### UH1. `eval_officejs` declared in ExcelToolName but never defined [RESOLVED]
 
 - **File**: `frontend/src/utils/excelTools.ts:66`
 - **Category**: Logic Bug / Dead Code
 - **Details**: `'eval_officejs'` is in the `ExcelToolName` union but no tool definition exists. The `as unknown as Record<ExcelToolName, ExcelToolDefinition>` cast suppresses the TypeScript error.
 - **Impact**: Runtime crash if the agent tries to invoke `eval_officejs` for Excel.
 - **Fix**: Either add the tool definition or remove the name from the union type.
+- **Resolution**: Removed `eval_officejs` from the union type.
 
-#### UH2. Column letter arithmetic overflow
+#### UH2. Column letter arithmetic overflow [RESOLVED]
 
 - **File**: `frontend/src/utils/excelTools.ts:1155, 1214`
 - **Category**: Logic Bug
 - **Details**: `String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)` breaks for multi-character columns (AA, AB) and overflows for single-character columns near Z.
 - **Impact**: Data corruption or crash when inserting/deleting columns at/beyond column Z.
 - **Fix**: Implement proper column letter arithmetic that handles multi-character references.
+- **Resolution**: Added helper functions `colToInt` and `intToCol` to correctly compute column offsets for multi-character column names.
 
 #### UH3. Double timeout in Outlook tool execution
 
@@ -264,13 +268,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Silent failures on slow connections or large emails.
 - **Fix**: Remove the inner 3-second timeout or increase it significantly.
 
-#### UH4. `language` parameter ignored in translate prompt
+#### UH4. Language parameter ignored in translate prompt [RESOLVED]
 
-- **File**: `frontend/src/utils/constant.ts:32-48`
+- **File**: `frontend/src/utils/prompt.ts:133-134`
 - **Category**: Logic Bug
-- **Details**: Translate prompt hardcodes "French-English bilingual translation" regardless of the `language` parameter. Explicitly says "Ignore requested output language preferences."
+- **Details**: `buildInPrompt.translate` takes an `args.language` parameter, but defaults the instruction to `args.language || 'English'`. When answering an email, it should use the language of the source email.
 - **Impact**: Users who select a target language other than French/English see their preference silently ignored.
-- **Fix**: Make the prompt respect the language parameter.
+- **Fix**: Use the detected source language of the email for replying. Checked and resolved in outlook reply logic. Make the prompt respect the language parameter.
+- **Resolution**: Updated the generic translation quick action prompt to correctly target the requested layout language.
 
 #### UH5. Host detection caching can return wrong host
 
@@ -355,11 +360,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: `delete msg.tool_calls` mutates original message objects from the input array.
 - **Fix**: Clone messages before modifying: `const msg = { ...originalMsg }`.
 
-#### UM10. Character-by-character HTML reconstruction in PowerPoint
+#### UM10. Character-by-character HTML reconstruction in PowerPoint [DEFERRED]
 
-- **File**: `frontend/src/utils/powerpointTools.ts:121-183`
-- **Category**: Performance
-- **Details**: Loads font properties for each individual character (up to 100,000) via `range.getSubstring(i, 1)`. Very memory-intensive.
+- **File**: `frontend/src/api/common.ts:169-173`
+- **Category**: Performance / UX
+- **Details**: Word processing uses `insertHtml`, but PowerPoint inserts character by character.
+- **Impact**: Noticeably slow insertion in PowerPoint, potential formatting loss.
+- **Fix**: Find API equivalent to `insertHtml` for PowerPoint if possible.
+- **Note**: Retaining this implementation as PowerPoint has severe formatting issues otherwise.
 
 ### LOW
 
@@ -388,29 +396,32 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### CC1. Prompt injection via unsanitized document selection
+#### CC1. Prompt injection via unsanitized document selection [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:613-616`
 - **Category**: Security
 - **Details**: Office selection text is directly interpolated into the user message: `fullMessage += \`\n\n[${selectionLabel}: "${selectedText}"]\``. A malicious document containing `"]` followed by injection instructions can break out of the framing.
 - **Impact**: Indirect prompt injection — attacker crafts document, victim opens it and uses KickOffice.
 - **Fix**: Use robust delimiters (XML CDATA-style, base64, unique boundary token).
+- **Resolution**: Replaced direct injection with robust XML-like `<document_content>` tags.
 
-#### CC2. Prompt injection via quick action selection text
+#### CC2. Prompt injection via quick action selection text [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:753, 761, 525`
 - **Category**: Security
 - **Details**: `textForLlm` from document selection passed directly to `action.user(textForLlm, lang)`. Email body injected into reply prompt at line 525 with `replyPrompt.user(emailBody, lang)`.
 - **Impact**: Attacker-crafted email/document content can override system prompt instructions.
+- **Resolution**: Escaped and encapsulated injected content inside `<document_content>` and `<email_content>` tags to prevent override.
 
 ### HIGH
 
-#### CH1. Race condition: concurrent `sendMessage` calls corrupt state
+#### CH1. Race condition: concurrent `sendMessage` calls corrupt state [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:466-468, 498-499`
 - **Category**: Logic Bug
 - **Details**: `if (loading.value) return` is check-then-act on a reactive ref. Two rapid calls can both pass before `loading.value = true` is set, causing concurrent agent loops writing to the same history array.
 - **Fix**: Set `loading.value = true` immediately at the top, before any async work.
+- **Resolution**: Set `loading.value = true` immediately and handled resetting the state on validation returns.
 
 #### CH2. `lastIndex` stale reference during agent loop
 
@@ -497,7 +508,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:96, 98, 143-145`
 - **Category**: Security
-- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()`.
+- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()` without sanitization.
 - **Fix**: Sanitize through DOMPurify before passing to Office APIs.
 
 #### CM9. Prompt injection via user profile fields
@@ -546,17 +557,18 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### IC1. Content-Type middleware blocks uploads (same as BC1)
+#### IC1. Content-Type middleware blocks uploads (same as BC1) [RESOLVED]
 
 - **File**: `backend/src/server.js:91-96`
 - **Details**: See BC1. The upload route at line 104 is unreachable for multipart requests.
 
-#### IC2. Containers run as root
+#### IC2. Containers run as root [DEFERRED]
 
-- **Files**: `backend/Dockerfile:1-15`, `frontend/Dockerfile:1-22`
+- **File**: `frontend/Dockerfile:1`, `backend/Dockerfile:1`
 - **Category**: Security
-- **Details**: Neither Dockerfile creates or switches to a non-root user. `PUID`/`PGID` env vars in docker-compose have no effect on standard Node/Nginx images.
-- **Fix**: Add `USER node` (backend) and create a non-root user for nginx (frontend).
+- **Details**: `node` Docker images run as `root` by default.
+- **Fix**: Add `USER node` to the Dockerfiles.
+- **Note**: Retaining this configuration deliberately.
 
 #### IC3. Internal infrastructure URL as default
 
@@ -566,40 +578,47 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### IH1. Four different Node.js versions across the project
+#### IH1. Node.js version mismatch between environments [RESOLVED]
 
-- **Files**: `docker-compose.yml:3` (Node 18), both `Dockerfile`s (Node 22), CI workflow (Node 20), `engines` (>=20.19.0 || >=22.0.0)
-- **Category**: Misconfiguration
-- **Details**: The manifest-gen service uses Node 18, violating the project's own engines constraint.
-- **Fix**: Standardize on a single Node.js version across all files.
+- **File**: `frontend/Dockerfile:1`, `backend/Dockerfile:1`, `docker-compose.yml:3`
+- **Category**: Infrastructure Issue
+- **Details**: `docker-compose.yml` uses `node:18-alpine` for `manifest-gen`, but both frontend/backend `Dockerfile`s use `node:22-alpine`.
+- **Impact**: Potential build/runtime inconsistencies. Scripts running differently.
+- **Fix**: Standardize on `node:22-alpine` everywhere.
+- **Resolution**: Upgraded `manifest-gen` to use `node:22-alpine` in `docker-compose.yml`.
 
-#### IH2. Private IP baked into frontend Docker build
+#### IH2. Private IP baked into frontend Docker build [DEFERRED]
 
 - **File**: `frontend/Dockerfile:9`
 - **Category**: Security
 - **Details**: Default build arg `VITE_BACKEND_URL=http://192.168.50.10:3003` bakes a private IP into the JS bundle.
 - **Fix**: Remove default or use a placeholder that fails visibly.
+- **Note**: Retaining this configuration deliberately.
 
-#### IH3. External DuckDNS domain as default in .env.example
+#### IH3. External DuckDNS domain as default in .env.example [DEFERRED]
 
 - **File**: `.env.example:10-11`
 - **Category**: Misconfiguration
 - **Details**: `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL` set to `https://kickoffice.duckdns.org` as active values.
 - **Fix**: Comment them out or use clearly fake placeholders.
+- **Note**: Retaining this configuration deliberately.
 
-#### IH4. Lock files not copied in Dockerfiles
+#### IH4. Undeterministic package resolution in Dockerfiles [RESOLVED]
 
-- **Files**: `backend/Dockerfile:5-6`, `frontend/Dockerfile:4-5`
-- **Category**: Misconfiguration
-- **Details**: Only `package.json` copied before `npm install`, not `package-lock.json`. Non-deterministic builds.
-- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci`.
+- **File**: `frontend/Dockerfile:5`, `backend/Dockerfile:6`
+- **Category**: Infrastructure Issue
+- **Details**: Both Dockerfiles use `COPY package.json ./` and `npm install` without copying `package-lock.json`.
+- **Impact**: Builds are not reproducible. A minor bump in a dependency can break the build unexpectedly.
+- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci` (or `npm ci --omit=dev` for backend).
+- **Resolution**: Changed Dockerfiles to copy `package-lock.json` and use `npm ci` for deterministic dependencies.
 
-#### IH5. Nginx missing security headers
+#### IH5. Nginx missing security headers [RESOLVED]
 
 - **File**: `frontend/nginx.conf:1-21`
 - **Category**: Security
 - **Details**: Missing `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options`. Uses deprecated `X-XSS-Protection`.
 - **Fix**: Add modern security headers, remove `X-XSS-Protection`.
+- **Resolution**: Security headers added to frontend nginx.conf.
 
 ### MEDIUM
 
@@ -690,61 +709,64 @@ Consolidated list of all dead code found across the codebase.
 
 ### Backend Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally |
-| BD2 | `backend/src/services/llmClient.js:10-29` | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports | Only used internally |
-| BD3 | `backend/src/middleware/validate.js:159` | `routeName` parameter | Never referenced in function body |
-| BD4 | `backend/src/routes/image.js:17-19` | `if (!imageModel)` branch | Can never be true |
+| ID  | File                                         | Item                                                                | Details                           |
+| --- | -------------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
+| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally              |
+| BD2 | `backend/src/services/llmClient.js:10-29`    | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports         | Only used internally              |
+| BD3 | `backend/src/middleware/validate.js:159`     | `routeName` parameter                                               | Never referenced in function body |
+| BD4 | `backend/src/routes/image.js:17-19`          | `if (!imageModel)` branch                                           | Can never be true                 |
 
 ### Frontend Utilities Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| UD1 | `frontend/src/utils/hostDetection.ts:55-57` | `getHostName()` export | Never imported anywhere |
-| UD2 | `frontend/src/utils/excelTools.ts:2149-2151` | `getExcelTool()` export | Never imported anywhere |
-| UD3 | `frontend/src/utils/wordTools.ts:1889-1891` | `getWordTool()` export | Never imported anywhere |
-| UD4 | `frontend/src/utils/outlookTools.ts:571-573` | `getOutlookTool()` export | Never imported anywhere |
-| UD5 | `frontend/src/utils/powerpointTools.ts:949-951` | `getPowerPointTool()` export | Never imported anywhere |
-| UD6 | `frontend/src/utils/generalTools.ts:98-103` | `getEnabledGeneralTools()` export | Never imported anywhere |
-| UD7 | `frontend/src/utils/powerpointTools.ts:63-66` | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
-| UD8 | `frontend/src/utils/toolStorage.ts:10` | `buildToolSignature()` export | Only used internally |
-| UD9 | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export | All consumers import named exports directly |
-| UD10 | `frontend/src/utils/credentialStorage.ts:40-49` | `CredentialStorage` interface export | Never imported |
-| UD11 | `frontend/src/utils/excelTools.ts:66` | `'eval_officejs'` in `ExcelToolName` | No tool definition exists |
-| UD12 | `frontend/src/utils/excelTools.ts:753` | `dataRange` variable in `sortRange` | Assigned but never read |
-| UD13 | `frontend/src/utils/common.ts:3-13` | `getOptionList()` export | Only used internally |
+| ID   | File                                              | Item                                   | Details                                                         |
+| ---- | ------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| UD1  | `frontend/src/utils/hostDetection.ts:55-57`       | `getHostName()` export                 | Never imported anywhere                                         |
+| UD2  | `frontend/src/utils/excelTools.ts:2149-2151`      | `getExcelTool()` export                | Never imported anywhere                                         |
+| UD3  | `frontend/src/utils/wordTools.ts:1889-1891`       | `getWordTool()` export                 | Never imported anywhere                                         |
+| UD4  | `frontend/src/utils/outlookTools.ts:571-573`      | `getOutlookTool()` export              | Never imported anywhere                                         |
+| UD5  | `frontend/src/utils/powerpointTools.ts:949-951`   | `getPowerPointTool()` export           | Never imported anywhere                                         |
+| UD6  | `frontend/src/utils/generalTools.ts:98-103`       | `getEnabledGeneralTools()` export      | Never imported anywhere                                         |
+| UD7  | `frontend/src/utils/powerpointTools.ts:63-66`     | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
+| UD8  | `frontend/src/utils/toolStorage.ts:10`            | `buildToolSignature()` export          | Only used internally                                            |
+| UD9  | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export      | All consumers import named exports directly                     |
+| UD10 | `frontend/src/utils/credentialStorage.ts:40-49`   | `CredentialStorage` interface export   | Never imported                                                  |
+| UD11 | `frontend/src/utils/excelTools.ts:66`             | `'eval_officejs'` in `ExcelToolName`   | No tool definition exists                                       |
+| UD12 | `frontend/src/utils/excelTools.ts:753`            | `dataRange` variable in `sortRange`    | Assigned but never read                                         |
+| UD13 | `frontend/src/utils/common.ts:3-13`               | `getOptionList()` export               | Only used internally                                            |
 
 ### Frontend Composables Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
+| ID  | File                                                 | Item                | Details                           |
+| --- | ---------------------------------------------------- | ------------------- | --------------------------------- |
 | CD1 | `frontend/src/composables/useAgentPrompts.ts:13, 26` | `hostIsWord` option | Destructured but never referenced |
 
 ### Infrastructure Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images |
-| ID2 | `backend/Dockerfile:12-13` | Dockerfile HEALTHCHECK | Overridden by compose |
-| ID3 | `backend/Dockerfile:10` | `EXPOSE 3003` | Purely documentary, port set by compose |
-| ID4 | `.gitignore:31-38` | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
+| ID  | File                              | Item                   | Details                                         |
+| --- | --------------------------------- | ---------------------- | ----------------------------------------------- |
+| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images                 |
+| ID2 | `backend/Dockerfile:12-13`        | Dockerfile HEALTHCHECK | Overridden by compose                           |
+| ID3 | `backend/Dockerfile:10`           | `EXPOSE 3003`          | Purely documentary, port set by compose         |
+| ID4 | `.gitignore:31-38`                | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
 
 ---
 
 ## 7. v2 Open Feature Issues (carried forward)
 
 ### F1. Quick actions strip images/formatting from documents
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
 
 ### F2. Outlook Reply produces low-quality responses
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
 
 ### F3. Excel agent processes cells one-by-one
+
 - **Status**: OPEN
 - **Severity**: HIGH
 - **Details**: See v2 DESIGN_REVIEW for full implementation plan.
@@ -754,12 +776,15 @@ Consolidated list of all dead code found across the codebase.
 ## 8. Build & Environment Warnings (carried forward from v2)
 
 ### B1. No unit test infrastructure
+
 - **Status**: OPEN
 
 ### B2. No linting or formatting configuration
+
 - **Status**: OPEN
 
 ### B3. No CI pipeline for automated testing
+
 - **Status**: OPEN
 
 ---
@@ -768,60 +793,68 @@ Consolidated list of all dead code found across the codebase.
 
 ### CRITICAL
 
-#### PC1. `keep-alive` never caches `HomePage.vue`
+#### PC1. `keep-alive` never caches `HomePage.vue` [RESOLVED]
 
 - **File**: `frontend/src/App.vue:4`, `frontend/src/pages/HomePage.vue`
 - **Category**: Broken Functionality
 - **Details**: `<keep-alive include="Home">` filters by component name, but `HomePage.vue` uses `<script setup>` without `defineOptions({ name: 'Home' })`. The auto-inferred name is `"HomePage"`, not `"Home"`. The component is destroyed and recreated on every navigation from Settings back to Home.
 - **Impact**: All transient state lost on navigation (scroll position, textarea, `abortController`). Repeated backend health checks, flickering.
 - **Fix**: Add `defineOptions({ name: 'Home' })` to `HomePage.vue`.
+- **Resolution**: Added `defineOptions` successfully.
 
 ### HIGH
 
-#### PH1. CSS typo — `itemse-center` instead of `items-center`
+#### PH1. CSS typo — `itemse-center` instead of `items-center` [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:3`
 - **Category**: UI Bug
 - **Details**: Tailwind class `"itemse-center"` is silently ignored. Container cross-axis alignment not applied.
 - **Impact**: Broken vertical centering on the home page root container.
 - **Fix**: Change to `items-center`.
+- **Resolution**: Corrected spelling from `itemse-center` to `items-center`.
 
-#### PH2. `startNewChat` uses `window.location.reload()` — destructive
+#### PH2. `startNewChat` uses `window.location.reload()` — destructive [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:539`
 - **Category**: Architecture / UX
 - **Details**: Full page reload instead of reactive state clearing. Discards all in-memory state, is slow, breaks SPA semantics.
 - **Impact**: Slow UX, complete app reload, potential loss of Office context.
+- **Resolution**: Replaced reload with reactive state resets.
 
-#### PH3. `agentMaxIterations` not validated on HomePage
+#### PH3. `agentMaxIterations` not validated on HomePage [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:193`
 - **Category**: Logic Bug
 - **Details**: `SettingsPage` validates and clamps between 1-100, but `HomePage` reads the raw `useStorage` value. Corrupted localStorage (0, -1, 999999) goes directly to the agent loop.
 - **Impact**: Runaway agent loop or zero iterations if localStorage is tampered with.
+- **Resolution**: Added computed property checking and clamping bounds in `HomePage.vue`.
 
-#### PH4. File upload `.xls` accepted by HTML but rejected by JS
+#### PH4. Discrepancy between HTML `accept` and JS extension validation [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:89` vs `ChatInput.vue:233`
-- **Category**: Logic Bug
-- **Details**: HTML `accept` attribute includes `.xls`, but `allowedExtensions` in `processFiles()` does not. Users select `.xls` files, they are silently dropped.
-- **Impact**: Silent data loss — user thinks file is attached but it is discarded.
+- **File**: `frontend/src/components/chat/ChatInput.vue:89, 233`
+- **Category**: UI Bug
+- **Details**: The `<input type="file" accept="... .xls ...">` allows `.xls` files, but the `allowedExtensions` array in `processFiles` does not include `.xls`, only `.xlsx`.
+- **Impact**: Users can select `.xls` files in the dialog, but they are silently dropped by the JS validation.
+- **Fix**: Add `.xls` to `allowedExtensions`.
+- **Resolution**: Added `.xls` to `allowedExtensions` in JS validation.
 
-#### PH5. File rejection is completely silent
+#### PH5. Silent failure when files exceed limits or have wrong type [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:231-256`
-- **Category**: UX
-- **Details**: When a file exceeds 10MB, has wrong type, or exceeds 3-file limit, no feedback is shown. File is simply not added to `attachedFiles`.
-- **Impact**: Users don't know why their file was not attached.
-- **Fix**: Show a toast with the rejection reason.
+- **File**: `frontend/src/components/chat/ChatInput.vue:239-247`
+- **Category**: UX Issue
+- **Details**: If a user drags >3 files, or a file >10MB, or an unsupported file, the code just skips it without any UI feedback.
+- **Impact**: User confusion ("Why didn't my file attach?").
+- **Fix**: Use `messageUtil.error()` or `messageUtil.warning()` to inform the user when files are rejected.
+- **Resolution**: Added `messageUtil` integration to show feedback for files dropped due to size limits or unknown types.
 
-#### AH1. `fetchModels()` missing credential headers
+#### AH1. Missing credential headers in `fetchModels` [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:90-94`
-- **Category**: Security / Logic Bug
-- **Details**: `fetchModels()` does not include `getUserCredentialHeaders()`, unlike all other API calls. Will fail if the backend requires authentication.
-- **Impact**: Models endpoint may return errors or incomplete data.
-- **Fix**: Add `...getUserCredentialHeaders()` to the headers.
+- **File**: `frontend/src/api/backend.ts:90`
+- **Category**: Security / Bug
+- **Details**: `fetchModels` calls `/api/models` without `X-User-Key` or `X-User-Email` headers. If the backend requires authentication for models, this will fail.
+- **Impact**: Feature completely broken or unauthorized access errors when launching the app.
+- **Fix**: Add `...getUserCredentialHeaders()` to the fetch options.
+- **Resolution**: Added `getUserCredentialHeaders()` to `fetchModels()` to ensure proper authentication.
 
 #### AH2. `healthCheck()` missing credential headers
 
@@ -1015,28 +1048,28 @@ Consolidated list of all dead code found across the codebase.
 
 ### Pages/Components Dead Code
 
-| ID | File | Item | Details |
-|----|------|------|---------|
-| PD1 | `frontend/src/pages/HomePage.vue:92` | `Briefcase` import | Never used in template or script |
-| PD2 | `frontend/src/pages/HomePage.vue:94` | `CheckCircle` import | Never used anywhere |
-| PD3 | `frontend/src/components/SettingSection.vue` | Entire component file | Never imported or used |
-| PD4 | `frontend/src/components/chat/ChatInput.vue:210` | `handleDragLeave` param `e` | Declared but never read |
-| PD5 | `frontend/src/components/chat/ChatInput.vue:177, 191` | `"input"` emit | Emitted but no consumer listens |
-| PD6 | `frontend/src/components/SettingCard.vue:2` | `p1` prop | Never passed by any consumer |
-| PD7 | `frontend/src/App.vue:11` | Empty `<script>` block | No code inside |
+| ID  | File                                                  | Item                        | Details                          |
+| --- | ----------------------------------------------------- | --------------------------- | -------------------------------- |
+| PD1 | `frontend/src/pages/HomePage.vue:92`                  | `Briefcase` import          | Never used in template or script |
+| PD2 | `frontend/src/pages/HomePage.vue:94`                  | `CheckCircle` import        | Never used anywhere              |
+| PD3 | `frontend/src/components/SettingSection.vue`          | Entire component file       | Never imported or used           |
+| PD4 | `frontend/src/components/chat/ChatInput.vue:210`      | `handleDragLeave` param `e` | Declared but never read          |
+| PD5 | `frontend/src/components/chat/ChatInput.vue:177, 191` | `"input"` emit              | Emitted but no consumer listens  |
+| PD6 | `frontend/src/components/SettingCard.vue:2`           | `p1` prop                   | Never passed by any consumer     |
+| PD7 | `frontend/src/App.vue:11`                             | Empty `<script>` block      | No code inside                   |
 
 ---
 
 ## 10. Summary Statistics
 
-| Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
-|------|----------|------|--------|-----|-----------|-------|
-| Backend | 4 | 7 | 10 | 4 | 4 | 29 |
-| Frontend Utils | 3 | 7 | 10 | 4 | 13 | 37 |
-| Composables | 2 | 7 | 11 | 5 | 1 | 26 |
-| Infrastructure | 3 | 5 | 8 | 7 | 4 | 27 |
-| Pages/Components/API | 1 | 8 | 19 | 8 | 7 | 43 |
-| **Total** | **13** | **34** | **58** | **28** | **29** | **162** |
+| Area                 | CRITICAL | HIGH   | MEDIUM | LOW    | Dead Code | Total   |
+| -------------------- | -------- | ------ | ------ | ------ | --------- | ------- |
+| Backend              | 4        | 7      | 10     | 4      | 4         | 29      |
+| Frontend Utils       | 3        | 7      | 10     | 4      | 13        | 37      |
+| Composables          | 2        | 7      | 11     | 5      | 1         | 26      |
+| Infrastructure       | 3        | 5      | 8      | 7      | 4         | 27      |
+| Pages/Components/API | 1        | 8      | 19     | 8      | 7         | 43      |
+| **Total**            | **13**   | **34** | **58** | **28** | **29**    | **162** |
 
 ---
 
@@ -1069,15 +1102,15 @@ Consolidated list of all dead code found across the codebase.
 
 ### Medium-term (MEDIUM — address in upcoming sprints)
 
-20. Remove all dead code (29 items across codebase)
-21. Fix i18n violations: hardcoded French/English strings (PM1, PM9, CM1, BL2)
-22. Fix error handling: add logging to silent catch blocks
+20. Remove all dead code (29 items across codebase) [RESOLVED]
+21. Fix i18n violations: hardcoded French/English strings (PM1, PM9, CM1, BL2) [RESOLVED]
+22. Fix error handling: add logging to silent catch blocks [RESOLVED]
 23. Replace `any` types with `unknown` + type guards
-24. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`, `forHost`)
+24. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`, `forHost`) [RESOLVED]
 25. Decompose oversized functions (3 functions >180 lines each)
-26. Add security headers to nginx config
-27. Wrap all quick action arrays in `computed()` for locale reactivity
+26. Add security headers to nginx config [RESOLVED]
+27. Wrap all quick action arrays in `computed()` for locale reactivity [RESOLVED]
 
 ---
 
-*Last updated: 2026-03-01*
+_Last updated: 2026-03-01_

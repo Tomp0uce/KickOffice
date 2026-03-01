@@ -19,20 +19,20 @@ chatRouter.post('/', async (req, res) => {
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  const validation = validateChatRequest(req.body, 'POST /api/chat')
+  const validation = validateChatRequest(req.body)
   if (validation.error) {
     return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat')
   }
 
-  const { modelConfig, parsedTools } = validation
+  const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
 
   try {
     const body = buildChatBody({
       modelTier,
       modelConfig,
       messages,
-      temperature,
-      maxTokens,
+      temperature: validTemp,
+      maxTokens: validMaxTokens,
       stream: true,
       tools: parsedTools.value,
     })
@@ -86,7 +86,12 @@ chatRouter.post('/', async (req, res) => {
         const canContinue = res.write(chunk)
         if (!canContinue && !clientDisconnected) {
           // Wait for drain before continuing
-          await new Promise(resolve => res.once('drain', resolve))
+          await new Promise(resolve => {
+            const onDrain = () => { res.removeListener('close', onClose); resolve() }
+            const onClose = () => { res.removeListener('drain', onDrain); clientDisconnected = true; resolve() }
+            res.once('drain', onDrain)
+            res.once('close', onClose)
+          })
         }
       }
       // Flush any remaining bytes in the decoder
@@ -106,6 +111,14 @@ chatRouter.post('/', async (req, res) => {
       }
     }
   } catch (error) {
+    if (res.headersSent) {
+      systemLog('ERROR', 'POST /api/chat proxy error during stream', error)
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: 'Internal server error during stream processing' })}\n\n`)
+        res.end()
+      }
+      return
+    }
     if (error.name === 'AbortError') {
       systemLog('ERROR', 'POST /api/chat LLM API request timeout')
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat')
@@ -126,20 +139,20 @@ chatRouter.post('/sync', async (req, res) => {
     hasMaxTokens: maxTokens !== undefined,
   })
 
-  const validation = validateChatRequest(req.body, 'POST /api/chat/sync')
+  const validation = validateChatRequest(req.body)
   if (validation.error) {
     return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat/sync')
   }
 
-  const { modelConfig, parsedTools } = validation
+  const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
 
   try {
     const body = buildChatBody({
       modelTier,
       modelConfig,
       messages,
-      temperature,
-      maxTokens,
+      temperature: validTemp,
+      maxTokens: validMaxTokens,
       stream: false,
       tools: parsedTools.value,
     })

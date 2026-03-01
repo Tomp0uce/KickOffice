@@ -27,12 +27,3 @@ manifest-outlook.xml
 
 # Docker volumes
 backend-data/
-
-# Keep the zip for reference
-# word-GPT-Plus-master.zip
-
-# LiteLLM proxy credentials (contient des secrets)
-litellm-local-proxy/.auth.env
-
-# OpenExcel reference code
-Open_Excel/

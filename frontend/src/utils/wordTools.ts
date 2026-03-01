@@ -4,21 +4,7 @@ import { sandboxedEval } from './sandbox'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './officeRichText'
 
-// R17 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
-function generateVisualDiff(originalText: string, newText: string): string {
-  const dmp = new DiffMatchPatch()
-  const diffs = dmp.diff_main(originalText, newText)
-  dmp.diff_cleanupSemantic(diffs)
-
-  return diffs
-    .map(([op, text]) => {
-      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
-      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
-      return escaped
-    })
-    .join('')
-}
+import { generateVisualDiff } from './common'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -1884,10 +1870,6 @@ const wordToolDefinitions = createWordTools({
 
 export function getWordToolDefinitions(): WordToolDefinition[] {
   return Object.values(wordToolDefinitions)
-}
-
-export function getWordTool(name: WordToolName): WordToolDefinition | undefined {
-  return wordToolDefinitions[name]
 }
 
 export { wordToolDefinitions }

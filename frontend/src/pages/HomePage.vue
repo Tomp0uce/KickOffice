@@ -1,6 +1,6 @@
 <template>
   <div
-    class="itemse-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1"
+    class="items-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1"
   >
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
@@ -29,13 +29,12 @@
         :empty-title="$t('emptyTitle')"
         :empty-subtitle="
           $t(
-            hostIsOutlook
-              ? 'emptySubtitleOutlook'
-              : hostIsPowerPoint
-                ? 'emptySubtitlePowerPoint'
-                : hostIsExcel
-                  ? 'emptySubtitleExcel'
-                  : 'emptySubtitle',
+            forHost({
+              outlook: 'emptySubtitleOutlook',
+              powerpoint: 'emptySubtitlePowerPoint',
+              excel: 'emptySubtitleExcel',
+              word: 'emptySubtitle',
+            }),
           )
         "
         :backend-online-label="t('backendOnline')"
@@ -64,13 +63,12 @@
         :use-word-formatting-label="$t('useWordFormattingLabel')"
         :include-selection-label="
           $t(
-            hostIsOutlook
-              ? 'includeSelectionLabelOutlook'
-              : hostIsPowerPoint
-                ? 'includeSelectionLabelPowerPoint'
-                : hostIsExcel
-                  ? 'includeSelectionLabelExcel'
-                  : 'includeSelectionLabel',
+            forHost({
+              outlook: 'includeSelectionLabelOutlook',
+              powerpoint: 'includeSelectionLabelPowerPoint',
+              excel: 'includeSelectionLabelExcel',
+              word: 'includeSelectionLabel',
+            }),
           )
         "
         :task-type-label="t('taskTypeLabel')"
@@ -85,13 +83,12 @@
 </template>
 
 <script lang="ts" setup>
+defineOptions({ name: "Home" });
 import { useStorage } from "@vueuse/core";
 import {
   BookOpen,
   Brush,
-  Briefcase,
   CheckCheck,
-  CheckCircle,
   Eraser,
   Eye,
   FileCheck,
@@ -106,15 +103,6 @@ import {
   Wand2,
   Zap,
 } from "lucide-vue-next";
-import {
-  computed,
-  nextTick,
-  onBeforeMount,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
@@ -134,12 +122,7 @@ import type {
   QuickAction,
 } from "@/types/chat";
 import { localStorageKey } from "@/utils/enum";
-import {
-  isExcel,
-  isOutlook,
-  isPowerPoint,
-  isWord,
-} from "@/utils/hostDetection";
+import { isPowerPoint, isWord, forHost } from "@/utils/hostDetection";
 import {
   loadSavedPromptsFromStorage,
   type SavedPrompt,
@@ -163,15 +146,12 @@ const hostIsWord = isWord();
 const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
-const currentHost = hostIsWord
-  ? "word"
-  : hostIsExcel
-    ? "excel"
-    : hostIsPowerPoint
-      ? "powerpoint"
-      : hostIsOutlook
-        ? "outlook"
-        : "unknown";
+const currentHost = forHost({
+  outlook: "outlook",
+  powerpoint: "powerpoint",
+  excel: "excel",
+  word: "word",
+});
 const MAX_HISTORY_MESSAGES = 100;
 const history = useStorage<DisplayMessage[]>(`chatHistory_${currentHost}`, []);
 watch(
@@ -189,8 +169,16 @@ const abortController = ref<AbortController | null>(null);
 const backendCheckInterval = ref<number | null>(null);
 const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true);
 const useSelectedText = useStorage(localStorageKey.useSelectedText, true);
-const replyLanguage = useStorage(localStorageKey.replyLanguage, "Français");
-const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
+const agentMaxIterationsRaw = useStorage(
+  localStorageKey.agentMaxIterations,
+  25,
+);
+const agentMaxIterations = computed(() => {
+  const val = Number(agentMaxIterationsRaw.value);
+  if (isNaN(val) || val < 1) return 1;
+  if (val > 100) return 100;
+  return Math.floor(val);
+});
 const userGender = useStorage(localStorageKey.userGender, "unspecified");
 const userFirstName = useStorage(localStorageKey.userFirstName, "");
 const userLastName = useStorage(localStorageKey.userLastName, "");
@@ -203,7 +191,7 @@ const insertType = ref<insertTypes>("replace");
 const chatInputRef = ref<InstanceType<typeof ChatInput>>();
 const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
 
-const wordQuickActions: QuickAction[] = [
+const wordQuickActions = computed<QuickAction[]>(() => [
   {
     key: "proofread",
     label: t("proofread"),
@@ -235,7 +223,7 @@ const wordQuickActions: QuickAction[] = [
     icon: FileCheck,
     tooltipKey: "summary_tooltip",
   },
-];
+]);
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: "clean",
@@ -278,7 +266,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     tooltipKey: "excelHighlight_tooltip",
   },
 ]);
-const outlookQuickActions: OutlookQuickAction[] = [
+const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
   {
     key: "proofread",
     label: t("outlookProofread"),
@@ -311,8 +299,8 @@ const outlookQuickActions: OutlookQuickAction[] = [
     prefix: t("outlookReplyPrePrompt"),
     tooltipKey: "outlookReply_tooltip",
   },
-];
-const powerPointQuickActions: PowerPointQuickAction[] = [
+]);
+const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
   {
     key: "proofread",
     label: t("proofread"),
@@ -349,16 +337,15 @@ const powerPointQuickActions: PowerPointQuickAction[] = [
     mode: "immediate",
     tooltipKey: "pptVisual_tooltip",
   },
-];
+]);
 
 const quickActions = computed(() =>
-  hostIsOutlook
-    ? outlookQuickActions
-    : hostIsPowerPoint
-      ? powerPointQuickActions
-      : hostIsExcel
-        ? excelQuickActions.value
-        : wordQuickActions,
+  forHost({
+    outlook: outlookQuickActions.value,
+    powerpoint: powerPointQuickActions.value,
+    excel: excelQuickActions.value,
+    word: wordQuickActions.value,
+  }),
 );
 const selectedModelInfo = computed(
   () => availableModels.value[selectedModelTier.value],
@@ -497,7 +484,6 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   },
   settings: {
     customSystemPrompt,
-    replyLanguage,
     agentMaxIterations,
     useSelectedText,
     excelFormulaLanguage,
@@ -534,9 +520,13 @@ function startNewChat() {
   if (history.value.length > 0 && !window.confirm(t("newChatConfirm"))) return;
   if (loading.value) stopGeneration();
 
-  // Hard reload the component by leveraging vue-router to replace the current route or by simply window.location.reload()
-  // This is the safest way to ensure all states (agentLoop history, selected prompt, input, etc.) are perfectly cleared.
-  window.location.reload();
+  // Reset all reactive state instead of reloading the page
+  history.value = [];
+  userInput.value = "";
+  customSystemPrompt.value = "";
+  selectedPromptId.value = "";
+  chatInputRef.value?.textareaEl?.value?.focus();
+  adjustTextareaHeight();
 }
 
 function loadSavedPrompts() {

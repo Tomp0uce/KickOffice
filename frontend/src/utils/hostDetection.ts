@@ -52,6 +52,24 @@ export function isOutlook(): boolean {
   return detectOfficeHost() === 'Outlook'
 }
 
-export function getHostName(): string {
-  return detectOfficeHost()
+export function forHost<T>(options: {
+  word?: T
+  excel?: T
+  powerpoint?: T
+  outlook?: T
+  default?: T
+}): T | undefined {
+  const host = detectOfficeHost()
+  switch (host) {
+    case 'Word':
+      return options.word !== undefined ? options.word : options.default
+    case 'Excel':
+      return options.excel !== undefined ? options.excel : options.default
+    case 'PowerPoint':
+      return options.powerpoint !== undefined ? options.powerpoint : options.default
+    case 'Outlook':
+      return options.outlook !== undefined ? options.outlook : options.default
+    default:
+      return options.default
+  }
 }
