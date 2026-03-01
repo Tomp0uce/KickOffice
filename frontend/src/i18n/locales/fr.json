@@ -269,6 +269,7 @@
   "failedToInsert": "Échec de l'insertion du contenu",
   "inserted": "Inséré dans le document",
   "imageInsertWordOnly": "Pour les images, l'insertion directe est disponible dans Word. L'image a été copiée dans le presse-papiers.",
+  "imageInsertOutlookFallback": "L'insertion directe d'images n'est pas supportée ici. L'image a été copiée dans le presse-papiers.",
   "outlookReply": "Répondre",
   "outlookTranslateFormalize": "Form. & Traduire",
   "outlookConcise": "Synthétiser",

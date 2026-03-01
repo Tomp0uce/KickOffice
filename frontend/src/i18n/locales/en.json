@@ -123,6 +123,7 @@
   "includeSelectionLabelExcel": "Include Selected Cells",
   "inserted": "Inserted into document",
   "imageInsertWordOnly": "For images, direct insertion is available in Word. The image was copied to the clipboard.",
+  "imageInsertOutlookFallback": "Direct image insertion is not supported here. The image was copied to the clipboard.",
   "insertedToCell": "Inserted into selected cell",
   "localLanguageLabel": "UI Language",
   "darkModeLabel": "Dark Mode",

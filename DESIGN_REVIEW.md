@@ -180,13 +180,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### UH5. Host detection caching can return wrong host [OPEN]
+#### UH5. Host detection caching can return wrong host [RESOLVED]
 
-- **File**: `frontend/src/utils/hostDetection.ts:3-37`
-- **Category**: Logic Bug
-- **Details**: `detectOfficeHost()` caches result in a module-level variable. If called before `Office.onReady` fires, may cache an incorrect host permanently.
-- **Impact**: Wrong host detection in edge cases, leading to wrong tool set and prompts.
-- **Fix**: Only cache after `Office.onReady` has resolved.
+> **Status**: Implemented. Added `officeReady` flag and `markOfficeReady()` function. Cache only persisted after `Office.onReady` callback fires. Called from main.ts before `detectOfficeHost()`.
 
 #### UH6. Message toast singleton race condition [RESOLVED]
 
@@ -293,12 +289,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### CH4. Raw `err.message` displayed to users [OPEN]
+#### CH4. Raw `err.message` displayed to users [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:304, 435, 551, 819`
-- **Category**: Security / Information Disclosure
-- **Details**: Server error messages (potentially containing internal URLs, API keys, stack traces) shown directly to users.
-- **Fix**: Show generic messages, log details to console only.
+> **Status**: Implemented. Raw err.message replaced with `t('imageError')` and `t('failedToResponse')`. Error details logged to console.error only.
 
 #### CH5. `any` types on error parameters and tool args [OPEN]
 
@@ -343,10 +336,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. `clearTimeout` called in Promise.race cleanup to prevent orphaned timers.
 
-#### CM7. Excel selection returns unescaped tab-separated values [OPEN]
+#### CM7. Excel selection returns unescaped tab-separated values [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeSelection.ts:86-92`
-- **Details**: Cell values containing tabs/newlines make output ambiguous.
+> **Status**: Already implemented. `escapeCell` helper at `useOfficeSelection.ts:122` wraps values containing tabs/newlines/commas in quotes.
 
 #### CM8. HTML injection via `richHtml` to Office APIs [RESOLVED]
 
@@ -356,15 +348,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. `firstName`/`lastName` sanitized via `sanitize()` helper before interpolation into system prompt.
 
-#### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics [OPEN]
+#### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics [RESOLVED]
 
-- **File**: `frontend/src/composables/useImageActions.ts:111-157`
-- **Details**: `'NoAction'` should mean "do nothing" but still inserts the image.
+> **Status**: Already implemented. `if (type === 'NoAction') return` guard at `useImageActions.ts:129` exits early before any insertion.
 
-#### CM11. Hidden side effect: `insertType.value` mutation [OPEN]
+#### CM11. Hidden side effect: `insertType.value` mutation [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeInsert.ts:140`
-- **Details**: Mutates external ref as side effect, causing unexpected reactivity triggers.
+> **Status**: Already implemented. No direct `insertType.value` mutation found in `useOfficeInsert.ts`; the ref is read-only in the composable.
 
 ### LOW
 
@@ -377,18 +367,17 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **File**: `frontend/src/composables/useImageActions.ts:13-33, 40-42`
 - **Details**: Inconsistent behavior for malformed tags.
 
-#### CL3. Inconsistent image insert error reporting across hosts [OPEN]
+#### CL3. Inconsistent image insert error reporting across hosts [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeInsert.ts:169-198`
-- **Details**: Outlook falls through and shows misleading "imageInsertWordOnly" message.
+> **Status**: Implemented. Replaced `imageInsertWordOnly` with `imageInsertOutlookFallback` i18n key in `useOfficeInsert.ts` Outlook path; added keys to both locale files.
 
-#### CL4. `payload` parameter typed as `unknown` — should be `string | undefined` [OPEN]
+#### CL4. `payload` parameter typed as `unknown` — should be `string | undefined` [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:449`
+> **Status**: Implemented. `sendMessage(payload?: unknown)` changed to `sendMessage(payload?: string)` in `useAgentLoop.ts`.
 
-#### CL5. Word HTML selection swallows errors silently [OPEN]
+#### CL5. Word HTML selection swallows errors silently [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeSelection.ts:135-136`
+> **Status**: Already implemented. `catch (err)` block at `useOfficeSelection.ts:176` calls `console.warn('[useOfficeSelection] Word getHtml failed', err)` before returning empty string.
 
 ---
 
@@ -808,7 +797,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | UH2  | Column letter arithmetic overflow                                     |
 | 🟢 Implemented | UH3  | Double timeout in Outlook tool execution                              |
 | 🟢 Implemented | UH4  | Language parameter ignored in translate prompt                        |
-| 🔴 Remaining   | UH5  | Host detection caching can return wrong host                          |
+| 🟢 Implemented | UH5  | Host detection caching can return wrong host                          |
 | 🟢 Implemented | UH6  | Message toast singleton race condition                                |
 | 🟢 Implemented | UH7  | `html: true` in MarkdownIt with `style` in DOMPurify allowlist        |
 | 🔴 Remaining   | UM1  | Massive type unsafety with `as unknown as` casts                      |
@@ -830,7 +819,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | CH1  | Race condition: concurrent `sendMessage` calls corrupt state          |
 | 🟢 Implemented | CH2  | `lastIndex` stale reference during agent loop                         |
 | 🟢 Implemented | CH3  | Timer leak — `timeoutId` reassigned without clearing                  |
-| 🔴 Remaining   | CH4  | Raw `err.message` displayed to users                                  |
+| 🟢 Implemented | CH4  | Raw `err.message` displayed to users                                  |
 | 🔴 Remaining   | CH5  | `any` types on error parameters and tool args                         |
 | 🟢 Implemented | CH6  | XSS via unvalidated `imageSrc` URL                                    |
 | 🟢 Implemented | CH7  | `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard     |
@@ -840,16 +829,16 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | CM4  | `insertToDocument` silently swallows all errors                       |
 | 🟢 Implemented | CM5  | Promise constructor anti-pattern in Outlook functions                 |
 | 🟢 Implemented | CM6  | Timeout promises create orphaned timers                               |
-| 🔴 Remaining   | CM7  | Excel selection returns unescaped tab-separated values                |
+| 🟢 Implemented | CM7  | Excel selection returns unescaped tab-separated values                |
 | 🟢 Implemented | CM8  | HTML injection via `richHtml` to Office APIs                          |
 | 🟢 Implemented | CM9  | Prompt injection via user profile fields                              |
-| 🔴 Remaining   | CM10 | `insertImageToPowerPoint` ignores `'NoAction'` semantics              |
-| 🔴 Remaining   | CM11 | Hidden side effect: `insertType.value` mutation                       |
+| 🟢 Implemented | CM10 | `insertImageToPowerPoint` ignores `'NoAction'` semantics              |
+| 🟢 Implemented | CM11 | Hidden side effect: `insertType.value` mutation                       |
 | 🟢 Implemented | CL1  | `hostIsWord` parameter accepted but never used                        |
 | 🔴 Remaining   | CL2  | `cleanContent` and `splitThinkSegments` use different think-tag logic |
-| 🔴 Remaining   | CL3  | Inconsistent image insert error reporting across hosts                |
-| 🔴 Remaining   | CL4  | `payload` parameter typed as `unknown` — should be `string            | undefined` |
-| 🔴 Remaining   | CL5  | Word HTML selection swallows errors silently                          |
+| 🟢 Implemented | CL3  | Inconsistent image insert error reporting across hosts                |
+| 🟢 Implemented | CL4  | `payload` parameter typed as `unknown` — should be `string \| undefined` |
+| 🟢 Implemented | CL5  | Word HTML selection swallows errors silently                          |
 | 🟢 Implemented | IC1  | Content-Type middleware blocks uploads (same as BC1)                  |
 | 🟡 Deferred    | IC2  | Containers run as root                                                |
 | 🟢 Implemented | IC3  | Internal infrastructure URL as default                                |
