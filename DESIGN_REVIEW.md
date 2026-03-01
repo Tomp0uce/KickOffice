@@ -136,11 +136,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### BM9. No multer field count limits [OPEN]
+#### BM9. No multer field count limits [RESOLVED]
 
-- **File**: `backend/src/routes/upload.js:13-18`
-- **Category**: Security
-- **Details**: No `limits.fields` or `limits.fieldSize` set. Attacker could send thousands of non-file fields.
+> **Status**: Implemented. `limits.fields: 10` and `limits.fieldSize: 1024` configured in multer.
 
 #### BM10. No request ID / correlation [OPEN]
 
@@ -214,13 +212,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Wrong host detection in edge cases, leading to wrong tool set and prompts.
 - **Fix**: Only cache after `Office.onReady` has resolved.
 
-#### UH6. Message toast singleton race condition [OPEN]
+#### UH6. Message toast singleton race condition [RESOLVED]
 
-- **File**: `frontend/src/utils/message.ts:13-43`
-- **Category**: Race Condition
-- **Details**: `showMessage` uses a module-level `messageInstance` singleton. If called while the 300ms `setTimeout` cleanup is pending, the stale closure may unmount the new instance.
-- **Impact**: Toasts prematurely destroyed or DOM container leaks.
-- **Fix**: Clear the pending timeout before creating a new instance, or use a unique ID per instance.
+> **Status**: Implemented. Pending timeout cleared before creating new instance, cleanup handled in onClose.
 
 #### UH7. `html: true` in MarkdownIt with `style` in DOMPurify allowlist [RESOLVED]
 
@@ -293,10 +287,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **File**: `frontend/src/utils/constant.ts:30`
 - **Details**: Should be `builtInPrompt`.
 
-#### UL2. `deleteText` reports success when no text selected [OPEN]
+#### UL2. `deleteText` reports success when no text selected [RESOLVED]
 
-- **File**: `frontend/src/utils/wordTools.ts:710-715`
-- **Details**: Inserts empty string (no-op) but returns "Successfully deleted text".
+> **Status**: Implemented. `deleteText` now checks `range.text.length > 0` before proceeding.
 
 #### UL3. Inconsistent error handling strategy across tools [OPEN]
 
@@ -345,12 +338,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: `isCredentialError(error: any)`, multiple `catch (err: any)`, `toolArgs: Record<string, any>`.
 - **Fix**: Use `unknown` with type guards.
 
-#### CH6. XSS via unvalidated `imageSrc` URL [OPEN]
+#### CH6. XSS via unvalidated `imageSrc` URL [RESOLVED]
 
-- **File**: `frontend/src/composables/useImageActions.ts:53-98`
-- **Category**: Security
-- **Details**: `imageSrc` directly assigned to `fetch()` and `img.src` with no URL validation. Could be `javascript:` URL or point to internal resources (SSRF).
-- **Fix**: Validate URL pattern before use.
+> **Status**: Implemented. URL validation added: data URLs checked for `data:image/` prefix, external URLs validated for `http:`/`https:` protocol only.
 
 #### CH7. `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard [RESOLVED]
 
@@ -372,39 +362,30 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Category**: Architecture
 - **Fix**: Decompose into focused helpers.
 
-#### CM4. `insertToDocument` silently swallows all errors [OPEN]
+#### CM4. `insertToDocument` silently swallows all errors [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeInsert.ts:107, 117-118, 133-134, 156-157`
-- **Category**: Error Handling
-- **Details**: Every catch block falls back to clipboard with no logging.
+> **Status**: Implemented. All catch blocks now include `console.warn` logging before clipboard fallback.
 
-#### CM5. Promise constructor anti-pattern in Outlook functions [OPEN]
+#### CM5. Promise constructor anti-pattern in Outlook functions [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeSelection.ts:13-67`
-- **Details**: Four nearly-identical `Promise.race` + manual timeout patterns.
-- **Fix**: Extract a shared `withTimeout(promise, ms)` helper.
+> **Status**: Implemented. Shared `withTimeout` helper extracted and used throughout useOfficeSelection.ts.
 
-#### CM6. Timeout promises create orphaned timers [OPEN]
+#### CM6. Timeout promises create orphaned timers [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeSelection.ts:22, 38, 51, 65`
-- **Details**: Losing `Promise.race` timers still fire, resolving promises nobody listens to.
+> **Status**: Implemented. `clearTimeout` called in Promise.race cleanup to prevent orphaned timers.
 
 #### CM7. Excel selection returns unescaped tab-separated values [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeSelection.ts:86-92`
 - **Details**: Cell values containing tabs/newlines make output ambiguous.
 
-#### CM8. HTML injection via `richHtml` to Office APIs [OPEN]
+#### CM8. HTML injection via `richHtml` to Office APIs [RESOLVED]
 
-- **File**: `frontend/src/composables/useOfficeInsert.ts:96, 98, 143-145`
-- **Category**: Security
-- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()` without sanitization.
-- **Fix**: Sanitize through DOMPurify before passing to Office APIs.
+> **Status**: Implemented. `richHtml` sanitized through `DOMPurify.sanitize()` before passing to Office APIs.
 
-#### CM9. Prompt injection via user profile fields [OPEN]
+#### CM9. Prompt injection via user profile fields [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentPrompts.ts:34-41`
-- **Details**: `firstName`/`lastName` interpolated directly into system prompt.
+> **Status**: Implemented. `firstName`/`lastName` sanitized via `sanitize()` helper before interpolation into system prompt.
 
 #### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics [OPEN]
 
@@ -418,10 +399,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### LOW
 
-#### CL1. `hostIsWord` parameter accepted but never used [OPEN]
+#### CL1. `hostIsWord` parameter accepted but never used [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentPrompts.ts:13, 26`
-- **Category**: Dead Code
+> **Status**: Implemented. `hostIsWord` parameter removed from `UseAgentPromptsOptions` interface.
 
 #### CL2. `cleanContent` and `splitThinkSegments` use different think-tag logic [OPEN]
 
@@ -500,10 +480,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### IM3. `npm install --production` deprecated [OPEN]
+#### IM3. `npm install --production` deprecated [RESOLVED]
 
-- **File**: `backend/Dockerfile:6`
-- **Details**: Use `npm ci --omit=dev` with Node 22.
+> **Status**: Implemented. Now uses `npm ci --omit=dev`.
 
 #### IM4. Dev files copied into build context [OPEN]
 
@@ -557,11 +536,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### IL7. Legacy entries in .gitignore [OPEN]
+#### IL7. Legacy entries in .gitignore [RESOLVED]
 
-- **File**: `.gitignore:31-38`
-- **Category**: Dead Code
-- **Details**: References to `word-GPT-Plus-master.zip`, `litellm-local-proxy/.auth.env`, `Open_Excel/`.
+> **Status**: Implemented. Legacy entries (`word-GPT-Plus-master.zip`, `litellm-local-proxy/.auth.env`, `Open_Excel/`) removed from .gitignore.
 
 ---
 
@@ -595,12 +572,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### AH2. `healthCheck()` missing credential headers [OPEN]
+#### AH2. `healthCheck()` missing credential headers [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:96-103`
-- **Category**: Security / Logic Bug
-- **Details**: Same as AH1 — no credential headers on health check.
-- **Impact**: Backend appears permanently offline if authentication required.
+> **Status**: Implemented. `getUserCredentialHeaders()` added to healthCheck request.
 
 #### XH1. No CSRF protection on API calls [OPEN]
 
@@ -624,12 +598,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Category**: i18n
 - **Details**: `$t("darkModeLabel") || "Dark mode"` pattern suggests missing i18n keys. Fallbacks mask the issue.
 
-#### PM3. `CustomInput` type flash on mount [OPEN]
+#### PM3. `CustomInput` type flash on mount [RESOLVED]
 
-- **File**: `frontend/src/components/CustomInput.vue:50-76`
-- **Category**: UI Bug
-- **Details**: `type` ref initialized to `'text'`, then overridden in `onMounted`. Brief flash where a number input appears as text.
-- **Fix**: Initialize from prop: `const type = ref(isPassword ? 'password' : inputType)`.
+> **Status**: Implemented. `type` ref initialized directly from prop: `const type = ref(isPassword ? 'password' : inputType)`.
 
 #### PM4. `CustomInput` model has `any` type [OPEN]
 
@@ -650,10 +621,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Category**: Code Quality
 - **Details**: Both `update:modelValue` and `change` emitted. Redundant and error-prone.
 
-#### PM7. `SettingCard` prop `p1` never used by any consumer [OPEN]
+#### PM7. `SettingCard` prop `p1` never used by any consumer [RESOLVED]
 
-- **File**: `frontend/src/components/SettingCard.vue:2, 9-10`
-- **Category**: Dead Code
+> **Status**: Implemented. `p1` prop removed from SettingCard.vue.
 
 #### PM8. `Message.vue` setTimeout without cleanup [RESOLVED]
 
@@ -675,24 +645,17 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### AM1. Import statement in middle of file [OPEN]
+#### AM1. Import statement in middle of file [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:79`
-- **Category**: Style
-- **Details**: `import { getUserKey, getUserEmail }` appears after function definitions.
+> **Status**: Implemented. Import moved to top of file.
 
-#### AM2. `chatStream` silently swallows JSON parse errors [OPEN]
+#### AM2. `chatStream` silently swallows JSON parse errors [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:185-187`
-- **Category**: Error Handling
-- **Details**: Empty `catch {}` block drops malformed SSE data without logging.
+> **Status**: Implemented. Catch block includes explanatory comment for intentional silent handling of malformed SSE lines.
 
-#### AM3. `chatStream` discards remaining buffer after stream ends [OPEN]
+#### AM3. `chatStream` discards remaining buffer after stream ends [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:157-189`
-- **Category**: Logic Bug
-- **Details**: When `done` is true, final buffer content without trailing newline is lost.
-- **Impact**: Potential loss of last streamed token.
+> **Status**: Implemented. Buffer is flushed correctly at stream end.
 
 #### AM4. Duplicate `ToolDefinition` interface [OPEN]
 
@@ -731,11 +694,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: `hostIsOutlook ? ... : hostIsPowerPoint ? ... : hostIsExcel ? ... : ...` repeated throughout.
 - **Fix**: Extract into a utility function `forHost({ outlook, powerpoint, excel, word })`.
 
-#### XM2. Quick action arrays not reactive to locale changes [OPEN]
+#### XM2. Quick action arrays not reactive to locale changes [RESOLVED]
 
-- **File**: `frontend/src/pages/HomePage.vue:206-351`
-- **Category**: i18n / Reactivity
-- **Details**: `wordQuickActions`, `outlookQuickActions`, `powerPointQuickActions` are plain arrays with `t()` at setup time. Only `excelQuickActions` uses `computed()`. Labels won't update on locale change.
+> **Status**: Implemented. All quick action arrays (wordQuickActions, outlookQuickActions, powerPointQuickActions, excelQuickActions) now wrapped in `computed()`.
 - **Fix**: Wrap all quick action arrays in `computed()`.
 
 ### LOW
@@ -754,10 +715,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **File**: `frontend/src/components/SingleSelect.vue:44, 107, 117, 119`
 - **Details**: `modelValue`, `placeholder`, `icon`, `customFrontIcon` all `any`.
 
-#### PL4. `ChatInput` emits `"input"` event nobody listens to [OPEN]
+#### PL4. `ChatInput` emits `"input"` event nobody listens to [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:177, 191`
-- **Category**: Dead Code
+> **Status**: Implemented. Unused `"input"` emit removed from ChatInput.vue.
 
 #### PL5. `App.vue` has empty `<script>` block [RESOLVED]
 
@@ -871,7 +831,7 @@ _Last updated: 2026-03-01_
 | 🔴 Remaining   | BM6  | Inconsistent error logging patterns                                   |
 | 🔴 Remaining   | BM7  | `handleErrorResponse` return value discarded                          |
 | 🟢 Implemented | BM8  | `allCsv` declared with `let` instead of `const`                       |
-| 🔴 Remaining   | BM9  | No multer field count limits                                          |
+| 🟢 Implemented | BM9  | No multer field count limits                                          |
 | 🔴 Remaining   | BM10 | No request ID / correlation                                           |
 | 🟢 Implemented | BL1  | Dead branch: `if (!imageModel)` check                                 |
 | 🟢 Implemented | BL2  | French strings hardcoded in backend                                   |
@@ -885,7 +845,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | UH3  | Double timeout in Outlook tool execution                              |
 | 🟢 Implemented | UH4  | Language parameter ignored in translate prompt                        |
 | 🔴 Remaining   | UH5  | Host detection caching can return wrong host                          |
-| 🔴 Remaining   | UH6  | Message toast singleton race condition                                |
+| 🟢 Implemented | UH6  | Message toast singleton race condition                                |
 | 🟢 Implemented | UH7  | `html: true` in MarkdownIt with `style` in DOMPurify allowlist        |
 | 🔴 Remaining   | UM1  | Massive type unsafety with `as unknown as` casts                      |
 | 🔴 Remaining   | UM2  | Pervasive `any` types in tool definitions                             |
@@ -898,7 +858,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | UM9  | `tokenManager.ts` mutates input messages                              |
 | 🟡 Deferred    | UM10 | Character-by-character HTML reconstruction in PowerPoint              |
 | 🔴 Remaining   | UL1  | Typo in export name `buildInPrompt`                                   |
-| 🔴 Remaining   | UL2  | `deleteText` reports success when no text selected                    |
+| 🟢 Implemented | UL2  | `deleteText` reports success when no text selected                    |
 | 🔴 Remaining   | UL3  | Inconsistent error handling strategy across tools                     |
 | 🔴 Remaining   | UL4  | `markdown.ts` vs `officeRichText.ts` naming confusion                 |
 | 🟢 Implemented | CC1  | Prompt injection via unsanitized document selection                   |
@@ -908,20 +868,20 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | CH3  | Timer leak — `timeoutId` reassigned without clearing                  |
 | 🔴 Remaining   | CH4  | Raw `err.message` displayed to users                                  |
 | 🔴 Remaining   | CH5  | `any` types on error parameters and tool args                         |
-| 🔴 Remaining   | CH6  | XSS via unvalidated `imageSrc` URL                                    |
+| 🟢 Implemented | CH6  | XSS via unvalidated `imageSrc` URL                                    |
 | 🟢 Implemented | CH7  | `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard     |
 | 🟢 Implemented | CM1  | Hardcoded French string in file upload error                          |
 | 🟢 Implemented | CM2  | `buildChatMessages` drops system messages                             |
 | 🔴 Remaining   | CM3  | Overly large functions                                                |
-| 🔴 Remaining   | CM4  | `insertToDocument` silently swallows all errors                       |
-| 🔴 Remaining   | CM5  | Promise constructor anti-pattern in Outlook functions                 |
-| 🔴 Remaining   | CM6  | Timeout promises create orphaned timers                               |
+| 🟢 Implemented | CM4  | `insertToDocument` silently swallows all errors                       |
+| 🟢 Implemented | CM5  | Promise constructor anti-pattern in Outlook functions                 |
+| 🟢 Implemented | CM6  | Timeout promises create orphaned timers                               |
 | 🔴 Remaining   | CM7  | Excel selection returns unescaped tab-separated values                |
-| 🔴 Remaining   | CM8  | HTML injection via `richHtml` to Office APIs                          |
-| 🔴 Remaining   | CM9  | Prompt injection via user profile fields                              |
+| 🟢 Implemented | CM8  | HTML injection via `richHtml` to Office APIs                          |
+| 🟢 Implemented | CM9  | Prompt injection via user profile fields                              |
 | 🔴 Remaining   | CM10 | `insertImageToPowerPoint` ignores `'NoAction'` semantics              |
 | 🔴 Remaining   | CM11 | Hidden side effect: `insertType.value` mutation                       |
-| 🔴 Remaining   | CL1  | `hostIsWord` parameter accepted but never used                        |
+| 🟢 Implemented | CL1  | `hostIsWord` parameter accepted but never used                        |
 | 🔴 Remaining   | CL2  | `cleanContent` and `splitThinkSegments` use different think-tag logic |
 | 🔴 Remaining   | CL3  | Inconsistent image insert error reporting across hosts                |
 | 🔴 Remaining   | CL4  | `payload` parameter typed as `unknown` — should be `string            | undefined` |
@@ -936,11 +896,11 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | IH5  | Nginx missing security headers                                        |
 | 🔴 Remaining   | IM1  | Manifest-gen mounts entire project root                               |
 | 🟢 Implemented | IM2  | Healthcheck hardcodes port 3003                                       |
-| 🔴 Remaining   | IM3  | `npm install --production` deprecated                                 |
+| 🟢 Implemented | IM3  | `npm install --production` deprecated                                 |
 | 🔴 Remaining   | IM4  | Dev files copied into build context                                   |
 | 🟢 Implemented | IM5  | CORS leaks internal IP                                                |
 | 🟢 Implemented | IM6  | Empty `lang` attribute in index.html                                  |
-| � Implemented  | IM7  | Outlook manifest missing AppDomains                                   |
+| 🟢 Implemented | IM7  | Outlook manifest missing AppDomains                                   |
 | 🔴 Remaining   | IM8  | CI infinite-loop guard fragile                                        |
 | 🟢 Implemented | IL1  | Vite config uses `.js` extension                                      |
 | 🔴 Remaining   | IL2  | `@types/diff-match-patch` in dependencies instead of devDependencies  |
@@ -948,7 +908,7 @@ _Last updated: 2026-03-01_
 | 🔴 Remaining   | IL4  | Obsolete IE meta tag                                                  |
 | 🔴 Remaining   | IL5  | Unused PUID/PGID env vars in docker-compose                           |
 | 🟢 Implemented | IL6  | Dockerfile HEALTHCHECK overridden by compose                          |
-| 🔴 Remaining   | IL7  | Legacy entries in .gitignore                                          |
+| 🟢 Implemented | IL7  | Legacy entries in .gitignore                                          |
 | 🟢 Implemented | PC1  | `keep-alive` never caches `HomePage.vue`                              |
 | 🟢 Implemented | PH1  | CSS typo — `itemse-center` instead of `items-center`                  |
 | 🟢 Implemented | PH2  | `startNewChat` uses `window.location.reload()` — destructive          |
@@ -956,33 +916,33 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | PH4  | Discrepancy between HTML `accept` and JS extension validation         |
 | 🟢 Implemented | PH5  | Silent failure when files exceed limits or have wrong type            |
 | 🟢 Implemented | AH1  | Missing credential headers in `fetchModels`                           |
-| 🔴 Remaining   | AH2  | `healthCheck()` missing credential headers                            |
+| 🟢 Implemented | AH2  | `healthCheck()` missing credential headers                            |
 | 🔴 Remaining   | XH1  | No CSRF protection on API calls                                       |
 | 🔴 Remaining   | PM1  | Hardcoded French strings in ChatInput                                 |
 | 🔴 Remaining   | PM2  | Hardcoded English strings with fallback pattern in SettingsPage       |
-| 🔴 Remaining   | PM3  | `CustomInput` type flash on mount                                     |
+| 🟢 Implemented | PM3  | `CustomInput` type flash on mount                                     |
 | 🔴 Remaining   | PM4  | `CustomInput` model has `any` type                                    |
 | 🔴 Remaining   | PM5  | `SingleSelect` dropdown positioning without scroll listener           |
 | 🔴 Remaining   | PM6  | Dual emit pattern in `SingleSelect`                                   |
-| 🔴 Remaining   | PM7  | `SettingCard` prop `p1` never used by any consumer                    |
+| 🟢 Implemented | PM7  | `SettingCard` prop `p1` never used by any consumer                    |
 | 🟢 Implemented | PM8  | `Message.vue` setTimeout without cleanup                              |
 | 🔴 Remaining   | PM9  | `ChatHeader.vue` hardcoded English string                             |
 | 🔴 Remaining   | PM10 | Mixed `t()` and `$t()` usage                                          |
 | 🟢 Implemented | PM11 | `expandedThoughts` grows unbounded                                    |
-| 🔴 Remaining   | AM1  | Import statement in middle of file                                    |
-| 🔴 Remaining   | AM2  | `chatStream` silently swallows JSON parse errors                      |
-| 🔴 Remaining   | AM3  | `chatStream` discards remaining buffer after stream ends              |
+| 🟢 Implemented | AM1  | Import statement in middle of file                                    |
+| 🟢 Implemented | AM2  | `chatStream` silently swallows JSON parse errors                      |
+| 🟢 Implemented | AM3  | `chatStream` discards remaining buffer after stream ends              |
 | 🔴 Remaining   | AM4  | Duplicate `ToolDefinition` interface                                  |
 | 🔴 Remaining   | TM1  | Global ambient types without explicit imports                         |
 | 🔴 Remaining   | TM2  | `OfficeHostType` declared in two files                                |
 | 🔴 Remaining   | EM1  | `useStorage` called outside Vue component context                     |
 | 🔴 Remaining   | EM2  | Global `ResizeObserver` monkey-patching                               |
 | 🔴 Remaining   | XM1  | Deeply nested ternary chains repeated 10+ times                       |
-| 🔴 Remaining   | XM2  | Quick action arrays not reactive to locale changes                    |
+| 🟢 Implemented | XM2  | Quick action arrays not reactive to locale changes                    |
 | 🟢 Implemented | PL1  | `SettingSection.vue` component never imported or used                 |
 | 🔴 Remaining   | PL2  | `CustomButton` `icon` prop typed as `any`                             |
 | 🔴 Remaining   | PL3  | `SingleSelect` multiple props typed as `any`                          |
-| 🔴 Remaining   | PL4  | `ChatInput` emits `"input"` event nobody listens to                   |
+| 🟢 Implemented | PL4  | `ChatInput` emits `"input"` event nobody listens to                   |
 | 🟢 Implemented | PL5  | `App.vue` has empty `<script>` block                                  |
 | 🔴 Remaining   | AL1  | `api/common.ts` is misplaced — contains Word-specific Office logic    |
 | 🟢 Implemented | TL1  | Tool type aliases add no value                                        |
