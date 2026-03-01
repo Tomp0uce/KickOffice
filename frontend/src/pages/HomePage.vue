@@ -123,7 +123,7 @@ import type {
   QuickAction,
 } from "@/types/chat";
 import { localStorageKey } from "@/utils/enum";
-import { isPowerPoint, isWord, forHost } from "@/utils/hostDetection";
+import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from "@/utils/hostDetection";
 import {
   loadSavedPromptsFromStorage,
   type SavedPrompt,
