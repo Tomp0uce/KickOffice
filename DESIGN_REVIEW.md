@@ -32,29 +32,17 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### BC1. Content-Type enforcement blocks file uploads [RESOLVED]
 
-- **File**: `backend/src/server.js:91-96`
-- **Category**: Broken Functionality
-- **Details**: Global middleware rejects all POST/PUT/PATCH requests without `Content-Type: application/json`, but `/api/upload` requires `multipart/form-data` via multer. Every file upload request is blocked with 415 before reaching the route handler.
-- **Impact**: The entire file upload feature is non-functional.
-- **Fix**: Exempt `/api/upload` from the Content-Type check, e.g. `if (req.path === '/api/upload') return next()`.
+> **Status**: Implemented.
 
-#### BC2. Internal LLM API URL exposed in source and .env.example
+#### BC2. Internal LLM API URL exposed in source and .env.example [RESOLVED]
 
-- **File**: `backend/.env.example:17`, `backend/src/config/models.js:25`
-- **Category**: Security / Information Disclosure
-- **Details**: The internal company LiteLLM proxy URL `https://litellm.kickmaker.net/v1` is hardcoded as the default value for `LLM_API_BASE_URL`. No validation that the URL is well-formed HTTPS pointing to an expected host.
-- **Impact**: Exposes internal infrastructure endpoint. Potential SSRF if the env var is misconfigured.
-- **Fix**: Replace with a placeholder like `https://your-llm-api.example.com/v1` and add URL validation.
+> **Status**: Implemented.
 
 #### BC3. Sensitive data logged to disk in plaintext [RESOLVED]
 
-- **File**: `backend/src/utils/logger.js:22-46`, `backend/src/routes/chat.js:49-52, 157-159, 210`
-- **Category**: Security / Privacy
-- **Details**: `systemLog` writes full request bodies (all user messages) and full LLM responses to `backend/logs/kickoffice.log` as pretty-printed JSON. No redaction of PII, no log rotation, no size limit.
-- **Impact**: GDPR risk, credential leakage if users paste secrets, unbounded disk usage.
-- **Fix**: Redact message content from logs, add log rotation (e.g. `rotating-file-stream`), set a max file size.
+> **Status**: Implemented.
 
-#### BC4. User-supplied credentials forwarded without sanitization
+#### BC4. User-supplied credentials forwarded without sanitization [OPEN]
 
 - **File**: `backend/src/services/llmClient.js:34-41`
 - **Category**: Security / Header Injection
@@ -66,31 +54,17 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### BH1. Drain event listener leak in streaming response [RESOLVED]
 
-- **File**: `backend/src/routes/chat.js:86-90`
-- **Category**: Logic Bug / Resource Leak
-- **Details**: When backpressure occurs during SSE streaming, `await new Promise(resolve => res.once('drain', resolve))` will never resolve if the client disconnects between the backpressure check and the drain event.
-- **Impact**: Permanently hung request handlers under load with slow/disconnecting clients.
-- **Fix**: Race the drain promise with a client-disconnect check or add a timeout.
-- **Resolution**: Raced the drain promise with the connection close event to prevent memory leaks.
+> **Status**: Implemented.
 
 #### BH2. logAndRespond called after headers already sent (streaming) [RESOLVED]
 
-- **File**: `backend/src/routes/chat.js:108-116`
-- **Category**: Logic Bug
-- **Details**: If an error occurs after SSE headers have been sent, the catch block calls `logAndRespond(res, 504/500, ...)` which tries to set headers and write JSON on an active SSE stream, causing `ERR_HTTP_HEADERS_SENT`.
-- **Impact**: Unhandled exception, malformed SSE stream, swallowed error.
-- **Fix**: Check `res.headersSent` before calling `logAndRespond`; if already streaming, write an SSE error event instead.
-- **Resolution**: Added `if (res.headersSent)` check to directly write SSE error data instead of trying to send a standard HTTP error.
+> **Status**: Implemented.
 
-#### BH3. Unbounded log file growth
+#### BH3. Unbounded log file growth [RESOLVED]
 
-- **File**: `backend/src/utils/logger.js:14, 44`
-- **Category**: Security / Availability
-- **Details**: Single log file with no rotation, size limits, or cleanup. Full request/response bodies are logged.
-- **Impact**: Disk exhaustion on busy servers (potentially gigabytes/day).
-- **Fix**: Add log rotation with max file size and retention policy.
+> **Status**: Implemented.
 
-#### BH4. Hardcoded version in health endpoint
+#### BH4. Hardcoded version in health endpoint [OPEN]
 
 - **File**: `backend/src/routes/health.js:9`, `backend/package.json:3`
 - **Category**: Logic Bug
@@ -98,7 +72,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Impossible to verify deployed version via health check.
 - **Fix**: Read version from `package.json` at startup: `const { version } = require('../../package.json')`.
 
-#### BH5. parsePositiveInt allows zero
+#### BH5. parsePositiveInt allows zero [OPEN]
 
 - **File**: `backend/src/config/env.js:9-20`
 - **Category**: Logic Bug
@@ -106,7 +80,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Rate limiting bypass via zero config.
 - **Fix**: Change to `if (parsed <= 0)`.
 
-#### BH6. Upload route lacks magic-byte file validation
+#### BH6. Upload route lacks magic-byte file validation [OPEN]
 
 - **File**: `backend/src/routes/upload.js:38-78`
 - **Category**: Security
@@ -114,7 +88,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Attackers can upload crafted files (zip bombs via XLSX, XXE via DOCX) that exploit parsing libraries.
 - **Fix**: Add magic-byte validation (e.g. `file-type` package) before processing.
 
-#### BH7. ReDoS potential in sanitizeErrorText
+#### BH7. ReDoS potential in sanitizeErrorText [OPEN]
 
 - **File**: `backend/src/utils/http.js:20-21`
 - **Category**: Security / Performance
@@ -123,62 +97,52 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### MEDIUM
 
-#### BM1. No graceful shutdown handling
+#### BM1. No graceful shutdown handling [OPEN]
 
 - **File**: `backend/src/server.js`
 - **Category**: Architecture
 - **Details**: No `SIGTERM`/`SIGINT` handler. In-flight streaming connections are abruptly severed during deployment.
 - **Fix**: Add signal handlers that stop accepting new connections and drain existing ones.
 
-#### BM2. Unused `routeName` parameter in `validateChatRequest`
+#### BM2. Unused `routeName` parameter in `validateChatRequest` [RESOLVED]
 
-- **File**: `backend/src/middleware/validate.js:159`
-- **Category**: Dead Code
-- **Details**: Second parameter `routeName` is accepted but never used in the function body.
+> **Status**: Implemented.
 
-#### BM3. Exported functions never imported externally
+#### BM3. Exported functions never imported externally [RESOLVED]
 
-- **File**: `backend/src/middleware/validate.js:219-221`
-- **Category**: Dead Code
-- **Details**: `validateMaxTokens`, `validateTemperature`, `validateTools` are exported but only used internally.
+> **Status**: Implemented.
 
-#### BM4. Exported constants/functions never imported externally
+#### BM4. Exported constants/functions never imported externally [RESOLVED]
 
-- **File**: `backend/src/services/llmClient.js:10-29`
-- **Category**: Dead Code
-- **Details**: `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exported but only used internally.
+> **Status**: Implemented.
 
-#### BM5. Validated values discarded in validateChatRequest
+#### BM5. Validated values discarded in validateChatRequest [RESOLVED]
 
-- **File**: `backend/src/middleware/validate.js:189-213`
-- **Category**: Logic Bug (minor)
-- **Details**: `validateTemperature` and `validateMaxTokens` compute `.value` but only `.error` is checked. Callers pass original `req.body` values, bypassing any future normalization.
+> **Status**: Implemented.
 
-#### BM6. Inconsistent error logging patterns
+#### BM6. Inconsistent error logging patterns [OPEN]
 
 - **File**: Multiple backend files
 - **Category**: Code Quality
 - **Details**: Four different logging patterns (`console.error`, `systemLog`, `logAndRespond`, `process.stderr.write`) used inconsistently. Many errors logged through both `systemLog` and `console.error` on consecutive lines.
 
-#### BM7. `handleErrorResponse` return value discarded
+#### BM7. `handleErrorResponse` return value discarded [OPEN]
 
 - **File**: `backend/src/routes/chat.js:61, 169`, `backend/src/routes/image.js:31`
 - **Category**: Code Quality
 - **Details**: `handleErrorResponse` returns sanitized error text but all call sites discard it.
 
-#### BM8. `allCsv` declared with `let` instead of `const`
+#### BM8. `allCsv` declared with `let` instead of `const` [RESOLVED]
 
-- **File**: `backend/src/routes/upload.js:58`
-- **Category**: Code Quality
-- **Details**: Variable is never reassigned, only mutated via `.push()`.
+> **Status**: Implemented.
 
-#### BM9. No multer field count limits
+#### BM9. No multer field count limits [OPEN]
 
 - **File**: `backend/src/routes/upload.js:13-18`
 - **Category**: Security
 - **Details**: No `limits.fields` or `limits.fieldSize` set. Attacker could send thousands of non-file fields.
 
-#### BM10. No request ID / correlation
+#### BM10. No request ID / correlation [OPEN]
 
 - **File**: Multiple backend files
 - **Category**: Architecture
@@ -186,25 +150,21 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### LOW
 
-#### BL1. Dead branch: `if (!imageModel)` check
+#### BL1. Dead branch: `if (!imageModel)` check [RESOLVED]
 
-- **File**: `backend/src/routes/image.js:17-19`
-- **Category**: Dead Code
-- **Details**: `models.image` is always defined in static config. Check can never be true.
+> **Status**: Implemented.
 
-#### BL2. French strings hardcoded in backend
+#### BL2. French strings hardcoded in backend [RESOLVED]
 
-- **File**: `backend/src/routes/upload.js:89`, `backend/src/config/models.js:49`
-- **Category**: i18n
-- **Details**: `'Contenu tronqué en raison de la taille du fichier'`, `'Raisonnement'` hardcoded in French.
+> **Status**: Implemented.
 
-#### BL3. Stale comment about character limit
+#### BL3. Stale comment about character limit [OPEN]
 
 - **File**: `backend/src/routes/upload.js:86-87`
 - **Category**: Documentation
 - **Details**: Comment says "50k chars" but constant is `MAX_CHARS = 100000`.
 
-#### BL4. `isPlainObject` accepts non-plain objects
+#### BL4. `isPlainObject` accepts non-plain objects [OPEN]
 
 - **File**: `backend/src/middleware/validate.js:4-6`
 - **Category**: Code Quality
@@ -216,15 +176,11 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### UC1. Prompt injection via custom prompt templates
+#### UC1. Prompt injection via custom prompt templates [RESOLVED]
 
-- **File**: `frontend/src/utils/constant.ts:305-321, 441-466, 469-495, 497-523`
-- **Category**: Security
-- **Details**: `getBuiltInPrompt()` and per-host variants load custom prompts from localStorage and use `String.replace()` with `${text}` as pattern. The replacement string `text` is interpreted by `String.replace()` — meaning `$&`, `$'`, `` $` ``, and `$<n>` patterns in user text are treated as special replacement patterns, causing silent data corruption.
-- **Impact**: User-supplied text containing `$&` or `$'` produces garbled output. Prompt injection via localStorage manipulation.
-- **Fix**: Use a function as the replacement argument: `.replace(/\$\{text\}/g, () => text)`.
+> **Status**: Implemented.
 
-#### UC2. XOR "obfuscation" provides false security for API keys
+#### UC2. XOR "obfuscation" provides false security for API keys [OPEN]
 
 - **File**: `frontend/src/utils/credentialStorage.ts:7-36`
 - **Category**: Security
@@ -234,50 +190,27 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### UC3. Unsanitized HTML injection in Outlook tools [RESOLVED]
 
-- **File**: `frontend/src/utils/outlookTools.ts:505-534` (insertHtmlAtCursor), `outlookTools.ts:261-291` (setEmailBodyHtml)
-- **Category**: Security / XSS
-- **Details**: Both tools insert raw HTML directly into Outlook email bodies via `setSelectedDataAsync` with no DOMPurify sanitization. The `html` argument from LLM output is passed verbatim.
-- **Impact**: Malicious HTML (scripts, phishing forms, event handlers) injected into outgoing emails.
-- **Fix**: Sanitize through DOMPurify before passing to Office APIs.
+> **Status**: Implemented.
 
 ### HIGH
 
 #### UH1. `eval_officejs` declared in ExcelToolName but never defined [RESOLVED]
 
-- **File**: `frontend/src/utils/excelTools.ts:66`
-- **Category**: Logic Bug / Dead Code
-- **Details**: `'eval_officejs'` is in the `ExcelToolName` union but no tool definition exists. The `as unknown as Record<ExcelToolName, ExcelToolDefinition>` cast suppresses the TypeScript error.
-- **Impact**: Runtime crash if the agent tries to invoke `eval_officejs` for Excel.
-- **Fix**: Either add the tool definition or remove the name from the union type.
-- **Resolution**: Removed `eval_officejs` from the union type.
+> **Status**: Implemented.
 
 #### UH2. Column letter arithmetic overflow [RESOLVED]
 
-- **File**: `frontend/src/utils/excelTools.ts:1155, 1214`
-- **Category**: Logic Bug
-- **Details**: `String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)` breaks for multi-character columns (AA, AB) and overflows for single-character columns near Z.
-- **Impact**: Data corruption or crash when inserting/deleting columns at/beyond column Z.
-- **Fix**: Implement proper column letter arithmetic that handles multi-character references.
-- **Resolution**: Added helper functions `colToInt` and `intToCol` to correctly compute column offsets for multi-character column names.
+> **Status**: Implemented.
 
-#### UH3. Double timeout in Outlook tool execution
+#### UH3. Double timeout in Outlook tool execution [RESOLVED]
 
-- **File**: `frontend/src/utils/outlookTools.ts:67-72`
-- **Category**: Logic Bug
-- **Details**: Inner 3-second `Promise.race` timeout is extremely aggressive for Outlook API calls (which need server round-trips). It returns an error string rather than rejecting, so the outer 10-second timeout never triggers. Many legitimate operations silently fail.
-- **Impact**: Silent failures on slow connections or large emails.
-- **Fix**: Remove the inner 3-second timeout or increase it significantly.
+> **Status**: Implemented.
 
 #### UH4. Language parameter ignored in translate prompt [RESOLVED]
 
-- **File**: `frontend/src/utils/prompt.ts:133-134`
-- **Category**: Logic Bug
-- **Details**: `buildInPrompt.translate` takes an `args.language` parameter, but defaults the instruction to `args.language || 'English'`. When answering an email, it should use the language of the source email.
-- **Impact**: Users who select a target language other than French/English see their preference silently ignored.
-- **Fix**: Use the detected source language of the email for replying. Checked and resolved in outlook reply logic. Make the prompt respect the language parameter.
-- **Resolution**: Updated the generic translation quick action prompt to correctly target the requested layout language.
+> **Status**: Implemented.
 
-#### UH5. Host detection caching can return wrong host
+#### UH5. Host detection caching can return wrong host [OPEN]
 
 - **File**: `frontend/src/utils/hostDetection.ts:3-37`
 - **Category**: Logic Bug
@@ -285,7 +218,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Wrong host detection in edge cases, leading to wrong tool set and prompts.
 - **Fix**: Only cache after `Office.onReady` has resolved.
 
-#### UH6. Message toast singleton race condition
+#### UH6. Message toast singleton race condition [OPEN]
 
 - **File**: `frontend/src/utils/message.ts:13-43`
 - **Category**: Race Condition
@@ -293,72 +226,60 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Toasts prematurely destroyed or DOM container leaks.
 - **Fix**: Clear the pending timeout before creating a new instance, or use a unique ID per instance.
 
-#### UH7. `html: true` in MarkdownIt with `style` in DOMPurify allowlist
+#### UH7. `html: true` in MarkdownIt with `style` in DOMPurify allowlist [RESOLVED]
 
-- **File**: `frontend/src/utils/officeRichText.ts:77, 403`
-- **Category**: Security
-- **Details**: Raw HTML passes through MarkdownIt, and DOMPurify allows the `style` attribute. Inline styles enable CSS-based attacks (data exfiltration via `background: url(...)`, UI spoofing).
-- **Impact**: CSS injection in Office-inserted content.
-- **Fix**: Remove `style` from `ALLOWED_ATTR` or use a CSS sanitizer.
+> **Status**: Implemented.
 
 ### MEDIUM
 
-#### UM1. Massive type unsafety with `as unknown as` casts
+#### UM1. Massive type unsafety with `as unknown as` casts [OPEN]
 
 - **Files**: `excelTools.ts:21`, `wordTools.ts:194`, `outlookTools.ts:75`, `powerpointTools.ts:39`
 - **Category**: Type Safety
 - **Details**: All four tool-creation factories use `as unknown as Record<ToolName, ToolDefinition>`, completely disabling TypeScript checking for missing tool definitions.
 - **Fix**: Use a type-safe builder that validates all required tool names are present.
 
-#### UM2. Pervasive `any` types in tool definitions
+#### UM2. Pervasive `any` types in tool definitions [OPEN]
 
 - **Files**: All tool definition files
 - **Category**: Type Safety
 - **Details**: `args: Record<string, any>`, `mailbox: any`, `context: any` across all tool files. Outlook tools especially: `getMailbox(): any`, `getOfficeAsyncStatus(): any`.
 
-#### UM3. Duplicated `generateVisualDiff` function
+#### UM3. Duplicated `generateVisualDiff` function [RESOLVED]
 
-- **Files**: `outlookTools.ts:8-20`, `wordTools.ts:8-21`
-- **Category**: Code Duplication
-- **Details**: Identical function copy-pasted between two files.
-- **Fix**: Extract to a shared utility.
+> **Status**: Implemented.
 
-#### UM4. Duplicated Office API helpers
+#### UM4. Duplicated Office API helpers [RESOLVED]
 
-- **Files**: `outlookTools.ts:42-66`, `officeOutlook.ts:48-66`
-- **Category**: Code Duplication
-- **Details**: Both files define their own helpers for `Office.context.mailbox`, `CoercionType`, `AsyncResultStatus`. The typed abstractions in `officeOutlook.ts` go partially unused.
+> **Status**: Implemented.
 
-#### UM5. `Ref` without type parameter in WordFormatter
+#### UM5. `Ref` without type parameter in WordFormatter [OPEN]
 
 - **File**: `frontend/src/utils/wordFormatter.ts:23, 54`
 - **Category**: Type Safety
 - **Details**: `insertType: Ref` (bare, unparameterized). Value is typed as `unknown`, requiring implicit `any` comparisons.
 
-#### UM6. `searchAndReplace` tools labeled as category `'read'`
+#### UM6. `searchAndReplace` tools labeled as category `'read'` [OPEN]
 
 - **Files**: `excelTools.ts:1365`, `wordTools.ts:517`
 - **Category**: Inconsistency
 - **Details**: Both perform write operations (replacing text/values) but are categorized as `'read'`.
 
-#### UM7. Redundant Set + Array checks in toolStorage
+#### UM7. Redundant Set + Array checks in toolStorage [OPEN]
 
 - **File**: `frontend/src/utils/toolStorage.ts:47`
 - **Category**: Code Quality
 - **Details**: `!storedEnabledSet.has(name) && !storedEnabledNames.includes(name)` — the Set was created from the same array, so these checks are redundant.
 
-#### UM8. No `QuotaExceededError` handling for localStorage
+#### UM8. No `QuotaExceededError` handling for localStorage [OPEN]
 
 - **Files**: `credentialStorage.ts`, `toolStorage.ts`, `savedPrompts.ts`, `constant.ts`
 - **Category**: Error Handling
 - **Details**: Multiple files write to localStorage without catching `QuotaExceededError`.
 
-#### UM9. `tokenManager.ts` mutates input messages
+#### UM9. `tokenManager.ts` mutates input messages [RESOLVED]
 
-- **File**: `frontend/src/utils/tokenManager.ts:105-108`
-- **Category**: Code Quality
-- **Details**: `delete msg.tool_calls` mutates original message objects from the input array.
-- **Fix**: Clone messages before modifying: `const msg = { ...originalMsg }`.
+> **Status**: Implemented.
 
 #### UM10. Character-by-character HTML reconstruction in PowerPoint [DEFERRED]
 
@@ -371,22 +292,22 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### LOW
 
-#### UL1. Typo in export name `buildInPrompt`
+#### UL1. Typo in export name `buildInPrompt` [OPEN]
 
 - **File**: `frontend/src/utils/constant.ts:30`
 - **Details**: Should be `builtInPrompt`.
 
-#### UL2. `deleteText` reports success when no text selected
+#### UL2. `deleteText` reports success when no text selected [OPEN]
 
 - **File**: `frontend/src/utils/wordTools.ts:710-715`
 - **Details**: Inserts empty string (no-op) but returns "Successfully deleted text".
 
-#### UL3. Inconsistent error handling strategy across tools
+#### UL3. Inconsistent error handling strategy across tools [OPEN]
 
 - **Files**: All tool files
 - **Details**: Some return error strings, some throw, some return empty strings. Caller must check string prefixes.
 
-#### UL4. `markdown.ts` vs `officeRichText.ts` naming confusion
+#### UL4. `markdown.ts` vs `officeRichText.ts` naming confusion [OPEN]
 
 - **Details**: Both render Markdown but for different targets (chat vs Office). Names don't communicate this.
 
@@ -398,156 +319,133 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### CC1. Prompt injection via unsanitized document selection [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:613-616`
-- **Category**: Security
-- **Details**: Office selection text is directly interpolated into the user message: `fullMessage += \`\n\n[${selectionLabel}: "${selectedText}"]\``. A malicious document containing `"]` followed by injection instructions can break out of the framing.
-- **Impact**: Indirect prompt injection — attacker crafts document, victim opens it and uses KickOffice.
-- **Fix**: Use robust delimiters (XML CDATA-style, base64, unique boundary token).
-- **Resolution**: Replaced direct injection with robust XML-like `<document_content>` tags.
+> **Status**: Implemented.
 
 #### CC2. Prompt injection via quick action selection text [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:753, 761, 525`
-- **Category**: Security
-- **Details**: `textForLlm` from document selection passed directly to `action.user(textForLlm, lang)`. Email body injected into reply prompt at line 525 with `replyPrompt.user(emailBody, lang)`.
-- **Impact**: Attacker-crafted email/document content can override system prompt instructions.
-- **Resolution**: Escaped and encapsulated injected content inside `<document_content>` and `<email_content>` tags to prevent override.
+> **Status**: Implemented.
 
 ### HIGH
 
 #### CH1. Race condition: concurrent `sendMessage` calls corrupt state [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:466-468, 498-499`
-- **Category**: Logic Bug
-- **Details**: `if (loading.value) return` is check-then-act on a reactive ref. Two rapid calls can both pass before `loading.value = true` is set, causing concurrent agent loops writing to the same history array.
-- **Fix**: Set `loading.value = true` immediately at the top, before any async work.
-- **Resolution**: Set `loading.value = true` immediately and handled resetting the state on validation returns.
+> **Status**: Implemented.
 
-#### CH2. `lastIndex` stale reference during agent loop
+#### CH2. `lastIndex` stale reference during agent loop [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:242, 267, 317`
-- **Category**: Logic Bug
-- **Details**: `lastIndex` captured once as `history.value.length - 1` but history is pushed to during the loop. Stale index updates the wrong message.
-- **Fix**: Store a direct reference to the message object instead of an index.
+> **Status**: Implemented.
 
-#### CH3. Timer leak — `timeoutId` reassigned without clearing
+#### CH3. Timer leak — `timeoutId` reassigned without clearing [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:559-568`
-- **Category**: Resource Leak
-- **Details**: First `setTimeout` assigned to `timeoutId`, then reassigned to a new one without clearing the first. `finally` only clears the last.
+> **Status**: Implemented.
 
-#### CH4. Raw `err.message` displayed to users
+#### CH4. Raw `err.message` displayed to users [OPEN]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:304, 435, 551, 819`
 - **Category**: Security / Information Disclosure
 - **Details**: Server error messages (potentially containing internal URLs, API keys, stack traces) shown directly to users.
 - **Fix**: Show generic messages, log details to console only.
 
-#### CH5. `any` types on error parameters and tool args
+#### CH5. `any` types on error parameters and tool args [OPEN]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:111, 288, 334, 433, 544`
 - **Category**: Type Safety
 - **Details**: `isCredentialError(error: any)`, multiple `catch (err: any)`, `toolArgs: Record<string, any>`.
 - **Fix**: Use `unknown` with type guards.
 
-#### CH6. XSS via unvalidated `imageSrc` URL
+#### CH6. XSS via unvalidated `imageSrc` URL [OPEN]
 
 - **File**: `frontend/src/composables/useImageActions.ts:53-98`
 - **Category**: Security
 - **Details**: `imageSrc` directly assigned to `fetch()` and `img.src` with no URL validation. Could be `javascript:` URL or point to internal resources (SSRF).
 - **Fix**: Validate URL pattern before use.
 
-#### CH7. `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard
+#### CH7. `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard [RESOLVED]
 
-- **File**: `frontend/src/composables/useImageActions.ts:10`
-- **Category**: Maintenance
-- **Details**: `g` flag maintains `lastIndex` state. Adding a `test()` call later would introduce subtle bugs.
+> **Status**: Implemented.
 
 ### MEDIUM
 
-#### CM1. Hardcoded French string in file upload error
+#### CM1. Hardcoded French string in file upload error [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:604`
-- **Category**: i18n
-- **Details**: `'Erreur lors de l\'extraction du fichier.'` hardcoded instead of using `t()`.
+> **Status**: Implemented.
 
-#### CM2. `buildChatMessages` drops system messages
+#### CM2. `buildChatMessages` drops system messages [RESOLVED]
 
-- **File**: `frontend/src/composables/useAgentLoop.ts:209-211`
-- **Details**: Filter strips all `system` messages from history.
+> **Status**: Implemented.
 
-#### CM3. Overly large functions
+#### CM3. Overly large functions [OPEN]
 
 - **Files**: `useAgentLoop.ts:449-638` (`sendMessage` ~190 lines), `useAgentLoop.ts:640-828` (`applyQuickAction` ~188 lines), `useAgentLoop.ts:227-421` (`runAgentLoop` ~195 lines)
 - **Category**: Architecture
 - **Fix**: Decompose into focused helpers.
 
-#### CM4. `insertToDocument` silently swallows all errors
+#### CM4. `insertToDocument` silently swallows all errors [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:107, 117-118, 133-134, 156-157`
 - **Category**: Error Handling
 - **Details**: Every catch block falls back to clipboard with no logging.
 
-#### CM5. Promise constructor anti-pattern in Outlook functions
+#### CM5. Promise constructor anti-pattern in Outlook functions [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeSelection.ts:13-67`
 - **Details**: Four nearly-identical `Promise.race` + manual timeout patterns.
 - **Fix**: Extract a shared `withTimeout(promise, ms)` helper.
 
-#### CM6. Timeout promises create orphaned timers
+#### CM6. Timeout promises create orphaned timers [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeSelection.ts:22, 38, 51, 65`
 - **Details**: Losing `Promise.race` timers still fire, resolving promises nobody listens to.
 
-#### CM7. Excel selection returns unescaped tab-separated values
+#### CM7. Excel selection returns unescaped tab-separated values [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeSelection.ts:86-92`
 - **Details**: Cell values containing tabs/newlines make output ambiguous.
 
-#### CM8. HTML injection via `richHtml` to Office APIs
+#### CM8. HTML injection via `richHtml` to Office APIs [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:96, 98, 143-145`
 - **Category**: Security
 - **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()` without sanitization.
 - **Fix**: Sanitize through DOMPurify before passing to Office APIs.
 
-#### CM9. Prompt injection via user profile fields
+#### CM9. Prompt injection via user profile fields [OPEN]
 
 - **File**: `frontend/src/composables/useAgentPrompts.ts:34-41`
 - **Details**: `firstName`/`lastName` interpolated directly into system prompt.
 
-#### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics
+#### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics [OPEN]
 
 - **File**: `frontend/src/composables/useImageActions.ts:111-157`
 - **Details**: `'NoAction'` should mean "do nothing" but still inserts the image.
 
-#### CM11. Hidden side effect: `insertType.value` mutation
+#### CM11. Hidden side effect: `insertType.value` mutation [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:140`
 - **Details**: Mutates external ref as side effect, causing unexpected reactivity triggers.
 
 ### LOW
 
-#### CL1. `hostIsWord` parameter accepted but never used
+#### CL1. `hostIsWord` parameter accepted but never used [OPEN]
 
 - **File**: `frontend/src/composables/useAgentPrompts.ts:13, 26`
 - **Category**: Dead Code
 
-#### CL2. `cleanContent` and `splitThinkSegments` use different think-tag logic
+#### CL2. `cleanContent` and `splitThinkSegments` use different think-tag logic [OPEN]
 
 - **File**: `frontend/src/composables/useImageActions.ts:13-33, 40-42`
 - **Details**: Inconsistent behavior for malformed tags.
 
-#### CL3. Inconsistent image insert error reporting across hosts
+#### CL3. Inconsistent image insert error reporting across hosts [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeInsert.ts:169-198`
 - **Details**: Outlook falls through and shows misleading "imageInsertWordOnly" message.
 
-#### CL4. `payload` parameter typed as `unknown` — should be `string | undefined`
+#### CL4. `payload` parameter typed as `unknown` — should be `string | undefined` [OPEN]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:449`
 
-#### CL5. Word HTML selection swallows errors silently
+#### CL5. Word HTML selection swallows errors silently [OPEN]
 
 - **File**: `frontend/src/composables/useOfficeSelection.ts:135-136`
 
@@ -559,8 +457,7 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### IC1. Content-Type middleware blocks uploads (same as BC1) [RESOLVED]
 
-- **File**: `backend/src/server.js:91-96`
-- **Details**: See BC1. The upload route at line 104 is unreachable for multipart requests.
+> **Status**: Implemented.
 
 #### IC2. Containers run as root [DEFERRED]
 
@@ -570,22 +467,15 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Fix**: Add `USER node` to the Dockerfiles.
 - **Note**: Retaining this configuration deliberately.
 
-#### IC3. Internal infrastructure URL as default
+#### IC3. Internal infrastructure URL as default [RESOLVED]
 
-- **File**: `backend/.env.example:17`
-- **Category**: Security
-- **Details**: See BC2. `https://litellm.kickmaker.net/v1` as default `LLM_API_BASE_URL`.
+> **Status**: Implemented.
 
 ### HIGH
 
 #### IH1. Node.js version mismatch between environments [RESOLVED]
 
-- **File**: `frontend/Dockerfile:1`, `backend/Dockerfile:1`, `docker-compose.yml:3`
-- **Category**: Infrastructure Issue
-- **Details**: `docker-compose.yml` uses `node:18-alpine` for `manifest-gen`, but both frontend/backend `Dockerfile`s use `node:22-alpine`.
-- **Impact**: Potential build/runtime inconsistencies. Scripts running differently.
-- **Fix**: Standardize on `node:22-alpine` everywhere.
-- **Resolution**: Upgraded `manifest-gen` to use `node:22-alpine` in `docker-compose.yml`.
+> **Status**: Implemented.
 
 #### IH2. Private IP baked into frontend Docker build [DEFERRED]
 
@@ -605,97 +495,81 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 #### IH4. Undeterministic package resolution in Dockerfiles [RESOLVED]
 
-- **File**: `frontend/Dockerfile:5`, `backend/Dockerfile:6`
-- **Category**: Infrastructure Issue
-- **Details**: Both Dockerfiles use `COPY package.json ./` and `npm install` without copying `package-lock.json`.
-- **Impact**: Builds are not reproducible. A minor bump in a dependency can break the build unexpectedly.
-- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci` (or `npm ci --omit=dev` for backend).
-- **Resolution**: Changed Dockerfiles to copy `package-lock.json` and use `npm ci` for deterministic dependencies.
+> **Status**: Implemented.
 
 #### IH5. Nginx missing security headers [RESOLVED]
 
-- **File**: `frontend/nginx.conf:1-21`
-- **Category**: Security
-- **Details**: Missing `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options`. Uses deprecated `X-XSS-Protection`.
-- **Fix**: Add modern security headers, remove `X-XSS-Protection`.
-- **Resolution**: Security headers added to frontend nginx.conf.
+> **Status**: Implemented.
 
 ### MEDIUM
 
-#### IM1. Manifest-gen mounts entire project root
+#### IM1. Manifest-gen mounts entire project root [OPEN]
 
 - **File**: `docker-compose.yml:5-6`
 - **Details**: Grants script access to `.env`, `.git`, all source code when it only needs `manifests-templates/`.
 
-#### IM2. Healthcheck hardcodes port 3003
+#### IM2. Healthcheck hardcodes port 3003 [RESOLVED]
 
-- **File**: `backend/Dockerfile:12-13`
-- **Details**: If `PORT` env var is changed, healthcheck always fails.
+> **Status**: Implemented.
 
-#### IM3. `npm install --production` deprecated
+#### IM3. `npm install --production` deprecated [OPEN]
 
 - **File**: `backend/Dockerfile:6`
 - **Details**: Use `npm ci --omit=dev` with Node 22.
 
-#### IM4. Dev files copied into build context
+#### IM4. Dev files copied into build context [OPEN]
 
 - **File**: `frontend/Dockerfile:7`
 - **Details**: `COPY . .` includes `e2e/`, `playwright.config.ts` unnecessarily.
 
-#### IM5. CORS leaks internal IP
+#### IM5. CORS leaks internal IP [RESOLVED]
 
-- **File**: `docker-compose.yml:29`
-- **Details**: Internal IP always added to CORS origins alongside public URL.
+> **Status**: Implemented.
 
-#### IM6. Empty `lang` attribute in index.html
+#### IM6. Empty `lang` attribute in index.html [RESOLVED]
 
-- **File**: `frontend/index.html:2`
-- **Details**: `<html lang="">` fails accessibility validation.
+> **Status**: Implemented.
 
-#### IM7. Outlook manifest missing AppDomains
+#### IM7. Outlook manifest missing AppDomains [RESOLVED]
 
-- **File**: `manifests-templates/manifest-outlook.template.xml`
-- **Details**: Office manifest has `<AppDomains>` but Outlook manifest does not.
+> **Status**: Implemented.
 
-#### IM8. CI infinite-loop guard fragile
+#### IM8. CI infinite-loop guard fragile [OPEN]
 
 - **File**: `.github/workflows/bump-version.yml:11, 37`
 - **Details**: Relies on commit message prefix + `[skip ci]` suffix — neither fully robust alone.
 
 ### LOW
 
-#### IL1. Vite config uses `.js` extension
+#### IL1. Vite config uses `.js` extension [RESOLVED]
 
-- **File**: `frontend/vite.config.js`
-- **Details**: Should be `.ts` to match the rest of the project.
+> **Status**: Implemented.
 
-#### IL2. `@types/diff-match-patch` in dependencies instead of devDependencies
+#### IL2. `@types/diff-match-patch` in dependencies instead of devDependencies [OPEN]
 
 - **File**: `frontend/package.json:15`
 
-#### IL3. `chunkSizeWarningLimit` raised to suppress warnings
+#### IL3. `chunkSizeWarningLimit` raised to suppress warnings [OPEN]
 
 - **File**: `frontend/vite.config.js:56-57`
 - **Details**: Masks bundle-size regressions.
 
-#### IL4. Obsolete IE meta tag
+#### IL4. Obsolete IE meta tag [OPEN]
 
 - **File**: `frontend/index.html:5`
 - **Details**: `<meta http-equiv="X-UA-Compatible" content="IE=edge" />` is inert.
 
-#### IL5. Unused PUID/PGID env vars in docker-compose
+#### IL5. Unused PUID/PGID env vars in docker-compose [OPEN]
 
 - **File**: `docker-compose.yml:31-32, 66-67`
 - **Category**: Dead Code
 - **Details**: Not consumed by standard Docker images.
 
-#### IL6. Dockerfile HEALTHCHECK overridden by compose
+#### IL6. Dockerfile HEALTHCHECK overridden by compose [RESOLVED]
 
-- **File**: `backend/Dockerfile:12-13`
-- **Category**: Dead Code
-- **Details**: Never executed when running via docker-compose.
+> **Status**: Implemented.
 
-#### IL7. Legacy entries in .gitignore
+#### IL7. Legacy entries in .gitignore [OPEN]
 
 - **File**: `.gitignore:31-38`
 - **Category**: Dead Code
@@ -795,75 +669,42 @@ Consolidated list of all dead code found across the codebase.
 
 #### PC1. `keep-alive` never caches `HomePage.vue` [RESOLVED]
 
-- **File**: `frontend/src/App.vue:4`, `frontend/src/pages/HomePage.vue`
-- **Category**: Broken Functionality
-- **Details**: `<keep-alive include="Home">` filters by component name, but `HomePage.vue` uses `<script setup>` without `defineOptions({ name: 'Home' })`. The auto-inferred name is `"HomePage"`, not `"Home"`. The component is destroyed and recreated on every navigation from Settings back to Home.
-- **Impact**: All transient state lost on navigation (scroll position, textarea, `abortController`). Repeated backend health checks, flickering.
-- **Fix**: Add `defineOptions({ name: 'Home' })` to `HomePage.vue`.
-- **Resolution**: Added `defineOptions` successfully.
+> **Status**: Implemented.
 
 ### HIGH
 
 #### PH1. CSS typo — `itemse-center` instead of `items-center` [RESOLVED]
 
-- **File**: `frontend/src/pages/HomePage.vue:3`
-- **Category**: UI Bug
-- **Details**: Tailwind class `"itemse-center"` is silently ignored. Container cross-axis alignment not applied.
-- **Impact**: Broken vertical centering on the home page root container.
-- **Fix**: Change to `items-center`.
-- **Resolution**: Corrected spelling from `itemse-center` to `items-center`.
+> **Status**: Implemented.
 
 #### PH2. `startNewChat` uses `window.location.reload()` — destructive [RESOLVED]
 
-- **File**: `frontend/src/pages/HomePage.vue:539`
-- **Category**: Architecture / UX
-- **Details**: Full page reload instead of reactive state clearing. Discards all in-memory state, is slow, breaks SPA semantics.
-- **Impact**: Slow UX, complete app reload, potential loss of Office context.
-- **Resolution**: Replaced reload with reactive state resets.
+> **Status**: Implemented.
 
 #### PH3. `agentMaxIterations` not validated on HomePage [RESOLVED]
 
-- **File**: `frontend/src/pages/HomePage.vue:193`
-- **Category**: Logic Bug
-- **Details**: `SettingsPage` validates and clamps between 1-100, but `HomePage` reads the raw `useStorage` value. Corrupted localStorage (0, -1, 999999) goes directly to the agent loop.
-- **Impact**: Runaway agent loop or zero iterations if localStorage is tampered with.
-- **Resolution**: Added computed property checking and clamping bounds in `HomePage.vue`.
+> **Status**: Implemented.
 
 #### PH4. Discrepancy between HTML `accept` and JS extension validation [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:89, 233`
-- **Category**: UI Bug
-- **Details**: The `<input type="file" accept="... .xls ...">` allows `.xls` files, but the `allowedExtensions` array in `processFiles` does not include `.xls`, only `.xlsx`.
-- **Impact**: Users can select `.xls` files in the dialog, but they are silently dropped by the JS validation.
-- **Fix**: Add `.xls` to `allowedExtensions`.
-- **Resolution**: Added `.xls` to `allowedExtensions` in JS validation.
+> **Status**: Implemented.
 
 #### PH5. Silent failure when files exceed limits or have wrong type [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:239-247`
-- **Category**: UX Issue
-- **Details**: If a user drags >3 files, or a file >10MB, or an unsupported file, the code just skips it without any UI feedback.
-- **Impact**: User confusion ("Why didn't my file attach?").
-- **Fix**: Use `messageUtil.error()` or `messageUtil.warning()` to inform the user when files are rejected.
-- **Resolution**: Added `messageUtil` integration to show feedback for files dropped due to size limits or unknown types.
+> **Status**: Implemented.
 
 #### AH1. Missing credential headers in `fetchModels` [RESOLVED]
 
-- **File**: `frontend/src/api/backend.ts:90`
-- **Category**: Security / Bug
-- **Details**: `fetchModels` calls `/api/models` without `X-User-Key` or `X-User-Email` headers. If the backend requires authentication for models, this will fail.
-- **Impact**: Feature completely broken or unauthorized access errors when launching the app.
-- **Fix**: Add `...getUserCredentialHeaders()` to the fetch options.
-- **Resolution**: Added `getUserCredentialHeaders()` to `fetchModels()` to ensure proper authentication.
+> **Status**: Implemented.
 
-#### AH2. `healthCheck()` missing credential headers
+#### AH2. `healthCheck()` missing credential headers [OPEN]
 
 - **File**: `frontend/src/api/backend.ts:96-103`
 - **Category**: Security / Logic Bug
 - **Details**: Same as AH1 — no credential headers on health check.
 - **Impact**: Backend appears permanently offline if authentication required.
 
-#### XH1. No CSRF protection on API calls
+#### XH1. No CSRF protection on API calls [OPEN]
 
 - **File**: `frontend/src/api/backend.ts` (all POST endpoints)
 - **Category**: Security
@@ -872,131 +713,127 @@ Consolidated list of all dead code found across the codebase.
 
 ### MEDIUM
 
-#### PM1. Hardcoded French strings in ChatInput
+#### PM1. Hardcoded French strings in ChatInput [OPEN]
 
 - **File**: `frontend/src/components/chat/ChatInput.vue:47, 79`
 - **Category**: i18n
 - **Details**: `"Retirer le fichier"` and `"Attacher un document (PDF, DOCX, XLSX)"` hardcoded in French.
 - **Fix**: Use `t()` with i18n keys.
 
-#### PM2. Hardcoded English strings with fallback pattern in SettingsPage
+#### PM2. Hardcoded English strings with fallback pattern in SettingsPage [OPEN]
 
 - **File**: `frontend/src/pages/SettingsPage.vue:190-193, 200, 470`
 - **Category**: i18n
 - **Details**: `$t("darkModeLabel") || "Dark mode"` pattern suggests missing i18n keys. Fallbacks mask the issue.
 
-#### PM3. `CustomInput` type flash on mount
+#### PM3. `CustomInput` type flash on mount [OPEN]
 
 - **File**: `frontend/src/components/CustomInput.vue:50-76`
 - **Category**: UI Bug
 - **Details**: `type` ref initialized to `'text'`, then overridden in `onMounted`. Brief flash where a number input appears as text.
 - **Fix**: Initialize from prop: `const type = ref(isPassword ? 'password' : inputType)`.
 
-#### PM4. `CustomInput` model has `any` type
+#### PM4. `CustomInput` model has `any` type [OPEN]
 
 - **File**: `frontend/src/components/CustomInput.vue:36`
 - **Category**: Type Safety
 - **Details**: `defineModel<any>()` loses all type safety.
 
-#### PM5. `SingleSelect` dropdown positioning without scroll listener
+#### PM5. `SingleSelect` dropdown positioning without scroll listener [OPEN]
 
 - **File**: `frontend/src/components/SingleSelect.vue:65-96`
 - **Category**: UI Bug
 - **Details**: Dropdown uses `position: fixed` calculated on toggle, but no scroll/resize recalculation.
 - **Impact**: Mispositioned dropdown when settings page is scrolled while open.
 
-#### PM6. Dual emit pattern in `SingleSelect`
+#### PM6. Dual emit pattern in `SingleSelect` [OPEN]
 
 - **File**: `frontend/src/components/SingleSelect.vue:42, 48-52`
 - **Category**: Code Quality
 - **Details**: Both `update:modelValue` and `change` emitted. Redundant and error-prone.
 
-#### PM7. `SettingCard` prop `p1` never used by any consumer
+#### PM7. `SettingCard` prop `p1` never used by any consumer [OPEN]
 
 - **File**: `frontend/src/components/SettingCard.vue:2, 9-10`
 - **Category**: Dead Code
 
-#### PM8. `Message.vue` setTimeout without cleanup
+#### PM8. `Message.vue` setTimeout without cleanup [RESOLVED]
 
-- **File**: `frontend/src/components/Message.vue:38-45`
-- **Category**: Resource Leak
-- **Details**: Two `setTimeout` calls in `onMounted` never cleared. Callbacks fire on unmounted components.
+> **Status**: Implemented.
 
-#### PM9. `ChatHeader.vue` hardcoded English string
+#### PM9. `ChatHeader.vue` hardcoded English string [OPEN]
 
 - **File**: `frontend/src/components/chat/ChatHeader.vue:13`
 - **Category**: i18n
 - **Details**: `"AI Office Assistant"` hardcoded. Not translatable.
 
-#### PM10. Mixed `t()` and `$t()` usage
+#### PM10. Mixed `t()` and `$t()` usage [OPEN]
 
 - **Files**: `HomePage.vue`, `SettingsPage.vue`
 - **Category**: Consistency
 - **Details**: Inconsistent use of composition API `t()` vs global `$t()` in templates.
 
-#### PM11. `expandedThoughts` grows unbounded
+#### PM11. `expandedThoughts` grows unbounded [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatMessageList.vue:164`
-- **Category**: Memory
-- **Details**: Record keyed by message+segment index. Old entries never cleaned up.
+> **Status**: Implemented.
 
-#### AM1. Import statement in middle of file
+#### AM1. Import statement in middle of file [OPEN]
 
 - **File**: `frontend/src/api/backend.ts:79`
 - **Category**: Style
 - **Details**: `import { getUserKey, getUserEmail }` appears after function definitions.
 
-#### AM2. `chatStream` silently swallows JSON parse errors
+#### AM2. `chatStream` silently swallows JSON parse errors [OPEN]
 
 - **File**: `frontend/src/api/backend.ts:185-187`
 - **Category**: Error Handling
 - **Details**: Empty `catch {}` block drops malformed SSE data without logging.
 
-#### AM3. `chatStream` discards remaining buffer after stream ends
+#### AM3. `chatStream` discards remaining buffer after stream ends [OPEN]
 
 - **File**: `frontend/src/api/backend.ts:157-189`
 - **Category**: Logic Bug
 - **Details**: When `done` is true, final buffer content without trailing newline is lost.
 - **Impact**: Potential loss of last streamed token.
 
-#### AM4. Duplicate `ToolDefinition` interface
+#### AM4. Duplicate `ToolDefinition` interface [OPEN]
 
 - **Files**: `frontend/src/api/backend.ts:192-200`, `frontend/src/types/index.d.ts:61-67`
 - **Category**: Type Safety
 - **Details**: Two different interfaces with the same name — API wire format vs internal tool definition. Name collision causes confusion.
 
-#### TM1. Global ambient types without explicit imports
+#### TM1. Global ambient types without explicit imports [OPEN]
 
 - **File**: `frontend/src/types/index.d.ts:32-74`
 - **Category**: Type Safety
 - **Details**: All types declared ambient (no `export`), available everywhere without imports. Bypasses module boundaries.
 
-#### TM2. `OfficeHostType` declared in two files
+#### TM2. `OfficeHostType` declared in two files [OPEN]
 
 - **Files**: `frontend/src/types/index.d.ts:74`, `frontend/src/utils/hostDetection.ts:1`
 - **Category**: Inconsistency
 - **Details**: Two sources of truth for the same type.
 
-#### EM1. `useStorage` called outside Vue component context
+#### EM1. `useStorage` called outside Vue component context [OPEN]
 
 - **File**: `frontend/src/main.ts:22`
 - **Category**: Code Quality
 - **Details**: VueUse composable called in `Office.onReady` callback, outside any component `setup()`. May break with future VueUse versions.
 
-#### EM2. Global `ResizeObserver` monkey-patching
+#### EM2. Global `ResizeObserver` monkey-patching [OPEN]
 
 - **File**: `frontend/src/main.ts:15-19`
 - **Category**: Code Quality
 - **Details**: Global `window.ResizeObserver` replaced with debounced version. Affects all code including third-party libraries.
 
-#### XM1. Deeply nested ternary chains repeated 10+ times
+#### XM1. Deeply nested ternary chains repeated 10+ times [OPEN]
 
 - **Files**: `HomePage.vue:31-38, 67-73, 166-174, 355-361`, `SettingsPage.vue:771-777, 781-787, 789-795, 887-894, 896-903, 916-922`
 - **Category**: Code Quality / DRY
 - **Details**: `hostIsOutlook ? ... : hostIsPowerPoint ? ... : hostIsExcel ? ... : ...` repeated throughout.
 - **Fix**: Extract into a utility function `forHost({ outlook, powerpoint, excel, word })`.
 
-#### XM2. Quick action arrays not reactive to locale changes
+#### XM2. Quick action arrays not reactive to locale changes [OPEN]
 
 - **File**: `frontend/src/pages/HomePage.vue:206-351`
 - **Category**: i18n / Reactivity
@@ -1005,43 +842,40 @@ Consolidated list of all dead code found across the codebase.
 
 ### LOW
 
-#### PL1. `SettingSection.vue` component never imported or used
+#### PL1. `SettingSection.vue` component never imported or used [RESOLVED]
 
-- **File**: `frontend/src/components/SettingSection.vue`
-- **Category**: Dead Code / Dead File
+> **Status**: Implemented.
 
-#### PL2. `CustomButton` `icon` prop typed as `any`
+#### PL2. `CustomButton` `icon` prop typed as `any` [OPEN]
 
 - **File**: `frontend/src/components/CustomButton.vue:43`
 - **Details**: Should be `Component | null`.
 
-#### PL3. `SingleSelect` multiple props typed as `any`
+#### PL3. `SingleSelect` multiple props typed as `any` [OPEN]
 
 - **File**: `frontend/src/components/SingleSelect.vue:44, 107, 117, 119`
 - **Details**: `modelValue`, `placeholder`, `icon`, `customFrontIcon` all `any`.
 
-#### PL4. `ChatInput` emits `"input"` event nobody listens to
+#### PL4. `ChatInput` emits `"input"` event nobody listens to [OPEN]
 
 - **File**: `frontend/src/components/chat/ChatInput.vue:177, 191`
 - **Category**: Dead Code
 
-#### PL5. `App.vue` has empty `<script>` block
+#### PL5. `App.vue` has empty `<script>` block [RESOLVED]
 
-- **File**: `frontend/src/App.vue:11`
-- **Category**: Dead Code
+> **Status**: Implemented.
 
-#### AL1. `api/common.ts` is misplaced — contains Word-specific Office logic
+#### AL1. `api/common.ts` is misplaced — contains Word-specific Office logic [OPEN]
 
 - **File**: `frontend/src/api/common.ts`
 - **Category**: Architecture
 - **Details**: Contains `Word.run`, `insertText`, `insertParagraph` and WordFormatter dependency. Not a generic API utility.
 
-#### TL1. Tool type aliases add no value
+#### TL1. Tool type aliases add no value [RESOLVED]
 
-- **File**: `frontend/src/types/index.d.ts:69-72`
-- **Details**: `WordToolDefinition = ToolDefinition`, `ExcelToolDefinition = ToolDefinition`, etc. — zero differentiation.
+> **Status**: Implemented.
 
-#### TL2. `insertTypes` uses lowercase, plural name
+#### TL2. `insertTypes` uses lowercase, plural name [OPEN]
 
 - **File**: `frontend/src/types/index.d.ts:34`
 - **Details**: Should be `InsertType` (PascalCase, singular) per TypeScript conventions.
@@ -1062,15 +896,15 @@ Consolidated list of all dead code found across the codebase.
 
 ## 10. Summary Statistics
 
-| Area                 | CRITICAL | HIGH   | MEDIUM | LOW    | Dead Code | Total   |
-| -------------------- | -------- | ------ | ------ | ------ | --------- | ------- |
-| Backend              | 4        | 7      | 10     | 4      | 4         | 29      |
-| Frontend Utils       | 3        | 7      | 10     | 4      | 13        | 37      |
-| Composables          | 2        | 7      | 11     | 5      | 1         | 26      |
-| Infrastructure       | 3        | 5      | 8      | 7      | 4         | 27      |
-| Pages/Components/API | 1        | 8      | 19     | 8      | 7         | 43      |
-| **Total**            | **13**   | **34** | **58** | **28** | **29**    | **162** |
-
+| Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
+|---|---|---|---|---|---|---|
+| Backend | 3/4 | 3/7 | 5/10 | 2/4 | - | **13/25** |
+| Frontend Utils | 2/3 | 5/7 | 3/10 | 0/4 | - | **10/24** |
+| Composables | 2/2 | 4/7 | 2/11 | 0/5 | - | **8/25** |
+| Infrastructure | 2/3 | 3/5 | 4/8 | 2/7 | - | **11/23** |
+| Pages/Components/API | 1/1 | 6/7 | 2/15 | 2/6 | - | **11/29** |
+| Types/Misc | 0/0 | 0/1 | 0/6 | 1/2 | - | **1/9** |
+| **Total** | **10/13** | **21/34** | **16/60** | **7/28** | - | **54/135** |
 ---
 
 ## 11. Priority Recommendations
@@ -1114,3 +948,143 @@ Consolidated list of all dead code found across the codebase.
 ---
 
 _Last updated: 2026-03-01_
+
+## Implementation Status Summary
+
+| Status         | ID   | Description                                                           |
+| -------------- | ---- | --------------------------------------------------------------------- | ---------- |
+| 🟢 Implemented | BC1  | Content-Type enforcement blocks file uploads                          |
+| 🟢 Implemented | BC2  | Internal LLM API URL exposed in source and .env.example               |
+| 🟢 Implemented | BC3  | Sensitive data logged to disk in plaintext                            |
+| 🔴 Remaining   | BC4  | User-supplied credentials forwarded without sanitization              |
+| 🟢 Implemented | BH1  | Drain event listener leak in streaming response                       |
+| 🟢 Implemented | BH2  | logAndRespond called after headers already sent (streaming)           |
+| 🟢 Implemented | BH3  | Unbounded log file growth                                             |
+| 🔴 Remaining   | BH4  | Hardcoded version in health endpoint                                  |
+| 🔴 Remaining   | BH5  | parsePositiveInt allows zero                                          |
+| 🔴 Remaining   | BH6  | Upload route lacks magic-byte file validation                         |
+| 🔴 Remaining   | BH7  | ReDoS potential in sanitizeErrorText                                  |
+| 🔴 Remaining   | BM1  | No graceful shutdown handling                                         |
+| 🟢 Implemented | BM2  | Unused `routeName` parameter in `validateChatRequest`                 |
+| 🟢 Implemented | BM3  | Exported functions never imported externally                          |
+| 🟢 Implemented | BM4  | Exported constants/functions never imported externally                |
+| 🟢 Implemented | BM5  | Validated values discarded in validateChatRequest                     |
+| 🔴 Remaining   | BM6  | Inconsistent error logging patterns                                   |
+| 🔴 Remaining   | BM7  | `handleErrorResponse` return value discarded                          |
+| 🟢 Implemented | BM8  | `allCsv` declared with `let` instead of `const`                       |
+| 🔴 Remaining   | BM9  | No multer field count limits                                          |
+| 🔴 Remaining   | BM10 | No request ID / correlation                                           |
+| 🟢 Implemented | BL1  | Dead branch: `if (!imageModel)` check                                 |
+| 🟢 Implemented | BL2  | French strings hardcoded in backend                                   |
+| 🔴 Remaining   | BL3  | Stale comment about character limit                                   |
+| 🔴 Remaining   | BL4  | `isPlainObject` accepts non-plain objects                             |
+| 🟢 Implemented | UC1  | Prompt injection via custom prompt templates                          |
+| 🔴 Remaining   | UC2  | XOR "obfuscation" provides false security for API keys                |
+| 🟢 Implemented | UC3  | Unsanitized HTML injection in Outlook tools                           |
+| 🟢 Implemented | UH1  | `eval_officejs` declared in ExcelToolName but never defined           |
+| 🟢 Implemented | UH2  | Column letter arithmetic overflow                                     |
+| 🟢 Implemented | UH3  | Double timeout in Outlook tool execution                              |
+| 🟢 Implemented | UH4  | Language parameter ignored in translate prompt                        |
+| 🔴 Remaining   | UH5  | Host detection caching can return wrong host                          |
+| 🔴 Remaining   | UH6  | Message toast singleton race condition                                |
+| 🟢 Implemented | UH7  | `html: true` in MarkdownIt with `style` in DOMPurify allowlist        |
+| 🔴 Remaining   | UM1  | Massive type unsafety with `as unknown as` casts                      |
+| 🔴 Remaining   | UM2  | Pervasive `any` types in tool definitions                             |
+| 🟢 Implemented | UM3  | Duplicated `generateVisualDiff` function                              |
+| 🟢 Implemented | UM4  | Duplicated Office API helpers                                         |
+| 🔴 Remaining   | UM5  | `Ref` without type parameter in WordFormatter                         |
+| 🔴 Remaining   | UM6  | `searchAndReplace` tools labeled as category `'read'`                 |
+| 🔴 Remaining   | UM7  | Redundant Set + Array checks in toolStorage                           |
+| 🔴 Remaining   | UM8  | No `QuotaExceededError` handling for localStorage                     |
+| 🟢 Implemented | UM9  | `tokenManager.ts` mutates input messages                              |
+| 🟡 Deferred    | UM10 | Character-by-character HTML reconstruction in PowerPoint              |
+| 🔴 Remaining   | UL1  | Typo in export name `buildInPrompt`                                   |
+| 🔴 Remaining   | UL2  | `deleteText` reports success when no text selected                    |
+| 🔴 Remaining   | UL3  | Inconsistent error handling strategy across tools                     |
+| 🔴 Remaining   | UL4  | `markdown.ts` vs `officeRichText.ts` naming confusion                 |
+| 🟢 Implemented | CC1  | Prompt injection via unsanitized document selection                   |
+| 🟢 Implemented | CC2  | Prompt injection via quick action selection text                      |
+| 🟢 Implemented | CH1  | Race condition: concurrent `sendMessage` calls corrupt state          |
+| 🟢 Implemented | CH2  | `lastIndex` stale reference during agent loop                         |
+| 🟢 Implemented | CH3  | Timer leak — `timeoutId` reassigned without clearing                  |
+| 🔴 Remaining   | CH4  | Raw `err.message` displayed to users                                  |
+| 🔴 Remaining   | CH5  | `any` types on error parameters and tool args                         |
+| 🔴 Remaining   | CH6  | XSS via unvalidated `imageSrc` URL                                    |
+| 🟢 Implemented | CH7  | `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard     |
+| 🟢 Implemented | CM1  | Hardcoded French string in file upload error                          |
+| 🟢 Implemented | CM2  | `buildChatMessages` drops system messages                             |
+| 🔴 Remaining   | CM3  | Overly large functions                                                |
+| 🔴 Remaining   | CM4  | `insertToDocument` silently swallows all errors                       |
+| 🔴 Remaining   | CM5  | Promise constructor anti-pattern in Outlook functions                 |
+| 🔴 Remaining   | CM6  | Timeout promises create orphaned timers                               |
+| 🔴 Remaining   | CM7  | Excel selection returns unescaped tab-separated values                |
+| 🔴 Remaining   | CM8  | HTML injection via `richHtml` to Office APIs                          |
+| 🔴 Remaining   | CM9  | Prompt injection via user profile fields                              |
+| 🔴 Remaining   | CM10 | `insertImageToPowerPoint` ignores `'NoAction'` semantics              |
+| 🔴 Remaining   | CM11 | Hidden side effect: `insertType.value` mutation                       |
+| 🔴 Remaining   | CL1  | `hostIsWord` parameter accepted but never used                        |
+| 🔴 Remaining   | CL2  | `cleanContent` and `splitThinkSegments` use different think-tag logic |
+| 🔴 Remaining   | CL3  | Inconsistent image insert error reporting across hosts                |
+| 🔴 Remaining   | CL4  | `payload` parameter typed as `unknown` — should be `string            | undefined` |
+| 🔴 Remaining   | CL5  | Word HTML selection swallows errors silently                          |
+| 🟢 Implemented | IC1  | Content-Type middleware blocks uploads (same as BC1)                  |
+| 🟡 Deferred    | IC2  | Containers run as root                                                |
+| 🟢 Implemented | IC3  | Internal infrastructure URL as default                                |
+| 🟢 Implemented | IH1  | Node.js version mismatch between environments                         |
+| 🟡 Deferred    | IH2  | Private IP baked into frontend Docker build                           |
+| 🟡 Deferred    | IH3  | External DuckDNS domain as default in .env.example                    |
+| 🟢 Implemented | IH4  | Undeterministic package resolution in Dockerfiles                     |
+| 🟢 Implemented | IH5  | Nginx missing security headers                                        |
+| 🔴 Remaining   | IM1  | Manifest-gen mounts entire project root                               |
+| 🟢 Implemented | IM2  | Healthcheck hardcodes port 3003                                       |
+| 🔴 Remaining   | IM3  | `npm install --production` deprecated                                 |
+| 🔴 Remaining   | IM4  | Dev files copied into build context                                   |
+| 🟢 Implemented | IM5  | CORS leaks internal IP                                                |
+| 🟢 Implemented | IM6  | Empty `lang` attribute in index.html                                  |
+| � Implemented  | IM7  | Outlook manifest missing AppDomains                                   |
+| 🔴 Remaining   | IM8  | CI infinite-loop guard fragile                                        |
+| 🟢 Implemented | IL1  | Vite config uses `.js` extension                                      |
+| 🔴 Remaining   | IL2  | `@types/diff-match-patch` in dependencies instead of devDependencies  |
+| 🔴 Remaining   | IL3  | `chunkSizeWarningLimit` raised to suppress warnings                   |
+| 🔴 Remaining   | IL4  | Obsolete IE meta tag                                                  |
+| 🔴 Remaining   | IL5  | Unused PUID/PGID env vars in docker-compose                           |
+| 🟢 Implemented | IL6  | Dockerfile HEALTHCHECK overridden by compose                          |
+| 🔴 Remaining   | IL7  | Legacy entries in .gitignore                                          |
+| 🟢 Implemented | PC1  | `keep-alive` never caches `HomePage.vue`                              |
+| 🟢 Implemented | PH1  | CSS typo — `itemse-center` instead of `items-center`                  |
+| 🟢 Implemented | PH2  | `startNewChat` uses `window.location.reload()` — destructive          |
+| 🟢 Implemented | PH3  | `agentMaxIterations` not validated on HomePage                        |
+| 🟢 Implemented | PH4  | Discrepancy between HTML `accept` and JS extension validation         |
+| 🟢 Implemented | PH5  | Silent failure when files exceed limits or have wrong type            |
+| 🟢 Implemented | AH1  | Missing credential headers in `fetchModels`                           |
+| 🔴 Remaining   | AH2  | `healthCheck()` missing credential headers                            |
+| 🔴 Remaining   | XH1  | No CSRF protection on API calls                                       |
+| 🔴 Remaining   | PM1  | Hardcoded French strings in ChatInput                                 |
+| 🔴 Remaining   | PM2  | Hardcoded English strings with fallback pattern in SettingsPage       |
+| 🔴 Remaining   | PM3  | `CustomInput` type flash on mount                                     |
+| 🔴 Remaining   | PM4  | `CustomInput` model has `any` type                                    |
+| 🔴 Remaining   | PM5  | `SingleSelect` dropdown positioning without scroll listener           |
+| 🔴 Remaining   | PM6  | Dual emit pattern in `SingleSelect`                                   |
+| 🔴 Remaining   | PM7  | `SettingCard` prop `p1` never used by any consumer                    |
+| 🟢 Implemented | PM8  | `Message.vue` setTimeout without cleanup                              |
+| 🔴 Remaining   | PM9  | `ChatHeader.vue` hardcoded English string                             |
+| 🔴 Remaining   | PM10 | Mixed `t()` and `$t()` usage                                          |
+| 🟢 Implemented | PM11 | `expandedThoughts` grows unbounded                                    |
+| 🔴 Remaining   | AM1  | Import statement in middle of file                                    |
+| 🔴 Remaining   | AM2  | `chatStream` silently swallows JSON parse errors                      |
+| 🔴 Remaining   | AM3  | `chatStream` discards remaining buffer after stream ends              |
+| 🔴 Remaining   | AM4  | Duplicate `ToolDefinition` interface                                  |
+| 🔴 Remaining   | TM1  | Global ambient types without explicit imports                         |
+| 🔴 Remaining   | TM2  | `OfficeHostType` declared in two files                                |
+| 🔴 Remaining   | EM1  | `useStorage` called outside Vue component context                     |
+| 🔴 Remaining   | EM2  | Global `ResizeObserver` monkey-patching                               |
+| 🔴 Remaining   | XM1  | Deeply nested ternary chains repeated 10+ times                       |
+| 🔴 Remaining   | XM2  | Quick action arrays not reactive to locale changes                    |
+| 🟢 Implemented | PL1  | `SettingSection.vue` component never imported or used                 |
+| 🔴 Remaining   | PL2  | `CustomButton` `icon` prop typed as `any`                             |
+| 🔴 Remaining   | PL3  | `SingleSelect` multiple props typed as `any`                          |
+| 🔴 Remaining   | PL4  | `ChatInput` emits `"input"` event nobody listens to                   |
+| 🟢 Implemented | PL5  | `App.vue` has empty `<script>` block                                  |
+| 🔴 Remaining   | AL1  | `api/common.ts` is misplaced — contains Word-specific Office logic    |
+| 🟢 Implemented | TL1  | Tool type aliases add no value                                        |
+| 🔴 Remaining   | TL2  | `insertTypes` uses lowercase, plural name                             |

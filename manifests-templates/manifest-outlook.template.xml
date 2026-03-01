@@ -18,6 +18,11 @@
 
   <SupportUrl DefaultValue="{{FRONTEND_URL}}" />
 
+  <AppDomains>
+    <AppDomain>{{FRONTEND_URL}}</AppDomain>
+    <AppDomain>{{BACKEND_URL}}</AppDomain>
+    <AppDomain>https://telemetryservice.firstpartyapps.oaspapps.com</AppDomain>
+  </AppDomains>
 
   <Hosts>
     <Host Name="Mailbox" />
