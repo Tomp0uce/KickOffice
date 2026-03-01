@@ -86,7 +86,7 @@
         type="file"
         ref="fileInputEl"
         class="hidden"
-        accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md"
+        accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.png,.jpeg,.jpg"
         multiple
         @change="onFileSelected"
       />
@@ -146,7 +146,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from '@/types'
+import type { ModelInfo } from "@/types";
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -182,6 +182,7 @@ const emit = defineEmits<{
 }>();
 
 const isDragOver = ref(false);
+const dragCounter = ref(0);
 const attachedFiles = ref<File[]>([]);
 const fileInputEl = ref<HTMLInputElement>();
 
@@ -202,6 +203,8 @@ const allowedTypes = [
   "text/csv",
   "text/plain",
   "text/markdown",
+  "image/png",
+  "image/jpeg",
 ];
 
 const handleDragOver = (e: DragEvent) => {
@@ -246,6 +249,9 @@ const processFiles = (fileList: FileList) => {
     ".csv",
     ".txt",
     ".md",
+    ".png",
+    ".jpeg",
+    ".jpg",
   ];
   let rejectedCount = 0;
   let oversizedCount = 0;

@@ -30,17 +30,31 @@ CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
 
 export const builtInPrompt = {
   translate: {
-    system: (language: string) =>
-      `You are an expert polyglot translator. Your task is to translate the provided text into ${language}.
-      Maintain formatting, keep the original tone, and ensure the output is idiomatic and elegant.`,
-    user: (text: string, language: string) =>
-      `Task: Translate the following text into ${language}.
-      Constraints:
-      1. Translate the source text accurately to natural ${language}.
-      2. Preserve all formatting (like bold, italic, lists), numbers, and proper names exactly as they are.
-      3. OUTPUT ONLY the translated text. Do not include explanations.
+    system: (_language: string) =>
+      `You are an expert bilingual translator (French ↔ English).
 
-      Text: ${text}`,
+## Language Detection Rule (MANDATORY — apply BEFORE translating)
+1. Read the source text carefully.
+2. Determine its dominant language: French or English.
+3. If the text is predominantly **French** → translate to **English**.
+4. If the text is predominantly **English** → translate to **French**.
+5. If the text is mixed → identify the majority language and translate to the other.
+6. NEVER translate a text to the same language it is already in.
+
+## Translation Quality Rules
+- Produce idiomatic, natural output — avoid literal word-for-word translation.
+- Preserve tone, register (formal/informal), formatting (bold, bullets, lists), numbers, and proper nouns exactly.
+- Maintain paragraph breaks and sentence structure as closely as the target language allows.`,
+    user: (text: string, _language: string) =>
+      `Detect the language of the following text, then translate it to the OTHER language (French → English, or English → French).
+
+Constraints:
+1. Detect language first (internal reasoning only — do not output this step).
+2. Translate to the opposite language with natural, idiomatic phrasing.
+3. Preserve all formatting exactly (Markdown, bullets, bold, line breaks).
+4. OUTPUT ONLY the translated text. Do not include any preamble, explanation, or language label.
+
+Text: ${text}`,
   },
 
   polish: {

@@ -136,7 +136,10 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
     const derived = deriveSessionName(messages)
     if (derived) name = derived
   }
-  await idbPut(store, { ...session, messages, name, updatedAt: Date.now() })
+  // Deep-clone to strip Vue reactive proxies — IDB's structured clone algorithm cannot serialize them
+  const plainMessages: DisplayMessage[] = JSON.parse(JSON.stringify(messages))
+  await idbPut(store, { ...session, messages: plainMessages, name, updatedAt: Date.now() })
+
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

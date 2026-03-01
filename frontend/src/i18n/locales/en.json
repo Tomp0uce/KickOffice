@@ -143,7 +143,6 @@
   "recursionLimitExceeded": "Agent exceeded the maximum number of iterations.",
   "responseTruncated": "The response was truncated by the token limit. Try increasing the limit or refining the request.",
   "replaceSelectedText": "Replace",
-  "replyLanguageLabel": "Reply In",
   "reset": "Reset",
   "save": "Save",
   "savedPrompts": "Saved Prompts",

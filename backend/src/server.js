@@ -129,9 +129,14 @@ app.use((req, res, next) => {
   }
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    const headerToken = req.headers['x-csrf-token']
-    if (!headerToken || headerToken !== token) {
-      return res.status(403).json({ error: 'Invalid CSRF token' })
+    // Skip CSRF check for requests authenticated via the X-User-Key header
+    // (Office add-in requests can't reliably carry cookies cross-origin)
+    const isKeyAuthenticated = !!req.headers['x-user-key']
+    if (!isKeyAuthenticated) {
+      const headerToken = req.headers['x-csrf-token']
+      if (!headerToken || headerToken !== token) {
+        return res.status(403).json({ error: 'Invalid CSRF token' })
+      }
     }
   }
 
