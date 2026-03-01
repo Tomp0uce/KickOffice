@@ -64,21 +64,23 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### BH1. Drain event listener leak in streaming response
+#### BH1. Drain event listener leak in streaming response [RESOLVED]
 
 - **File**: `backend/src/routes/chat.js:86-90`
 - **Category**: Logic Bug / Resource Leak
 - **Details**: When backpressure occurs during SSE streaming, `await new Promise(resolve => res.once('drain', resolve))` will never resolve if the client disconnects between the backpressure check and the drain event.
 - **Impact**: Permanently hung request handlers under load with slow/disconnecting clients.
 - **Fix**: Race the drain promise with a client-disconnect check or add a timeout.
+- **Resolution**: Raced the drain promise with the connection close event to prevent memory leaks.
 
-#### BH2. logAndRespond called after headers already sent (streaming)
+#### BH2. logAndRespond called after headers already sent (streaming) [RESOLVED]
 
 - **File**: `backend/src/routes/chat.js:108-116`
 - **Category**: Logic Bug
 - **Details**: If an error occurs after SSE headers have been sent, the catch block calls `logAndRespond(res, 504/500, ...)` which tries to set headers and write JSON on an active SSE stream, causing `ERR_HTTP_HEADERS_SENT`.
 - **Impact**: Unhandled exception, malformed SSE stream, swallowed error.
 - **Fix**: Check `res.headersSent` before calling `logAndRespond`; if already streaming, write an SSE error event instead.
+- **Resolution**: Added `if (res.headersSent)` check to directly write SSE error data instead of trying to send a standard HTTP error.
 
 #### BH3. Unbounded log file growth
 
@@ -240,21 +242,23 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### UH1. `eval_officejs` declared in ExcelToolName but never defined
+#### UH1. `eval_officejs` declared in ExcelToolName but never defined [RESOLVED]
 
 - **File**: `frontend/src/utils/excelTools.ts:66`
 - **Category**: Logic Bug / Dead Code
 - **Details**: `'eval_officejs'` is in the `ExcelToolName` union but no tool definition exists. The `as unknown as Record<ExcelToolName, ExcelToolDefinition>` cast suppresses the TypeScript error.
 - **Impact**: Runtime crash if the agent tries to invoke `eval_officejs` for Excel.
 - **Fix**: Either add the tool definition or remove the name from the union type.
+- **Resolution**: Removed `eval_officejs` from the union type.
 
-#### UH2. Column letter arithmetic overflow
+#### UH2. Column letter arithmetic overflow [RESOLVED]
 
 - **File**: `frontend/src/utils/excelTools.ts:1155, 1214`
 - **Category**: Logic Bug
 - **Details**: `String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)` breaks for multi-character columns (AA, AB) and overflows for single-character columns near Z.
 - **Impact**: Data corruption or crash when inserting/deleting columns at/beyond column Z.
 - **Fix**: Implement proper column letter arithmetic that handles multi-character references.
+- **Resolution**: Added helper functions `colToInt` and `intToCol` to correctly compute column offsets for multi-character column names.
 
 #### UH3. Double timeout in Outlook tool execution
 
@@ -409,12 +413,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### HIGH
 
-#### CH1. Race condition: concurrent `sendMessage` calls corrupt state
+#### CH1. Race condition: concurrent `sendMessage` calls corrupt state [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:466-468, 498-499`
 - **Category**: Logic Bug
 - **Details**: `if (loading.value) return` is check-then-act on a reactive ref. Two rapid calls can both pass before `loading.value = true` is set, causing concurrent agent loops writing to the same history array.
 - **Fix**: Set `loading.value = true` immediately at the top, before any async work.
+- **Resolution**: Set `loading.value = true` immediately and handled resetting the state on validation returns.
 
 #### CH2. `lastIndex` stale reference during agent loop
 
@@ -791,13 +796,14 @@ Consolidated list of all dead code found across the codebase.
 
 ### HIGH
 
-#### PH1. CSS typo — `itemse-center` instead of `items-center`
+#### PH1. CSS typo — `itemse-center` instead of `items-center` [RESOLVED]
 
 - **File**: `frontend/src/pages/HomePage.vue:3`
 - **Category**: UI Bug
 - **Details**: Tailwind class `"itemse-center"` is silently ignored. Container cross-axis alignment not applied.
 - **Impact**: Broken vertical centering on the home page root container.
 - **Fix**: Change to `items-center`.
+- **Resolution**: Corrected spelling from `itemse-center` to `items-center`.
 
 #### PH2. `startNewChat` uses `window.location.reload()` — destructive
 

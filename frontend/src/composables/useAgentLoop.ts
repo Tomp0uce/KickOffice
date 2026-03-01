@@ -464,8 +464,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (loading.value) {
       return
     }
+    
+    loading.value = true
 
     if (!backendOnline.value) {
+      loading.value = false
       return messageUtil.error(t('backendOffline'))
     }
 
@@ -488,12 +491,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
       const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
       if (wordCount < 5) {
+        loading.value = false
         return messageUtil.error(t('imageSelectionTooShort'))
       }
       isImageFromSelection = true
     }
 
-    loading.value = true
     abortController.value = new AbortController()
 
     // If it's pure selection image, we show the selection as the user message bubble

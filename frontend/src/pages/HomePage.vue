@@ -1,6 +1,6 @@
 <template>
   <div
-    class="itemse-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1"
+    class="items-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1"
   >
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
