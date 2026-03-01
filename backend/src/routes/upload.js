@@ -50,7 +50,9 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
     // PDF Extraction
     if (mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
-      const data = await pdf(file.buffer)
+      // pdf-parse might be a CJS module that require returns as { default: [Function] } or just the function
+      const pdfParser = pdf.default || pdf
+      const data = await pdfParser(file.buffer)
       extractedText = data.text
     } 
     // DOCX Extraction

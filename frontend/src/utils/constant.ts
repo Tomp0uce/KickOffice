@@ -302,7 +302,7 @@ export const powerPointBuiltInPrompt = {
 }
 
 export const getPowerPointBuiltInPrompt = () => {
-  const stored = localStorage.getItem('customPowerPointBuiltInPrompts')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_ppt_v5')
   if (!stored) {
     return powerPointBuiltInPrompt
   }
@@ -315,9 +315,9 @@ export const getPowerPointBuiltInPrompt = () => {
       const typedKey = key as keyof typeof powerPointBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
+          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
+            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
         }
       }
     })
@@ -448,7 +448,7 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
 }
 
 export const getOutlookBuiltInPrompt = () => {
-  const stored = localStorage.getItem('customOutlookBuiltInPrompts')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_outlook_v5')
   if (!stored) {
     return outlookBuiltInPrompt
   }
@@ -461,9 +461,9 @@ export const getOutlookBuiltInPrompt = () => {
       const typedKey = key as keyof typeof outlookBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
+          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
+            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
         }
       }
     })
@@ -476,7 +476,7 @@ export const getOutlookBuiltInPrompt = () => {
 }
 
 export const getExcelBuiltInPrompt = () => {
-  const stored = localStorage.getItem('customExcelBuiltInPrompts')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_excel_v5')
   if (!stored) {
     return excelBuiltInPrompt
   }
@@ -489,9 +489,9 @@ export const getExcelBuiltInPrompt = () => {
       const typedKey = key as keyof typeof excelBuiltInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
+          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
+            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
         }
       }
     })
@@ -504,7 +504,7 @@ export const getExcelBuiltInPrompt = () => {
 }
 
 export const getBuiltInPrompt = () => {
-  const stored = localStorage.getItem('customBuiltInPrompts')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_word_v5')
   if (!stored) {
     return builtInPrompt
   }
@@ -517,9 +517,9 @@ export const getBuiltInPrompt = () => {
       const typedKey = key as keyof typeof builtInPrompt
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\$\{language\}/g, () => language),
+          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\$\{text\}/g, () => text).replace(/\$\{language\}/g, () => language),
+            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
         }
       }
     })

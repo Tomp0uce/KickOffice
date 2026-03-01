@@ -495,7 +495,8 @@ const excelToolDefinitions = createExcelTools({
       const { chartType, title } = args as Record<string, any>
       
         const range = context.workbook.getSelectedRange()
-        range.load('address')
+        // We load values to ensure Excel has fully evaluated the range before generating the chart
+        range.load(['address', 'values'])
         await context.sync()
 
         const sheet = range.worksheet
@@ -512,6 +513,12 @@ const excelToolDefinitions = createExcelTools({
         }
 
         const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
+        
+        // Use 'auto' series but if range is 1 cell, Excel might fail.
+        if (range.values.length <= 1 && range.values[0].length <= 1) {
+          return 'Error: Invalid selection. Please select a larger data range including headers and values before creating a chart.'
+        }
+
         const chart = sheet.charts.add(excelChartType, range, Excel.ChartSeriesBy.auto)
 
         if (title) {
@@ -521,8 +528,12 @@ const excelToolDefinitions = createExcelTools({
         chart.width = 400
         chart.height = 300
 
+        // Explicitly re-select the original data range. 
+        // Excel by default selects the newly created chart, which breaks subsequent createChart calls or range operations.
+        range.select()
+
         await context.sync()
-        return `Successfully created ${chartType} chart${title ? ` with title "${title}"` : ''}`
+        return `Successfully created ${chartType} chart${title ? ` with title "${title}"` : ''} and re-selected original data range.`
       },
   },
 
