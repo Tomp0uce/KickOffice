@@ -42,13 +42,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### BC4. User-supplied credentials forwarded without sanitization [OPEN]
+#### BC4. User-supplied credentials forwarded without sanitization [RESOLVED]
 
-- **File**: `backend/src/services/llmClient.js:34-41`
-- **Category**: Security / Header Injection
-- **Details**: `X-User-Key` and `X-User-Email` headers are forwarded verbatim to the upstream LLM API. No sanitization against header injection characters (`\r\n`). The user key is accepted with only a minimum length of 8 characters.
-- **Impact**: Potential HTTP header injection if the underlying HTTP library has a bypass.
-- **Fix**: Strip `\r`, `\n`, and non-printable characters from header values before forwarding.
+> **Status**: Implemented. `sanitizeHeaderValue()` strips `\r`, `\n`, and non-printable chars from `X-User-Key` and `X-OpenWebUi-User-Email` before forwarding.
 
 ### HIGH
 
@@ -64,21 +60,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### BH4. Hardcoded version in health endpoint [OPEN]
+#### BH4. Hardcoded version in health endpoint [RESOLVED]
 
-- **File**: `backend/src/routes/health.js:9`, `backend/package.json:3`
-- **Category**: Logic Bug
-- **Details**: Health endpoint returns `version: '1.0.0'` but `package.json` declares `"1.0.29"`. These will always drift.
-- **Impact**: Impossible to verify deployed version via health check.
-- **Fix**: Read version from `package.json` at startup: `const { version } = require('../../package.json')`.
+> **Status**: Implemented. Version now read from `package.json` via `createRequire`.
 
-#### BH5. parsePositiveInt allows zero [OPEN]
+#### BH5. parsePositiveInt allows zero [RESOLVED]
 
-- **File**: `backend/src/config/env.js:9-20`
-- **Category**: Logic Bug
-- **Details**: Named `parsePositiveInt` but check is `if (parsed < 0)` which allows zero. `CHAT_RATE_LIMIT_MAX=0` would disable rate limiting.
-- **Impact**: Rate limiting bypass via zero config.
-- **Fix**: Change to `if (parsed <= 0)`.
+> **Status**: Implemented. Check changed to `<= 0` to reject zero values.
 
 #### BH6. Upload route lacks magic-byte file validation [OPEN]
 
@@ -88,12 +76,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Attackers can upload crafted files (zip bombs via XLSX, XXE via DOCX) that exploit parsing libraries.
 - **Fix**: Add magic-byte validation (e.g. `file-type` package) before processing.
 
-#### BH7. ReDoS potential in sanitizeErrorText [OPEN]
+#### BH7. ReDoS potential in sanitizeErrorText [RESOLVED]
 
-- **File**: `backend/src/utils/http.js:20-21`
-- **Category**: Security / Performance
-- **Details**: Regex objects are constructed inside a loop on every error response. On pathological input from upstream, this could block the event loop.
-- **Fix**: Pre-compile regex patterns at module load time.
+> **Status**: Implemented. Regex patterns pre-compiled at module load via `SENSITIVE_HEADER_REGEXES` constant array.
 
 ### MEDIUM
 
@@ -126,11 +111,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Category**: Code Quality
 - **Details**: Four different logging patterns (`console.error`, `systemLog`, `logAndRespond`, `process.stderr.write`) used inconsistently. Many errors logged through both `systemLog` and `console.error` on consecutive lines.
 
-#### BM7. `handleErrorResponse` return value discarded [OPEN]
+#### BM7. `handleErrorResponse` return value discarded [RESOLVED]
 
-- **File**: `backend/src/routes/chat.js:61, 169`, `backend/src/routes/image.js:31`
-- **Category**: Code Quality
-- **Details**: `handleErrorResponse` returns sanitized error text but all call sites discard it.
+> **Status**: Implemented. `handleErrorResponse` made void (no return value) since callers don't use the return.
 
 #### BM8. `allCsv` declared with `let` instead of `const` [RESOLVED]
 
@@ -156,17 +139,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented.
 
-#### BL3. Stale comment about character limit [OPEN]
+#### BL3. Stale comment about character limit [RESOLVED]
 
-- **File**: `backend/src/routes/upload.js:86-87`
-- **Category**: Documentation
-- **Details**: Comment says "50k chars" but constant is `MAX_CHARS = 100000`.
+> **Status**: Implemented. Comment updated to "100k chars is roughly 25-30k tokens".
 
-#### BL4. `isPlainObject` accepts non-plain objects [OPEN]
+#### BL4. `isPlainObject` accepts non-plain objects [RESOLVED]
 
-- **File**: `backend/src/middleware/validate.js:4-6`
-- **Category**: Code Quality
-- **Details**: Returns true for Date, RegExp, Map, Set. Safe for JSON-parsed context but imprecise.
+> **Status**: Implemented. Now uses `Object.getPrototypeOf` check to only accept true plain objects.
 
 ---
 
@@ -815,28 +794,28 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | BC1  | Content-Type enforcement blocks file uploads                          |
 | 🟢 Implemented | BC2  | Internal LLM API URL exposed in source and .env.example               |
 | 🟢 Implemented | BC3  | Sensitive data logged to disk in plaintext                            |
-| 🔴 Remaining   | BC4  | User-supplied credentials forwarded without sanitization              |
+| 🟢 Implemented | BC4  | User-supplied credentials forwarded without sanitization              |
 | 🟢 Implemented | BH1  | Drain event listener leak in streaming response                       |
 | 🟢 Implemented | BH2  | logAndRespond called after headers already sent (streaming)           |
 | 🟢 Implemented | BH3  | Unbounded log file growth                                             |
-| 🔴 Remaining   | BH4  | Hardcoded version in health endpoint                                  |
-| 🔴 Remaining   | BH5  | parsePositiveInt allows zero                                          |
+| 🟢 Implemented | BH4  | Hardcoded version in health endpoint                                  |
+| 🟢 Implemented | BH5  | parsePositiveInt allows zero                                          |
 | 🔴 Remaining   | BH6  | Upload route lacks magic-byte file validation                         |
-| 🔴 Remaining   | BH7  | ReDoS potential in sanitizeErrorText                                  |
+| 🟢 Implemented | BH7  | ReDoS potential in sanitizeErrorText                                  |
 | 🔴 Remaining   | BM1  | No graceful shutdown handling                                         |
 | 🟢 Implemented | BM2  | Unused `routeName` parameter in `validateChatRequest`                 |
 | 🟢 Implemented | BM3  | Exported functions never imported externally                          |
 | 🟢 Implemented | BM4  | Exported constants/functions never imported externally                |
 | 🟢 Implemented | BM5  | Validated values discarded in validateChatRequest                     |
 | 🔴 Remaining   | BM6  | Inconsistent error logging patterns                                   |
-| 🔴 Remaining   | BM7  | `handleErrorResponse` return value discarded                          |
+| 🟢 Implemented | BM7  | `handleErrorResponse` return value discarded                          |
 | 🟢 Implemented | BM8  | `allCsv` declared with `let` instead of `const`                       |
 | 🟢 Implemented | BM9  | No multer field count limits                                          |
 | 🔴 Remaining   | BM10 | No request ID / correlation                                           |
 | 🟢 Implemented | BL1  | Dead branch: `if (!imageModel)` check                                 |
 | 🟢 Implemented | BL2  | French strings hardcoded in backend                                   |
-| 🔴 Remaining   | BL3  | Stale comment about character limit                                   |
-| 🔴 Remaining   | BL4  | `isPlainObject` accepts non-plain objects                             |
+| 🟢 Implemented | BL3  | Stale comment about character limit                                   |
+| 🟢 Implemented | BL4  | `isPlainObject` accepts non-plain objects                             |
 | 🟢 Implemented | UC1  | Prompt injection via custom prompt templates                          |
 | 🔴 Remaining   | UC2  | XOR "obfuscation" provides false security for API keys                |
 | 🟢 Implemented | UC3  | Unsanitized HTML injection in Outlook tools                           |

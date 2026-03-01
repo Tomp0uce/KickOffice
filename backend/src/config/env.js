@@ -13,8 +13,8 @@ function parsePositiveInt(envVar, defaultValue, name) {
   if (Number.isNaN(parsed)) {
     throw new Error(`Invalid ${name}: "${raw}" is not a valid integer`)
   }
-  if (parsed < 0) {
-    throw new Error(`Invalid ${name}: must be a positive integer`)
+  if (parsed <= 0) {
+    throw new Error(`Invalid ${name}: must be a positive integer (> 0)`)
   }
   return parsed
 }

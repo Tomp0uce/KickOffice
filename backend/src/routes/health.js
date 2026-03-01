@@ -1,4 +1,8 @@
 import { Router } from 'express'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json')
 
 const healthRouter = Router()
 
@@ -6,7 +10,7 @@ healthRouter.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version,
   })
 })
 
