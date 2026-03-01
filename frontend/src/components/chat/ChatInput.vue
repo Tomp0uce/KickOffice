@@ -148,7 +148,10 @@
 <script lang="ts" setup>
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { message as messageUtil } from "@/utils/message";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   availableModels: Record<string, ModelInfo>;
@@ -251,7 +254,7 @@ const processFiles = (fileList: FileList) => {
 
     // Limits: Max 3 files
     if (attachedFiles.value.length >= 3) {
-      messageUtil.warning("Maximum 3 fichiers autorisés.");
+      messageUtil.warning(t("maxFilesWarning"));
       break;
     }
 
@@ -275,14 +278,10 @@ const processFiles = (fileList: FileList) => {
   }
 
   if (oversizedCount > 0) {
-    messageUtil.error(
-      `${oversizedCount} fichier(s) ignoré(s) : taille > 10MB.`,
-    );
+    messageUtil.error(t("filesOversized", { count: oversizedCount }));
   }
   if (rejectedCount > 0) {
-    messageUtil.error(
-      `${rejectedCount} fichier(s) ignoré(s) : format non supporté.`,
-    );
+    messageUtil.error(t("filesRejected", { count: rejectedCount }));
   }
 };
 

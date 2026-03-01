@@ -6,6 +6,18 @@
 
 const OBFUSCATION_KEY = 'K1ck0ff1c3' // Simple obfuscation key
 
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[CredentialStorage] localStorage quota exceeded — credential not saved:', key)
+    } else {
+      throw e
+    }
+  }
+}
+
 /**
  * Simple XOR-based obfuscation (not encryption, just makes credentials non-plaintext)
  */
@@ -54,7 +66,7 @@ function getCredential(key: string, remember: boolean): string {
 function setCredential(key: string, value: string, remember: boolean): void {
   if (remember) {
     if (value) {
-      localStorage.setItem(`${STORAGE_PREFIX}${key}`, obfuscate(value))
+      safeSetItem(`${STORAGE_PREFIX}${key}`, obfuscate(value))
     } else {
       localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
     }
@@ -83,18 +95,18 @@ export function getRememberCredentials(): boolean {
  */
 export function setRememberCredentials(value: boolean): void {
   const wasRemembering = getRememberCredentials()
-  localStorage.setItem('rememberCredentials', value ? 'true' : 'false')
+  safeSetItem('rememberCredentials', value ? 'true' : 'false')
 
   if (value && !wasRemembering) {
     // Migrate from sessionStorage to localStorage
     const key = sessionStorage.getItem('litellmUserKey')
     const email = sessionStorage.getItem('litellmUserEmail')
     if (key) {
-      localStorage.setItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(key))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(key))
       sessionStorage.removeItem('litellmUserKey')
     }
     if (email) {
-      localStorage.setItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(email))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(email))
       sessionStorage.removeItem('litellmUserEmail')
     }
   } else if (!value && wasRemembering) {
@@ -147,11 +159,11 @@ export function migrateFromSessionStorage(): void {
     const sessionKey = sessionStorage.getItem('litellmUserKey')
     const sessionEmail = sessionStorage.getItem('litellmUserEmail')
     if (sessionKey && !localStorage.getItem(`${STORAGE_PREFIX}litellmUserKey`)) {
-      localStorage.setItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(sessionKey))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(sessionKey))
       sessionStorage.removeItem('litellmUserKey')
     }
     if (sessionEmail && !localStorage.getItem(`${STORAGE_PREFIX}litellmUserEmail`)) {
-      localStorage.setItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(sessionEmail))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(sessionEmail))
       sessionStorage.removeItem('litellmUserEmail')
     }
   }

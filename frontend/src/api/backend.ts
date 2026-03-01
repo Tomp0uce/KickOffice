@@ -136,7 +136,7 @@ export interface TokenUsage {
 export interface ChatStreamOptions {
   messages: ChatRequestMessage[]
   modelTier: ModelTier
-  tools?: ToolDefinition[]
+  tools?: ApiToolDefinition[]
   onStream: (text: string) => void
   onToolCallDelta?: (toolCallDeltas: any[]) => void
   onFinishReason?: (finishReason: string | null) => void
@@ -208,7 +208,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
   }
 }
 
-export interface ToolDefinition {
+export interface ApiToolDefinition {
   type: 'function'
   function: {
     name: string

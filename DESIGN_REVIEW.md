@@ -227,11 +227,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. Redundant `.includes()` check removed — only `storedEnabledSet.has()` retained.
 
-#### UM8. No `QuotaExceededError` handling for localStorage [OPEN]
+#### UM8. No `QuotaExceededError` handling for localStorage [RESOLVED]
 
-- **Files**: `credentialStorage.ts`, `toolStorage.ts`, `savedPrompts.ts`, `constant.ts`
-- **Category**: Error Handling
-- **Details**: Multiple files write to localStorage without catching `QuotaExceededError`.
+> **Status**: Implemented. Added `safeSetItem()` helper in `credentialStorage.ts` and inline try-catch in `toolStorage.ts` and `SettingsPage.vue`; all `localStorage.setItem` calls now catch `QuotaExceededError` and log a warning.
 
 #### UM9. `tokenManager.ts` mutates input messages [RESOLVED]
 
@@ -538,12 +536,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### MEDIUM
 
-#### PM1. Hardcoded French strings in ChatInput [OPEN]
+#### PM1. Hardcoded French strings in ChatInput [RESOLVED]
 
-- **File**: `frontend/src/components/chat/ChatInput.vue:47, 79`
-- **Category**: i18n
-- **Details**: `"Retirer le fichier"` and `"Attacher un document (PDF, DOCX, XLSX)"` hardcoded in French.
-- **Fix**: Use `t()` with i18n keys.
+> **Status**: Implemented. All French strings replaced with `t()` calls; added `removeFile`, `attachDocument`, `maxFilesWarning`, `filesOversized`, `filesRejected` keys to both locale files. `useI18n` imported for JS-side usage.
 
 #### PM2. Hardcoded English strings with fallback pattern in SettingsPage [OPEN]
 
@@ -555,11 +550,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. `type` ref initialized directly from prop: `const type = ref(isPassword ? 'password' : inputType)`.
 
-#### PM4. `CustomInput` model has `any` type [OPEN]
+#### PM4. `CustomInput` model has `any` type [RESOLVED]
 
-- **File**: `frontend/src/components/CustomInput.vue:36`
-- **Category**: Type Safety
-- **Details**: `defineModel<any>()` loses all type safety.
+> **Status**: Already implemented. `defineModel<string | number>()` used — confirmed in code.
 
 #### PM5. `SingleSelect` dropdown positioning without scroll listener [OPEN]
 
@@ -568,11 +561,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: Dropdown uses `position: fixed` calculated on toggle, but no scroll/resize recalculation.
 - **Impact**: Mispositioned dropdown when settings page is scrolled while open.
 
-#### PM6. Dual emit pattern in `SingleSelect` [OPEN]
+#### PM6. Dual emit pattern in `SingleSelect` [RESOLVED]
 
-- **File**: `frontend/src/components/SingleSelect.vue:42, 48-52`
-- **Category**: Code Quality
-- **Details**: Both `update:modelValue` and `change` emitted. Redundant and error-prone.
+> **Status**: Implemented. Removed unused `defineEmits` for `change` event; `defineModel<string>()` is the sole mechanism. `defineModel<any>` narrowed to `defineModel<string>`.
 
 #### PM7. `SettingCard` prop `p1` never used by any consumer [RESOLVED]
 
@@ -608,11 +599,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. Buffer is flushed correctly at stream end.
 
-#### AM4. Duplicate `ToolDefinition` interface [OPEN]
+#### AM4. Duplicate `ToolDefinition` interface [RESOLVED]
 
-- **Files**: `frontend/src/api/backend.ts:192-200`, `frontend/src/types/index.d.ts:61-67`
-- **Category**: Type Safety
-- **Details**: Two different interfaces with the same name — API wire format vs internal tool definition. Name collision causes confusion.
+> **Status**: Implemented. Renamed API wire-format interface in `backend.ts` from `ToolDefinition` to `ApiToolDefinition` to distinguish it from the internal `ToolDefinition` in `index.d.ts`.
 
 #### TM1. Global ambient types without explicit imports [OPEN]
 
@@ -805,7 +794,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | UM5  | `Ref` without type parameter in WordFormatter                         |
 | 🟢 Implemented | UM6  | `searchAndReplace` tools labeled as category `'read'`                 |
 | 🟢 Implemented | UM7  | Redundant Set + Array checks in toolStorage                           |
-| 🔴 Remaining   | UM8  | No `QuotaExceededError` handling for localStorage                     |
+| 🟢 Implemented | UM8  | No `QuotaExceededError` handling for localStorage                     |
 | 🟢 Implemented | UM9  | `tokenManager.ts` mutates input messages                              |
 | 🟡 Deferred    | UM10 | Character-by-character HTML reconstruction in PowerPoint              |
 | 🟢 Implemented | UL1  | Typo in export name `buildInPrompt`                                   |
@@ -869,12 +858,12 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | AH1  | Missing credential headers in `fetchModels`                           |
 | 🟢 Implemented | AH2  | `healthCheck()` missing credential headers                            |
 | 🔴 Remaining   | XH1  | No CSRF protection on API calls                                       |
-| 🔴 Remaining   | PM1  | Hardcoded French strings in ChatInput                                 |
+| 🟢 Implemented | PM1  | Hardcoded French strings in ChatInput                                 |
 | 🔴 Remaining   | PM2  | Hardcoded English strings with fallback pattern in SettingsPage       |
 | 🟢 Implemented | PM3  | `CustomInput` type flash on mount                                     |
-| 🔴 Remaining   | PM4  | `CustomInput` model has `any` type                                    |
+| 🟢 Implemented | PM4  | `CustomInput` model has `any` type                                    |
 | 🔴 Remaining   | PM5  | `SingleSelect` dropdown positioning without scroll listener           |
-| 🔴 Remaining   | PM6  | Dual emit pattern in `SingleSelect`                                   |
+| 🟢 Implemented | PM6  | Dual emit pattern in `SingleSelect`                                   |
 | 🟢 Implemented | PM7  | `SettingCard` prop `p1` never used by any consumer                    |
 | 🟢 Implemented | PM8  | `Message.vue` setTimeout without cleanup                              |
 | 🟢 Implemented | PM9  | `ChatHeader.vue` hardcoded English string                             |
@@ -883,7 +872,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | AM1  | Import statement in middle of file                                    |
 | 🟢 Implemented | AM2  | `chatStream` silently swallows JSON parse errors                      |
 | 🟢 Implemented | AM3  | `chatStream` discards remaining buffer after stream ends              |
-| 🔴 Remaining   | AM4  | Duplicate `ToolDefinition` interface                                  |
+| 🟢 Implemented | AM4  | Duplicate `ToolDefinition` interface                                  |
 | 🔴 Remaining   | TM1  | Global ambient types without explicit imports                         |
 | 🔴 Remaining   | TM2  | `OfficeHostType` declared in two files                                |
 | 🔴 Remaining   | EM1  | `useStorage` called outside Vue component context                     |

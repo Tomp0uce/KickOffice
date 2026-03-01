@@ -17,7 +17,15 @@ export function persistEnabledTools(allToolNames: string[], enabledToolNames: Se
     signature: buildToolSignature(allToolNames),
     enabledToolNames: allToolNames.filter(name => enabledToolNames.has(name)),
   }
-  localStorage.setItem(ENABLED_TOOLS_STORAGE_KEY, JSON.stringify(payload))
+  try {
+    localStorage.setItem(ENABLED_TOOLS_STORAGE_KEY, JSON.stringify(payload))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[ToolStorage] localStorage quota exceeded — tool preferences not saved')
+    } else {
+      throw e
+    }
+  }
 }
 
 /**

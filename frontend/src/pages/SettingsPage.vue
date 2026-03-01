@@ -972,7 +972,15 @@ function loadPrompts() {
 }
 
 function savePromptsToStorage() {
-  localStorage.setItem("savedPrompts", JSON.stringify(savedPrompts.value));
+  try {
+    localStorage.setItem("savedPrompts", JSON.stringify(savedPrompts.value));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[SettingsPage] localStorage quota exceeded — saved prompts not persisted')
+    } else {
+      throw e
+    }
+  }
 }
 
 function addNewPrompt() {
@@ -1049,7 +1057,15 @@ function saveBuiltInPrompts() {
       user: builtInPromptsData.value[key].user("[TEXT]", "[LANGUAGE]"),
     };
   });
-  localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
+  try {
+    localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[SettingsPage] localStorage quota exceeded — built-in prompts not persisted')
+    } else {
+      throw e
+    }
+  }
 }
 
 function toggleEditBuiltinPrompt(key: string) {
