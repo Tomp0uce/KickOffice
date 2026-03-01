@@ -82,12 +82,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### MEDIUM
 
-#### BM1. No graceful shutdown handling [OPEN]
+#### BM1. No graceful shutdown handling [RESOLVED]
 
-- **File**: `backend/src/server.js`
-- **Category**: Architecture
-- **Details**: No `SIGTERM`/`SIGINT` handler. In-flight streaming connections are abruptly severed during deployment.
-- **Fix**: Add signal handlers that stop accepting new connections and drain existing ones.
+> **Status**: Implemented. SIGTERM/SIGINT handlers added to `server.js` — stops accepting connections, waits for drain, force-exits after 30s.
 
 #### BM2. Unused `routeName` parameter in `validateChatRequest` [RESOLVED]
 
@@ -802,7 +799,7 @@ _Last updated: 2026-03-01_
 | 🟢 Implemented | BH5  | parsePositiveInt allows zero                                          |
 | 🔴 Remaining   | BH6  | Upload route lacks magic-byte file validation                         |
 | 🟢 Implemented | BH7  | ReDoS potential in sanitizeErrorText                                  |
-| 🔴 Remaining   | BM1  | No graceful shutdown handling                                         |
+| 🟢 Implemented | BM1  | No graceful shutdown handling                                         |
 | 🟢 Implemented | BM2  | Unused `routeName` parameter in `validateChatRequest`                 |
 | 🟢 Implemented | BM3  | Exported functions never imported externally                          |
 | 🟢 Implemented | BM4  | Exported constants/functions never imported externally                |
