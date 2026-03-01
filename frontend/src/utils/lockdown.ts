@@ -14,7 +14,7 @@ function saveFunctionProperties(): Map<string, unknown> {
   const saved = new Map<string, unknown>();
   for (const key of Object.getOwnPropertyNames(Function)) {
     if (!PRESERVE_FUNCTION_PROPS.has(key)) {
-      saved.set(key, (Function as unknown as Record<string, unknown>)[key]);
+      saved.set(key, (Function as unknown as Record<string, any>)[key]);
     }
   }
   return saved;

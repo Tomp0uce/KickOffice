@@ -3,7 +3,7 @@ import type { Component } from 'vue'
 export interface ToolCallPart {
   id: string
   name: string
-  args: Record<string, unknown>
+  args: Record<string, any>
   status: 'pending' | 'running' | 'complete' | 'error'
   result?: string
 }

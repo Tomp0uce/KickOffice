@@ -103,7 +103,7 @@ chatRouter.post('/', async (req, res) => {
     } catch (streamError) {
       if (!clientDisconnected) {
         systemLog('ERROR', 'POST /api/chat stream error', streamError)
-        console.error('Stream error:', streamError)
+        systemLog('ERROR', 'Stream error:', streamError)
       }
     } finally {
       if (!res.writableEnded) {
@@ -124,7 +124,7 @@ chatRouter.post('/', async (req, res) => {
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat')
     }
     systemLog('ERROR', 'POST /api/chat Chat proxy error', error)
-    console.error('Chat proxy error:', error)
+    systemLog('ERROR', 'Chat proxy error:', error)
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat')
   }
 })
@@ -189,14 +189,14 @@ chatRouter.post('/sync', async (req, res) => {
 
     // Validate upstream response structure
     if (!data || typeof data !== 'object') {
-      console.error('LLM API returned invalid response format', { type: typeof data })
+      systemLog('ERROR', 'LLM API returned invalid response format', { type: typeof data })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an invalid response format.',
       }, 'POST /api/chat/sync')
     }
 
     if (!Array.isArray(data.choices) || data.choices.length === 0) {
-      console.error('LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500) })
+      systemLog('ERROR', 'LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500) })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an empty response.',
       }, 'POST /api/chat/sync')
@@ -204,7 +204,7 @@ chatRouter.post('/sync', async (req, res) => {
 
     const firstChoice = data.choices[0]
     if (!firstChoice.message || typeof firstChoice.message !== 'object') {
-      console.error('LLM API returned invalid choice structure', { choice: firstChoice })
+      systemLog('ERROR', 'LLM API returned invalid choice structure', { choice: firstChoice })
       return logAndRespond(res, 502, {
         error: 'The AI service returned an invalid response structure.',
       }, 'POST /api/chat/sync')
@@ -228,7 +228,7 @@ chatRouter.post('/sync', async (req, res) => {
       return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
     systemLog('ERROR', 'POST /api/chat/sync Chat sync proxy error', error)
-    console.error('Chat sync proxy error', { modelTier, error })
+    systemLog('ERROR', 'Chat sync proxy error', { modelTier, error })
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })

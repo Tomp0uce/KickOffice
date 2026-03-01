@@ -1,3 +1,4 @@
+import type { IStringKeyMap } from '@/types'
 export const languageMap: IStringKeyMap = {
   en: 'English',
   es: 'Espa\u00f1ol',

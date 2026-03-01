@@ -4,6 +4,7 @@ import { models } from '../config/models.js'
 import { validateImagePayload } from '../middleware/validate.js'
 import { handleErrorResponse, imageGeneration } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
+import { systemLog } from '../utils/logger.js'
 
 const imageRouter = Router()
 
@@ -37,7 +38,7 @@ imageRouter.post('/', async (req, res) => {
     if (error.name === 'AbortError') {
       return logAndRespond(res, 504, { error: 'Image API request timeout' }, 'POST /api/image')
     }
-    console.error('Image proxy error:', error)
+    systemLog('ERROR', 'Image proxy error:', error)
     return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/image')
   }
 })

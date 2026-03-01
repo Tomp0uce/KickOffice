@@ -31,9 +31,9 @@
         :current-action="currentAction"
         :loading="loading"
         :backend-online="backendOnline"
-        :empty-title="$t('emptyTitle')"
+        :empty-title="t('emptyTitle')"
         :empty-subtitle="
-          $t(
+          t(
             forHost({
               outlook: 'emptySubtitleOutlook',
               powerpoint: 'emptySubtitlePowerPoint',
@@ -65,9 +65,9 @@
         :show-word-formatting="
           !hostIsExcel && !hostIsPowerPoint && !hostIsOutlook
         "
-        :use-word-formatting-label="$t('useWordFormattingLabel')"
+        :use-word-formatting-label="t('useWordFormattingLabel')"
         :include-selection-label="
-          $t(
+          t(
             forHost({
               outlook: 'includeSelectionLabelOutlook',
               powerpoint: 'includeSelectionLabelPowerPoint',
@@ -85,15 +85,24 @@
       />
       <StatsBar
         :session-stats="sessionStats"
-        :model-name="selectedModelInfo?.label ?? selectedModelTier"
+        :model-name="selectedModelInfo?.id ?? selectedModelTier"
       />
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
+import type { InsertType, ModelTier, ModelInfo } from '@/types'
 defineOptions({ name: "Home" });
-import { ref, computed, watch, nextTick, onBeforeMount, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useStorage } from "@vueuse/core";
 import {
   BookOpen,
@@ -134,7 +143,13 @@ import type {
   QuickAction,
 } from "@/types/chat";
 import { localStorageKey } from "@/utils/enum";
-import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from "@/utils/hostDetection";
+import {
+  isPowerPoint,
+  isWord,
+  isExcel,
+  isOutlook,
+  forHost,
+} from "@/utils/hostDetection";
 import {
   loadSavedPromptsFromStorage,
   type SavedPrompt,
@@ -191,7 +206,7 @@ const excelFormulaLanguage = useStorage<"en" | "fr">(
   localStorageKey.excelFormulaLanguage,
   "en",
 );
-const insertType = ref<insertTypes>("replace");
+const insertType = ref<InsertType>("replace");
 
 const chatInputRef = ref<InstanceType<typeof ChatInput>>();
 const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
@@ -463,7 +478,13 @@ const officeInsert = useOfficeInsert({
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
 });
 
-const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } = useAgentLoop({
+const {
+  sendMessage,
+  applyQuickAction,
+  currentAction,
+  sessionStats,
+  resetSessionStats,
+} = useAgentLoop({
   t,
   refs: {
     history,
@@ -592,7 +613,7 @@ watch(loading, async (isLoading, wasLoading) => {
 
 onBeforeMount(async () => {
   insertType.value =
-    (localStorage.getItem(localStorageKey.insertType) as insertTypes) ||
+    (localStorage.getItem(localStorageKey.insertType) as InsertType) ||
     "replace";
   loadSavedPrompts();
   checkBackend();

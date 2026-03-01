@@ -1,3 +1,4 @@
+import type { PowerPointToolDefinition } from '@/types'
 /**
  * PowerPoint interaction utilities.
  *
@@ -7,7 +8,7 @@
  */
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './officeRichText'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './markdown'
 import { sandboxedEval } from './sandbox'
 
 declare const Office: any
@@ -353,7 +354,7 @@ const powerpointToolDefinitions = createPowerPointTools({
     },
     executePowerPoint: async (context: any, args: any) => {
       ensurePowerPointRunAvailable()
-      const { code } = args
+      const { code } = args as Record<string, any>
       try {
         const result = await sandboxedEval(code, { context, PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined })
         return JSON.stringify({ success: true, result: result ?? null }, null, 2)
@@ -377,10 +378,10 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['newText'],
     },
-    executeCommon: async args => {
-      const { newText } = args
+    executeCommon: async (args: Record<string, any>) => {
+      const { newText } = args as Record<string, any>
       if (!newText || typeof newText !== 'string') {
-        return 'Error: newText is required and must be a string.'
+        throw new Error('Error: newText is required and must be a string.')
       }
       await insertIntoPowerPoint(newText)
       return 'Successfully replaced selected text in PowerPoint.'
@@ -420,11 +421,11 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        return 'Error: slideNumber must be a number greater than or equal to 1.'
+        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
       }
 
       
@@ -434,7 +435,7 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         const index = Math.trunc(slideNumber) - 1
         if (index >= slides.items.length) {
-          return `Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`
+          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
         }
 
         const slide = slides.getItemAt(index)
@@ -484,7 +485,7 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: [],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       
         const slides = context.presentation.slides
@@ -523,17 +524,17 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'notesText'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
 
       if (!isPowerPointApiSupported('1.4')) {
-        return 'Error: setSlideNotes requires PowerPointApi 1.4 or newer.'
+        throw new Error('Error: setSlideNotes requires PowerPointApi 1.4 or newer.')
       }
 
       const slideNumber = Number(args.slideNumber)
       const notesText = String(args.notesText ?? '')
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        return 'Error: slideNumber must be a number greater than or equal to 1.'
+        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
       }
 
       
@@ -543,13 +544,13 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         const index = Math.trunc(slideNumber) - 1
         if (index >= slides.items.length) {
-          return `Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`
+          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
         }
 
         const slide = slides.getItemAt(index)
         const notesSlide = (slide as any).notesSlide
         if (!notesSlide?.shapes?.addTextBox) {
-          return 'Error: notesSlide is not available in this PowerPoint runtime.'
+          throw new Error('Error: notesSlide is not available in this PowerPoint runtime.')
         }
 
         const notesBox = notesSlide.shapes.addTextBox(notesText)
@@ -585,16 +586,16 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'text'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        return 'Error: slideNumber must be a number greater than or equal to 1.'
+        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
       }
 
       const text = String(args.text ?? '')
       if (!text) {
-        return 'Error: text is required.'
+        throw new Error('Error: text is required.')
       }
 
       
@@ -604,7 +605,7 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         const index = Math.trunc(slideNumber) - 1
         if (index >= slides.items.length) {
-          return `Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`
+          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
         }
 
         const slide = slides.getItemAt(index)
@@ -652,16 +653,16 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'base64Image'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        return 'Error: slideNumber must be a number greater than or equal to 1.'
+        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
       }
 
       const base64ImageRaw = String(args.base64Image ?? '').trim()
       if (!base64ImageRaw) {
-        return 'Error: base64Image is required.'
+        throw new Error('Error: base64Image is required.')
       }
       const base64Image = base64ImageRaw.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '')
 
@@ -672,7 +673,7 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         const index = Math.trunc(slideNumber) - 1
         if (index >= slides.items.length) {
-          return `Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`
+          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
         }
 
         const slide = slides.getItemAt(index)
@@ -698,15 +699,15 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
       slides.getItemAt(index).delete()
       await context.sync()
       return `Successfully deleted slide ${slideNumber}.`
@@ -724,15 +725,15 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
       const slide = slides.getItemAt(index)
       const shapes = slide.shapes
@@ -776,25 +777,25 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'shapeIdOrName'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
-      if (!shapeIdOrName) return 'Error: shapeIdOrName is required.'
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
 
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
       const slide = slides.getItemAt(index)
       const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
       shape.load('isNullObject')
       await context.sync()
 
-      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`
+      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
 
       shape.delete()
       await context.sync()
@@ -815,26 +816,26 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'shapeIdOrName', 'color'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       const shapeIdOrName = String(args.shapeIdOrName ?? '')
       const color = String(args.color ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
-      if (!shapeIdOrName || !color) return 'Error: shapeIdOrName and color are required.'
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      if (!shapeIdOrName || !color) throw new Error('Error: shapeIdOrName and color are required.')
 
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
       const slide = slides.getItemAt(index)
       const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
       shape.load('isNullObject')
       await context.sync()
 
-      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found.`
+      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found.`)
 
       shape.fill.setSolidColor(color)
       await context.sync()
@@ -858,25 +859,25 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
       required: ['slideNumber', 'shapeIdOrName'],
     },
-    executePowerPoint: async (context: any, args) => {
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       const slideNumber = Number(args.slideNumber)
       const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) return 'Error: slideNumber must be a number >= 1.'
-      if (!shapeIdOrName) return 'Error: shapeIdOrName is required.'
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
 
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) return `Error: slide ${slideNumber} does not exist.`
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
       const slide = slides.getItemAt(index)
       const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
       shape.load('isNullObject')
       await context.sync()
 
-      if (shape.isNullObject) return `Error: Shape '${shapeIdOrName}' not found.`
+      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found.`)
 
       if (Number.isFinite(args.left)) shape.left = Number(args.left)
       if (Number.isFinite(args.top)) shape.top = Number(args.top)

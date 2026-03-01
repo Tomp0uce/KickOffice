@@ -42,6 +42,11 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
   }
 
   async function newSession() {
+    // If the current session is already empty, do not create a new one.
+    if (history.value.length === 0) {
+      return
+    }
+
     // Save current session first
     if (currentSessionId.value) {
       await saveSession(currentSessionId.value, history.value)

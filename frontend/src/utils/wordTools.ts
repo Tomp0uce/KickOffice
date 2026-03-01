@@ -1,8 +1,9 @@
+import type { WordToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import DiffMatchPatch from 'diff-match-patch'
 import { sandboxedEval } from './sandbox'
 
-import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './officeRichText'
+import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './markdown'
 
 import { generateVisualDiff } from './common'
 
@@ -235,7 +236,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['text'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { text, location = 'End' } = args
       // R1: read insertion context (list detection + document styles) in 2 syncs
       const { inList, styles } = await readInsertionContext(context)
@@ -274,8 +275,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['newText'],
     },
-    executeWord: async (context, args) => {
-      const { newText, preserveFormatting = true, diffTracking = false } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { newText, preserveFormatting = true, diffTracking = false } = args as Record<string, any>
       const range = context.document.getSelection()
       range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
       // R15: load paragraph-level spacing/alignment from first paragraph (not available on Range)
@@ -284,7 +285,7 @@ const wordToolDefinitions = createWordTools({
       await context.sync()
 
       if (!range.text || range.text.length === 0) {
-        return 'Error: No text selected. Select text in the document, then try again.'
+        throw new Error('Error: No text selected. Select text in the document, then try again.')
       }
 
       // R17: diffTracking mode — show visual diff instead of replacing directly
@@ -376,8 +377,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['text'],
     },
-    executeWord: async (context, args) => {
-      const { text } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { text } = args as Record<string, any>
       const body = context.document.body
       body.insertHtml(renderOfficeRichHtml(text), 'End')
       await context.sync()
@@ -420,7 +421,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['text'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { text, location = 'After', style } = args
       let range
       const htmlText = renderOfficeRichHtml(text)
@@ -475,15 +476,15 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
-      const { bold, italic, underline, fontSize, fontColor, highlightColor } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { bold, italic, underline, fontSize, fontColor, highlightColor } = args as Record<string, any>
       
         const range = context.document.getSelection()
         range.load('text')
         await context.sync()
 
         if (!range.text || range.text.length === 0) {
-          return 'Error: No text selected. Select text in the document, then try again.'
+          throw new Error('Error: No text selected. Select text in the document, then try again.')
         }
 
         if (bold !== undefined) range.font.bold = bold
@@ -524,8 +525,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['searchText', 'replaceText'],
     },
-    executeWord: async (context, args) => {
-      const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
       
         const body = context.document.body
         const searchResults = body.search(searchText, {
@@ -606,8 +607,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['rows', 'columns'],
     },
-    executeWord: async (context, args) => {
-      const { rows, columns, data } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { rows, columns, data } = args as Record<string, any>
       
         const range = context.document.getSelection()
 
@@ -644,8 +645,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['items', 'listType'],
     },
-    executeWord: async (context, args) => {
-      const { items, listType } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { items, listType } = args as Record<string, any>
       const range = context.document.getSelection()
 
       let topLevelIndex = 0
@@ -684,7 +685,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { direction = 'After' } = args
       
         const range = context.document.getSelection()
@@ -740,8 +741,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['fontName'],
     },
-    executeWord: async (context, args) => {
-      const { fontName } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { fontName } = args as Record<string, any>
       
         const range = context.document.getSelection()
         range.font.name = fontName
@@ -765,7 +766,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { location = 'After' } = args
       
         const range = context.document.getSelection()
@@ -835,8 +836,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['scope'],
     },
-    executeWord: async (context, args) => {
-      const { scope } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { scope } = args as Record<string, any>
       
         if (scope === 'All') {
           const body = context.document.body
@@ -875,7 +876,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['imageUrl'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { imageUrl, width, height, location = 'After' } = args
       
         const range = context.document.getSelection()
@@ -944,8 +945,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['name'],
     },
-    executeWord: async (context, args) => {
-      const { name } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { name } = args as Record<string, any>
       
         const range = context.document.getSelection()
 
@@ -975,8 +976,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['name'],
     },
-    executeWord: async (context, args) => {
-      const { name } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { name } = args as Record<string, any>
       
         const bookmarkName = name.replace(/\s+/g, '_')
         const contentControls = context.document.contentControls
@@ -1022,7 +1023,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['title'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { title, tag, appearance = 'BoundingBox' } = args
       
         const range = context.document.getSelection()
@@ -1058,8 +1059,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['searchText'],
     },
-    executeWord: async (context, args) => {
-      const { searchText, matchCase = false, matchWholeWord = false } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { searchText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
       
         const body = context.document.body
         const searchResults = body.search(searchText, {
@@ -1142,7 +1143,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const tagName = typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'format'
       const fontName = typeof args.fontName === 'string' && args.fontName.trim() ? args.fontName.trim() : undefined
       const fontSize = typeof args.fontSize === 'number' ? args.fontSize : undefined
@@ -1255,8 +1256,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
-      const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } = args as Record<string, any>
       
         const selection = context.document.getSelection()
         const paragraphs = selection.paragraphs
@@ -1264,7 +1265,7 @@ const wordToolDefinitions = createWordTools({
         await context.sync()
 
         if (paragraphs.items.length === 0) {
-          return 'Error: No paragraph found in the current selection.'
+          throw new Error('Error: No paragraph found in the current selection.')
         }
 
         for (const paragraph of paragraphs.items) {
@@ -1299,8 +1300,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['address'],
     },
-    executeWord: async (context, args) => {
-      const { address, textToDisplay } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { address, textToDisplay } = args as Record<string, any>
       
         const range = context.document.getSelection()
         const linkRange = typeof textToDisplay === 'string' ? range.insertText(textToDisplay, 'Replace') : range
@@ -1341,15 +1342,15 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['row', 'column', 'text'],
     },
-    executeWord: async (context, args) => {
-      const { row, column, text, tableIndex = 0 } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { row, column, text, tableIndex = 0 } = args as Record<string, any>
       
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
 
         if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
-          return 'Error: Table not found at the requested index.'
+          throw new Error('Error: Table not found at the requested index.')
         }
 
         const targetTable = tables.items[tableIndex]
@@ -1382,7 +1383,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
       
         const tables = context.document.body.tables
@@ -1390,7 +1391,7 @@ const wordToolDefinitions = createWordTools({
         await context.sync()
 
         if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
-          return 'Error: Table not found at the requested index.'
+          throw new Error('Error: Table not found at the requested index.')
         }
 
         const targetTable = tables.items[tableIndex] as any
@@ -1422,7 +1423,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { tableIndex = 0, location = 'After', count = 1, values } = args
       
         const tables = context.document.body.tables
@@ -1430,7 +1431,7 @@ const wordToolDefinitions = createWordTools({
         await context.sync()
 
         if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
-          return 'Error: Table not found at the requested index.'
+          throw new Error('Error: Table not found at the requested index.')
         }
 
         const targetTable = tables.items[tableIndex] as any
@@ -1458,15 +1459,15 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['target', 'index'],
     },
-    executeWord: async (context, args) => {
-      const { tableIndex = 0, target, index, count = 1 } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { tableIndex = 0, target, index, count = 1 } = args as Record<string, any>
       
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
 
         if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
-          return 'Error: Table not found at the requested index.'
+          throw new Error('Error: Table not found at the requested index.')
         }
 
         const targetTable = tables.items[tableIndex] as any
@@ -1501,15 +1502,15 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['row', 'column'],
     },
-    executeWord: async (context, args) => {
-      const { tableIndex = 0, row, column, shadingColor, fontName, fontSize, fontColor, bold, italic } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { tableIndex = 0, row, column, shadingColor, fontName, fontSize, fontColor, bold, italic } = args as Record<string, any>
       
         const tables = context.document.body.tables
         tables.load('items')
         await context.sync()
 
         if (tables.items.length === 0 || tableIndex < 0 || tableIndex >= tables.items.length) {
-          return 'Error: Table not found at the requested index.'
+          throw new Error('Error: Table not found at the requested index.')
         }
 
         const cell = tables.items[tableIndex].getCell(row, column) as any
@@ -1551,7 +1552,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['target', 'text'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { target, type = 'Primary', text } = args
       
         const section = context.document.sections.getFirst() as any
@@ -1573,8 +1574,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['text'],
     },
-    executeWord: async (context, args) => {
-      const { text } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { text } = args as Record<string, any>
       
         const range = context.document.getSelection() as any
         range.insertFootnote(text)
@@ -1595,8 +1596,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['textSegment', 'comment'],
     },
-    executeWord: async (context, args) => {
-      const { textSegment, comment } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { textSegment, comment } = args as Record<string, any>
       
       const range = context.document.getSelection() as any
       // Perform a search within the selected range
@@ -1672,8 +1673,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
-      const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } = args as Record<string, any>
       
         const section = context.document.sections.getFirst() as any
         const pageSetup = section.pageSetup
@@ -1704,15 +1705,15 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['index'],
     },
-    executeWord: async (context, args) => {
-      const { index } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { index } = args as Record<string, any>
       
         const paragraphs = context.document.body.paragraphs
         paragraphs.load('items')
         await context.sync()
 
         if (index < 0 || index >= paragraphs.items.length) {
-          return `Error: Paragraph index out of bounds. Range is 0 to ${Math.max(paragraphs.items.length - 1, 0)}.`
+          throw new Error(`Error: Paragraph index out of bounds. Range is 0 to ${Math.max(paragraphs.items.length - 1, 0)}.`)
         }
 
         const paragraph = paragraphs.items[index]
@@ -1754,7 +1755,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: [],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { location = 'After' } = args
 
         const range = context.document.getSelection() as any
@@ -1796,7 +1797,7 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['styleBuiltIn'],
     },
-    executeWord: async (context, args) => {
+    executeWord: async (context, args: Record<string, any>) => {
       const { styleBuiltIn, target = 'selection' } = args
       const selection = context.document.getSelection()
 
@@ -1856,8 +1857,8 @@ const wordToolDefinitions = createWordTools({
       },
       required: ['code'],
     },
-    executeWord: async (context, args) => {
-      const { code } = args
+    executeWord: async (context, args: Record<string, any>) => {
+      const { code } = args as Record<string, any>
       try {
         const result = await sandboxedEval(code, { context, Word: typeof Word !== 'undefined' ? Word : undefined })
         return JSON.stringify({ success: true, result: result ?? null }, null, 2)

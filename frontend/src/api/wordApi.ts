@@ -1,6 +1,6 @@
 import { Ref } from 'vue'
 
-import { stripRichFormattingSyntax } from '@/utils/officeRichText'
+import { stripRichFormattingSyntax } from '@/utils/markdown'
 import { WordFormatter } from '@/utils/wordFormatter'
 
 export async function insertResult(result: string, insertType: Ref): Promise<void> {

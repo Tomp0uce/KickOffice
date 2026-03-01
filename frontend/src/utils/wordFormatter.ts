@@ -1,7 +1,7 @@
 import { Ref } from 'vue'
 
 import { detectOfficeHost } from './hostDetection'
-import { renderOfficeRichHtml, stripRichFormattingSyntax } from './officeRichText'
+import { renderOfficeRichHtml, stripRichFormattingSyntax } from './markdown'
 
 function insertHtmlWithCommonApi(html: string): Promise<void> {
   return new Promise((resolve, reject) => {

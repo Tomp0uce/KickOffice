@@ -1,3 +1,4 @@
+import type { ToolInputSchema, ToolCategory } from '@/types'
 import { evaluate } from 'mathjs'
 
 export type GeneralToolName = 'getCurrentDate' | 'calculateMath'
@@ -75,7 +76,7 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       required: ['expression'],
     },
     execute: async (args) => {
-      const { expression } = args
+      const { expression } = args as Record<string, any>
       try {
         const result = evaluate(expression)
 

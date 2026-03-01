@@ -10,7 +10,7 @@ export interface SavedPrompt {
  */
 function isValidSavedPrompt(item: unknown): item is SavedPrompt {
   if (!item || typeof item !== 'object') return false
-  const obj = item as Record<string, unknown>
+  const obj = item as Record<string, any>
   return (
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&

@@ -3,6 +3,7 @@ import 'dotenv/config'
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
+import crypto from 'crypto'
 import morgan from 'morgan'
 
 import { models } from './config/models.js'
@@ -62,7 +63,8 @@ if (PUBLIC_FRONTEND_URL) {
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email', 'x-csrf-token'],
+  credentials: true,
 }))
 
 app.use(helmet({
@@ -90,6 +92,13 @@ app.use((req, res, next) => {
   next()
 })
 
+
+// Add request ID
+app.use((req, res, next) => {
+  res.locals.reqId = crypto.randomUUID()
+  next()
+})
+
 app.use(express.json({ limit: '4mb' }))
 
 // Reject POST/PUT/PATCH requests that don't declare application/json to avoid silent empty bodies
@@ -98,6 +107,34 @@ app.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
     return res.status(415).json({ error: 'Content-Type must be application/json' })
   }
+  next()
+})
+
+// CSRF Protection Mechanism
+app.use((req, res, next) => {
+  // Exempt healthcheck from CSRF if we want, but letting it generate a cookie is fine.
+  let token = null
+  if (req.headers.cookie) {
+    const match = req.headers.cookie.match(/(?:^| )csrf_token=([^;]+)/)
+    if (match) token = match[1]
+  }
+
+  if (!token) {
+    token = crypto.randomUUID()
+    res.cookie('csrf_token', token, {
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: 'none'
+    })
+  }
+
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const headerToken = req.headers['x-csrf-token']
+    if (!headerToken || headerToken !== token) {
+      return res.status(403).json({ error: 'Invalid CSRF token' })
+    }
+  }
+
   next()
 })
 
