@@ -5,6 +5,7 @@ import frontendPackage from './package.json'
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 function getBuildVersion() {
   const packageVersion = frontendPackage.version
@@ -32,7 +33,14 @@ function getBuildVersion() {
 const appVersion = getBuildVersion()
 
 export default defineConfig({
-  plugins: [tailwindcss(), vue()],
+  plugins: [
+    tailwindcss(),
+    vue(),
+    nodePolyfills({
+      include: ['zlib', 'module', 'stream', 'util', 'buffer', 'events'],
+      globals: { Buffer: true, process: true },
+    }),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
