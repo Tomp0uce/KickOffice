@@ -264,13 +264,14 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Impact**: Silent failures on slow connections or large emails.
 - **Fix**: Remove the inner 3-second timeout or increase it significantly.
 
-#### UH4. `language` parameter ignored in translate prompt
+#### UH4. `language` parameter ignored in translate prompt [RESOLVED]
 
 - **File**: `frontend/src/utils/constant.ts:32-48`
 - **Category**: Logic Bug
 - **Details**: Translate prompt hardcodes "French-English bilingual translation" regardless of the `language` parameter. Explicitly says "Ignore requested output language preferences."
 - **Impact**: Users who select a target language other than French/English see their preference silently ignored.
 - **Fix**: Make the prompt respect the language parameter.
+- **Resolution**: Updated the generic translation quick action prompt to correctly target the requested layout language.
 
 #### UH5. Host detection caching can return wrong host
 
@@ -355,11 +356,12 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: `delete msg.tool_calls` mutates original message objects from the input array.
 - **Fix**: Clone messages before modifying: `const msg = { ...originalMsg }`.
 
-#### UM10. Character-by-character HTML reconstruction in PowerPoint
+#### UM10. Character-by-character HTML reconstruction in PowerPoint [DEFERRED]
 
 - **File**: `frontend/src/utils/powerpointTools.ts:121-183`
 - **Category**: Performance
 - **Details**: Loads font properties for each individual character (up to 100,000) via `range.getSubstring(i, 1)`. Very memory-intensive.
+- **Note**: Will test the performance of the current logic. Native rich formatting is tricky in PowerPoint. If viable, it stays; otherwise, it will be reconsidered or removed.
 
 ### LOW
 
@@ -388,20 +390,22 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### CRITICAL
 
-#### CC1. Prompt injection via unsanitized document selection
+#### CC1. Prompt injection via unsanitized document selection [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:613-616`
 - **Category**: Security
 - **Details**: Office selection text is directly interpolated into the user message: `fullMessage += \`\n\n[${selectionLabel}: "${selectedText}"]\``. A malicious document containing `"]` followed by injection instructions can break out of the framing.
 - **Impact**: Indirect prompt injection — attacker crafts document, victim opens it and uses KickOffice.
 - **Fix**: Use robust delimiters (XML CDATA-style, base64, unique boundary token).
+- **Resolution**: Replaced direct injection with robust XML-like `<document_content>` tags.
 
-#### CC2. Prompt injection via quick action selection text
+#### CC2. Prompt injection via quick action selection text [RESOLVED]
 
 - **File**: `frontend/src/composables/useAgentLoop.ts:753, 761, 525`
 - **Category**: Security
 - **Details**: `textForLlm` from document selection passed directly to `action.user(textForLlm, lang)`. Email body injected into reply prompt at line 525 with `replyPrompt.user(emailBody, lang)`.
 - **Impact**: Attacker-crafted email/document content can override system prompt instructions.
+- **Resolution**: Escaped and encapsulated injected content inside `<document_content>` and `<email_content>` tags to prevent override.
 
 ### HIGH
 
@@ -551,12 +555,13 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **File**: `backend/src/server.js:91-96`
 - **Details**: See BC1. The upload route at line 104 is unreachable for multipart requests.
 
-#### IC2. Containers run as root
+#### IC2. Containers run as root [DEFERRED]
 
 - **Files**: `backend/Dockerfile:1-15`, `frontend/Dockerfile:1-22`
 - **Category**: Security
 - **Details**: Neither Dockerfile creates or switches to a non-root user. `PUID`/`PGID` env vars in docker-compose have no effect on standard Node/Nginx images.
 - **Fix**: Add `USER node` (backend) and create a non-root user for nginx (frontend).
+- **Note**: Retaining this configuration deliberately.
 
 #### IC3. Internal infrastructure URL as default
 
@@ -573,19 +578,21 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 - **Details**: The manifest-gen service uses Node 18, violating the project's own engines constraint.
 - **Fix**: Standardize on a single Node.js version across all files.
 
-#### IH2. Private IP baked into frontend Docker build
+#### IH2. Private IP baked into frontend Docker build [DEFERRED]
 
 - **File**: `frontend/Dockerfile:9`
 - **Category**: Security
 - **Details**: Default build arg `VITE_BACKEND_URL=http://192.168.50.10:3003` bakes a private IP into the JS bundle.
 - **Fix**: Remove default or use a placeholder that fails visibly.
+- **Note**: Retaining this configuration deliberately.
 
-#### IH3. External DuckDNS domain as default in .env.example
+#### IH3. External DuckDNS domain as default in .env.example [DEFERRED]
 
 - **File**: `.env.example:10-11`
 - **Category**: Misconfiguration
 - **Details**: `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL` set to `https://kickoffice.duckdns.org` as active values.
 - **Fix**: Comment them out or use clearly fake placeholders.
+- **Note**: Retaining this configuration deliberately.
 
 #### IH4. Lock files not copied in Dockerfiles
 

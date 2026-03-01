@@ -1,6 +1,5 @@
 export const localStorageKey = {
   localLanguage: 'localLanguage',
-  replyLanguage: 'replyLanguage',
   excelFormulaLanguage: 'excelFormulaLanguage',
   insertType: 'insertType',
   useWordFormatting: 'useWordFormatting',

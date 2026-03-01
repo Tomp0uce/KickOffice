@@ -17,5 +17,4 @@ export const optionLists = {
     { label: 'English', value: 'en' },
     { label: 'Fran\u00e7ais', value: 'fr' },
   ],
-  replyLanguageList: getOptionList(languageMap, 'value'),
 }

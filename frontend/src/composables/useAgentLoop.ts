@@ -71,7 +71,6 @@ interface AgentLoopHost {
 
 interface AgentLoopSettings {
   customSystemPrompt: Ref<string>
-  replyLanguage: Ref<string>
   agentMaxIterations: Ref<number>
   useSelectedText: Ref<boolean>
   excelFormulaLanguage: Ref<'en' | 'fr'>
@@ -153,7 +152,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   // Destructure settings
   const {
     customSystemPrompt,
-    replyLanguage,
     agentMaxIterations,
     useSelectedText,
     excelFormulaLanguage,
@@ -439,7 +437,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       await scrollToBottom() // Final scroll after image loads
       return
     }
-    const systemPrompt = customSystemPrompt.value || agentPrompt(replyLanguage.value || 'Français')
+    const systemPrompt = customSystemPrompt.value || agentPrompt(localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français')
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
@@ -519,10 +517,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           messageUtil.error(t('selectEmailPrompt'))
           return
         }
-        const lang = replyLanguage.value || 'Français'
+        const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
         const replyPrompt = getOutlookBuiltInPrompt()['reply']
         const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
-        const userMsg = replyPrompt.user(emailBody, lang).replace('[REPLY_INTENT]', replyIntent)
+        const sanitizedEmail = '\\n<email_content>\\n' + emailBody.replace(new RegExp('</?email_content>', 'g'), '') + '\\n<'+'/email_content>\\n'
+        const sanitizedIntent = '\\n<user_intent>\\n' + replyIntent.replace(new RegExp('</?user_intent>', 'g'), '') + '\\n<'+'/user_intent>\\n'
+        const userMsg = replyPrompt.user(sanitizedEmail, lang).replace('[REPLY_INTENT]', sanitizedIntent)
         history.value.push(createDisplayMessage('assistant', ''))
         await scrollToMessageTop()
         try {
@@ -612,7 +612,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       } else {
         if (selectedText) {
            const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-           fullMessage += `\n\n[${selectionLabel}: "${selectedText}"]`
+           const sanitizedText = '\\n<document_content>\\n' + selectedText.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
+           fullMessage += '\\n\\n[' + selectionLabel + ']: ' + sanitizedText
         }
         if (extractedFilesContext) {
            fullMessage += extractedFilesContext
@@ -740,7 +741,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
-      const textForLlm = richContext ? richContext.cleanText : selectedText
+      const rawTextForLlm = richContext ? richContext.cleanText : selectedText
+      const textForLlm = '\\n<document_content>\\n' + rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
 
       let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
       let systemMsg = ''
@@ -756,7 +758,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (!systemMsg || !userMsg) {
         if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
         if (!action) return
-        const lang = replyLanguage.value || 'Français'
+        const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
         systemMsg = action.system(lang)
         userMsg = action.user(textForLlm, lang)
       }

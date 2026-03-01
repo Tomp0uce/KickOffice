@@ -85,6 +85,7 @@
 </template>
 
 <script lang="ts" setup>
+defineOptions({ name: "Home" });
 import { useStorage } from "@vueuse/core";
 import {
   BookOpen,
@@ -189,7 +190,6 @@ const abortController = ref<AbortController | null>(null);
 const backendCheckInterval = ref<number | null>(null);
 const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true);
 const useSelectedText = useStorage(localStorageKey.useSelectedText, true);
-const replyLanguage = useStorage(localStorageKey.replyLanguage, "Français");
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
 const userGender = useStorage(localStorageKey.userGender, "unspecified");
 const userFirstName = useStorage(localStorageKey.userFirstName, "");
@@ -497,7 +497,6 @@ const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
   },
   settings: {
     customSystemPrompt,
-    replyLanguage,
     agentMaxIterations,
     useSelectedText,
     excelFormulaLanguage,
