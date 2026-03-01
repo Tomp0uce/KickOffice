@@ -513,6 +513,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           message.content = text
           await scrollToBottom()
         },
+        onUsage: accumulateUsage,
         abortSignal: abortController.value?.signal,
       })
       const lastMessage = history.value[history.value.length - 1]
@@ -567,7 +568,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     return localSelectedText
   }
 
-  async function processChat(userMessage: string) {
+  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string }>) {
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -590,6 +591,19 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const systemPrompt = customSystemPrompt.value || agentPrompt(localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français')
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
+
+    // Inject vision images as multipart content into the last user message
+    if (visionImages && visionImages.length > 0) {
+      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+      if (lastUserIdx !== -1) {
+        const textContent = messages[lastUserIdx].content || userMessage
+        const parts: any[] = [{ type: 'text', text: textContent }]
+        for (const img of visionImages) {
+          parts.push({ type: 'image_url', image_url: { url: img.dataUri } })
+        }
+        ;(messages[lastUserIdx] as any).content = parts
+      }
+    }
 
     await runAgentLoop(messages, modelTier)
   }
@@ -668,13 +682,22 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
       let fullMessage = displayMessageText
       let extractedFilesContext = ''
+      // Images uploaded are sent as vision content (base64 data-URIs)
+      const uploadedImages: Array<{ filename: string; dataUri: string }> = []
 
       if (files && files.length > 0) {
         currentAction.value = t('agentUploadingFiles') || 'Extraction des fichiers...'
         try {
            for (const file of files) {
              const result = await uploadFile(file)
-             extractedFilesContext += `\n\n[Contenu extrait du fichier "${result.filename}"]:\n${result.extractedText}\n[Fin du fichier]`
+             if (result.imageBase64) {
+               // Image file: store for vision injection
+               uploadedImages.push({ filename: result.filename, dataUri: result.imageBase64 })
+               // Show a preview thumbnail in the user message bubble
+               history.value[history.value.length - 1].imageSrc = result.imageBase64
+             } else {
+               extractedFilesContext += `\n\n[Contenu extrait du fichier "${result.filename}"]:\n${result.extractedText}\n[Fin du fichier]`
+             }
            }
         } catch (uploadObjErr: unknown) {
            console.error('[AgentLoop] File upload/extraction failed', uploadObjErr)
@@ -698,7 +721,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         history.value[history.value.length - 1].content = fullMessage.trim()
       }
 
-      await processChat(fullMessage.trim())
+      await processChat(fullMessage.trim(), uploadedImages.length > 0 ? uploadedImages : undefined)
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)

@@ -262,7 +262,7 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
   return ''
 }
 
-export async function uploadFile(file: File): Promise<{ filename: string; extractedText: string }> {
+export async function uploadFile(file: File): Promise<{ filename: string; extractedText: string; imageBase64?: string }> {
   const formData = new FormData()
   formData.append('file', file)
 

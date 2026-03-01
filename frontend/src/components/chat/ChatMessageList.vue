@@ -4,7 +4,7 @@
     role="log"
     aria-live="polite"
     aria-relevant="additions text"
-    class="card flex flex-1 flex-col gap-4 overflow-y-auto"
+    class="card flex flex-1 flex-col gap-4 overflow-y-auto min-h-0"
   >
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ liveAnnouncement }}
@@ -64,19 +64,31 @@
                 class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-accent hover:bg-bg-tertiary transition-colors"
                 @click="toggleThought(item.key, idx)"
               >
-                <component :is="isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight" :size="10" />
+                <component
+                  :is="
+                    isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight
+                  "
+                  :size="10"
+                />
                 <Brain :size="10" />
                 <span>{{ thoughtProcessLabel }}</span>
                 <!-- Streaming dots: show when loading and this is last segment -->
                 <span
-                  v-if="loading && idx === item.segments.length - 1 && item.key === historyWithSegments[historyWithSegments.length - 1]?.key"
+                  v-if="
+                    loading &&
+                    idx === item.segments.length - 1 &&
+                    item.key ===
+                      historyWithSegments[historyWithSegments.length - 1]?.key
+                  "
                   class="animate-pulse ml-1"
-                >...</span>
+                  >...</span
+                >
               </button>
               <pre
                 v-if="isThoughtOpen(item.key, idx)"
                 class="m-0 px-2 py-1.5 text-xs wrap-break-word whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
-              >{{ segment.text.trim() }}</pre>
+                >{{ segment.text.trim() }}</pre
+              >
             </div>
           </template>
           <ToolCallBlock
@@ -137,7 +149,15 @@
 </template>
 
 <script lang="ts" setup>
-import { Brain, ChevronDown, ChevronRight, Copy, FileText, Plus, Sparkles } from "lucide-vue-next";
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  FileText,
+  Plus,
+  Sparkles,
+} from "lucide-vue-next";
 import { computed, ref, watch } from "vue";
 
 import CustomButton from "@/components/CustomButton.vue";

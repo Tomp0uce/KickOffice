@@ -86,12 +86,14 @@ function idbGetAllByIndex<T>(store: IDBObjectStore, indexName: string, value: st
   })
 }
 
-function deriveSessionName(messages: DisplayMessage[]): string | null {
-  const firstUser = messages.find(m => m.role === 'user')
-  if (!firstUser) return null
-  const text = firstUser.content.trim()
-  if (!text) return null
-  return text.length > 40 ? `${text.slice(0, 37)}...` : text
+function formatSessionDate(timestamp: number): string {
+  const d = new Date(timestamp)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yy = String(d.getFullYear()).slice(-2)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm}/${yy} ${hh}:${min}`
 }
 
 export async function listSessions(hostType: string): Promise<ChatSession[]> {
@@ -131,14 +133,10 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
   const store = tx.objectStore(SESSIONS_STORE)
   const session = await idbGet<ChatSession>(store, sessionId)
   if (!session) return
-  let name = session.name
-  if (name === 'New Chat') {
-    const derived = deriveSessionName(messages)
-    if (derived) name = derived
-  }
   // Deep-clone to strip Vue reactive proxies — IDB's structured clone algorithm cannot serialize them
   const plainMessages: DisplayMessage[] = JSON.parse(JSON.stringify(messages))
-  await idbPut(store, { ...session, messages: plainMessages, name, updatedAt: Date.now() })
+  const newName = (session.name === 'New Chat') ? formatSessionDate(session.createdAt) : session.name
+  await idbPut(store, { ...session, messages: plainMessages, name: newName, updatedAt: Date.now() })
 
 }
 

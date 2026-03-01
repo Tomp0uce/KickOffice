@@ -1,8 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
-import * as pdfParseModule from 'pdf-parse'
-const pdf = pdfParseModule.default || pdfParseModule
+import pdf from 'pdf-parse'
 import mammoth from 'mammoth'
 import * as xlsx from 'xlsx'
 import { logAndRespond } from '../utils/http.js'
@@ -84,14 +83,28 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     else if (mimeType.startsWith('text/') || filename.toLowerCase().endsWith('.txt') || filename.toLowerCase().endsWith('.md')) {
        extractedText = file.buffer.toString('utf-8')
     }
+    // Image types — return base64 data-URI for LLM vision
+    else if (
+      mimeType === 'image/png' ||
+      mimeType === 'image/jpeg' ||
+      mimeType === 'image/jpg' ||
+      mimeType === 'image/webp' ||
+      mimeType === 'image/gif' ||
+      /\.(png|jpe?g|webp|gif)$/i.test(filename)
+    ) {
+      const b64 = file.buffer.toString('base64')
+      const imageBase64 = `data:${mimeType};base64,${b64}`
+      systemLog('INFO', `POST /api/upload completed image encoding`, { filename, bytes: file.size })
+      return res.json({ filename, imageBase64 })
+    }
     else {
       return logAndRespond(res, 400, { 
-        error: `Unsupported file type: ${mimeType}. Please upload a PDF, DOCX, XLSX, CSV, or Text file.` 
+        error: `Unsupported file type: ${mimeType}. Please upload a PDF, DOCX, XLSX, CSV, Image (PNG/JPG/WEBP/GIF), or Text file.` 
       }, 'POST /api/upload')
     }
 
     if (!extractedText || !extractedText.trim()) {
-      return logAndRespond(res, 400, { error: 'No text could be extracted from the file' }, 'POST /api/upload')
+      return logAndRespond(res, 400, { error: 'No text could be extracted from the file. Make sure the file contains readable text.' }, 'POST /api/upload')
     }
 
     // Limit text size to prevent enormous context windows (approx context token limit defense)
