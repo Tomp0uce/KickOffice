@@ -25,6 +25,7 @@
         :history="history"
         :history-with-segments="historyWithSegments"
         :current-action="currentAction"
+        :loading="loading"
         :backend-online="backendOnline"
         :empty-title="$t('emptyTitle')"
         :empty-subtitle="

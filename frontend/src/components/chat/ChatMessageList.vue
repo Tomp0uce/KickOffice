@@ -72,6 +72,11 @@
               >
             </details>
           </template>
+          <ToolCallBlock
+            v-for="tc in item.message.toolCalls"
+            :key="tc.id"
+            :tool-call="tc"
+          />
           <img
             v-if="item.message.imageSrc"
             :src="item.message.imageSrc"
@@ -111,14 +116,15 @@
       </div>
     </div>
     <div
-      v-if="currentAction"
+      v-if="currentAction || (loading && !currentAction)"
       class="mt-auto flex items-center gap-2 px-2 pb-1 text-xs text-secondary"
       role="status"
       aria-live="polite"
       aria-atomic="true"
     >
       <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
-      <span>{{ currentAction }}</span>
+      <span v-if="currentAction">{{ currentAction }}</span>
+      <span v-else class="animate-pulse">▊</span>
     </div>
   </div>
 </template>
@@ -129,6 +135,7 @@ import { ref, watch } from "vue";
 
 import CustomButton from "@/components/CustomButton.vue";
 import MarkdownRenderer from "@/components/chat/MarkdownRenderer.vue";
+import ToolCallBlock from "@/components/chat/ToolCallBlock.vue";
 import type { DisplayMessage, RenderSegment } from "@/types/chat";
 
 const props = defineProps<{
@@ -139,6 +146,7 @@ const props = defineProps<{
     segments: RenderSegment[];
   }>;
   currentAction: string;
+  loading: boolean;
   backendOnline: boolean;
   emptyTitle: string;
   emptySubtitle: string;

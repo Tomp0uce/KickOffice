@@ -1,11 +1,20 @@
 import type { Component } from 'vue'
 
+export interface ToolCallPart {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  status: 'pending' | 'running' | 'complete' | 'error'
+  result?: string
+}
+
 export interface DisplayMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   imageSrc?: string
   richHtml?: string
+  toolCalls?: ToolCallPart[]
 }
 
 export interface QuickAction {
