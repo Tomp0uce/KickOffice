@@ -9,8 +9,8 @@
  * to prevent data loss when processing rich content.
  */
 
-import type { InheritedStyles } from './officeRichText'
-import { htmlToMarkdown } from './officeRichText'
+import type { InheritedStyles } from './markdown'
+import { htmlToMarkdown } from './markdown'
 
 const PLACEHOLDER_PREFIX = '{{PRESERVE_'
 const PLACEHOLDER_SUFFIX = '}}'

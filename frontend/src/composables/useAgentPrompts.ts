@@ -171,10 +171,12 @@ Do not send emails unless explicitly instructed.
 ${COMMON_FORMATTING_INSTRUCTIONS}`
 
   const agentPrompt = (lang: string) => {
-    let base = hostIsOutlook ? outlookAgentPrompt(lang) 
-      : hostIsPowerPoint ? powerPointAgentPrompt(lang) 
-      : hostIsExcel ? excelAgentPrompt(lang) 
-      : wordAgentPrompt(lang)
+    let base = ''
+    if (hostIsOutlook) base = outlookAgentPrompt(lang)
+    else if (hostIsPowerPoint) base = powerPointAgentPrompt(lang)
+    else if (hostIsExcel) base = excelAgentPrompt(lang)
+    else base = wordAgentPrompt(lang)
+    
     return `${base}${userProfilePromptBlock()}\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
   }
 

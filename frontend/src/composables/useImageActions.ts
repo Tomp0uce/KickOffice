@@ -1,3 +1,4 @@
+import type { InsertType } from '@/types'
 import type { Ref } from 'vue'
 
 import { message as messageUtil } from '@/utils/message'
@@ -6,30 +7,32 @@ import type { DisplayMessage, RenderSegment } from '@/types/chat'
 
 const THINK_TAG = '<think>'
 const THINK_TAG_END = '</think>'
-// Get a fresh regex instance each time to avoid stateful lastIndex issues (CH7)
-const getThinkTagRegex = () => new RegExp(`${THINK_TAG}[\\s\\S]*?${THINK_TAG_END}`, 'g')
+
+export function parseThinkTags(text: string): RenderSegment[] {
+  if (!text) return []
+  const segments: RenderSegment[] = []
+  let cursor = 0
+  while (cursor < text.length) {
+    const start = text.indexOf(THINK_TAG, cursor)
+    if (start === -1) {
+      segments.push({ type: 'text', text: text.slice(cursor) })
+      break
+    }
+    if (start > cursor) segments.push({ type: 'text', text: text.slice(cursor, start) })
+    const end = text.indexOf(THINK_TAG_END, start + THINK_TAG.length)
+    if (end === -1) {
+      segments.push({ type: 'think', text: text.slice(start + THINK_TAG.length) })
+      break
+    }
+    segments.push({ type: 'think', text: text.slice(start + THINK_TAG.length, end) })
+    cursor = end + THINK_TAG_END.length
+  }
+  return segments.filter(s => s.text)
+}
 
 export function useImageActions(t: (key: string) => string) {
   function splitThinkSegments(text: string): RenderSegment[] {
-    if (!text) return []
-    const segments: RenderSegment[] = []
-    let cursor = 0
-    while (cursor < text.length) {
-      const start = text.indexOf(THINK_TAG, cursor)
-      if (start === -1) {
-        segments.push({ type: 'text', text: text.slice(cursor) })
-        break
-      }
-      if (start > cursor) segments.push({ type: 'text', text: text.slice(cursor, start) })
-      const end = text.indexOf(THINK_TAG_END, start + THINK_TAG.length)
-      if (end === -1) {
-        segments.push({ type: 'think', text: text.slice(start + THINK_TAG.length) })
-        break
-      }
-      segments.push({ type: 'think', text: text.slice(start + THINK_TAG.length, end) })
-      cursor = end + THINK_TAG_END.length
-    }
-    return segments.filter(s => s.text)
+    return parseThinkTags(text)
   }
 
   function createDisplayMessage(role: DisplayMessage['role'], content: string, imageSrc?: string): DisplayMessage {
@@ -38,7 +41,11 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   function cleanContent(content: string): string {
-    return content.replace(getThinkTagRegex(), '').trim()
+    return parseThinkTags(content)
+      .filter(s => s.type === 'text')
+      .map(s => s.text)
+      .join('')
+      .trim()
   }
 
   function getMessageActionPayload(message: DisplayMessage): string {
@@ -114,7 +121,7 @@ export function useImageActions(t: (key: string) => string) {
     messageUtil.error(t('imageClipboardNotSupported'))
   }
 
-  async function insertImageToWord(imageSrc: string, type: insertTypes) {
+  async function insertImageToWord(imageSrc: string, type: InsertType) {
     // Use regex to safely extract base64 payload from data URL
     const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim()
     if (!base64Payload) throw new Error('Image base64 payload is empty')
@@ -125,7 +132,7 @@ export function useImageActions(t: (key: string) => string) {
     })
   }
 
-  async function insertImageToPowerPoint(imageSrc: string, type: insertTypes) {
+  async function insertImageToPowerPoint(imageSrc: string, type: InsertType) {
     if (type === 'NoAction') return
 
     const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim()

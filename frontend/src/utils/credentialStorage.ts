@@ -1,10 +1,8 @@
 /**
- * Secure credential storage utility
- * Uses localStorage with obfuscation for persistent storage
- * Falls back to sessionStorage for session-only storage
+ * Credential storage utility
+ * Uses sessionStorage by default for better security.
+ * Can use localStorage if "remember credentials" is explicitly enabled.
  */
-
-const OBFUSCATION_KEY = 'K1ck0ff1c3' // Simple obfuscation key
 
 function safeSetItem(key: string, value: string): void {
   try {
@@ -18,35 +16,6 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
-/**
- * Simple XOR-based obfuscation (not encryption, just makes credentials non-plaintext)
- */
-function obfuscate(text: string): string {
-  if (!text) return ''
-  let result = ''
-  for (let i = 0; i < text.length; i++) {
-    result += String.fromCharCode(text.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length))
-  }
-  return btoa(result) // Base64 encode the result
-}
-
-/**
- * Reverse the obfuscation
- */
-function deobfuscate(encoded: string): string {
-  if (!encoded) return ''
-  try {
-    const decoded = atob(encoded)
-    let result = ''
-    for (let i = 0; i < decoded.length; i++) {
-      result += String.fromCharCode(decoded.charCodeAt(i) ^ OBFUSCATION_KEY.charCodeAt(i % OBFUSCATION_KEY.length))
-    }
-    return result
-  } catch {
-    return ''
-  }
-}
-
 const STORAGE_PREFIX = 'ko_cred_'
 
 /**
@@ -54,8 +23,7 @@ const STORAGE_PREFIX = 'ko_cred_'
  */
 function getCredential(key: string, remember: boolean): string {
   if (remember) {
-    const stored = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
-    return stored ? deobfuscate(stored) : ''
+    return localStorage.getItem(`${STORAGE_PREFIX}${key}`) || ''
   }
   return sessionStorage.getItem(key) || ''
 }
@@ -66,7 +34,7 @@ function getCredential(key: string, remember: boolean): string {
 function setCredential(key: string, value: string, remember: boolean): void {
   if (remember) {
     if (value) {
-      safeSetItem(`${STORAGE_PREFIX}${key}`, obfuscate(value))
+      safeSetItem(`${STORAGE_PREFIX}${key}`, value)
     } else {
       localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
     }
@@ -102,11 +70,11 @@ export function setRememberCredentials(value: boolean): void {
     const key = sessionStorage.getItem('litellmUserKey')
     const email = sessionStorage.getItem('litellmUserEmail')
     if (key) {
-      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(key))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, key)
       sessionStorage.removeItem('litellmUserKey')
     }
     if (email) {
-      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(email))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, email)
       sessionStorage.removeItem('litellmUserEmail')
     }
   } else if (!value && wasRemembering) {
@@ -159,11 +127,11 @@ export function migrateFromSessionStorage(): void {
     const sessionKey = sessionStorage.getItem('litellmUserKey')
     const sessionEmail = sessionStorage.getItem('litellmUserEmail')
     if (sessionKey && !localStorage.getItem(`${STORAGE_PREFIX}litellmUserKey`)) {
-      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, obfuscate(sessionKey))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, sessionKey)
       sessionStorage.removeItem('litellmUserKey')
     }
     if (sessionEmail && !localStorage.getItem(`${STORAGE_PREFIX}litellmUserEmail`)) {
-      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, obfuscate(sessionEmail))
+      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, sessionEmail)
       sessionStorage.removeItem('litellmUserEmail')
     }
   }

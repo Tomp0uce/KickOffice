@@ -53,8 +53,6 @@ export default defineConfig({
         },
       },
     },
-    // Increase warning threshold to 600kB (from default 500kB)
-    chunkSizeWarningLimit: 600,
   },
   server: {
     port: 3002,

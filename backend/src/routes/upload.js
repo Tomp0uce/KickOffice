@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import multer from 'multer'
+import { fileTypeFromBuffer } from 'file-type'
 import * as pdfParseModule from 'pdf-parse'
 const pdf = pdfParseModule.default || pdfParseModule
 import mammoth from 'mammoth'
@@ -26,7 +27,16 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
   const file = req.file
   const filename = file.originalname || 'unknown_file'
-  const mimeType = file.mimetype
+  let mimeType = file.mimetype
+  
+  try {
+    const typeInfo = await fileTypeFromBuffer(file.buffer)
+    if (typeInfo) {
+      mimeType = typeInfo.mime
+    }
+  } catch (err) {
+    systemLog('WARN', 'Could not determine file type from buffer', err)
+  }
   
   systemLog('INFO', `POST /api/upload started parsing file: ${filename}`, {
     size: file.size,
@@ -100,7 +110,6 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
   } catch (error) {
     systemLog('ERROR', `POST /api/upload error parsing file ${filename}`, error)
-    console.error('File parsing error:', error)
     return logAndRespond(res, 500, { error: 'Failed to process file' }, 'POST /api/upload')
   }
 })

@@ -20,7 +20,7 @@
         </div>
         <div class="flex-1">
           <h2 class="text-sm font-semibold text-main">
-            {{ $t("settings") }}
+            {{ t("settings") }}
           </h2>
         </div>
       </div>
@@ -37,7 +37,7 @@
           :aria-selected="currentTab === tab.id"
           text=""
           :type="currentTab === tab.id ? 'primary' : 'secondary'"
-          :title="$t(tab.label) || tab.defaultLabel"
+          :title="t(tab.label) || tab.defaultLabel"
           :icon="tab.icon"
           :icon-size="16"
           class="flex-1 rounded-sm border-none! p-1!"
@@ -59,8 +59,8 @@
             <SettingCard>
               <CustomInput
                 v-model="litellmUserKey"
-                :title="$t('litellmUserKeyLabel')"
-                :placeholder="$t('litellmUserKeyPlaceholder')"
+                :title="t('litellmUserKeyLabel')"
+                :placeholder="t('litellmUserKeyPlaceholder')"
                 :is-password="true"
               />
             </SettingCard>
@@ -68,8 +68,8 @@
             <SettingCard>
               <CustomInput
                 v-model="litellmUserEmail"
-                :title="$t('litellmUserEmailLabel')"
-                :placeholder="$t('litellmUserEmailPlaceholder')"
+                :title="t('litellmUserEmailLabel')"
+                :placeholder="t('litellmUserEmailPlaceholder')"
               />
             </SettingCard>
 
@@ -79,17 +79,17 @@
               >
                 <div class="flex flex-col">
                   <span class="text-sm font-semibold text-main">{{
-                    $t("rememberCredentialsLabel")
+                    t("rememberCredentialsLabel")
                   }}</span>
                   <span class="text-xs text-secondary">{{
-                    $t("rememberCredentialsDescription")
+                    t("rememberCredentialsDescription")
                   }}</span>
                 </div>
                 <input
                   v-model="rememberCredentials"
                   type="checkbox"
                   class="h-4 w-4 cursor-pointer accent-accent"
-                  :aria-label="$t('rememberCredentialsLabel')"
+                  :aria-label="t('rememberCredentialsLabel')"
                 />
               </label>
             </SettingCard>
@@ -97,7 +97,7 @@
             <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t("litellmCredentialsMissing")
+                  t("litellmCredentialsMissing")
                 }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
@@ -115,8 +115,8 @@
                   />
                   {{
                     litellmConfigured
-                      ? $t("litellmCredentialsConfigured")
-                      : $t("litellmCredentialsMissing")
+                      ? t("litellmCredentialsConfigured")
+                      : t("litellmCredentialsMissing")
                   }}
                 </div>
               </div>
@@ -125,7 +125,7 @@
             <SettingCard>
               <div class="flex flex-col gap-1">
                 <span class="text-xs text-secondary">{{
-                  $t("litellmCredentialsInfo")
+                  t("litellmCredentialsInfo")
                 }}</span>
                 <a
                   href="https://getkey.ai.kickmaker.net/"
@@ -149,7 +149,7 @@
                 v-model="localLanguage"
                 :tight="false"
                 :key-list="localLanguageOptions.map((item) => item.value)"
-                :title="$t('localLanguageLabel')"
+                :title="t('localLanguageLabel')"
                 :fronticon="false"
                 :placeholder="
                   localLanguageOptions.find((o) => o.value === localLanguage)
@@ -170,7 +170,7 @@
                 v-model="replyLanguage"
                 :tight="false"
                 :key-list="replyLanguageOptions.map((item) => item.value)"
-                :title="$t('replyLanguageLabel')"
+                :title="t('replyLanguageLabel')"
                 :fronticon="false"
                 :placeholder="
                   replyLanguageOptions.find((o) => o.value === replyLanguage)
@@ -192,17 +192,17 @@
               >
                 <div class="flex flex-col">
                   <span class="text-sm font-semibold text-main">{{
-                    $t("darkModeLabel")
+                    t("darkModeLabel")
                   }}</span>
                   <span class="text-xs text-secondary">{{
-                    $t("darkModeDescription")
+                    t("darkModeDescription")
                   }}</span>
                 </div>
                 <input
                   v-model="darkMode"
                   type="checkbox"
                   class="h-4 w-4 cursor-pointer accent-accent"
-                  :aria-label="$t('darkModeLabel')"
+                  :aria-label="t('darkModeLabel')"
                 />
               </label>
             </SettingCard>
@@ -214,7 +214,7 @@
                 :key-list="
                   excelFormulaLanguageOptions.map((item) => item.value)
                 "
-                :title="$t('excelFormulaLanguageLabel')"
+                :title="t('excelFormulaLanguageLabel')"
                 :fronticon="false"
                 :placeholder="
                   excelFormulaLanguageOptions.find(
@@ -235,13 +235,13 @@
               <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
                 <CustomInput
                   v-model="userFirstName"
-                  :title="$t('userFirstNameLabel')"
-                  :placeholder="$t('userFirstNamePlaceholder')"
+                  :title="t('userFirstNameLabel')"
+                  :placeholder="t('userFirstNamePlaceholder')"
                 />
                 <CustomInput
                   v-model="userLastName"
-                  :title="$t('userLastNameLabel')"
-                  :placeholder="$t('userLastNamePlaceholder')"
+                  :title="t('userLastNameLabel')"
+                  :placeholder="t('userLastNamePlaceholder')"
                 />
               </div>
             </SettingCard>
@@ -251,7 +251,7 @@
                 v-model="userGender"
                 :tight="false"
                 :key-list="genderOptions.map((item) => item.value)"
-                :title="$t('userGenderLabel')"
+                :title="t('userGenderLabel')"
                 :fronticon="false"
                 :placeholder="
                   genderOptions.find((o) => o.value === userGender)?.label ||
@@ -269,7 +269,7 @@
             <SettingCard>
               <CustomInput
                 v-model.number="agentMaxIterations"
-                :title="$t('agentMaxIterationsLabel')"
+                :title="t('agentMaxIterationsLabel')"
                 placeholder="25"
                 input-type="number"
               />
@@ -279,7 +279,7 @@
             <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t("backendStatus")
+                  t("backendStatus")
                 }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
@@ -294,7 +294,7 @@
                     :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
                   />
                   {{
-                    backendOnline ? $t("backendOnline") : $t("backendOffline")
+                    backendOnline ? t("backendOnline") : t("backendOffline")
                   }}
                 </div>
               </div>
@@ -303,7 +303,7 @@
             <SettingCard>
               <div class="flex items-center justify-between gap-2">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t("appVersion")
+                  t("appVersion")
                 }}</span>
                 <span
                   class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary"
@@ -316,7 +316,7 @@
             <SettingCard v-if="Object.keys(availableModels).length > 0">
               <div class="flex flex-col gap-2">
                 <span class="text-sm font-semibold text-secondary">{{
-                  $t("configuredModels")
+                  t("configuredModels")
                 }}</span>
                 <div
                   v-for="(info, tier) in availableModels"
@@ -352,7 +352,7 @@
             >
               <div class="flex items-center justify-between">
                 <h3 class="text-center text-sm font-semibold text-main">
-                  {{ $t("savedPrompts") }}
+                  {{ t("savedPrompts") }}
                 </h3>
                 <CustomButton
                   :icon="Plus"
@@ -411,24 +411,24 @@
                 >
                   <label
                     class="mb-1 block text-xs font-semibold text-secondary"
-                    >{{ $t("systemPrompt") }}</label
+                    >{{ t("systemPrompt") }}</label
                   >
                   <textarea
                     v-model="editingPrompt.systemPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
                     rows="3"
-                    :placeholder="$t('systemPromptPlaceholder')"
+                    :placeholder="t('systemPromptPlaceholder')"
                   />
 
                   <label
                     class="mb-1 block text-xs font-semibold text-secondary"
-                    >{{ $t("userPrompt") }}</label
+                    >{{ t("userPrompt") }}</label
                   >
                   <textarea
                     v-model="editingPrompt.userPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
                     rows="3"
-                    :placeholder="$t('userPromptPlaceholder')"
+                    :placeholder="t('userPromptPlaceholder')"
                   />
 
                   <div class="mt-3 flex gap-2">
@@ -533,7 +533,7 @@
                 <div v-if="editingBuiltinPromptKey === key">
                   <label
                     class="mt-2 block text-xs font-semibold text-secondary"
-                    >{{ $t("systemPrompt") }}</label
+                    >{{ t("systemPrompt") }}</label
                   >
                   <textarea
                     v-model="editingBuiltinPrompt.system"
@@ -542,7 +542,7 @@
                   />
                   <label
                     class="mt-2 block text-xs font-semibold text-secondary"
-                    >{{ $t("userPrompt") }}</label
+                    >{{ t("userPrompt") }}</label
                   >
                   <textarea
                     v-model="editingBuiltinPrompt.user"
@@ -553,7 +553,7 @@
 
                 <div v-else class="mt-2">
                   <p class="mb-2 text-xs font-semibold text-secondary">
-                    {{ $t("systemPrompt") }}:
+                    {{ t("systemPrompt") }}:
                   </p>
                   <p
                     class="text-xs leading-normal wrap-break-word text-secondary"
@@ -561,7 +561,7 @@
                     {{ getSystemPromptPreview(promptConfig.system) }}
                   </p>
                   <p class="mt-2 mb-2 text-xs font-semibold text-secondary">
-                    {{ $t("userPrompt") }}:
+                    {{ t("userPrompt") }}:
                   </p>
                   <p
                     class="text-xs leading-normal wrap-break-word text-secondary"
@@ -616,10 +616,10 @@
                       :for="'tool-' + tool.name"
                       class="text-xs font-semibold text-secondary"
                     >
-                      {{ $t(`${toolTranslationPrefix}_${tool.name}`) }}
+                      {{ t(`${toolTranslationPrefix}_${tool.name}`) }}
                     </label>
                     <span class="text-xs text-secondary/90">
-                      {{ $t(`${toolTranslationPrefix}_${tool.name}_desc`) }}
+                      {{ t(`${toolTranslationPrefix}_${tool.name}_desc`) }}
                     </span>
                   </div>
                 </div>
@@ -633,6 +633,7 @@
 </template>
 
 <script lang="ts" setup>
+import type { ModelInfo } from '@/types'
 import { useStorage } from "@vueuse/core";
 import {
   ArrowLeft,

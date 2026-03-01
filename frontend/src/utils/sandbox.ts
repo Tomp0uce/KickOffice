@@ -4,7 +4,7 @@ import { ensureLockdown } from "./lockdown";
 
 export function sandboxedEval(
   code: string,
-  globals: Record<string, unknown>,
+  globals: Record<string, any>,
 ): unknown {
   ensureLockdown();
   // @ts-ignore

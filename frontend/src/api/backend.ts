@@ -1,3 +1,4 @@
+import type { ModelTier, ModelInfo } from '@/types'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
 if (!BACKEND_URL) {
@@ -54,6 +55,7 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
     try {
       return await fetch(url, {
         ...init,
+        credentials: 'include',
         signal,
       })
     } catch (error) {
@@ -78,12 +80,22 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
 
 import { getUserKey, getUserEmail } from '@/utils/credentialStorage'
 
+function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^| )csrf_token=([^;]+)/)
+  if (match) return match[1]
+  return ''
+}
+
 function getUserCredentialHeaders(): Record<string, string> {
   const userKey = getUserKey()
   const userEmail = getUserEmail()
   const headers: Record<string, string> = {}
   if (userKey) headers['X-User-Key'] = userKey
   if (userEmail) headers['X-User-Email'] = userEmail
+  
+  const csrf = getCsrfToken()
+  if (csrf) headers['x-csrf-token'] = csrf
+  
   return headers
 }
 
@@ -213,7 +225,7 @@ export interface ApiToolDefinition {
   function: {
     name: string
     description?: string
-    parameters: Record<string, unknown>
+    parameters: Record<string, any>
     strict?: boolean
   }
 }

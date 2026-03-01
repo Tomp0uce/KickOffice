@@ -146,6 +146,7 @@
 </template>
 
 <script lang="ts" setup>
+import type { ModelInfo } from '@/types'
 import { Send, Square, Paperclip } from "lucide-vue-next";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";

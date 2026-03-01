@@ -3,15 +3,15 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed } from "vue";
 
-import { renderSanitizedMarkdown } from '@/utils/markdown'
+import { renderSanitizedMarkdown } from "@/utils/officeRichText";
 
 const props = defineProps<{
-  content: string
-}>()
+  content: string;
+}>();
 
-const renderedHtml = computed(() => renderSanitizedMarkdown(props.content))
+const renderedHtml = computed(() => renderSanitizedMarkdown(props.content));
 </script>
 
 <style scoped>
@@ -42,6 +42,8 @@ const renderedHtml = computed(() => renderSanitizedMarkdown(props.content))
 }
 
 .markdown-renderer :deep(code) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 </style>

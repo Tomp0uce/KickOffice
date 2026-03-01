@@ -1,15 +1,88 @@
+import type { InsertType } from '@/types'
 import { type Ref, ref } from 'vue'
 
 import type { DisplayMessage } from '@/types/chat'
-import { insertFormattedResult, insertResult } from '@/api/common'
+import { insertFormattedResult, insertResult } from '@/api/wordApi'
 import { message as messageUtil } from '@/utils/message'
 import { getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
 import { insertIntoPowerPoint } from '@/utils/powerpointTools'
-import { renderOfficeCommonApiHtml } from '@/utils/officeRichText'
+import { renderOfficeCommonApiHtml } from '@/utils/markdown'
 import DOMPurify from 'dompurify'
 
 const VERBOSE_LOGGING_ENABLED = import.meta.env.VITE_VERBOSE_LOGGING === 'true'
 const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-INSERT]') : () => {}
+
+async function doOutlookInsert(content: string, richHtml: string | undefined, copyToClipboard: Function, t: (key: string) => string) {
+  try {
+    const mailbox = getOutlookMailbox()
+    const item = mailbox?.item
+    if (item?.body?.setSelectedDataAsync) {
+      const rawHtmlBody = richHtml || renderOfficeCommonApiHtml(content)
+      const htmlBody = DOMPurify.sanitize(rawHtmlBody, { USE_PROFILES: { html: true } })
+      await new Promise<void>((resolve, reject) => {
+        item.body.setSelectedDataAsync!(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
+          if (isOfficeAsyncSucceeded(result.status)) resolve()
+          else reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
+        })
+      })
+      messageUtil.success(t('insertedToEmail'))
+    } else {
+      await copyToClipboard(content, true)
+    }
+  } catch (err) {
+    console.warn('[useOfficeInsert] Outlook error/fallback to clipboard', err)
+    await copyToClipboard(content, true)
+  }
+}
+
+async function doPowerPointInsert(content: string, copyToClipboard: Function, t: (key: string) => string) {
+  try {
+    await insertIntoPowerPoint(content)
+    messageUtil.success(t('insertedToSlide'))
+  } catch (err) {
+    console.warn('[useOfficeInsert] PowerPoint error/fallback to clipboard', err)
+    await copyToClipboard(content, true)
+  }
+}
+
+async function doExcelInsert(content: string, copyToClipboard: Function, t: (key: string) => string) {
+  try {
+    await Excel.run(async (ctx) => {
+      const range = ctx.workbook.getSelectedRange()
+      range.values = [[content]]
+      range.format.wrapText = true
+      await ctx.sync()
+    })
+    messageUtil.success(t('insertedToCell'))
+  } catch (err) {
+    console.warn('[useOfficeInsert] Excel error/fallback to clipboard', err)
+    await copyToClipboard(content, true)
+  }
+}
+
+async function doWordInsert(content: string, type: InsertType, richHtml: string | undefined, useWordFormatting: boolean, copyToClipboard: Function, t: (key: string) => string) {
+  try {
+    if (richHtml) {
+      const sanitizedHtml = DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } })
+      await Word.run(async (context) => {
+        const range = context.document.getSelection()
+        range.insertHtml(sanitizedHtml, type === 'newLine' ? 'After' : 'Replace')
+        await context.sync()
+      })
+      messageUtil.success(t('inserted'))
+    } else if (useWordFormatting) {
+      await insertFormattedResult(content, ref(type))
+      messageUtil.success(t('inserted'))
+    } else {
+      await insertResult(content, ref(type))
+      messageUtil.success(t('inserted'))
+    }
+  } catch (err) {
+    console.warn('[useOfficeInsert] Word error/fallback to clipboard', err)
+    await copyToClipboard(content, true)
+  }
+}
+
 
 interface UseOfficeInsertOptions {
   hostIsOutlook: boolean
@@ -17,13 +90,13 @@ interface UseOfficeInsertOptions {
   hostIsExcel: boolean
   hostIsWord: boolean
   useWordFormatting: Ref<boolean>
-  insertType: Ref<insertTypes>
+  insertType: Ref<InsertType>
   t: (key: string) => string
   shouldTreatMessageAsImage: (message: DisplayMessage) => boolean
   getMessageActionPayload: (message: DisplayMessage) => string
   copyImageToClipboard: (imageSrc: string, fallback?: boolean) => Promise<void>
-  insertImageToWord: (imageSrc: string, type: insertTypes) => Promise<void>
-  insertImageToPowerPoint: (imageSrc: string, type: insertTypes) => Promise<void>
+  insertImageToWord: (imageSrc: string, type: InsertType) => Promise<void>
+  insertImageToPowerPoint: (imageSrc: string, type: InsertType) => Promise<void>
 }
 
 export function useOfficeInsert(options: UseOfficeInsertOptions) {
@@ -76,7 +149,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     }
   }
 
-  async function insertToDocument(content: string, type: insertTypes, richHtml?: string) {
+  async function insertToDocument(content: string, type: InsertType, richHtml?: string) {
     const normalizedContent = normalizeInsertionContent(content)
     if (!normalizedContent) return
 
@@ -89,79 +162,21 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     })
 
     if (hostIsOutlook) {
-      try {
-        const mailbox = getOutlookMailbox()
-        const item = mailbox?.item
-        if (item?.body?.setSelectedDataAsync) {
-          // F1: Use rich HTML if available (preserves images/formatting), otherwise render from markdown
-          const rawHtmlBody = richHtml || renderOfficeCommonApiHtml(normalizedContent)
-          const htmlBody = DOMPurify.sanitize(rawHtmlBody, { USE_PROFILES: { html: true } })
-          await new Promise<void>((resolve, reject) => {
-            item.body.setSelectedDataAsync!(htmlBody, { coercionType: getOfficeHtmlCoercionType() }, (result: OfficeAsyncResult) => {
-              if (isOfficeAsyncSucceeded(result.status)) resolve()
-              else reject(new Error(result.error?.message || 'setSelectedDataAsync failed'))
-            })
-          })
-          messageUtil.success(t('insertedToEmail'))
-        } else {
-          await copyToClipboard(content, true)
-        }
-      } catch (err) {
-        console.warn('[useOfficeInsert] Outlook error/fallback to clipboard', err)
-        await copyToClipboard(content, true)
-      }
+      await doOutlookInsert(normalizedContent, richHtml, copyToClipboard, t)
       return
     }
 
     if (hostIsPowerPoint) {
-      try {
-        await insertIntoPowerPoint(normalizedContent)
-        messageUtil.success(t('insertedToSlide'))
-      } catch (err) {
-        console.warn('[useOfficeInsert] PowerPoint error/fallback to clipboard', err)
-        await copyToClipboard(normalizedContent, true)
-      }
+      await doPowerPointInsert(normalizedContent, copyToClipboard, t)
       return
     }
 
     if (hostIsExcel) {
-      try {
-        await Excel.run(async (ctx) => {
-          const range = ctx.workbook.getSelectedRange()
-          range.values = [[normalizedContent]]
-          range.format.wrapText = true
-          await ctx.sync()
-        })
-        messageUtil.success(t('insertedToCell'))
-      } catch (err) {
-        console.warn('[useOfficeInsert] Excel error/fallback to clipboard', err)
-        await copyToClipboard(normalizedContent, true)
-      }
+      await doExcelInsert(normalizedContent, copyToClipboard, t)
       return
     }
 
-    // Word insertion
-    try {
-      // F1: Use rich HTML if available (preserves images/formatting from original selection)
-      if (richHtml) {
-        const sanitizedHtml = DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } })
-        await Word.run(async (context) => {
-          const range = context.document.getSelection()
-          range.insertHtml(sanitizedHtml, type === 'newLine' ? 'After' : 'Replace')
-          await context.sync()
-        })
-        messageUtil.success(t('inserted'))
-      } else if (useWordFormatting.value) {
-        await insertFormattedResult(normalizedContent, ref(type))
-        messageUtil.success(t('inserted'))
-      } else {
-        await insertResult(normalizedContent, ref(type))
-        messageUtil.success(t('inserted'))
-      }
-    } catch (err) {
-      console.warn('[useOfficeInsert] Word error/fallback to clipboard', err)
-      await copyToClipboard(normalizedContent, true)
-    }
+    await doWordInsert(normalizedContent, type, richHtml, useWordFormatting.value, copyToClipboard, t)
   }
 
   async function copyMessageToClipboard(message: DisplayMessage, fallback = false) {
@@ -172,7 +187,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     await copyToClipboard(getMessageActionPayload(message), fallback)
   }
 
-  async function insertMessageToDocument(message: DisplayMessage, type: insertTypes) {
+  async function insertMessageToDocument(message: DisplayMessage, type: InsertType) {
     if (shouldTreatMessageAsImage(message) && message.imageSrc) {
       if (hostIsWord) {
         try {

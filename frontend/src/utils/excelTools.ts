@@ -1,3 +1,4 @@
+import type { ToolProperty, ExcelToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import { localStorageKey } from './enum'
 import { sandboxedEval } from './sandbox'
@@ -141,8 +142,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'value'],
     },
-    executeExcel: async (context, args) => {
-      const { address, value } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, value } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(address)
@@ -232,7 +233,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const {
         address,
         validationType = 'list',
@@ -315,7 +316,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const { address, hasHeaders = true, tableName, style = 'TableStyleMedium2' } = args
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -350,8 +351,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['sourceAddress', 'destinationAddress'],
     },
-    executeExcel: async (context, args) => {
-      const { sourceAddress, destinationAddress } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { sourceAddress, destinationAddress } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const sourceRange = sheet.getRange(sourceAddress)
@@ -387,8 +388,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'formula'],
     },
-    executeExcel: async (context, args) => {
-      const { address, formula } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, formula } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const cell = sheet.getRange(address)
@@ -429,8 +430,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['startCell', 'endCell', 'formula'],
     },
-    executeExcel: async (context, args) => {
-      const { startCell, endCell, formula } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { startCell, endCell, formula } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const formulaLocale = getExcelFormulaLanguage()
@@ -490,8 +491,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['chartType'],
     },
-    executeExcel: async (context, args) => {
-      const { chartType, title } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { chartType, title } = args as Record<string, any>
       
         const range = context.workbook.getSelectedRange()
         range.load('address')
@@ -614,7 +615,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const {
         address,
         fillColor,
@@ -630,7 +631,7 @@ const excelToolDefinitions = createExcelTools({
         borderStyle,
         borderColor,
         borderWeight,
-      } = args
+      } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
@@ -760,8 +761,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { columnIndex = 0, ascending = true, hasHeaders = true } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { columnIndex = 0, ascending = true, hasHeaders = true } = args as Record<string, any>
       
         const range = context.workbook.getSelectedRange()
         range.load('values, rowCount, columnCount')
@@ -832,8 +833,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { sheetName } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { sheetName } = args as Record<string, any>
       
         const sheet = sheetName
           ? context.workbook.worksheets.getItem(sheetName)
@@ -904,8 +905,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['currentName', 'newName'],
     },
-    executeExcel: async (context, args) => {
-      const { currentName, newName } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { currentName, newName } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getItem(currentName)
         sheet.name = newName
@@ -928,8 +929,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name'],
     },
-    executeExcel: async (context, args) => {
-      const { name } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { name } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getItem(name)
         sheet.delete()
@@ -952,8 +953,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name'],
     },
-    executeExcel: async (context, args) => {
-      const { name } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { name } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getItem(name)
         sheet.activate()
@@ -980,8 +981,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name'],
     },
-    executeExcel: async (context, args) => {
-      const { name, address } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { name, address } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getItem(name)
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
@@ -1025,8 +1026,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['mode'],
     },
-    executeExcel: async (context, args) => {
-      const { mode, count = 1, address } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { mode, count = 1, address } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
 
@@ -1074,8 +1075,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'hyperlinkAddress'],
     },
-    executeExcel: async (context, args) => {
-      const { address, hyperlinkAddress, textToDisplay, screenTip } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, hyperlinkAddress, textToDisplay, screenTip } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(address)
@@ -1108,8 +1109,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'text'],
     },
-    executeExcel: async (context, args) => {
-      const { address, text } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, text } = args as Record<string, any>
       
         const comments = context.workbook.comments
         comments.add(address, text)
@@ -1136,8 +1137,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['rowIndex'],
     },
-    executeExcel: async (context, args) => {
-      const { rowIndex, count = 1 } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { rowIndex, count = 1 } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
@@ -1165,8 +1166,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['columnLetter'],
     },
-    executeExcel: async (context, args) => {
-      const { columnLetter, count = 1 } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { columnLetter, count = 1 } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const startColNum = colToInt(columnLetter.toUpperCase())
@@ -1196,8 +1197,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['rowIndex'],
     },
-    executeExcel: async (context, args) => {
-      const { rowIndex, count = 1 } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { rowIndex, count = 1 } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
@@ -1225,8 +1226,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['columnLetter'],
     },
-    executeExcel: async (context, args) => {
-      const { columnLetter, count = 1 } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { columnLetter, count = 1 } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const startColNum = colToInt(columnLetter.toUpperCase())
@@ -1256,8 +1257,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { address, merge = true } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, merge = true } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
@@ -1292,8 +1293,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['format'],
     },
-    executeExcel: async (context, args) => {
-      const { address, format } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, format } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
@@ -1322,7 +1323,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const { address, clearType = 'all' } = args
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
@@ -1358,8 +1359,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { address } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
@@ -1397,8 +1398,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['searchText'],
     },
-    executeExcel: async (context, args) => {
-      const { searchText, replaceText } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { searchText, replaceText } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const usedRange = sheet.getUsedRange()
@@ -1443,8 +1444,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { address } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
@@ -1469,8 +1470,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { name } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { name } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.add(name || undefined)
         sheet.activate()
@@ -1498,8 +1499,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['columnLetter', 'width'],
     },
-    executeExcel: async (context, args) => {
-      const { columnLetter, width } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { columnLetter, width } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const colRange = columnLetter.includes(':')
@@ -1530,8 +1531,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['rowIndex', 'height'],
     },
-    executeExcel: async (context, args) => {
-      const { rowIndex, height } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { rowIndex, height } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const rowRange = sheet.getRange(`${rowIndex}:${rowIndex}`)
@@ -1576,7 +1577,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['action'],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const {
         sheetName,
         action,
@@ -1584,7 +1585,7 @@ const excelToolDefinitions = createExcelTools({
         allowAutoFilter = false,
         allowFormatCells = false,
         allowInsertRows = false,
-      } = args
+      } = args as Record<string, any>
 
       
         const sheet = sheetName
@@ -1655,8 +1656,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name', 'rangeAddress'],
     },
-    executeExcel: async (context, args) => {
-      const { name, rangeAddress } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { name, rangeAddress } = args as Record<string, any>
       
         context.workbook.names.add(name, rangeAddress)
         await context.sync()
@@ -1748,7 +1749,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'ruleType'],
     },
-    executeExcel: async (context, args) => {
+    executeExcel: async (context, args: Record<string, any>) => {
       const {
         address,
         ruleType,
@@ -1882,8 +1883,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args) => {
-      const { address } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
@@ -1938,10 +1939,10 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['cells'],
     },
-    executeExcel: async (context, args) => {
-      const { cells } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { cells } = args as Record<string, any>
       if (!Array.isArray(cells) || cells.length === 0) {
-        return 'Error: cells array is empty or invalid'
+        throw new Error('Error: cells array is empty or invalid')
       }
       const sheet = context.workbook.worksheets.getActiveWorksheet()
       for (const cell of cells) {
@@ -1976,10 +1977,10 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['address', 'values'],
     },
-    executeExcel: async (context, args) => {
-      const { address, values } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { address, values } = args as Record<string, any>
       if (!Array.isArray(values) || values.length === 0) {
-        return 'Error: values array is empty or invalid'
+        throw new Error('Error: values array is empty or invalid')
       }
       const sheet = context.workbook.worksheets.getActiveWorksheet()
       const range = sheet.getRange(address)
@@ -2003,8 +2004,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['searchTerm'],
     },
-    executeExcel: async (context, args) => {
-      const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args as Record<string, any>
       const sheets = context.workbook.worksheets
       sheets.load('items')
       await context.sync()
@@ -2065,8 +2066,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['sourceName'],
     },
-    executeExcel: async (context, args) => {
-      const { sourceName, newName } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { sourceName, newName } = args as Record<string, any>
       const sheet = context.workbook.worksheets.getItem(sourceName)
       const copy = sheet.copy()
       if (newName) copy.name = newName
@@ -2088,8 +2089,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['dimension', 'reference', 'action']
     },
-    executeExcel: async (context, args) => {
-      const { dimension, reference, action } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { dimension, reference, action } = args as Record<string, any>
       const sheet = context.workbook.worksheets.getActiveWorksheet()
       const isRow = dimension === 'rows'
       
@@ -2144,8 +2145,8 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['objectType', 'name']
     },
-    executeExcel: async (context, args) => {
-      const { objectType, name } = args
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { objectType, name } = args as Record<string, any>
       const sheet = context.workbook.worksheets.getActiveWorksheet()
       
       if (objectType === 'chart') {

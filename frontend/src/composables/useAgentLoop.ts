@@ -1,3 +1,4 @@
+import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
 import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
@@ -11,7 +12,7 @@ import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
 import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
-import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/officeRichText'
+import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
@@ -107,15 +108,97 @@ interface UseAgentLoopOptions {
 /**
  * Check if an error is a 401 credential error from LiteLLM
  */
-function isCredentialError(error: any): boolean {
+function isCredentialError(error: unknown): boolean {
   if (!error) return false
-  const message = error.message || String(error)
+  const errObj = error as Record<string, any>
+  const message = (errObj.message || String(error)).toString()
   return (
     message.includes('401') ||
     message.includes('LiteLLM user credentials') ||
     message.includes('X-User-Key') ||
     message.includes('X-User-Email')
   )
+}
+
+export async function executeAgentToolCall(
+  toolCall: any,
+  enabledToolDefs: any[],
+  assistantMessage: DisplayMessage | undefined,
+  currentActionRef: Ref<string>,
+  getActionLabelForCategory: (cat?: ToolCategory) => string,
+  scrollToBottomFn: () => Promise<void>
+) {
+  const toolName = toolCall.function.name
+  let toolArgs: Record<string, any> = {}
+  try {
+    toolArgs = JSON.parse(toolCall.function.arguments)
+  } catch (parseErr) {
+    console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
+    if (assistantMessage) {
+      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+      assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: {}, status: 'error', result: 'Malformed tool arguments — JSON parse failed' })
+    }
+    return { tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed`, success: false }
+  }
+
+  const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
+  if (!toolDef) {
+    if (assistantMessage) {
+      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+      assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'error', result: `Tool ${toolName} not found` })
+    }
+    return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
+  }
+
+  const signature = `${toolName}${JSON.stringify(toolArgs)}`
+  let result = ''
+  let success = false
+
+  if (assistantMessage) {
+    if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+    assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'running' })
+  }
+
+  currentActionRef.value = getActionLabelForCategory(toolDef.category)
+  await scrollToBottomFn()
+  try {
+    result = await toolDef.execute(toolArgs)
+    success = true
+    if (assistantMessage?.toolCalls) {
+      const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
+      if (idx !== -1) assistantMessage.toolCalls[idx].status = 'complete'
+    }
+  } catch (err: unknown) {
+    console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    result = `Error in ${toolName}: ${errorMessage}`
+    if (assistantMessage?.toolCalls) {
+      const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
+      if (idx !== -1) {
+         assistantMessage.toolCalls[idx].status = 'error'
+         assistantMessage.toolCalls[idx].result = errorMessage
+      }
+    }
+  }
+  currentActionRef.value = ''
+
+  let safeContent = ''
+  if (result === null || result === undefined) {
+    safeContent = ''
+  } else if (typeof result === 'object') {
+    safeContent = JSON.stringify(result)
+  } else {
+    safeContent = String(result)
+  }
+
+  if (assistantMessage?.toolCalls) {
+    const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
+    if (idx !== -1 && success) {
+      assistantMessage.toolCalls[idx].result = safeContent
+    }
+  }
+
+  return { tool_call_id: toolCall.id, content: safeContent, success, signature }
 }
 
 export function useAgentLoop(options: UseAgentLoopOptions) {
@@ -236,86 +319,21 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
 
 
-async function executeToolCall(toolCall: any, enabledToolDefs: any[], assistantMessage?: DisplayMessage) {
-    const toolName = toolCall.function.name
-    let toolArgs: Record<string, any> = {}
-    try {
-      toolArgs = JSON.parse(toolCall.function.arguments)
-    } catch (parseErr) {
-      console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
-      // Add error tool call block to message
-      if (assistantMessage) {
-        if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-        assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: {}, status: 'error', result: 'Malformed tool arguments — JSON parse failed' })
-      }
-      return { tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed`, success: false }
-    }
-
-    const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
-    if (!toolDef) {
-      if (assistantMessage) {
-        if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-        assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'error', result: `Tool ${toolName} not found` })
-      }
-      return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
-    }
-
-    const signature = `${toolName}${JSON.stringify(toolArgs)}`
-    let result = ''
-    let success = false
-
-    // Add running tool call block to message
-    const toolCallPart: ToolCallPart = { id: toolCall.id, name: toolName, args: toolArgs, status: 'running' }
-    if (assistantMessage) {
-      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-      assistantMessage.toolCalls.push(toolCallPart)
-    }
-
-    currentAction.value = getActionLabelForCategory(toolDef.category)
-    await scrollToBottom()
-    try {
-      result = await toolDef.execute(toolArgs)
-      success = true
-      toolCallPart.status = 'complete'
-    } catch (err: unknown) {
-      console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
-      const errorMessage = err instanceof Error ? err.message : String(err)
-      result = `Error in ${toolName}: ${errorMessage}`
-      toolCallPart.status = 'error'
-      toolCallPart.result = errorMessage
-    }
-    currentAction.value = ''
-
-    let safeContent = ''
-    if (result === null || result === undefined) {
-      safeContent = ''
-    } else if (typeof result === 'object') {
-      try {
-        safeContent = JSON.stringify(result)
-      } catch {
-        safeContent = String(result)
-      }
-    } else {
-      safeContent = String(result)
-    }
-
-    if (success) {
-      toolCallPart.result = safeContent.length > 500 ? safeContent.slice(0, 500) + '…' : safeContent
-    }
-
-    return { tool_call_id: toolCall.id, content: safeContent, success, signature }
-  }
-
-
 async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
-    const appToolDefs = hostIsOutlook ? getOutlookToolDefinitions() : hostIsPowerPoint ? getPowerPointToolDefinitions() : hostIsExcel ? getExcelToolDefinitions() : getWordToolDefinitions()
+    let appToolDefs = getWordToolDefinitions()
+    if (hostIsOutlook) appToolDefs = getOutlookToolDefinitions()
+    else if (hostIsPowerPoint) appToolDefs = getPowerPointToolDefinitions()
+    else if (hostIsExcel) appToolDefs = getExcelToolDefinitions()
+    
     const generalToolDefs = getGeneralToolDefinitions()
     const allToolDefs = [...generalToolDefs, ...appToolDefs]
     const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
-    const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, unknown> } }))
+    const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, any> } }))
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 10
+    const startTime = Date.now()
+    const timeoutMs = maxIter * 60 * 1000 // up to 1 minute per iteration allowed
     let currentMessages: ChatRequestMessage[] = [...messages]
     let lastToolSignature: string | null = null
     let toolsWereExecuted = false // Track if any tools were successfully executed
@@ -324,7 +342,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     await scrollToMessageTop() // Scroll to show start of assistant response
     const currentAssistantMessage = history.value[history.value.length - 1]
     let abortedByUser = false
-    while (iteration < maxIter) {
+    while (Date.now() - startTime < timeoutMs) {
       if (abortController.value?.signal.aborted) {
         abortedByUser = true
         break
@@ -369,8 +387,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           onUsage: accumulateUsage,
         })
         response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
-      } catch (err: any) {
-        if (err.name === 'AbortError' || abortController.value?.signal.aborted) {
+      } catch (err: unknown) {
+        if ((err instanceof Error && err.name === 'AbortError') || abortController.value?.signal.aborted) {
           abortedByUser = true
           break
         }
@@ -415,7 +433,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           break
         }
 
-        const toolResult = await executeToolCall(toolCall, enabledToolDefs, currentAssistantMessage)
+        const toolResult = await executeAgentToolCall(toolCall, enabledToolDefs, currentAssistantMessage, currentAction, getActionLabelForCategory, scrollToBottom)
         if (toolResult.signature === lastToolSignature) {
           toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.' })
         } else {
@@ -459,7 +477,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
     }
 
-    if (iteration >= maxIter) messageUtil.warning(t('recursionLimitExceeded'))
+    if (Date.now() - startTime >= timeoutMs) messageUtil.warning(t('recursionLimitExceeded'))
     currentAction.value = ''
   }
 
@@ -658,7 +676,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
              const result = await uploadFile(file)
              extractedFilesContext += `\n\n[Contenu extrait du fichier "${result.filename}"]:\n${result.extractedText}\n[Fin du fichier]`
            }
-        } catch (uploadObjErr: any) {
+        } catch (uploadObjErr: unknown) {
            console.error('[AgentLoop] File upload/extraction failed', uploadObjErr)
            messageUtil.error(t('somethingWentWrong'))
            return
@@ -681,8 +699,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       await processChat(fullMessage.trim())
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)
         if (isCredentialError(error)) {
           messageUtil.warning(t('credentialsRequired'))

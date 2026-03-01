@@ -1,4 +1,4 @@
-export type OfficeHostType = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook' | 'Unknown'
+import type { OfficeHostType } from '@/types'
 
 let detectedHost: OfficeHostType = 'Unknown'
 // Cache is only trusted after Office.onReady has fired to avoid stale detection

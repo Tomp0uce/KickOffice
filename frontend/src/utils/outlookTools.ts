@@ -1,9 +1,10 @@
+import type { WordToolDefinition, OutlookToolDefinition } from '@/types'
 import DiffMatchPatch from 'diff-match-patch'
 
 import DOMPurify from 'dompurify'
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeRichHtml } from './officeRichText'
+import { renderOfficeRichHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
 
 import { generateVisualDiff } from './common'
@@ -24,7 +25,7 @@ export type OutlookToolName =
   | 'insertHtmlAtCursor'
   | 'eval_outlookjs'
 
-type OutlookToolDefinition = WordToolDefinition
+
 
 type RecipientField = 'to' | 'cc' | 'bcc'
 
@@ -68,7 +69,7 @@ function resolveAsyncResult(result: any, onSuccess: (value: any) => string): str
   if (result.status === getOfficeAsyncStatus()?.Succeeded) {
     return onSuccess(result.value)
   }
-  return `Error: ${result.error?.message || 'unknown error'}`
+  throw new Error(`Error: ${result.error?.message || 'unknown error'}`)
 }
 
 function normalizeRecipient(recipient: any): { displayName: string; emailAddress: string } {
@@ -183,8 +184,8 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['text'],
     },
-    executeOutlook: async (mailbox, args) => {
-      const { text } = args
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { text } = args as Record<string, any>
       if (!mailbox?.item?.body?.setAsync) {
         return 'Cannot set email body: compose mode is not available.'
       }
@@ -222,7 +223,7 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['text'],
     },
-    executeOutlook: async (mailbox, args) => {
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
       const { text, diffTracking = false, originalText = '' } = args
       if (!mailbox?.item?.body?.setSelectedDataAsync) {
         return 'Cannot insert text at cursor: compose mode is not available.'
@@ -261,8 +262,8 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['html'],
     },
-    executeOutlook: async (mailbox, args) => {
-      const { html } = args
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { html } = args as Record<string, any>
       if (!mailbox?.item?.body?.setAsync) {
         return 'Cannot set HTML email body: compose mode is not available.'
       }
@@ -317,8 +318,8 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['subject'],
     },
-    executeOutlook: async (mailbox, args) => {
-      const { subject } = args
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { subject } = args as Record<string, any>
       if (!mailbox?.item?.subject?.setAsync) {
         return 'Cannot set email subject: compose mode is not available.'
       }
@@ -396,7 +397,7 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['recipients'],
     },
-    executeOutlook: async (mailbox, args) => {
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
       if (!mailbox?.item) return 'No email item available.'
 
       const field = getRecipientField(args.field)
@@ -505,8 +506,8 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['html'],
     },
-    executeOutlook: async (mailbox, args) => {
-      const { html } = args
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { html } = args as Record<string, any>
       if (!mailbox?.item?.body?.setSelectedDataAsync) {
         return 'Cannot insert HTML at cursor: compose mode is not available.'
       }
@@ -541,8 +542,8 @@ const outlookToolDefinitions = createOutlookTools({
       },
       required: ['code'],
     },
-    executeOutlook: async (mailbox, args) => {
-      const { code } = args
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { code } = args as Record<string, any>
       try {
         const result = await sandboxedEval(code, { mailbox, Office: typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined })
         return JSON.stringify({ success: true, result: result ?? null }, null, 2)

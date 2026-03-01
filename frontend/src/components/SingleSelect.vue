@@ -31,7 +31,7 @@
     <div
       v-show="dropDownOpen"
       ref="optionsRef"
-      class="sort-options fixed z-10 mt-0.5 max-h-50 min-w-37.5 overflow-hidden overflow-y-auto rounded-md border border-border-secondary bg-bg-tertiary shadow-lg"
+      class="sort-options absolute z-10 mt-1 mb-1 max-h-50 min-w-37.5 overflow-hidden overflow-y-auto rounded-md border border-border-secondary bg-bg-tertiary shadow-lg"
     >
       <button
         v-for="key in keyList"
@@ -48,8 +48,7 @@
 <script setup lang="ts">
 import { onClickOutside } from "@vueuse/core";
 import { ChevronDownIcon, SortAscIcon } from "lucide-vue-next";
-import { nextTick, ref } from "vue";
-
+import { nextTick, ref, type Component } from "vue";
 
 const dropdownRef = ref(null);
 const modelValue = defineModel<string>();
@@ -69,11 +68,6 @@ async function toggleDropdown() {
   if (dropDownOpen.value) {
     await nextTick();
     updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-  } else {
-    window.removeEventListener("scroll", updatePosition, true);
-    window.removeEventListener("resize", updatePosition);
   }
 }
 
@@ -84,37 +78,27 @@ function updatePosition() {
 
   const rect = trigger.getBoundingClientRect();
   const dropdownHeight = dropdown.offsetHeight;
-  const dropdownWidth = Math.max(rect.width, 160);
   const viewportHeight = window.innerHeight;
-  const viewportWidth = window.innerWidth;
 
-  // 1. 垂直位置计算：检查下方空间是否足够
   const spaceBelow = viewportHeight - rect.bottom;
-  const canFitBelow = spaceBelow > dropdownHeight + 10; // 预留10px间距
+  const canFitBelow = spaceBelow > dropdownHeight + 10;
 
   if (!canFitBelow && rect.top > dropdownHeight) {
-    // 空间不足且上方放得下，向上翻转
-    dropdown.style.top = `${rect.top - dropdownHeight - 4}px`;
+    dropdown.style.top = "auto";
+    dropdown.style.bottom = "100%";
   } else {
-    // 默认向下
-    dropdown.style.top = `${rect.bottom + 2}px`;
+    dropdown.style.top = "100%";
+    dropdown.style.bottom = "auto";
   }
 
-  // 2. 水平位置计算：防止右侧溢出
-  let leftPos = rect.left;
-  if (leftPos + dropdownWidth > viewportWidth) {
-    leftPos = viewportWidth - dropdownWidth - 10; // 靠右对齐并留点边距
-  }
-
-  dropdown.style.left = `${leftPos}px`;
+  let dropdownWidth = Math.max(rect.width, 160);
+  dropdown.style.left = "0px";
   dropdown.style.width = `${dropdownWidth}px`;
 }
 
 onClickOutside(dropdownRef, () => {
   if (dropDownOpen.value) {
     dropDownOpen.value = false;
-    window.removeEventListener("scroll", updatePosition, true);
-    window.removeEventListener("resize", updatePosition);
   }
 });
 
@@ -130,12 +114,12 @@ const {
   required = false,
 } = defineProps<{
   title: string;
-  icon?: any;
+  icon?: Component | null;
   iconSize?: number;
   tight?: boolean;
-  placeholder?: any;
+  placeholder?: string;
   fronticon?: boolean;
-  customFrontIcon?: any;
+  customFrontIcon?: Component | null;
   keyList: string[];
   required?: boolean;
 }>();
