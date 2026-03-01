@@ -103,13 +103,8 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         if (selected) return selected
       }
       
-      // Only the 'reply' quick action is allowed to fall back to reading the entire thread.
-      // All other actions (proofread, formal, polite, etc.) require an active text selection.
-      if (selectionOptions?.actionKey === 'reply') {
-        return getOutlookMailBody()
-      }
-      
-      return ''
+      // Fall back to the full email body when no text is selected
+      return getOutlookMailBody()
     }
     if (hostIsPowerPoint) return getPowerPointSelection()
     if (hostIsExcel) {
@@ -151,12 +146,9 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         if (selectedHtml) return selectedHtml
       }
       
-      if (selectionOptions?.actionKey === 'reply') {
-        const html = await getOutlookMailBodyAsHtml()
-        return html || getOutlookMailBody()
-      }
-      
-      return ''
+      // Fall back to the full email body HTML for all quick actions
+      const html = await getOutlookMailBodyAsHtml()
+      return html || getOutlookMailBody()
     }
     if (hostIsExcel) {
       // Excel cells don't have meaningful HTML content

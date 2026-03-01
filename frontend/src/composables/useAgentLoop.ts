@@ -82,9 +82,9 @@ interface AgentLoopSettings {
 
 interface AgentLoopActions {
   quickActions: Ref<QuickAction[]>
-  outlookQuickActions?: OutlookQuickAction[]
+  outlookQuickActions?: Ref<OutlookQuickAction[]>
   excelQuickActions: Ref<ExcelQuickAction[]>
-  powerPointQuickActions: PowerPointQuickAction[]
+  powerPointQuickActions: Ref<PowerPointQuickAction[]>
 }
 
 interface AgentLoopHelpers {
@@ -743,9 +743,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const selectedQuickAction = hostIsExcel
       ? excelQuickActions.value.find(a => a.key === actionKey)
       : hostIsPowerPoint
-        ? powerPointQuickActions.find(a => a.key === actionKey)
+        ? powerPointQuickActions.value.find(a => a.key === actionKey)
         : hostIsOutlook && outlookQuickActions
-          ? outlookQuickActions.find(a => a.key === actionKey)
+          ? outlookQuickActions.value?.find(a => a.key === actionKey)
           : quickActions.value.find(a => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined

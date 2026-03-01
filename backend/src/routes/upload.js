@@ -1,11 +1,8 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
-import { createRequire } from 'module'
+import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
-
-const require = createRequire(import.meta.url)
-const pdf = require('pdf-parse')
 import * as xlsx from 'xlsx'
 import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'
@@ -50,9 +47,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
     // PDF Extraction
     if (mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
-      // pdf-parse might be a CJS module that require returns as { default: [Function] } or just the function
-      const pdfParser = pdf.default || pdf
-      const data = await pdfParser(file.buffer)
+      const data = await pdfParse(file.buffer)
       extractedText = data.text
     } 
     // DOCX Extraction
