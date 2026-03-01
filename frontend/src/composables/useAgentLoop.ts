@@ -1,6 +1,6 @@
 import { nextTick, ref, type Ref } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, chatStream, generateImage, uploadFile } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -15,7 +15,7 @@ import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/officeR
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 
-import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
+import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
 
 
 interface ToolCallFunction {
@@ -179,6 +179,22 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const currentAction = ref('')
   const pendingSmartReply = ref(false)
 
+  const sessionStats = ref({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+  })
+
+  function resetSessionStats() {
+    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  }
+
+  function accumulateUsage(usage: TokenUsage) {
+    sessionStats.value.inputTokens += usage.promptTokens
+    sessionStats.value.outputTokens += usage.completionTokens
+    sessionStats.value.totalTokens += usage.totalTokens
+  }
+
   const getActionLabelForCategory = (category?: ToolCategory) => {
     switch (category) {
       case 'read':
@@ -220,18 +236,27 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
 
 
-async function executeToolCall(toolCall: any, enabledToolDefs: any[]) {
+async function executeToolCall(toolCall: any, enabledToolDefs: any[], assistantMessage?: DisplayMessage) {
     const toolName = toolCall.function.name
     let toolArgs: Record<string, any> = {}
     try {
       toolArgs = JSON.parse(toolCall.function.arguments)
     } catch (parseErr) {
       console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
+      // Add error tool call block to message
+      if (assistantMessage) {
+        if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+        assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: {}, status: 'error', result: 'Malformed tool arguments — JSON parse failed' })
+      }
       return { tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed`, success: false }
     }
 
     const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
     if (!toolDef) {
+      if (assistantMessage) {
+        if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+        assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'error', result: `Tool ${toolName} not found` })
+      }
       return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
     }
 
@@ -239,15 +264,25 @@ async function executeToolCall(toolCall: any, enabledToolDefs: any[]) {
     let result = ''
     let success = false
 
+    // Add running tool call block to message
+    const toolCallPart: ToolCallPart = { id: toolCall.id, name: toolName, args: toolArgs, status: 'running' }
+    if (assistantMessage) {
+      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
+      assistantMessage.toolCalls.push(toolCallPart)
+    }
+
     currentAction.value = getActionLabelForCategory(toolDef.category)
     await scrollToBottom()
     try {
       result = await toolDef.execute(toolArgs)
       success = true
+      toolCallPart.status = 'complete'
     } catch (err: unknown) {
       console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
       const errorMessage = err instanceof Error ? err.message : String(err)
       result = `Error in ${toolName}: ${errorMessage}`
+      toolCallPart.status = 'error'
+      toolCallPart.result = errorMessage
     }
     currentAction.value = ''
 
@@ -262,6 +297,10 @@ async function executeToolCall(toolCall: any, enabledToolDefs: any[]) {
       }
     } else {
       safeContent = String(result)
+    }
+
+    if (success) {
+      toolCallPart.result = safeContent.length > 500 ? safeContent.slice(0, 500) + '…' : safeContent
     }
 
     return { tool_call_id: toolCall.id, content: safeContent, success, signature }
@@ -326,7 +365,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                 response.choices[0].message.tool_calls[idx].function.arguments += delta.function.arguments
               }
             }
-          }
+          },
+          onUsage: accumulateUsage,
         })
         response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
       } catch (err: any) {
@@ -375,7 +415,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           break
         }
 
-        const toolResult = await executeToolCall(toolCall, enabledToolDefs)
+        const toolResult = await executeToolCall(toolCall, enabledToolDefs, currentAssistantMessage)
         if (toolResult.signature === lastToolSignature) {
           toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.' })
         } else {
@@ -847,5 +887,5 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
   }
 
-  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction }
+  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction, sessionStats, resetSessionStats }
 }

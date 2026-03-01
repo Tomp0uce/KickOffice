@@ -127,6 +127,12 @@ export interface ToolChatMessage {
 
 export type ChatRequestMessage = ChatMessage | ToolChatMessage
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 export interface ChatStreamOptions {
   messages: ChatRequestMessage[]
   modelTier: ModelTier
@@ -134,16 +140,17 @@ export interface ChatStreamOptions {
   onStream: (text: string) => void
   onToolCallDelta?: (toolCallDeltas: any[]) => void
   onFinishReason?: (finishReason: string | null) => void
+  onUsage?: (usage: TokenUsage) => void
   abortSignal?: AbortSignal
 }
 
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
-  const { messages, modelTier, tools, onStream, onToolCallDelta, onFinishReason, abortSignal } = options
+  const { messages, modelTier, tools, onStream, onToolCallDelta, onFinishReason, onUsage, abortSignal } = options
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
-    body: JSON.stringify({ messages, modelTier, tools }),
+    body: JSON.stringify({ messages, modelTier, tools, stream_options: { include_usage: true } }),
     signal: abortSignal,
   })
 
@@ -185,6 +192,14 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
         }
         if (delta?.tool_calls?.length && onToolCallDelta) {
           onToolCallDelta(delta.tool_calls)
+        }
+        // Capture token usage from final SSE chunk
+        if (parsed.usage && onUsage) {
+          onUsage({
+            promptTokens: parsed.usage.prompt_tokens ?? 0,
+            completionTokens: parsed.usage.completion_tokens ?? 0,
+            totalTokens: parsed.usage.total_tokens ?? 0,
+          })
         }
       } catch {
         // Skip malformed JSON lines

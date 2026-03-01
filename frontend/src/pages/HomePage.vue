@@ -4,10 +4,14 @@
   >
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
-        :clear-chat-title="t('clearChat')"
         :settings-title="t('settings')"
+        :loading="loading"
+        :sessions="sessionManager.sessions.value"
+        :current-session-id="sessionManager.currentSessionId.value"
         @new-chat="startNewChat"
         @settings="goToSettings"
+        @switch-session="handleSwitchSession"
+        @delete-session="handleDeleteSession"
       />
 
       <QuickActionsBar
@@ -25,6 +29,7 @@
         :history="history"
         :history-with-segments="historyWithSegments"
         :current-action="currentAction"
+        :loading="loading"
         :backend-online="backendOnline"
         :empty-title="$t('emptyTitle')"
         :empty-subtitle="
@@ -78,6 +83,10 @@
         @submit="sendMessage"
         @stop="stopGeneration"
       />
+      <StatsBar
+        :session-stats="sessionStats"
+        :model-name="selectedModelInfo?.label ?? selectedModelTier"
+      />
     </div>
   </div>
 </template>
@@ -112,9 +121,11 @@ import ChatHeader from "@/components/chat/ChatHeader.vue";
 import ChatInput from "@/components/chat/ChatInput.vue";
 import ChatMessageList from "@/components/chat/ChatMessageList.vue";
 import QuickActionsBar from "@/components/chat/QuickActionsBar.vue";
+import StatsBar from "@/components/chat/StatsBar.vue";
 import { useAgentLoop } from "@/composables/useAgentLoop";
 import { useImageActions } from "@/composables/useImageActions";
 import { useOfficeInsert } from "@/composables/useOfficeInsert";
+import { useSessionManager } from "@/composables/useSessionManager";
 import type {
   DisplayMessage,
   ExcelQuickAction,
@@ -153,16 +164,9 @@ const currentHost = forHost({
   excel: "excel",
   word: "word",
 });
-const MAX_HISTORY_MESSAGES = 100;
-const history = useStorage<DisplayMessage[]>(`chatHistory_${currentHost}`, []);
-watch(
-  () => history.value.length,
-  (len) => {
-    if (len > MAX_HISTORY_MESSAGES) {
-      history.value = history.value.slice(len - MAX_HISTORY_MESSAGES);
-    }
-  },
-);
+const history = ref<DisplayMessage[]>([]);
+
+const sessionManager = useSessionManager(currentHost, history);
 const userInput = ref("");
 const loading = ref(false);
 const imageLoading = ref(false);
@@ -459,7 +463,7 @@ const officeInsert = useOfficeInsert({
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
 });
 
-const { sendMessage, applyQuickAction, currentAction } = useAgentLoop({
+const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } = useAgentLoop({
   t,
   refs: {
     history,
@@ -517,17 +521,31 @@ function goToSettings() {
   router.push("/settings");
 }
 
-function startNewChat() {
-  if (history.value.length > 0 && !window.confirm(t("newChatConfirm"))) return;
+async function startNewChat() {
   if (loading.value) stopGeneration();
-
-  // Reset all reactive state instead of reloading the page
-  history.value = [];
+  await sessionManager.newSession();
+  resetSessionStats();
   userInput.value = "";
   customSystemPrompt.value = "";
   selectedPromptId.value = "";
+  await nextTick();
   chatInputRef.value?.textareaEl?.value?.focus();
   adjustTextareaHeight();
+}
+
+async function handleSwitchSession(sessionId: string) {
+  if (loading.value) return;
+  await sessionManager.switchSession(sessionId);
+  resetSessionStats();
+  await nextTick();
+  scrollToVeryBottom();
+}
+
+async function handleDeleteSession() {
+  if (loading.value) return;
+  await sessionManager.deleteCurrentSession();
+  await nextTick();
+  scrollToVeryBottom();
 }
 
 function loadSavedPrompts() {
@@ -565,13 +583,21 @@ async function checkBackend() {
 
 const { insertMessageToDocument, copyMessageToClipboard } = officeInsert;
 
-onBeforeMount(() => {
+// Persist session after each agent turn completes
+watch(loading, async (isLoading, wasLoading) => {
+  if (wasLoading && !isLoading) {
+    await sessionManager.persistCurrentSession();
+  }
+});
+
+onBeforeMount(async () => {
   insertType.value =
     (localStorage.getItem(localStorageKey.insertType) as insertTypes) ||
     "replace";
   loadSavedPrompts();
   checkBackend();
   backendCheckInterval.value = window.setInterval(checkBackend, 30000);
+  await sessionManager.init();
 });
 
 onMounted(() => {

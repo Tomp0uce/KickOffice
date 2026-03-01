@@ -54,24 +54,36 @@
               v-if="segment.type === 'text'"
               :content="segment.text"
             />
-            <details
+            <!-- Enhanced thinking block with brain icon + streaming dots -->
+            <div
               v-else
-              class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary"
-              :open="isThoughtOpen(item.key, idx)"
-              :aria-expanded="isThoughtOpen(item.key, idx)"
-              @toggle="onThoughtToggle(item.key, idx, $event)"
+              class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary overflow-hidden"
             >
-              <summary
-                class="cursor-pointer list-none p-1 text-sm font-semibold text-secondary"
+              <button
+                type="button"
+                class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-accent hover:bg-bg-tertiary transition-colors"
+                @click="toggleThought(item.key, idx)"
               >
-                {{ thoughtProcessLabel }}
-              </summary>
+                <component :is="isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight" :size="10" />
+                <Brain :size="10" />
+                <span>{{ thoughtProcessLabel }}</span>
+                <!-- Streaming dots: show when loading and this is last segment -->
+                <span
+                  v-if="loading && idx === item.segments.length - 1 && item.key === historyWithSegments[historyWithSegments.length - 1]?.key"
+                  class="animate-pulse ml-1"
+                >...</span>
+              </button>
               <pre
-                class="m-0 p-1 text-xs wrap-break-word whitespace-pre-wrap text-secondary"
-                >{{ segment.text.trim() }}</pre
-              >
-            </details>
+                v-if="isThoughtOpen(item.key, idx)"
+                class="m-0 px-2 py-1.5 text-xs wrap-break-word whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
+              >{{ segment.text.trim() }}</pre>
+            </div>
           </template>
+          <ToolCallBlock
+            v-for="tc in item.message.toolCalls"
+            :key="tc.id"
+            :tool-call="tc"
+          />
           <img
             v-if="item.message.imageSrc"
             :src="item.message.imageSrc"
@@ -111,24 +123,26 @@
       </div>
     </div>
     <div
-      v-if="currentAction"
+      v-if="currentAction || (loading && !currentAction)"
       class="mt-auto flex items-center gap-2 px-2 pb-1 text-xs text-secondary"
       role="status"
       aria-live="polite"
       aria-atomic="true"
     >
       <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
-      <span>{{ currentAction }}</span>
+      <span v-if="currentAction">{{ currentAction }}</span>
+      <span v-else class="animate-pulse">▊</span>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { Copy, FileText, Plus, Sparkles } from "lucide-vue-next";
-import { ref, watch } from "vue";
+import { Brain, ChevronDown, ChevronRight, Copy, FileText, Plus, Sparkles } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
 
 import CustomButton from "@/components/CustomButton.vue";
 import MarkdownRenderer from "@/components/chat/MarkdownRenderer.vue";
+import ToolCallBlock from "@/components/chat/ToolCallBlock.vue";
 import type { DisplayMessage, RenderSegment } from "@/types/chat";
 
 const props = defineProps<{
@@ -139,6 +153,7 @@ const props = defineProps<{
     segments: RenderSegment[];
   }>;
   currentAction: string;
+  loading: boolean;
   backendOnline: boolean;
   emptyTitle: string;
   emptySubtitle: string;
@@ -169,6 +184,11 @@ function thoughtKey(itemKey: string, segmentIndex: number): string {
 
 function isThoughtOpen(itemKey: string, segmentIndex: number): boolean {
   return expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] || false;
+}
+
+function toggleThought(itemKey: string, segmentIndex: number): void {
+  const key = thoughtKey(itemKey, segmentIndex);
+  expandedThoughts.value[key] = !expandedThoughts.value[key];
 }
 
 function onThoughtToggle(
