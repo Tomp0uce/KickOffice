@@ -1,688 +1,814 @@
-# Design Review & Code Audit — v2
+# Design Review & Code Audit — v3
 
-**Date**: 2026-02-22
-**Scope**: Full architecture, security, code quality, UX, and technical debt analysis of the KickOffice codebase.
+**Date**: 2026-03-01
+**Scope**: Full codebase audit — security, logic bugs, code quality, dead code, architecture across backend, frontend utilities, composables, pages/components, API layer, and infrastructure.
 
 ---
 
 ## 1. Executive Summary
 
-KickOffice is a production-grade Microsoft Office add-in (Word, Excel, PowerPoint, Outlook) powered by an AI backend proxy. The architecture — Vue 3 + Vite frontend, Express.js backend, OpenAI-compatible LLM API — is sound and well-structured after the v1 audit cycle.
+KickOffice is a Microsoft Office add-in (Word, Excel, PowerPoint, Outlook) powered by a Vue 3 + Vite frontend and Express.js backend proxy for OpenAI-compatible LLM APIs.
 
-The previous audit (v1, 2026-02-21) identified and resolved **38 issues**. This v2 review is a fresh analysis of the current codebase state, identifying **28 new issues** that were not covered or have emerged since:
+**Previous audits**: v1 (2026-02-21, 38 issues — all resolved) and v2 (2026-02-22, 28 issues — all resolved except B1-B3 build warnings and F1-F3 feature issues).
 
-- **CRITICAL**: 3 issues (correctness, configuration)
-- **HIGH**: 5 issues (architecture, data integrity, documentation accuracy)
-- **MEDIUM**: 10 issues (code quality, UX, maintainability)
-- **LOW**: 7 issues (polish, performance, resilience)
-- **BUILD**: 3 warnings (testing, tooling, CI)
+This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Findings are organized by codebase area, then by severity.
 
-### Previous Audit Status
+### v2 Open Items Status
 
-All 38 issues from the v1 audit (3 CRITICAL, 6 HIGH, 16 MEDIUM, 10 LOW, 3 BUILD) have been resolved and verified. Key wins from v1:
-- Session storage for credentials (C1)
-- Reasoning effort parameter fix (C2)
-- JSON parse failure handling (C3)
-- XSS protection, credential sanitization, rate limiting, HSTS
-- LLM API service abstraction, validation middleware, E2E test infrastructure
+| ID | Description | Status |
+|----|-------------|--------|
+| B1 | No unit test infrastructure | OPEN |
+| B2 | No linting or formatting configuration | OPEN |
+| B3 | No CI pipeline for automated testing | OPEN |
+| F1 | Quick actions strip images/formatting | OPEN |
+| F2 | Outlook Reply produces low-quality responses | OPEN |
+| F3 | Excel agent processes cells one-by-one | OPEN |
 
 ---
 
-## 2. New Issues by Severity
+## 2. Backend Findings
 
-### CRITICAL (C1–C3) — Requires immediate action
+### CRITICAL
 
-#### C1. Agent max iterations setting is silently ignored
-- **Files**: `frontend/src/composables/useAgentLoop.ts:214`, `frontend/src/pages/SettingsPage.vue:664-676`
-- **Issue**: The Settings UI allows `agentMaxIterations` between 1 and 100, but `useAgentLoop.ts` hardcodes `Math.min(Number(agentMaxIterations.value) || 10, 10)` — capping the effective maximum at **10 iterations** regardless of user setting.
-- **Impact**: The settings UI misleads users. Setting iterations to 25 (the default) or 100 has no effect; the agent always stops at 10. For complex multi-step tasks this is a significant functional limitation.
-- **Fix**: Replace the hardcoded `10` with the setting value: `Math.min(Number(agentMaxIterations.value) || 10, agentMaxIterations.value)`, or more simply use the setting value directly with a reasonable cap (e.g. 50).
-- **Status**: ✅ Fixed 2026-02-24 — Removed `Math.min(..., 10)` cap; `useAgentLoop.ts` now uses `Number(agentMaxIterations.value) || 10` directly, respecting the full user-configured range.
+#### BC1. Content-Type enforcement blocks file uploads
 
-#### C2. `.env.example` still contains invalid `reasoning_effort=none`
-- **File**: `backend/.env.example:27`
-- **Issue**: `MODEL_STANDARD_REASONING_EFFORT=none` is present in the example env file. The v1 audit (C2) fixed the code default from `'none'` to `undefined`, but the `.env.example` was not updated. Since `models.js:21` reads `process.env.MODEL_STANDARD_REASONING_EFFORT || undefined`, the string `'none'` is truthy and passes through, ultimately sending `reasoning_effort: 'none'` to the OpenAI API.
-- **Impact**: Any deployment following the `.env.example` template will send an invalid API parameter, causing empty responses when tools are used with GPT-5 models.
-- **Fix**: Change line 27 to `MODEL_STANDARD_REASONING_EFFORT=` (empty, meaning "omit the parameter") and add a comment explaining valid values.
-- **Status**: ✅ Fixed 2026-02-24 — Replaced the invalid `MODEL_STANDARD_REASONING_EFFORT=none` with a commented-out placeholder documenting valid values (`low`, `medium`, `high`).
+- **File**: `backend/src/server.js:91-96`
+- **Category**: Broken Functionality
+- **Details**: Global middleware rejects all POST/PUT/PATCH requests without `Content-Type: application/json`, but `/api/upload` requires `multipart/form-data` via multer. Every file upload request is blocked with 415 before reaching the route handler.
+- **Impact**: The entire file upload feature is non-functional.
+- **Fix**: Exempt `/api/upload` from the Content-Type check, e.g. `if (req.path === '/api/upload') return next()`.
 
-#### C3. Quick actions bypass loading/abort state management
-- **Files**: `frontend/src/composables/useAgentLoop.ts:512-617`
-- **Issue**: `applyQuickAction()` calls `chatStream` and `runAgentLoop` without setting `loading.value = true` or creating an `AbortController`. The stop button doesn't work during quick actions.
-- **Impact**: Users cannot abort a running quick action. If a quick action is triggered while another is running, concurrent stream writes corrupt the chat history. The UI gives no visual feedback that a quick action is in progress.
-- **Fix**: Wrap the quick action execution in the same loading/abort pattern as `sendMessage()`.
-- **Status**: ✅ Fixed 2026-02-24 — `applyQuickAction()` now sets `loading.value = true` and creates a fresh `AbortController` before any async LLM work, with a `try/finally` block ensuring cleanup on completion or abort.
+#### BC2. Internal LLM API URL exposed in source and .env.example
 
----
+- **File**: `backend/.env.example:17`, `backend/src/config/models.js:25`
+- **Category**: Security / Information Disclosure
+- **Details**: The internal company LiteLLM proxy URL `https://litellm.kickmaker.net/v1` is hardcoded as the default value for `LLM_API_BASE_URL`. No validation that the URL is well-formed HTTPS pointing to an expected host.
+- **Impact**: Exposes internal infrastructure endpoint. Potential SSRF if the env var is misconfigured.
+- **Fix**: Replace with a placeholder like `https://your-llm-api.example.com/v1` and add URL validation.
 
-### HIGH (H1–H5) — Should fix soon
+#### BC3. Sensitive data logged to disk in plaintext
 
-#### H1. Chat history grows unbounded in localStorage
-- **File**: `frontend/src/pages/HomePage.vue:174`
-- **Issue**: `useStorage<DisplayMessage[]>('chatHistory_word', [])` has no size limit. Each message (especially tool results with full document content) can be several KB. Long agent sessions can produce hundreds of messages.
-- **Impact**: `localStorage` has a ~5-10 MB limit per origin. When exceeded, `QuotaExceededError` is thrown silently (Vue `useStorage` swallows it), causing data loss or broken persistence.
-- **Fix**: Implement a max history size (e.g. 100 messages or 1 MB). Prune oldest messages when the limit is reached. Consider a warning toast when approaching the limit.
-- **Status**: ✅ Fixed 2026-02-24 — Added `MAX_HISTORY_MESSAGES = 100` constant and a watcher in `HomePage.vue` that trims `history.value` to the last 100 messages whenever the array grows beyond that.
+- **File**: `backend/src/utils/logger.js:22-46`, `backend/src/routes/chat.js:49-52, 157-159, 210`
+- **Category**: Security / Privacy
+- **Details**: `systemLog` writes full request bodies (all user messages) and full LLM responses to `backend/logs/kickoffice.log` as pretty-printed JSON. No redaction of PII, no log rotation, no size limit.
+- **Impact**: GDPR risk, credential leakage if users paste secrets, unbounded disk usage.
+- **Fix**: Redact message content from logs, add log rotation (e.g. `rotating-file-stream`), set a max file size.
 
-#### H2. Token manager uses character count instead of token count
-- **File**: `frontend/src/utils/tokenManager.ts:3`
-- **Issue**: `MAX_CONTEXT_CHARS = 100_000` uses character count as a proxy for token count. The function name `prepareMessagesForContext` and the variable name suggest token management, but no tokenization occurs.
-- **Impact**: For CJK text (1-2 chars per token), the budget is ~2x too generous, risking API token limit errors. For English (~4 chars per token), 100k chars ≈ 25k tokens, which is acceptable but imprecise. Additionally, `getMessageContentLength()` does not account for `tool_calls` JSON payload in assistant messages, leading to budget underestimation in tool-heavy conversations.
-- **Fix**: Either rename to `MAX_CONTEXT_CHARS` (already done) and document the approximation, or integrate a lightweight tokenizer (e.g. `tiktoken` WASM build) for accurate counting. At minimum, include `tool_calls` serialized length in the budget calculation.
-- **Status**: ✅ Fixed 2026-02-24 — `getMessageContentLength()` in `tokenManager.ts` now adds `JSON.stringify(message.tool_calls).length` to the budget when `tool_calls` is present on an assistant message.
+#### BC4. User-supplied credentials forwarded without sanitization
 
-#### H3. Validation error message references invalid `none` value
-- **File**: `backend/src/middleware/validate.js:189`
-- **Issue**: Error message says `"temperature is only supported for GPT-5 models when reasoning effort is none"`. The value `'none'` is no longer valid (removed in v1 C2 fix). The correct phrasing is "when reasoning effort is not set".
-- **Impact**: Confusing error message for API consumers. Could lead developers to set `reasoning_effort=none` based on this message.
-- **Fix**: Change to `"temperature is not supported for GPT-5 models when reasoning effort is enabled"`.
-- **Status**: ✅ Fixed 2026-02-24 — Error message in `validate.js:189` updated to correctly describe the constraint without referencing the invalid `'none'` value.
+- **File**: `backend/src/services/llmClient.js:34-41`
+- **Category**: Security / Header Injection
+- **Details**: `X-User-Key` and `X-User-Email` headers are forwarded verbatim to the upstream LLM API. No sanitization against header injection characters (`\r\n`). The user key is accepted with only a minimum length of 8 characters.
+- **Impact**: Potential HTTP header injection if the underlying HTTP library has a bypass.
+- **Fix**: Strip `\r`, `\n`, and non-printable characters from header values before forwarding.
 
-#### H4. `chatSync` function is exported but unused (dead code)
-- **File**: `frontend/src/api/backend.ts:228-249`
-- **Issue**: The `chatSync()` function is still fully implemented and exported, but the agent loop was migrated to use `chatStream()` with `onToolCallDelta` instead. No code path calls `chatSync`.
-- **Impact**: Dead code increases maintenance burden and confusion. The function also contains a useless `try { ... } catch (error) { throw error }` wrapper.
-- **Fix**: Remove the `chatSync` function, its interface `ChatSyncOptions`, and the unused import in any consuming file. If kept as future API surface, mark it with a `@deprecated` comment.
-- **Status**: ✅ Fixed 2026-02-24 — Removed `chatSync()`, `ChatSyncOptions`, and `OpenAIChatCompletion` interfaces from `backend.ts`; cleaned up the unused import in `useAgentLoop.ts`.
+### HIGH
 
-#### H5. README model defaults do not match actual code
-- **Files**: `README.md:47-49`, `backend/src/config/models.js:17,26,33`, `backend/.env.example:23,30,37`
-- **Issue**: README documents default models as `gpt-5.2` and `gpt-image-1.5`, but actual code defaults are `gpt-5.1` and `gpt-image-1`. The `.env.example` correctly shows `gpt-5.1` and `gpt-image-1`.
-- **Impact**: Documentation mismatch causes confusion during deployment.
-- **Fix**: Update README to match actual defaults (`gpt-5.1`, `gpt-image-1`).
-- **Status**: ✅ Fixed 2026-02-24 — README already showed `gpt-5.1` and `gpt-image-1`; no change needed.
+#### BH1. Drain event listener leak in streaming response
 
----
+- **File**: `backend/src/routes/chat.js:86-90`
+- **Category**: Logic Bug / Resource Leak
+- **Details**: When backpressure occurs during SSE streaming, `await new Promise(resolve => res.once('drain', resolve))` will never resolve if the client disconnects between the backpressure check and the drain event.
+- **Impact**: Permanently hung request handlers under load with slow/disconnecting clients.
+- **Fix**: Race the drain promise with a client-disconnect check or add a timeout.
 
-### MEDIUM (M1–M10) — Should address
+#### BH2. logAndRespond called after headers already sent (streaming)
 
-#### M1. No confirmation dialog for "New Chat"
-- **File**: `frontend/src/pages/HomePage.vue:490-497`
-- **Issue**: `startNewChat()` immediately clears all history without confirmation. One accidental click destroys the entire conversation.
-- **Impact**: Users lose conversation data with no recovery path.
-- **Fix**: Add a confirmation prompt before clearing, or implement undo functionality.
-- **Status**: ✅ Fixed 2026-02-24 — `startNewChat()` now guards with `window.confirm(t("newChatConfirm"))` when history is non-empty; i18n key added to both `en.json` and `fr.json`.
+- **File**: `backend/src/routes/chat.js:108-116`
+- **Category**: Logic Bug
+- **Details**: If an error occurs after SSE headers have been sent, the catch block calls `logAndRespond(res, 504/500, ...)` which tries to set headers and write JSON on an active SSE stream, causing `ERR_HTTP_HEADERS_SENT`.
+- **Impact**: Unhandled exception, malformed SSE stream, swallowed error.
+- **Fix**: Check `res.headersSent` before calling `logAndRespond`; if already streaming, write an SSE error event instead.
 
-#### M2. `processChat` has useless try/catch wrapper
-- **File**: `frontend/src/composables/useAgentLoop.ts:406-410`
-- **Issue**: `try { await runAgentLoop(messages, modelTier) } catch (error) { throw error }` catches and immediately re-throws without transformation.
-- **Impact**: Dead code that adds noise. The catch block does nothing useful.
-- **Fix**: Remove the try/catch, call `runAgentLoop` directly.
-- **Status**: ✅ Fixed 2026-02-24 — Removed the `try { await runAgentLoop() } catch(e) { throw e }` wrapper in `processChat()`; `runAgentLoop()` is now called directly.
+#### BH3. Unbounded log file growth
 
-#### M3. Inconsistent quick action type definitions
-- **Files**: `frontend/src/pages/HomePage.vue:271,305`, `frontend/src/composables/useAgentLoop.ts:83-86`
-- **Issue**: `outlookQuickActions` is a plain array, `excelQuickActions` is a `computed`, `powerPointQuickActions` is a plain array, and `wordQuickActions` is a plain array. The `AgentLoopActions` interface expects `outlookQuickActions` as `Ref<OutlookQuickAction[]>` (optional) and `powerPointQuickActions` as a plain array. Then `HomePage.vue:469` wraps `outlookQuickActions` in `computed(() => outlookQuickActions)` to satisfy the ref requirement.
-- **Impact**: Unnecessary complexity and inconsistent patterns make the code harder to understand.
-- **Fix**: Standardize all quick action arrays to the same type (either all `computed` or all plain arrays) and update the interface accordingly.
-- **Status**: ✅ Fixed 2026-02-24 — Changed `AgentLoopActions.outlookQuickActions` from `Ref<OutlookQuickAction[]>` to `OutlookQuickAction[]`; removed the `computed(() => outlookQuickActions)` wrapper in `HomePage.vue`, passing the plain array directly.
+- **File**: `backend/src/utils/logger.js:14, 44`
+- **Category**: Security / Availability
+- **Details**: Single log file with no rotation, size limits, or cleanup. Full request/response bodies are logged.
+- **Impact**: Disk exhaustion on busy servers (potentially gigabytes/day).
+- **Fix**: Add log rotation with max file size and retention policy.
 
-#### M4. Missing accessibility (ARIA) attributes
-- **Files**: `frontend/src/pages/SettingsPage.vue`, `frontend/src/components/chat/ChatInput.vue`
-- **Issue**: Settings tabs lack `role="tablist"` / `role="tab"` / `role="tabpanel"` attributes. Tool checkboxes have no `aria-label`. The chat input textarea has no `aria-label`.
-- **Impact**: Screen reader users cannot properly navigate the UI. May not meet corporate accessibility requirements (WCAG 2.1 AA).
-- **Fix**: Add ARIA roles and labels to interactive elements.
-- **Status**: ✅ Fixed 2026-02-24 — Added `role="tablist"` to settings nav, `role="tab"` + `:aria-selected` to `CustomButton` tabs, `role="tabpanel"` to all 5 settings panels, and `aria-label` to the chat input textarea.
+#### BH4. Hardcoded version in health endpoint
 
-#### M5. Built-in prompts serialization uses fragile interpolation
-- **Files**: `frontend/src/pages/SettingsPage.vue:968-971,986-987,997-1001`
-- **Issue**: Custom built-in prompts are serialized with `${language}` and `${text}` placeholders but the editor UI uses `[LANGUAGE]` and `[TEXT]`. The bidirectional translation works but is fragile. If a user types a literal `${text}` in the editor, it would be interpreted as a replacement variable during deserialization.
-- **Impact**: Edge case data corruption. The dual-format approach is a maintenance risk.
-- **Fix**: Standardize on a single placeholder format (prefer `[LANGUAGE]`/`[TEXT]` since that's what the user sees) and use it for both serialization and deserialization.
-- **Status**: ✅ Fixed 2026-02-24 — `saveBuiltInPrompts()` now serializes with `[LANGUAGE]`/`[TEXT]`; `loadBuiltInPrompts()` regex updated to match the new format. Both directions use a single consistent placeholder format.
+- **File**: `backend/src/routes/health.js:9`, `backend/package.json:3`
+- **Category**: Logic Bug
+- **Details**: Health endpoint returns `version: '1.0.0'` but `package.json` declares `"1.0.29"`. These will always drift.
+- **Impact**: Impossible to verify deployed version via health check.
+- **Fix**: Read version from `package.json` at startup: `const { version } = require('../../package.json')`.
 
-#### M6. `useOfficeInsert.ts` uses `any` for message parameters
-- **File**: `frontend/src/composables/useOfficeInsert.ts:20-21,145,153`
-- **Issue**: `shouldTreatMessageAsImage: (message: any) => boolean`, `copyMessageToClipboard(message: any)`, `insertMessageToDocument(message: any)` all use `any` type.
-- **Impact**: No TypeScript type safety. Callers could pass incorrect objects without compile-time errors.
-- **Fix**: Use `DisplayMessage` type from `@/types/chat`.
-- **Status**: ✅ Fixed 2026-02-24 — Replaced all three `message: any` signatures in `useOfficeInsert.ts` with `message: DisplayMessage`; added the required `import type { DisplayMessage }` from `@/types/chat`.
+#### BH5. parsePositiveInt allows zero
 
-#### M7. No TypeScript on backend
-- **Files**: All `backend/src/*.js` files
-- **Issue**: The entire backend is plain JavaScript with no JSDoc type annotations or TypeScript. Request bodies, model configs, and API responses have no type definitions.
-- **Impact**: As the project grows, refactoring becomes risky. Runtime type errors are caught late. IDE support (autocomplete, refactoring) is limited.
-- **Fix**: Consider migrating to TypeScript incrementally, starting with `config/models.js` and `middleware/validate.js` which handle the most complex data shapes. At minimum, add JSDoc types.
-- **Status**: ✅ Fixed 2026-02-24 — Added `@typedef` blocks for `ModelTier`, `ModelConfig`, `ChatBodyParams` in `models.js` and `@param`/`@returns` JSDoc to all public functions in both `models.js` and `validate.js`.
+- **File**: `backend/src/config/env.js:9-20`
+- **Category**: Logic Bug
+- **Details**: Named `parsePositiveInt` but check is `if (parsed < 0)` which allows zero. `CHAT_RATE_LIMIT_MAX=0` would disable rate limiting.
+- **Impact**: Rate limiting bypass via zero config.
+- **Fix**: Change to `if (parsed <= 0)`.
 
-#### M8. Missing `Content-Type` enforcement on backend
-- **File**: `backend/src/server.js:87`
-- **Issue**: `express.json({ limit: '4mb' })` silently ignores requests without `Content-Type: application/json`. A POST with `text/plain` body will pass through with an empty `req.body`.
-- **Impact**: Potentially confusing error messages when content type is wrong (validation says "messages array is required" instead of "invalid content type").
-- **Fix**: Add middleware that rejects POST requests without `application/json` content type.
-- **Status**: ✅ Fixed 2026-02-24 — Added middleware in `server.js` that returns HTTP 415 for POST/PUT/PATCH requests missing `Content-Type: application/json`, placed after `express.json()` parsing.
+#### BH6. Upload route lacks magic-byte file validation
 
-#### M9. Docker Compose `version` field is deprecated
-- **File**: `docker-compose.yml:1`
-- **Issue**: `version: "3.8"` is deprecated in Docker Compose v2. It's silently ignored but generates warnings.
-- **Impact**: Build-time warning noise.
-- **Fix**: Remove the `version` line.
-- **Status**: ✅ Fixed 2026-02-24 — Removed the deprecated `version: "3.8"` field from `docker-compose.yml`; Docker Compose v2 does not require it.
+- **File**: `backend/src/routes/upload.js:38-78`
+- **Category**: Security
+- **Details**: File type detection relies on client-controlled MIME type or extension. No magic-byte validation.
+- **Impact**: Attackers can upload crafted files (zip bombs via XLSX, XXE via DOCX) that exploit parsing libraries.
+- **Fix**: Add magic-byte validation (e.g. `file-type` package) before processing.
 
-#### M10. `officeRichText.ts` markdown parser has `html: true`
-- **File**: `frontend/src/utils/officeRichText.ts:9`
-- **Issue**: The Office markdown parser has `html: true`, allowing raw HTML pass-through before DOMPurify sanitization. While the sanitization step (line 326-333) properly filters tags, the `ALLOWED_ATTR` list includes `style` attribute, which can carry CSS injection payloads (e.g., `expression()` in older IE, `url()` for data exfiltration).
-- **Impact**: Low risk in modern browsers/Office webviews, but the `style` attribute in the allow list is broader than needed. Since the input comes from AI responses (not direct user input), exploitation requires prompt injection.
-- **Fix**: Consider using DOMPurify's `FORBID_ATTR: ['style']` or a CSS sanitizer for the `style` attribute values if stricter security is needed.
-- **Status**: ✅ Fixed 2026-02-24 — Removed `style` from `ALLOWED_ATTR` and added `FORBID_ATTR: ['style']` to the DOMPurify configuration in `officeRichText.ts`, eliminating the CSS injection vector.
+#### BH7. ReDoS potential in sanitizeErrorText
 
----
+- **File**: `backend/src/utils/http.js:20-21`
+- **Category**: Security / Performance
+- **Details**: Regex objects are constructed inside a loop on every error response. On pathological input from upstream, this could block the event loop.
+- **Fix**: Pre-compile regex patterns at module load time.
 
-### LOW (L1–L7) — Nice to have
+### MEDIUM
 
-#### L1. `scrollToBottom` couples to Tailwind CSS class
-- **File**: `frontend/src/pages/HomePage.vue:393`
-- **Issue**: `container.querySelectorAll('.group')` uses the Tailwind `.group` utility class as a DOM selector. A Tailwind version upgrade or class rename would silently break auto-scroll.
-- **Fix**: Use a `data-*` attribute or dedicated CSS class for message identification.
-- **Status**: ✅ Fixed 2026-02-24 — Added `data-message` attribute to the message `<div>` in `ChatMessageList.vue`; updated `scrollToBottom` selector from `'.group'` to `'[data-message]'`.
+#### BM1. No graceful shutdown handling
 
-#### L2. Custom `debounce` reimplemented despite `@vueuse/core` dependency
-- **File**: `frontend/src/main.ts:15-25`
-- **Issue**: A custom debounce function is written inline, but `@vueuse/core` (already imported in the same file) provides `useDebounceFn`.
-- **Fix**: Replace with `useDebounceFn` from VueUse.
-- **Status**: ✅ Fixed 2026-02-24 — Replaced the custom 10-line inline debounce in `main.ts` with `useDebounceFn(callback, 16)` from `@vueuse/core`, which was already imported in the same file.
+- **File**: `backend/src/server.js`
+- **Category**: Architecture
+- **Details**: No `SIGTERM`/`SIGINT` handler. In-flight streaming connections are abruptly severed during deployment.
+- **Fix**: Add signal handlers that stop accepting new connections and drain existing ones.
 
-#### L3. Backend polling interval is fixed at 30 seconds
-- **File**: `frontend/src/pages/HomePage.vue:539`
-- **Issue**: `window.setInterval(checkBackend, 30000)` polls regardless of user activity. No exponential backoff when backend is down, no pause when the add-in is backgrounded.
-- **Fix**: Use `document.visibilityState` check to pause polling when the tab is hidden. Consider backoff when offline.
-- **Status**: ✅ Fixed 2026-02-24 — Added `if (document.visibilityState === 'hidden') return` early exit at the top of `checkBackend()` in `HomePage.vue`.
+#### BM2. Unused `routeName` parameter in `validateChatRequest`
 
-#### L4. `backend.ts:148` non-null assertion on response body
-- **File**: `frontend/src/api/backend.ts:148`
-- **Issue**: `res.body!.getReader()` uses a non-null assertion. While a 200 response always has a body, a defensive check would prevent crashes on unexpected responses.
-- **Fix**: Add a null check: `if (!res.body) throw new Error('Empty response body')`.
-- **Status**: ✅ Fixed 2026-02-24 — Replaced `res.body!.getReader()` with an explicit null check that throws `new Error('Empty response body')`, then calls `.getReader()` safely.
+- **File**: `backend/src/middleware/validate.js:159`
+- **Category**: Dead Code
+- **Details**: Second parameter `routeName` is accepted but never used in the function body.
 
-#### L5. Undocumented frontend environment variables
-- **Files**: `frontend/src/composables/useOfficeInsert.ts:9`, `frontend/src/api/backend.ts:7`
-- **Issue**: `VITE_VERBOSE_LOGGING` and `VITE_REQUEST_TIMEOUT_MS` are used in the frontend but not documented in the README's environment variables section or in any `.env.example`.
-- **Fix**: Add these to the frontend environment variables table in README.
-- **Status**: ✅ Fixed 2026-02-24 — Both `VITE_VERBOSE_LOGGING` and `VITE_REQUEST_TIMEOUT_MS` were already documented in the README frontend environment variables section; no change needed.
+#### BM3. Exported functions never imported externally
 
-#### L6. SettingsPage status label has hardcoded French fallback
-- **File**: `frontend/src/pages/SettingsPage.vue:75`
-- **Issue**: `$t('litellmCredentialsMissing') || 'Statut'` contains a hardcoded French fallback string. This pattern was identified and fixed in the v1 audit (L2) for other instances, but this one was missed.
-- **Fix**: Remove the `|| 'Statut'` fallback; the i18n system handles missing keys.
-- **Status**: ✅ Fixed 2026-02-24 — Removed the `|| 'Statut'` hardcoded French fallback from `SettingsPage.vue`; the i18n call is now clean.
+- **File**: `backend/src/middleware/validate.js:219-221`
+- **Category**: Dead Code
+- **Details**: `validateMaxTokens`, `validateTemperature`, `validateTools` are exported but only used internally.
 
-#### L7. Inconsistent error message format in agent tool execution
-- **File**: `frontend/src/composables/useAgentLoop.ts:311,323`
-- **Issue**: Parse errors return `"Error: malformed tool arguments — JSON parse failed"` while execution errors return `"Error: ${err.message}"`. The first format includes context, the second doesn't include the tool name.
-- **Fix**: Standardize error messages to include tool name and error type: `"Error in ${toolName}: ${description}"`.
-- **Status**: ✅ Fixed 2026-02-24 — Both error paths in `useAgentLoop.ts` now use the `Error in ${toolName}: ...` prefix: JSON parse failures say `Error in ${toolName}: malformed tool arguments — JSON parse failed` and execution errors say `Error in ${toolName}: ${err.message}`.
+#### BM4. Exported constants/functions never imported externally
+
+- **File**: `backend/src/services/llmClient.js:10-29`
+- **Category**: Dead Code
+- **Details**: `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exported but only used internally.
+
+#### BM5. Validated values discarded in validateChatRequest
+
+- **File**: `backend/src/middleware/validate.js:189-213`
+- **Category**: Logic Bug (minor)
+- **Details**: `validateTemperature` and `validateMaxTokens` compute `.value` but only `.error` is checked. Callers pass original `req.body` values, bypassing any future normalization.
+
+#### BM6. Inconsistent error logging patterns
+
+- **File**: Multiple backend files
+- **Category**: Code Quality
+- **Details**: Four different logging patterns (`console.error`, `systemLog`, `logAndRespond`, `process.stderr.write`) used inconsistently. Many errors logged through both `systemLog` and `console.error` on consecutive lines.
+
+#### BM7. `handleErrorResponse` return value discarded
+
+- **File**: `backend/src/routes/chat.js:61, 169`, `backend/src/routes/image.js:31`
+- **Category**: Code Quality
+- **Details**: `handleErrorResponse` returns sanitized error text but all call sites discard it.
+
+#### BM8. `allCsv` declared with `let` instead of `const`
+
+- **File**: `backend/src/routes/upload.js:58`
+- **Category**: Code Quality
+- **Details**: Variable is never reassigned, only mutated via `.push()`.
+
+#### BM9. No multer field count limits
+
+- **File**: `backend/src/routes/upload.js:13-18`
+- **Category**: Security
+- **Details**: No `limits.fields` or `limits.fieldSize` set. Attacker could send thousands of non-file fields.
+
+#### BM10. No request ID / correlation
+
+- **File**: Multiple backend files
+- **Category**: Architecture
+- **Details**: No request ID generation. Cannot correlate client-side errors with server-side logs.
+
+### LOW
+
+#### BL1. Dead branch: `if (!imageModel)` check
+
+- **File**: `backend/src/routes/image.js:17-19`
+- **Category**: Dead Code
+- **Details**: `models.image` is always defined in static config. Check can never be true.
+
+#### BL2. French strings hardcoded in backend
+
+- **File**: `backend/src/routes/upload.js:89`, `backend/src/config/models.js:49`
+- **Category**: i18n
+- **Details**: `'Contenu tronqué en raison de la taille du fichier'`, `'Raisonnement'` hardcoded in French.
+
+#### BL3. Stale comment about character limit
+
+- **File**: `backend/src/routes/upload.js:86-87`
+- **Category**: Documentation
+- **Details**: Comment says "50k chars" but constant is `MAX_CHARS = 100000`.
+
+#### BL4. `isPlainObject` accepts non-plain objects
+
+- **File**: `backend/src/middleware/validate.js:4-6`
+- **Category**: Code Quality
+- **Details**: Returns true for Date, RegExp, Map, Set. Safe for JSON-parsed context but imprecise.
 
 ---
 
-## 3. Build & Environment Warnings
+## 3. Frontend Utilities Findings
+
+### CRITICAL
+
+#### UC1. Prompt injection via custom prompt templates
+
+- **File**: `frontend/src/utils/constant.ts:305-321, 441-466, 469-495, 497-523`
+- **Category**: Security
+- **Details**: `getBuiltInPrompt()` and per-host variants load custom prompts from localStorage and use `String.replace()` with `${text}` as pattern. The replacement string `text` is interpreted by `String.replace()` — meaning `$&`, `$'`, `` $` ``, and `$<n>` patterns in user text are treated as special replacement patterns, causing silent data corruption.
+- **Impact**: User-supplied text containing `$&` or `$'` produces garbled output. Prompt injection via localStorage manipulation.
+- **Fix**: Use a function as the replacement argument: `.replace(/\$\{text\}/g, () => text)`.
+
+#### UC2. XOR "obfuscation" provides false security for API keys
+
+- **File**: `frontend/src/utils/credentialStorage.ts:7-36`
+- **Category**: Security
+- **Details**: API keys XOR'd with hardcoded key `'K1ck0ff1c3'` then base64-encoded in localStorage. Trivially reversible with browser dev tools.
+- **Impact**: Any XSS vulnerability allows immediate credential theft. The obfuscation creates a false sense of security.
+- **Fix**: Document the limitation clearly. Consider using session-only storage or backend-managed tokens.
+
+#### UC3. Unsanitized HTML injection in Outlook tools
+
+- **File**: `frontend/src/utils/outlookTools.ts:505-534` (insertHtmlAtCursor), `outlookTools.ts:261-291` (setEmailBodyHtml)
+- **Category**: Security / XSS
+- **Details**: Both tools insert raw HTML directly into Outlook email bodies via `setSelectedDataAsync` with no DOMPurify sanitization. The `html` argument from LLM output is passed verbatim.
+- **Impact**: Malicious HTML (scripts, phishing forms, event handlers) injected into outgoing emails.
+- **Fix**: Sanitize through DOMPurify before passing to Office APIs.
+
+### HIGH
+
+#### UH1. `eval_officejs` declared in ExcelToolName but never defined
+
+- **File**: `frontend/src/utils/excelTools.ts:66`
+- **Category**: Logic Bug / Dead Code
+- **Details**: `'eval_officejs'` is in the `ExcelToolName` union but no tool definition exists. The `as unknown as Record<ExcelToolName, ExcelToolDefinition>` cast suppresses the TypeScript error.
+- **Impact**: Runtime crash if the agent tries to invoke `eval_officejs` for Excel.
+- **Fix**: Either add the tool definition or remove the name from the union type.
+
+#### UH2. Column letter arithmetic overflow
+
+- **File**: `frontend/src/utils/excelTools.ts:1155, 1214`
+- **Category**: Logic Bug
+- **Details**: `String.fromCharCode(columnLetter.charCodeAt(0) + count - 1)` breaks for multi-character columns (AA, AB) and overflows for single-character columns near Z.
+- **Impact**: Data corruption or crash when inserting/deleting columns at/beyond column Z.
+- **Fix**: Implement proper column letter arithmetic that handles multi-character references.
+
+#### UH3. Double timeout in Outlook tool execution
+
+- **File**: `frontend/src/utils/outlookTools.ts:67-72`
+- **Category**: Logic Bug
+- **Details**: Inner 3-second `Promise.race` timeout is extremely aggressive for Outlook API calls (which need server round-trips). It returns an error string rather than rejecting, so the outer 10-second timeout never triggers. Many legitimate operations silently fail.
+- **Impact**: Silent failures on slow connections or large emails.
+- **Fix**: Remove the inner 3-second timeout or increase it significantly.
+
+#### UH4. `language` parameter ignored in translate prompt
+
+- **File**: `frontend/src/utils/constant.ts:32-48`
+- **Category**: Logic Bug
+- **Details**: Translate prompt hardcodes "French-English bilingual translation" regardless of the `language` parameter. Explicitly says "Ignore requested output language preferences."
+- **Impact**: Users who select a target language other than French/English see their preference silently ignored.
+- **Fix**: Make the prompt respect the language parameter.
+
+#### UH5. Host detection caching can return wrong host
+
+- **File**: `frontend/src/utils/hostDetection.ts:3-37`
+- **Category**: Logic Bug
+- **Details**: `detectOfficeHost()` caches result in a module-level variable. If called before `Office.onReady` fires, may cache an incorrect host permanently.
+- **Impact**: Wrong host detection in edge cases, leading to wrong tool set and prompts.
+- **Fix**: Only cache after `Office.onReady` has resolved.
+
+#### UH6. Message toast singleton race condition
+
+- **File**: `frontend/src/utils/message.ts:13-43`
+- **Category**: Race Condition
+- **Details**: `showMessage` uses a module-level `messageInstance` singleton. If called while the 300ms `setTimeout` cleanup is pending, the stale closure may unmount the new instance.
+- **Impact**: Toasts prematurely destroyed or DOM container leaks.
+- **Fix**: Clear the pending timeout before creating a new instance, or use a unique ID per instance.
+
+#### UH7. `html: true` in MarkdownIt with `style` in DOMPurify allowlist
+
+- **File**: `frontend/src/utils/officeRichText.ts:77, 403`
+- **Category**: Security
+- **Details**: Raw HTML passes through MarkdownIt, and DOMPurify allows the `style` attribute. Inline styles enable CSS-based attacks (data exfiltration via `background: url(...)`, UI spoofing).
+- **Impact**: CSS injection in Office-inserted content.
+- **Fix**: Remove `style` from `ALLOWED_ATTR` or use a CSS sanitizer.
+
+### MEDIUM
+
+#### UM1. Massive type unsafety with `as unknown as` casts
+
+- **Files**: `excelTools.ts:21`, `wordTools.ts:194`, `outlookTools.ts:75`, `powerpointTools.ts:39`
+- **Category**: Type Safety
+- **Details**: All four tool-creation factories use `as unknown as Record<ToolName, ToolDefinition>`, completely disabling TypeScript checking for missing tool definitions.
+- **Fix**: Use a type-safe builder that validates all required tool names are present.
+
+#### UM2. Pervasive `any` types in tool definitions
+
+- **Files**: All tool definition files
+- **Category**: Type Safety
+- **Details**: `args: Record<string, any>`, `mailbox: any`, `context: any` across all tool files. Outlook tools especially: `getMailbox(): any`, `getOfficeAsyncStatus(): any`.
+
+#### UM3. Duplicated `generateVisualDiff` function
+
+- **Files**: `outlookTools.ts:8-20`, `wordTools.ts:8-21`
+- **Category**: Code Duplication
+- **Details**: Identical function copy-pasted between two files.
+- **Fix**: Extract to a shared utility.
+
+#### UM4. Duplicated Office API helpers
+
+- **Files**: `outlookTools.ts:42-66`, `officeOutlook.ts:48-66`
+- **Category**: Code Duplication
+- **Details**: Both files define their own helpers for `Office.context.mailbox`, `CoercionType`, `AsyncResultStatus`. The typed abstractions in `officeOutlook.ts` go partially unused.
+
+#### UM5. `Ref` without type parameter in WordFormatter
+
+- **File**: `frontend/src/utils/wordFormatter.ts:23, 54`
+- **Category**: Type Safety
+- **Details**: `insertType: Ref` (bare, unparameterized). Value is typed as `unknown`, requiring implicit `any` comparisons.
+
+#### UM6. `searchAndReplace` tools labeled as category `'read'`
+
+- **Files**: `excelTools.ts:1365`, `wordTools.ts:517`
+- **Category**: Inconsistency
+- **Details**: Both perform write operations (replacing text/values) but are categorized as `'read'`.
+
+#### UM7. Redundant Set + Array checks in toolStorage
+
+- **File**: `frontend/src/utils/toolStorage.ts:47`
+- **Category**: Code Quality
+- **Details**: `!storedEnabledSet.has(name) && !storedEnabledNames.includes(name)` — the Set was created from the same array, so these checks are redundant.
+
+#### UM8. No `QuotaExceededError` handling for localStorage
+
+- **Files**: `credentialStorage.ts`, `toolStorage.ts`, `savedPrompts.ts`, `constant.ts`
+- **Category**: Error Handling
+- **Details**: Multiple files write to localStorage without catching `QuotaExceededError`.
+
+#### UM9. `tokenManager.ts` mutates input messages
+
+- **File**: `frontend/src/utils/tokenManager.ts:105-108`
+- **Category**: Code Quality
+- **Details**: `delete msg.tool_calls` mutates original message objects from the input array.
+- **Fix**: Clone messages before modifying: `const msg = { ...originalMsg }`.
+
+#### UM10. Character-by-character HTML reconstruction in PowerPoint
+
+- **File**: `frontend/src/utils/powerpointTools.ts:121-183`
+- **Category**: Performance
+- **Details**: Loads font properties for each individual character (up to 100,000) via `range.getSubstring(i, 1)`. Very memory-intensive.
+
+### LOW
+
+#### UL1. Typo in export name `buildInPrompt`
+
+- **File**: `frontend/src/utils/constant.ts:30`
+- **Details**: Should be `builtInPrompt`.
+
+#### UL2. `deleteText` reports success when no text selected
+
+- **File**: `frontend/src/utils/wordTools.ts:710-715`
+- **Details**: Inserts empty string (no-op) but returns "Successfully deleted text".
+
+#### UL3. Inconsistent error handling strategy across tools
+
+- **Files**: All tool files
+- **Details**: Some return error strings, some throw, some return empty strings. Caller must check string prefixes.
+
+#### UL4. `markdown.ts` vs `officeRichText.ts` naming confusion
+
+- **Details**: Both render Markdown but for different targets (chat vs Office). Names don't communicate this.
+
+---
+
+## 4. Frontend Composables Findings
+
+### CRITICAL
+
+#### CC1. Prompt injection via unsanitized document selection
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:613-616`
+- **Category**: Security
+- **Details**: Office selection text is directly interpolated into the user message: `fullMessage += \`\n\n[${selectionLabel}: "${selectedText}"]\``. A malicious document containing `"]` followed by injection instructions can break out of the framing.
+- **Impact**: Indirect prompt injection — attacker crafts document, victim opens it and uses KickOffice.
+- **Fix**: Use robust delimiters (XML CDATA-style, base64, unique boundary token).
+
+#### CC2. Prompt injection via quick action selection text
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:753, 761, 525`
+- **Category**: Security
+- **Details**: `textForLlm` from document selection passed directly to `action.user(textForLlm, lang)`. Email body injected into reply prompt at line 525 with `replyPrompt.user(emailBody, lang)`.
+- **Impact**: Attacker-crafted email/document content can override system prompt instructions.
+
+### HIGH
+
+#### CH1. Race condition: concurrent `sendMessage` calls corrupt state
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:466-468, 498-499`
+- **Category**: Logic Bug
+- **Details**: `if (loading.value) return` is check-then-act on a reactive ref. Two rapid calls can both pass before `loading.value = true` is set, causing concurrent agent loops writing to the same history array.
+- **Fix**: Set `loading.value = true` immediately at the top, before any async work.
+
+#### CH2. `lastIndex` stale reference during agent loop
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:242, 267, 317`
+- **Category**: Logic Bug
+- **Details**: `lastIndex` captured once as `history.value.length - 1` but history is pushed to during the loop. Stale index updates the wrong message.
+- **Fix**: Store a direct reference to the message object instead of an index.
+
+#### CH3. Timer leak — `timeoutId` reassigned without clearing
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:559-568`
+- **Category**: Resource Leak
+- **Details**: First `setTimeout` assigned to `timeoutId`, then reassigned to a new one without clearing the first. `finally` only clears the last.
+
+#### CH4. Raw `err.message` displayed to users
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:304, 435, 551, 819`
+- **Category**: Security / Information Disclosure
+- **Details**: Server error messages (potentially containing internal URLs, API keys, stack traces) shown directly to users.
+- **Fix**: Show generic messages, log details to console only.
+
+#### CH5. `any` types on error parameters and tool args
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:111, 288, 334, 433, 544`
+- **Category**: Type Safety
+- **Details**: `isCredentialError(error: any)`, multiple `catch (err: any)`, `toolArgs: Record<string, any>`.
+- **Fix**: Use `unknown` with type guards.
+
+#### CH6. XSS via unvalidated `imageSrc` URL
+
+- **File**: `frontend/src/composables/useImageActions.ts:53-98`
+- **Category**: Security
+- **Details**: `imageSrc` directly assigned to `fetch()` and `img.src` with no URL validation. Could be `javascript:` URL or point to internal resources (SSRF).
+- **Fix**: Validate URL pattern before use.
+
+#### CH7. `THINK_TAG_REGEX` module-level with `g` flag — maintenance hazard
+
+- **File**: `frontend/src/composables/useImageActions.ts:10`
+- **Category**: Maintenance
+- **Details**: `g` flag maintains `lastIndex` state. Adding a `test()` call later would introduce subtle bugs.
+
+### MEDIUM
+
+#### CM1. Hardcoded French string in file upload error
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:604`
+- **Category**: i18n
+- **Details**: `'Erreur lors de l\'extraction du fichier.'` hardcoded instead of using `t()`.
+
+#### CM2. `buildChatMessages` drops system messages
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:209-211`
+- **Details**: Filter strips all `system` messages from history.
+
+#### CM3. Overly large functions
+
+- **Files**: `useAgentLoop.ts:449-638` (`sendMessage` ~190 lines), `useAgentLoop.ts:640-828` (`applyQuickAction` ~188 lines), `useAgentLoop.ts:227-421` (`runAgentLoop` ~195 lines)
+- **Category**: Architecture
+- **Fix**: Decompose into focused helpers.
+
+#### CM4. `insertToDocument` silently swallows all errors
+
+- **File**: `frontend/src/composables/useOfficeInsert.ts:107, 117-118, 133-134, 156-157`
+- **Category**: Error Handling
+- **Details**: Every catch block falls back to clipboard with no logging.
+
+#### CM5. Promise constructor anti-pattern in Outlook functions
+
+- **File**: `frontend/src/composables/useOfficeSelection.ts:13-67`
+- **Details**: Four nearly-identical `Promise.race` + manual timeout patterns.
+- **Fix**: Extract a shared `withTimeout(promise, ms)` helper.
+
+#### CM6. Timeout promises create orphaned timers
+
+- **File**: `frontend/src/composables/useOfficeSelection.ts:22, 38, 51, 65`
+- **Details**: Losing `Promise.race` timers still fire, resolving promises nobody listens to.
+
+#### CM7. Excel selection returns unescaped tab-separated values
+
+- **File**: `frontend/src/composables/useOfficeSelection.ts:86-92`
+- **Details**: Cell values containing tabs/newlines make output ambiguous.
+
+#### CM8. HTML injection via `richHtml` to Office APIs
+
+- **File**: `frontend/src/composables/useOfficeInsert.ts:96, 98, 143-145`
+- **Category**: Security
+- **Details**: `richHtml` from LLM output passed directly to `insertHtml()` and `setSelectedDataAsync()`.
+- **Fix**: Sanitize through DOMPurify before passing to Office APIs.
+
+#### CM9. Prompt injection via user profile fields
+
+- **File**: `frontend/src/composables/useAgentPrompts.ts:34-41`
+- **Details**: `firstName`/`lastName` interpolated directly into system prompt.
+
+#### CM10. `insertImageToPowerPoint` ignores `'NoAction'` semantics
+
+- **File**: `frontend/src/composables/useImageActions.ts:111-157`
+- **Details**: `'NoAction'` should mean "do nothing" but still inserts the image.
+
+#### CM11. Hidden side effect: `insertType.value` mutation
+
+- **File**: `frontend/src/composables/useOfficeInsert.ts:140`
+- **Details**: Mutates external ref as side effect, causing unexpected reactivity triggers.
+
+### LOW
+
+#### CL1. `hostIsWord` parameter accepted but never used
+
+- **File**: `frontend/src/composables/useAgentPrompts.ts:13, 26`
+- **Category**: Dead Code
+
+#### CL2. `cleanContent` and `splitThinkSegments` use different think-tag logic
+
+- **File**: `frontend/src/composables/useImageActions.ts:13-33, 40-42`
+- **Details**: Inconsistent behavior for malformed tags.
+
+#### CL3. Inconsistent image insert error reporting across hosts
+
+- **File**: `frontend/src/composables/useOfficeInsert.ts:169-198`
+- **Details**: Outlook falls through and shows misleading "imageInsertWordOnly" message.
+
+#### CL4. `payload` parameter typed as `unknown` — should be `string | undefined`
+
+- **File**: `frontend/src/composables/useAgentLoop.ts:449`
+
+#### CL5. Word HTML selection swallows errors silently
+
+- **File**: `frontend/src/composables/useOfficeSelection.ts:135-136`
+
+---
+
+## 5. Infrastructure Findings
+
+### CRITICAL
+
+#### IC1. Content-Type middleware blocks uploads (same as BC1)
+
+- **File**: `backend/src/server.js:91-96`
+- **Details**: See BC1. The upload route at line 104 is unreachable for multipart requests.
+
+#### IC2. Containers run as root
+
+- **Files**: `backend/Dockerfile:1-15`, `frontend/Dockerfile:1-22`
+- **Category**: Security
+- **Details**: Neither Dockerfile creates or switches to a non-root user. `PUID`/`PGID` env vars in docker-compose have no effect on standard Node/Nginx images.
+- **Fix**: Add `USER node` (backend) and create a non-root user for nginx (frontend).
+
+#### IC3. Internal infrastructure URL as default
+
+- **File**: `backend/.env.example:17`
+- **Category**: Security
+- **Details**: See BC2. `https://litellm.kickmaker.net/v1` as default `LLM_API_BASE_URL`.
+
+### HIGH
+
+#### IH1. Four different Node.js versions across the project
+
+- **Files**: `docker-compose.yml:3` (Node 18), both `Dockerfile`s (Node 22), CI workflow (Node 20), `engines` (>=20.19.0 || >=22.0.0)
+- **Category**: Misconfiguration
+- **Details**: The manifest-gen service uses Node 18, violating the project's own engines constraint.
+- **Fix**: Standardize on a single Node.js version across all files.
+
+#### IH2. Private IP baked into frontend Docker build
+
+- **File**: `frontend/Dockerfile:9`
+- **Category**: Security
+- **Details**: Default build arg `VITE_BACKEND_URL=http://192.168.50.10:3003` bakes a private IP into the JS bundle.
+- **Fix**: Remove default or use a placeholder that fails visibly.
+
+#### IH3. External DuckDNS domain as default in .env.example
+
+- **File**: `.env.example:10-11`
+- **Category**: Misconfiguration
+- **Details**: `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL` set to `https://kickoffice.duckdns.org` as active values.
+- **Fix**: Comment them out or use clearly fake placeholders.
+
+#### IH4. Lock files not copied in Dockerfiles
+
+- **Files**: `backend/Dockerfile:5-6`, `frontend/Dockerfile:4-5`
+- **Category**: Misconfiguration
+- **Details**: Only `package.json` copied before `npm install`, not `package-lock.json`. Non-deterministic builds.
+- **Fix**: `COPY package.json package-lock.json ./` and use `npm ci`.
+
+#### IH5. Nginx missing security headers
+
+- **File**: `frontend/nginx.conf:1-21`
+- **Category**: Security
+- **Details**: Missing `Content-Security-Policy`, `Referrer-Policy`, `X-Frame-Options`. Uses deprecated `X-XSS-Protection`.
+- **Fix**: Add modern security headers, remove `X-XSS-Protection`.
+
+### MEDIUM
+
+#### IM1. Manifest-gen mounts entire project root
+
+- **File**: `docker-compose.yml:5-6`
+- **Details**: Grants script access to `.env`, `.git`, all source code when it only needs `manifests-templates/`.
+
+#### IM2. Healthcheck hardcodes port 3003
+
+- **File**: `backend/Dockerfile:12-13`
+- **Details**: If `PORT` env var is changed, healthcheck always fails.
+
+#### IM3. `npm install --production` deprecated
+
+- **File**: `backend/Dockerfile:6`
+- **Details**: Use `npm ci --omit=dev` with Node 22.
+
+#### IM4. Dev files copied into build context
+
+- **File**: `frontend/Dockerfile:7`
+- **Details**: `COPY . .` includes `e2e/`, `playwright.config.ts` unnecessarily.
+
+#### IM5. CORS leaks internal IP
+
+- **File**: `docker-compose.yml:29`
+- **Details**: Internal IP always added to CORS origins alongside public URL.
+
+#### IM6. Empty `lang` attribute in index.html
+
+- **File**: `frontend/index.html:2`
+- **Details**: `<html lang="">` fails accessibility validation.
+
+#### IM7. Outlook manifest missing AppDomains
+
+- **File**: `manifests-templates/manifest-outlook.template.xml`
+- **Details**: Office manifest has `<AppDomains>` but Outlook manifest does not.
+
+#### IM8. CI infinite-loop guard fragile
+
+- **File**: `.github/workflows/bump-version.yml:11, 37`
+- **Details**: Relies on commit message prefix + `[skip ci]` suffix — neither fully robust alone.
+
+### LOW
+
+#### IL1. Vite config uses `.js` extension
+
+- **File**: `frontend/vite.config.js`
+- **Details**: Should be `.ts` to match the rest of the project.
+
+#### IL2. `@types/diff-match-patch` in dependencies instead of devDependencies
+
+- **File**: `frontend/package.json:15`
+
+#### IL3. `chunkSizeWarningLimit` raised to suppress warnings
+
+- **File**: `frontend/vite.config.js:56-57`
+- **Details**: Masks bundle-size regressions.
+
+#### IL4. Obsolete IE meta tag
+
+- **File**: `frontend/index.html:5`
+- **Details**: `<meta http-equiv="X-UA-Compatible" content="IE=edge" />` is inert.
+
+#### IL5. Unused PUID/PGID env vars in docker-compose
+
+- **File**: `docker-compose.yml:31-32, 66-67`
+- **Category**: Dead Code
+- **Details**: Not consumed by standard Docker images.
+
+#### IL6. Dockerfile HEALTHCHECK overridden by compose
+
+- **File**: `backend/Dockerfile:12-13`
+- **Category**: Dead Code
+- **Details**: Never executed when running via docker-compose.
+
+#### IL7. Legacy entries in .gitignore
+
+- **File**: `.gitignore:31-38`
+- **Category**: Dead Code
+- **Details**: References to `word-GPT-Plus-master.zip`, `litellm-local-proxy/.auth.env`, `Open_Excel/`.
+
+---
+
+## 6. Dead Code Registry
+
+Consolidated list of all dead code found across the codebase.
+
+### Backend Dead Code
+
+| ID | File | Item | Details |
+|----|------|------|---------|
+| BD1 | `backend/src/middleware/validate.js:219-221` | `validateMaxTokens`, `validateTemperature`, `validateTools` exports | Only used internally |
+| BD2 | `backend/src/services/llmClient.js:10-29` | `TIMEOUTS`, `getChatTimeoutMs`, `getImageTimeoutMs` exports | Only used internally |
+| BD3 | `backend/src/middleware/validate.js:159` | `routeName` parameter | Never referenced in function body |
+| BD4 | `backend/src/routes/image.js:17-19` | `if (!imageModel)` branch | Can never be true |
+
+### Frontend Utilities Dead Code
+
+| ID | File | Item | Details |
+|----|------|------|---------|
+| UD1 | `frontend/src/utils/hostDetection.ts:55-57` | `getHostName()` export | Never imported anywhere |
+| UD2 | `frontend/src/utils/excelTools.ts:2149-2151` | `getExcelTool()` export | Never imported anywhere |
+| UD3 | `frontend/src/utils/wordTools.ts:1889-1891` | `getWordTool()` export | Never imported anywhere |
+| UD4 | `frontend/src/utils/outlookTools.ts:571-573` | `getOutlookTool()` export | Never imported anywhere |
+| UD5 | `frontend/src/utils/powerpointTools.ts:949-951` | `getPowerPointTool()` export | Never imported anywhere |
+| UD6 | `frontend/src/utils/generalTools.ts:98-103` | `getEnabledGeneralTools()` export | Never imported anywhere |
+| UD7 | `frontend/src/utils/powerpointTools.ts:63-66` | `normalizePowerPointListText()` export | Never imported; callers use `stripMarkdownListMarkers` directly |
+| UD8 | `frontend/src/utils/toolStorage.ts:10` | `buildToolSignature()` export | Only used internally |
+| UD9 | `frontend/src/utils/credentialStorage.ts:171-180` | `credentialStorage` object export | All consumers import named exports directly |
+| UD10 | `frontend/src/utils/credentialStorage.ts:40-49` | `CredentialStorage` interface export | Never imported |
+| UD11 | `frontend/src/utils/excelTools.ts:66` | `'eval_officejs'` in `ExcelToolName` | No tool definition exists |
+| UD12 | `frontend/src/utils/excelTools.ts:753` | `dataRange` variable in `sortRange` | Assigned but never read |
+| UD13 | `frontend/src/utils/common.ts:3-13` | `getOptionList()` export | Only used internally |
+
+### Frontend Composables Dead Code
+
+| ID | File | Item | Details |
+|----|------|------|---------|
+| CD1 | `frontend/src/composables/useAgentPrompts.ts:13, 26` | `hostIsWord` option | Destructured but never referenced |
+
+### Infrastructure Dead Code
+
+| ID | File | Item | Details |
+|----|------|------|---------|
+| ID1 | `docker-compose.yml:31-32, 66-67` | `PUID`/`PGID` env vars | Not consumed by standard images |
+| ID2 | `backend/Dockerfile:12-13` | Dockerfile HEALTHCHECK | Overridden by compose |
+| ID3 | `backend/Dockerfile:10` | `EXPOSE 3003` | Purely documentary, port set by compose |
+| ID4 | `.gitignore:31-38` | Legacy file references | `word-GPT-Plus-master.zip`, `Open_Excel/`, etc. |
+
+---
+
+## 7. v2 Open Feature Issues (carried forward)
+
+### F1. Quick actions strip images/formatting from documents
+- **Status**: OPEN
+- **Severity**: HIGH
+- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
+
+### F2. Outlook Reply produces low-quality responses
+- **Status**: OPEN
+- **Severity**: HIGH
+- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
+
+### F3. Excel agent processes cells one-by-one
+- **Status**: OPEN
+- **Severity**: HIGH
+- **Details**: See v2 DESIGN_REVIEW for full implementation plan.
+
+---
+
+## 8. Build & Environment Warnings (carried forward from v2)
 
 ### B1. No unit test infrastructure
-- **Status**: Not addressed
-- **Issue**: No unit test framework (vitest, jest) is configured. Critical business logic in `tokenManager.ts`, `toolStorage.ts`, `validate.js`, `models.js`, and `buildChatBody()` has zero unit test coverage. Only E2E tests via Playwright exist.
-- **Fix**: Add vitest to the frontend. Key candidates for unit testing:
-  - `tokenManager.ts:prepareMessagesForContext` — budget calculation and message pruning
-  - `toolStorage.ts:migrateToolPreferences` — migration logic
-  - `validate.js:validateChatRequest` — input validation
-  - `models.js:buildChatBody` — request construction
+- **Status**: OPEN
 
 ### B2. No linting or formatting configuration
-- **Status**: Not addressed
-- **Issue**: No ESLint configuration file (`.eslintrc`, `eslint.config.js`) or Prettier config exists in the repository. No pre-commit hooks (husky, lint-staged) are configured.
-- **Fix**: Add ESLint + Prettier with a pre-commit hook. This prevents style drift and catches common errors before commit.
+- **Status**: OPEN
 
 ### B3. No CI pipeline for automated testing
-- **Status**: Partial
-- **Issue**: Only a `bump-version.yml` GitHub Action exists. No automated test execution (lint, build, E2E) on pull requests. Code can be merged without passing any checks.
-- **Fix**: Add a CI workflow that runs `npm run build` (both frontend and backend), `npm run lint` (once configured), and `npm run test:e2e` on every PR.
-
----
-
-## 4. Tracking Matrix
-
-| ID  | Severity | Category       | Status              | File(s)                                   |
-|-----|----------|----------------|---------------------|-------------------------------------------|
-| C1  | CRITICAL | Correctness    | ✅ FIXED 2026-02-24 | useAgentLoop.ts, SettingsPage.vue         |
-| C2  | CRITICAL | Configuration  | ✅ FIXED 2026-02-24 | .env.example, models.js                   |
-| C3  | CRITICAL | UX / Stability | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
-| H1  | HIGH     | Data Integrity | ✅ FIXED 2026-02-24 | HomePage.vue                              |
-| H2  | HIGH     | Architecture   | ✅ FIXED 2026-02-24 | tokenManager.ts                           |
-| H3  | HIGH     | Correctness    | ✅ FIXED 2026-02-24 | validate.js                               |
-| H4  | HIGH     | Quality        | ✅ FIXED 2026-02-24 | backend.ts                                |
-| H5  | HIGH     | Documentation  | ✅ FIXED 2026-02-24 | README.md, models.js                      |
-| M1  | MEDIUM   | UX             | ✅ FIXED 2026-02-24 | HomePage.vue                              |
-| M2  | MEDIUM   | Quality        | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
-| M3  | MEDIUM   | Architecture   | ✅ FIXED 2026-02-24 | HomePage.vue, useAgentLoop.ts             |
-| M4  | MEDIUM   | Accessibility  | ✅ FIXED 2026-02-24 | SettingsPage.vue, ChatInput.vue           |
-| M5  | MEDIUM   | Quality        | ✅ FIXED 2026-02-24 | SettingsPage.vue                          |
-| M6  | MEDIUM   | Type Safety    | ✅ FIXED 2026-02-24 | useOfficeInsert.ts                        |
-| M7  | MEDIUM   | Architecture   | ✅ FIXED 2026-02-24 | backend/src/*.js                          |
-| M8  | MEDIUM   | Validation     | ✅ FIXED 2026-02-24 | server.js                                 |
-| M9  | MEDIUM   | Config         | ✅ FIXED 2026-02-24 | docker-compose.yml                        |
-| M10 | MEDIUM   | Security       | ✅ FIXED 2026-02-24 | officeRichText.ts                         |
-| L1  | LOW      | Quality        | ✅ FIXED 2026-02-24 | HomePage.vue, ChatMessageList.vue         |
-| L2  | LOW      | Quality        | ✅ FIXED 2026-02-24 | main.ts                                   |
-| L3  | LOW      | Performance    | ✅ FIXED 2026-02-24 | HomePage.vue                              |
-| L4  | LOW      | Resilience     | ✅ FIXED 2026-02-24 | backend.ts                                |
-| L5  | LOW      | Documentation  | ✅ FIXED 2026-02-24 | README.md (already present)               |
-| L6  | LOW      | i18n           | ✅ FIXED 2026-02-24 | SettingsPage.vue                          |
-| L7  | LOW      | Quality        | ✅ FIXED 2026-02-24 | useAgentLoop.ts                           |
-| B1  | BUILD    | Testing        | OPEN                | (no test framework)                       |
-| B2  | BUILD    | Tooling        | OPEN                | (no lint config)                          |
-| B3  | BUILD    | CI/CD          | OPEN                | .github/workflows/                        |
-
----
-
-## 5. Recommended Implementation Priority
-
-### Phase 1 — Immediate (critical correctness)
-1. **C1** — Fix agent max iterations cap (5 min fix, high user impact)
-2. **C2** — Fix `.env.example` reasoning_effort value (1 min fix, prevents broken deployments)
-3. **C3** — Add loading/abort state to quick actions (prevents data corruption)
-4. **H5** — Update README model defaults (documentation accuracy)
-
-### Phase 2 — Short-term (stability & data integrity)
-5. **H1** — Implement chat history size limits
-6. **H3** — Fix validation error message
-7. **H4** — Remove dead `chatSync` code
-8. **M1** — Add new chat confirmation dialog
-9. **M2** — Remove useless try/catch
-
-### Phase 3 — Medium-term (quality & maintainability)
-10. **H2** — Improve token budget calculation
-11. **M3** — Standardize quick action types
-12. **M5** — Unify prompt serialization format
-13. **M6** — Replace `any` types with `DisplayMessage`
-14. **M8** — Add Content-Type enforcement
-15. **M9** — Remove deprecated Docker Compose version
-16. **L6** — Remove French fallback string
-
-### Phase 4 — Backlog (polish & infrastructure)
-17. **M4** — Accessibility improvements
-18. **M7** — Backend TypeScript migration
-19. **M10** — Review `style` attribute in DOMPurify config
-20. **B1** — Add vitest unit test infrastructure
-21. **B2** — Add ESLint + Prettier
-22. **B3** — Add CI pipeline
-23. **L1–L5, L7** — Minor quality and resilience improvements
-
----
-
-## 6. Architecture Strengths (preserved from v1)
-
-The following architectural decisions are sound and should be maintained:
-
-- **Proxy pattern**: API keys never reach the client. All LLM communication goes through the Express backend.
-- **Modular composables**: `useAgentLoop`, `useAgentPrompts`, `useOfficeInsert`, `useImageActions` provide clear separation of concerns.
-- **Host-aware design**: Tool definitions, prompts, quick actions, and insertion logic are all host-specific (Word/Excel/PowerPoint/Outlook).
-- **Centralized LLM client**: `services/llmClient.js` is the single point of contact with the upstream API.
-- **Validation middleware**: `validate.js` provides thorough input validation with clear error messages.
-- **Security posture**: DOMPurify strict allowlists, HSTS in production, credential sanitization, rate limiting, session storage for user credentials.
-- **i18n framework**: Full English and French locale support with translation-aware built-in prompts.
-- **Tool preference migration**: `toolStorage.ts` gracefully handles tool definition changes without resetting user preferences.
-
----
-
-## 7. New Feature Issues & Implementation Plans (v2.1)
-
-The following three issues were identified during functional testing and require targeted implementation work. Each includes a detailed root-cause analysis and step-by-step implementation plan.
-
-### F1. Quick actions strip images, formatting, and non-text elements from documents
-
-- **Severity**: HIGH
-- **Category**: Data Integrity / UX
 - **Status**: OPEN
-- **Scope**: ALL text-modifying quick actions (translate, polish, academic, summary, proofread, concise) across ALL hosts (Word, Outlook, PowerPoint)
-- **Files**: `frontend/src/composables/useOfficeSelection.ts`, `frontend/src/composables/useAgentLoop.ts:615-677`, `frontend/src/api/common.ts`, `frontend/src/utils/wordTools.ts`, `frontend/src/utils/constant.ts`
-
-#### Problem
-
-When ANY text-modifying quick action is triggered (translate, polish, academic, concise, etc.), the current flow is:
-
-1. `getOfficeSelection()` reads the selected content as **plain text only** (`range.load('text')` for Word, `getAsync(CoercionType.Text)` for Outlook, `getPowerPointSelection()` for PowerPoint).
-2. The plain-text selection is sent to the LLM for processing.
-3. The processed result is displayed in chat. When the user clicks "Replace", it is inserted back via `insertResult()` / `insertFormattedResult()` which overwrites the entire selection.
-
-This flow **destroys all non-text elements** in the original selection:
-- **Inline images** (embedded photos, diagrams, logos)
-- **Bullet points and list formatting** (indentation levels, custom bullets)
-- **Rich formatting** (tables, text boxes, shapes, drawings)
-- **Embedded objects** (charts, OLE objects)
-- **Text styling** (colors, highlights, custom fonts applied to specific runs)
-
-This affects **all hosts** (Word, Outlook, PowerPoint) and **all text-modifying quick actions**, not just translation.
-
-#### Root Cause
-
-- `useOfficeSelection.ts:56-61`: Word selection reads only `.text`, discarding all rich content.
-- `useOfficeSelection.ts:19`: Outlook uses `CoercionType.Text`, losing all HTML formatting and images.
-- `common.ts:14-17`: `insertResult()` uses `range.insertText(normalizedResult, 'Replace')` which replaces the entire selection with plain text.
-- All quick action prompts (`constant.ts`) produce text-only output with no awareness of non-text elements.
-
-#### Implementation Plan
-
-**Approach**: For all text-modifying quick actions across all hosts, capture the rich content (HTML) of the selection, extract only the text for LLM processing while preserving non-text elements with placeholders, then reassemble the rich content with the LLM's processed text before insertion.
-
-**Step 1 — Create a `richContentPreserver` utility** (new file: `frontend/src/utils/richContentPreserver.ts`)
-- Utility to handle HTML parsing and reassembly:
-  - `extractTextFromHtml(html: string)`: Parses HTML, replaces `<img>`, `<svg>`, `<table>`, and other non-text elements with unique `{{PRESERVE_N}}` placeholders. Returns `{ cleanText: string, fragments: Map<string, string> }`.
-  - `reassembleHtml(processedText: string, fragments: Map<string, string>)`: Takes LLM-processed text and replaces `{{PRESERVE_N}}` placeholders with original HTML fragments.
-  - Handles nested structures: images inside table cells, styled lists, etc.
-
-**Step 2 — Add HTML-aware selection readers** (`useOfficeSelection.ts`)
-- **Word**: Add `getWordSelectionAsHtml()` using `range.getHtml()` to capture full rich content.
-- **Outlook**: Add `getOutlookMailBodyAsHtml()` using `getAsync(CoercionType.Html)` instead of `CoercionType.Text`.
-- **PowerPoint**: Verify current `getPowerPointSelection()` behavior — if it strips formatting, add HTML-aware variant.
-- Each returns raw HTML that can be fed to the `richContentPreserver`.
-
-**Step 3 — Modify quick action flow for ALL text-modifying actions** (`useAgentLoop.ts:615-677`)
-- In `applyQuickAction()`, for all non-agent quick actions on Word/Outlook/PowerPoint:
-  1. Get selection as HTML via the new HTML-aware readers.
-  2. Call `extractTextFromHtml(html)` to get clean text + preserved fragments.
-  3. Send only the clean text to the LLM (with placeholder instruction in prompt).
-  4. When LLM responds, call `reassembleHtml(llmResponse, fragments)` to produce final HTML.
-  5. Store the reassembled HTML as `richHtml` on the `DisplayMessage` for insertion.
-
-**Step 4 — Update insertion to use rich HTML when available** (`useOfficeInsert.ts`)
-- Check if the message has `richHtml` content.
-- **Word**: Use `range.insertHtml(richHtml, 'Replace')` instead of `range.insertText()`.
-- **Outlook**: Use `setSelectedDataAsync(richHtml, { coercionType: CoercionType.Html })`.
-- **PowerPoint**: Use HTML-aware insertion if available, otherwise fall back to text.
-- Preserve the existing plain-text path as fallback when no `richHtml` is available.
-
-**Step 5 — Update ALL text-modifying prompts** (`constant.ts`)
-- Add to ALL quick action prompts (translate, polish, academic, summary, concise, proofread):
-  ```
-  If the text contains preservation placeholders like {{PRESERVE_1}}, {{PRESERVE_2}}, etc., keep them exactly in their original position. These represent images and formatting elements that must not be removed or modified.
-  ```
-
-**Step 6 — Add `richHtml` field to `DisplayMessage`** (`types/chat.ts`)
-- Add optional `richHtml?: string` field to `DisplayMessage` interface.
-- This stores the reassembled HTML with preserved non-text elements, ready for insertion.
-
-**Estimated Impact**: Prevents data loss across all text-modifying operations for all Office hosts. Critical for professional workflows where documents contain images, tables, styled lists, and other rich elements.
 
 ---
 
-### F2. Outlook "Reply" quick action produces low-quality, wrong-language responses
+## 9. Summary Statistics
 
-- **Severity**: HIGH
-- **Category**: UX / Quality
-- **Status**: OPEN
-- **Files**: `frontend/src/utils/constant.ts:323-342`, `frontend/src/pages/HomePage.vue:272-305`, `frontend/src/composables/useAgentLoop.ts:587-599`, `frontend/src/i18n/locales/fr.json:268`, `frontend/src/i18n/locales/en.json:263`
+| Area | CRITICAL | HIGH | MEDIUM | LOW | Dead Code | Total |
+|------|----------|------|--------|-----|-----------|-------|
+| Backend | 4 | 7 | 10 | 4 | 4 | 29 |
+| Frontend Utils | 3 | 7 | 10 | 4 | 13 | 37 |
+| Composables | 2 | 7 | 11 | 5 | 1 | 26 |
+| Infrastructure | 3 | 5 | 8 | 7 | 4 | 27 |
+| **Total** | **12** | **26** | **39** | **20** | **22** | **119** |
 
-#### Problem
-
-The Outlook "Reply" quick action (`reply` key) currently operates in **draft mode**: it pre-fills the chat input with a short prefix (`"Rédige une réponse à ce mail en disant que : "` / `"Draft a reply to this email saying that: "`) and waits for the user to type a brief intent. The user then presses Send, which triggers the normal `sendMessage()` flow.
-
-The result is a poor-quality reply because:
-
-1. **Insufficient context**: The email thread body is only included as `[Email body: "..."]` context appended by `sendMessage()` via `useSelectedText`. There is no structured analysis of the previous email's tone, formality level, or language.
-2. **Wrong language**: The reply prompt (`outlookBuiltInPrompt.reply`) contains language detection instructions, but these are in the **built-in prompt** which is only used when the action is NOT in draft mode. In draft mode, the user's message goes through `processChat()` with the generic `agentPrompt()`, which uses `replyLanguage` setting (defaulting to `Français`) instead of detecting the email language.
-3. **No tone analysis**: The generic agent prompt does not analyze the email thread to determine if the tone should be formal (external client) or casual (internal colleague).
-4. **No message length calibration**: Short user input like "dis oui" should generate a brief reply, while "explique en détail pourquoi on ne peut pas faire ça" should generate a longer response. There's no instruction for this.
-
-#### Root Cause
-
-- Draft mode (`mode: 'draft'` in `HomePage.vue:301`) bypasses the `outlookBuiltInPrompt.reply` prompt entirely. It only pre-fills the chat input, then `sendMessage()` uses the generic Outlook agent prompt.
-- The generic Outlook agent prompt (`useAgentPrompts.ts:120-136`) has basic reply language instructions but no structured email analysis framework.
-- The user's brief reply intent (e.g., "dis oui") provides no tone, length, or language guidance.
-
-#### Implementation Plan
-
-**Approach**: Replace the draft mode with a two-phase "smart reply" flow that first analyzes the email thread, then generates a calibrated response.
-
-**Step 1 — Change reply action from draft mode to a new "smart reply" mode** (`HomePage.vue:297-304`)
-- Change `mode: 'draft'` to `mode: 'smart-reply'` (new mode).
-- Remove the `prefix` property; it's no longer needed as a pre-fill.
-- Instead, the smart reply will: (1) open a small inline prompt for the user to describe their reply intent, (2) automatically fetch and analyze the email body.
-
-**Step 2 — Create a dedicated smart reply system prompt** (`constant.ts`)
-- Add a new `outlookBuiltInPrompt.smartReply` prompt with a comprehensive analysis framework:
-
-```typescript
-smartReply: {
-  system: (language: string) =>
-    `You are an expert email assistant specialized in drafting context-aware, natural email replies.
-
-BEFORE drafting the reply, you MUST analyze the email thread and determine these parameters:
-
-## Analysis Parameters (internal, do not output these)
-1. **Language**: Detect the dominant language of the email thread. Reply in that EXACT language. Ignore interface language "${language}".
-2. **Tone**: Determine the formality level from the email context:
-   - FORMAL: External clients, senior management, first contact, legal/compliance (use "Monsieur/Madame", "Dear", "Cordialement", "Best regards")
-   - SEMI-FORMAL: Known colleagues, recurring contacts (use first name + polite register)
-   - CASUAL: Close team members, internal quick exchanges (direct, concise, friendly)
-3. **Reply length**: Calibrate based on:
-   - User's input length and specificity (short input = short reply, detailed input = detailed reply)
-   - Original email complexity (a 3-line email doesn't warrant a 15-line reply)
-   - Match the approximate length of the original sender's style
-4. **Key points to address**: Identify which points from the original email need to be addressed in the reply.
-5. **Sender relationship**: Infer from greeting style, sign-off, and language register.
-
-## Reply Generation Rules
-- Address ALL points raised in the original email that relate to the user's intent.
-- Match the detected tone and formality level precisely.
-- Use appropriate greetings and sign-offs for the detected tone level.
-- Keep the reply proportional to the original email's length and the user's intent complexity.
-- OUTPUT ONLY the reply text, ready to send. No meta-commentary, no "Here is your reply".
-- Do NOT include a subject line ("Objet:", "Subject:"). Start directly with the greeting.
-- The user's input is their INTENT for the reply (what they want to say), not the literal text to send.`,
-  user: (text: string, language: string) =>
-    `## Email thread to reply to:
-${text}
-
-## User's reply intent:
-[REPLY_INTENT]
-
-Draft the reply now following all analysis rules above.
-${GLOBAL_STYLE_INSTRUCTIONS}`,
-}
-```
-
-**Step 3 — Implement the smart-reply flow in `useAgentLoop.ts`**
-- Add handling for `mode === 'smart-reply'` in `applyQuickAction()`:
-  1. Pre-fill the chat input with a contextual prompt (keep the existing prefix UX for user intent input).
-  2. When the user presses Send, intercept the flow (detect that a smart-reply was pending).
-  3. Fetch the full email body via `getOfficeSelection()`.
-  4. Build the smart reply prompt by:
-     - Using `outlookBuiltInPrompt.smartReply.system(lang)` as the system prompt.
-     - Replacing `[REPLY_INTENT]` in the user prompt with the user's typed intent.
-     - Replacing `${text}` with the full email body.
-  5. Stream the response directly (non-agent mode, no tools needed).
-
-**Step 4 — Add email metadata enrichment** (`useOfficeSelection.ts` or `outlookTools.ts`)
-- When building the smart reply context, also fetch:
-  - `getEmailSender()` — to determine the sender's name and relationship.
-  - `getEmailDate()` — for temporal context.
-  - `getEmailSubject()` — for topic context.
-- Prepend this metadata to the email thread text:
-  ```
-  From: {sender}
-  Date: {date}
-  Subject: {subject}
-
-  {body}
-  ```
-- This gives the LLM better context for tone and formality analysis.
-
-**Step 5 — Update i18n strings** (`fr.json`, `en.json`)
-- Update the reply pre-prompt to be more descriptive:
-  - FR: `"Décrivez brièvement ce que vous voulez répondre : "`
-  - EN: `"Briefly describe what you want to reply: "`
-- Add new i18n keys for smart reply status messages:
-  - `smartReplyAnalyzing`: `"Analyzing email tone and language..."` / `"Analyse du ton et de la langue du mail..."`
-
-**Step 6 — Alternative: Keep draft mode but inject smart prompt at send time**
-- If the UX of draft mode (user types in chat input) is preferred, then instead of changing the mode:
-  - Keep `mode: 'draft'` and `prefix`.
-  - In `sendMessage()`, detect that the message starts with the reply prefix.
-  - If so, strip the prefix, treat the rest as the reply intent, and route to the smart reply flow from Step 3.
-  - This preserves the existing UX while improving the backend prompt quality.
-
-**Estimated Impact**: Dramatically improves reply quality by ensuring correct language detection, tone matching, and proportional response length. The current implementation produces replies that feel generic and robotic; this fix makes them contextually aware and natural.
+*Note: Pages/Components and API layer audit pending — will be added as Section 10.*
 
 ---
 
-### F3. Excel agent mode processes cells one-by-one with individual LLM calls — extremely inefficient
+## 10. Priority Recommendations
 
-- **Severity**: HIGH
-- **Category**: Performance / Cost
-- **Status**: OPEN
-- **Files**: `frontend/src/composables/useAgentLoop.ts:224-418`, `frontend/src/utils/excelTools.ts:99-141` (`setCellValue`), `frontend/src/composables/useAgentPrompts.ts:92`
+### Immediate (CRITICAL — fix now)
 
-#### Problem
+1. **BC1/IC1** — Exempt `/api/upload` from Content-Type middleware (upload feature broken)
+2. **UC3** — Sanitize HTML before Outlook email injection (XSS in outgoing emails)
+3. **BC3** — Add log rotation and redact user content from logs (GDPR/privacy)
+4. **CC1/CC2** — Sanitize document content before LLM prompt interpolation (prompt injection)
+5. **UC1** — Use function replacement in `String.replace()` (data corruption)
+6. **BC2/IC3** — Replace internal URL with placeholder in `.env.example`
+7. **IC2** — Add non-root users to Dockerfiles
 
-When a user asks the Excel agent to translate, transform, or modify multiple cells (e.g., "translate all cells in column A from French to English"), the agent loop processes each cell individually:
+### Short-term (HIGH — fix before next release)
 
-1. The LLM generates one `setCellValue` tool call per cell.
-2. Each tool call is executed, and the result is appended to the message history.
-3. The updated history is sent back to the LLM for the next iteration.
-4. The LLM generates the next `setCellValue` call for the next cell.
+8. **UH1** — Add or remove `eval_officejs` from ExcelToolName
+9. **UH2** — Fix column letter arithmetic for multi-char columns
+10. **BH1** — Fix drain event listener leak in streaming
+11. **BH2** — Check `res.headersSent` before error response
+12. **CH1** — Fix `sendMessage` race condition
+13. **IH1** — Standardize Node.js version
+14. **IH4** — Copy lock files in Dockerfiles, use `npm ci`
 
-For 50 cells, this produces **50+ LLM round-trips** (each iteration often yields only 1-2 tool calls), consuming enormous amounts of tokens and taking a very long time. The `setCellValue` tool already supports multi-cell writes via JSON 2D arrays, but the LLM is not instructed to batch operations.
+### Medium-term (MEDIUM — address in upcoming sprints)
 
-#### Root Cause
-
-1. **Agent prompt lacks batching instructions** (`useAgentPrompts.ts:92`): The Excel agent prompt says `"Tool First"` and `"use fillFormulaDown when applying same formula across rows"` but has no instruction to batch `setCellValue` calls for multi-cell text transformations.
-2. **No batch-oriented tool**: While `setCellValue` accepts a 2D array, there's no dedicated "batch transform" tool that would let the LLM send all transformations in a single call.
-3. **LLM behavior**: Without explicit batching instructions, the model defaults to the most "reliable" pattern: one cell at a time, verify, next cell. This is safe but extremely wasteful.
-4. **Agent loop design**: The loop processes tool calls sequentially within an iteration, but the LLM typically generates only 1-3 tool calls per response for cell modifications.
-
-#### Implementation Plan
-
-**Approach**: Two-pronged fix: (1) add a dedicated batch cell operation tool, (2) update the agent prompt to strongly prefer batching.
-
-**Step 1 — Add `batchSetCellValues` tool** (`excelTools.ts`)
-- Create a new tool designed for bulk cell transformations:
-
-```typescript
-batchSetCellValues: {
-  name: 'batchSetCellValues',
-  category: 'write',
-  description:
-    'Set values for multiple individual cells in a single operation. This is much more efficient than calling setCellValue repeatedly. Use this tool whenever you need to modify more than 2 cells. Provide an array of {address, value} pairs.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      cells: {
-        type: 'array',
-        description: 'Array of cell updates. Each item has an "address" (A1 notation) and a "value" (the new cell content).',
-        items: {
-          type: 'object',
-          properties: {
-            address: { type: 'string', description: 'Cell address in A1 notation (e.g., "A1")' },
-            value: { type: 'string', description: 'New value for the cell' },
-          },
-          required: ['address', 'value'],
-        },
-      },
-    },
-    required: ['cells'],
-  },
-  executeExcel: async (context, args) => {
-    const { cells } = args
-    const sheet = context.workbook.worksheets.getActiveWorksheet()
-    for (const cell of cells) {
-      const range = sheet.getRange(cell.address)
-      const num = Number(cell.value)
-      range.values = [[isNaN(num) ? cell.value : num]]
-    }
-    await context.sync()
-    return `Successfully updated ${cells.length} cells`
-  },
-}
-```
-
-**Step 2 — Add `batchProcessCells` tool for LLM-powered transformations** (`excelTools.ts`)
-- This is an alternative/complementary approach: a tool that reads a range, sends all values for transformation in one shot, and writes back:
-
-```typescript
-batchProcessRange: {
-  name: 'batchProcessRange',
-  category: 'write',
-  description:
-    'Read all values from a range, apply the same transformation to each cell, and write the results back in one operation. Use this for translations, text cleanup, formatting, or any uniform transformation across multiple cells. You provide the range address and the transformed values as a 2D array matching the range dimensions.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      address: {
-        type: 'string',
-        description: 'Range address to process (e.g., "A1:A50", "B2:D10")',
-      },
-      values: {
-        type: 'array',
-        description: 'A 2D array of new values matching the range dimensions. Example: [["translated1"],["translated2"]] for a single-column range.',
-        items: {
-          type: 'array',
-          items: { type: 'string' },
-        },
-      },
-    },
-    required: ['address', 'values'],
-  },
-  executeExcel: async (context, args) => {
-    const { address, values } = args
-    const sheet = context.workbook.worksheets.getActiveWorksheet()
-    const range = sheet.getRange(address)
-    range.values = values
-    await context.sync()
-    return `Successfully updated range ${address} (${values.length} rows × ${values[0]?.length || 0} columns)`
-  },
-}
-```
-
-**Step 3 — Update the Excel agent prompt** (`useAgentPrompts.ts:92`)
-- Add strong batching instructions to the Excel agent prompt:
-
-```typescript
-const excelAgentPrompt = (lang: string) => `# Role
-You are a highly skilled Microsoft Excel Expert Agent...
-
-# Guidelines
-1. **Tool First**
-2. **Read First**: Always read the data before modifying it.
-3. **BATCH OPERATIONS (CRITICAL)**: When modifying multiple cells:
-   - NEVER use setCellValue in a loop to modify cells one by one.
-   - For text transformations (translate, clean, format, etc.): use getSelectedCells or getWorksheetData to read ALL values first, then process ALL transformations in your response, and use batchSetCellValues or batchProcessRange to write ALL results in ONE tool call.
-   - For formula application: use fillFormulaDown instead of calling insertFormula per row.
-   - Example: To translate 50 cells, read all 50 values, translate them all in one response, then write all 50 translated values using batchProcessRange.
-4. **Accuracy**
-5. **Conciseness**
-6. **Language**: You must communicate entirely in ${lang}.
-7. **Formula locale**: ${excelFormulaLanguageInstruction()}
-8. **Formula duplication**: use fillFormulaDown when applying same formula across rows.`
-```
-
-**Step 4 — Add `ExcelToolName` entries** (`excelTools.ts:23-63`)
-- Add `'batchSetCellValues'` and `'batchProcessRange'` to the `ExcelToolName` union type.
-
-**Step 5 — Consider token budget for large ranges**
-- For very large ranges (100+ cells), the LLM might not be able to process all values in a single response due to output token limits.
-- Add a note in the tool description: `"For ranges larger than 100 cells, process in chunks of 50-100 cells at a time."`.
-- Alternatively, implement a chunking strategy in the tool itself that splits the range into manageable batches.
-
-**Step 6 — Update tool preferences migration** (`toolStorage.ts`)
-- Ensure the new tool names are added to the default enabled set so existing users see them immediately without needing to manually enable them in settings.
-
-**Estimated Impact**: Reduces token consumption by **10-50x** for multi-cell operations. A 50-cell translation that currently takes 50+ LLM round-trips would be reduced to 2-3 (read, process, write). This directly impacts API cost and user wait time.
+15. Remove all dead code (22 items across codebase)
+16. Fix error handling: add logging to silent catch blocks
+17. Replace `any` types with `unknown` + type guards
+18. Extract shared utilities (deduplicate `generateVisualDiff`, `withTimeout`)
+19. Decompose oversized functions (3 functions >180 lines each)
+20. Add security headers to nginx config
 
 ---
 
-## 8. Updated Tracking Matrix (v2.1 additions)
-
-| ID  | Severity | Category        | Status | File(s)                                                |
-|-----|----------|-----------------|--------|--------------------------------------------------------|
-| F1  | HIGH     | Data Integrity  | OPEN   | useOfficeSelection.ts, useAgentLoop.ts, useOfficeInsert.ts, richContentPreserver.ts, constant.ts, chat.ts |
-| F2  | HIGH     | UX / Quality    | OPEN   | constant.ts, HomePage.vue, useAgentLoop.ts, i18n/*     |
-| F3  | HIGH     | Performance     | OPEN   | excelTools.ts, useAgentPrompts.ts, useAgentLoop.ts     |
-
-### Updated Implementation Priority
-
-Insert between Phase 1 and Phase 2 as **Phase 1.5 — Functional quality**:
-1. **F2** — Outlook smart reply (highest user-facing quality impact, prompt-only change for quick win)
-2. **F3** — Excel batch cell processing (highest cost/performance impact, new tools + prompt change)
-3. **F1** — Translation image preservation (requires OOXML/HTML parsing, most complex implementation)
-
----
-
-*Last updated: 2026-02-23*
+*Last updated: 2026-03-01*
