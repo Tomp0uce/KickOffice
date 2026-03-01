@@ -1381,7 +1381,7 @@ const excelToolDefinitions = createExcelTools({
 
   searchAndReplace: {
     name: 'searchAndReplace',
-    category: 'read',
+    category: 'write',
     description: 'Search for a value in the used range and optionally replace it.',
     inputSchema: {
       type: 'object',

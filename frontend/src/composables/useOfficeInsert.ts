@@ -196,8 +196,9 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
         messageUtil.info(t('imageInsertExcelNotSupported'))
         return
       }
+      // Outlook and other hosts: copy to clipboard with a host-appropriate message
       await copyImageToClipboard(message.imageSrc, true)
-      messageUtil.info(t('imageInsertWordOnly'))
+      messageUtil.info(t('imageInsertOutlookFallback'))
       return
     }
     await insertToDocument(getMessageActionPayload(message), type, message.richHtml)

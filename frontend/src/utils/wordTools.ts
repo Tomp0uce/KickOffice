@@ -500,7 +500,7 @@ const wordToolDefinitions = createWordTools({
 
   searchAndReplace: {
     name: 'searchAndReplace',
-    category: 'read',
+    category: 'write',
     description: 'Search for text in the document and replace it with new text. PREFERRED METHOD for correcting typos, modifying phrasing, or making targeted changes within paragraphs without destroying the surrounding document layout. Be surgical.',
     inputSchema: {
       type: 'object',

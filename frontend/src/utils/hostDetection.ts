@@ -1,39 +1,55 @@
 export type OfficeHostType = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook' | 'Unknown'
 
 let detectedHost: OfficeHostType = 'Unknown'
+// Cache is only trusted after Office.onReady has fired to avoid stale detection
+let officeReady = false
+
+/** Called from main.ts inside Office.onReady callback to enable result caching. */
+export function markOfficeReady(): void {
+  officeReady = true
+  detectedHost = 'Unknown' // reset so next call re-detects with full Office context
+}
 
 export function detectOfficeHost(): OfficeHostType {
-  if (detectedHost !== 'Unknown') return detectedHost
+  // Return cached value only once Office is confirmed ready
+  if (officeReady && detectedHost !== 'Unknown') return detectedHost
+
+  let result: OfficeHostType = 'Unknown'
 
   try {
     // Office.context.host is the official way
     const host = (window as any).Office?.context?.host
     if (host === 'Word' || host === 'Document') {
-      detectedHost = 'Word'
+      result = 'Word'
     } else if (host === 'Excel' || host === 'Workbook') {
-      detectedHost = 'Excel'
+      result = 'Excel'
     } else if (host === 'PowerPoint' || host === 'Presentation') {
-      detectedHost = 'PowerPoint'
+      result = 'PowerPoint'
     } else if (host === 'Outlook' || host === 'Mailbox') {
-      detectedHost = 'Outlook'
+      result = 'Outlook'
     }
   } catch {
     // Fallback: check global objects
   }
 
-  if (detectedHost === 'Unknown') {
+  if (result === 'Unknown') {
     if (typeof (window as any).Word !== 'undefined') {
-      detectedHost = 'Word'
+      result = 'Word'
     } else if (typeof (window as any).Excel !== 'undefined') {
-      detectedHost = 'Excel'
+      result = 'Excel'
     } else if (typeof (window as any).PowerPoint !== 'undefined') {
-      detectedHost = 'PowerPoint'
+      result = 'PowerPoint'
     } else if (typeof (window as any).Office?.context?.mailbox !== 'undefined') {
-      detectedHost = 'Outlook'
+      result = 'Outlook'
     }
   }
 
-  return detectedHost
+  // Only persist to cache after Office is ready
+  if (officeReady) {
+    detectedHost = result
+  }
+
+  return result
 }
 
 export function isExcel(): boolean {

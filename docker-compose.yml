@@ -3,7 +3,9 @@ services:
     image: node:22-slim
     container_name: kickoffice-manifest-gen
     volumes:
-      - ./:/app
+      - ./scripts:/app/scripts:ro
+      - ./manifests-templates:/app/manifests-templates:ro
+      - ./generated-manifests:/app/generated-manifests
     working_dir: /app
     environment:
       - SERVER_IP=${SERVER_IP}
@@ -28,8 +30,6 @@ services:
       - PORT=${BACKEND_PORT}
       - FRONTEND_URL=http://${SERVER_IP}:${FRONTEND_PORT}
       - PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL:-}
-      - PUID=1026
-      - PGID=100
     healthcheck:
       test:
         [
@@ -62,9 +62,6 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT}:80"
-    environment:
-      - PUID=1026
-      - PGID=100
     depends_on:
       manifest-gen:
         condition: service_completed_successfully

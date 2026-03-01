@@ -85,7 +85,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     }
 
     // Limit text size to prevent enormous context windows (approx context token limit defense)
-    // 50k chars is rough 10-15k tokens
+    // 100k chars is roughly 25-30k tokens
     const MAX_CHARS = 100000 
     if (extractedText.length > MAX_CHARS) {
         extractedText = extractedText.substring(0, MAX_CHARS) + '\n\n... [Content truncated due to file size]'

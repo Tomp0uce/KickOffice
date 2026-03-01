@@ -117,10 +117,27 @@ app.use((err, req, res, next) => {
   return logAndRespond(res, 500, { error: 'Internal server error' }, 'SERVER')
 })
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`KickOffice backend running on port ${PORT}`)
   console.log('Models configured:')
   for (const [tier, config] of Object.entries(models)) {
     console.log(`  ${tier}: ${config.id} (${config.label})`)
   }
 })
+
+// Graceful shutdown: stop accepting new connections and wait for in-flight requests
+function shutdown(signal) {
+  console.log(`${signal} received — shutting down gracefully`)
+  server.close(() => {
+    console.log('All connections closed. Exiting.')
+    process.exit(0)
+  })
+  // Force exit after 30s if connections don't drain
+  setTimeout(() => {
+    console.error('Graceful shutdown timeout — forcing exit')
+    process.exit(1)
+  }, 30_000).unref()
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => shutdown('SIGINT'))

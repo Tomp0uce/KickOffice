@@ -29,14 +29,22 @@ function getImageTimeoutMs() {
 }
 
 /**
+ * Strips header injection characters (\r, \n, non-printable) from a header value.
+ */
+function sanitizeHeaderValue(value) {
+  if (typeof value !== 'string') return ''
+  return value.replace(/[\r\n\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+}
+
+/**
  * Builds common headers for LLM API requests.
  */
 function buildHeaders(userCredentials) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${LLM_API_KEY}`,
-    'X-User-Key': userCredentials.userKey,
-    'X-OpenWebUi-User-Email': userCredentials.userEmail,
+    'X-User-Key': sanitizeHeaderValue(userCredentials.userKey),
+    'X-OpenWebUi-User-Email': sanitizeHeaderValue(userCredentials.userEmail),
   }
 }
 
@@ -86,7 +94,6 @@ export async function imageGeneration({ body, userCredentials }) {
  * Extracts and sanitizes error text for logging.
  * @param {Response} response - The failed response
  * @param {string} context - Context string for logging
- * @returns {Promise<string>} Sanitized error text
  */
 export async function handleErrorResponse(response, context) {
   const errorText = await response.text()
@@ -95,5 +102,4 @@ export async function handleErrorResponse(response, context) {
     status: response.status,
     errorText: sanitized,
   })
-  return sanitized
 }

@@ -1,7 +1,7 @@
 import { nextTick, ref, type Ref } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
-import { GLOBAL_STYLE_INSTRUCTIONS, buildInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -559,9 +559,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const imageSrc = await generateImage({ prompt: userMessage })
         const message = history.value[history.value.length - 1]
         message.role = 'assistant'; message.content = ''; message.imageSrc = imageSrc
-      } catch (err: any) {
+      } catch (err: unknown) {
+        console.error('[AgentLoop] image generation failed', err)
         const message = history.value[history.value.length - 1]
-        message.role = 'assistant'; message.content = `${t('imageError')}: ${err.message}`; message.imageSrc = undefined
+        message.role = 'assistant'; message.content = t('imageError'); message.imageSrc = undefined
       } finally {
         imageLoading.value = false
       }
@@ -575,10 +576,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     await runAgentLoop(messages, modelTier)
   }
 
-  async function sendMessage(payload?: unknown, files?: File[]) {
+  async function sendMessage(payload?: string, files?: File[]) {
     let textToSend = ''
 
-    if (typeof payload === 'string') {
+    if (payload) {
       textToSend = payload
     } else if (userInput.value && typeof userInput.value === 'string') {
       textToSend = userInput.value
@@ -812,9 +813,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           systemMsg = selectedExcelQuickAction.systemPrompt
           userMsg = `Selection:\n${selectedText}`
         } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
-      } else action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+      } else action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
       if (!systemMsg || !userMsg) {
-        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof buildInPrompt]
+        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
         if (!action) return
         const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
         systemMsg = action.system(lang)
@@ -876,7 +877,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
             lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
             messageUtil.warning(t('credentialsRequired'))
           } else {
-            lastMessage.content = `Error: ${err.message || t('failedToResponse')}`
+            console.error('[AgentLoop] agent loop failed', err)
+            lastMessage.content = t('failedToResponse')
             messageUtil.error(t('failedToResponse'))
           }
         }

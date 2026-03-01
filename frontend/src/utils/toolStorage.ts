@@ -17,7 +17,15 @@ export function persistEnabledTools(allToolNames: string[], enabledToolNames: Se
     signature: buildToolSignature(allToolNames),
     enabledToolNames: allToolNames.filter(name => enabledToolNames.has(name)),
   }
-  localStorage.setItem(ENABLED_TOOLS_STORAGE_KEY, JSON.stringify(payload))
+  try {
+    localStorage.setItem(ENABLED_TOOLS_STORAGE_KEY, JSON.stringify(payload))
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[ToolStorage] localStorage quota exceeded — tool preferences not saved')
+    } else {
+      throw e
+    }
+  }
 }
 
 /**
@@ -44,7 +52,7 @@ function migrateToolPreferences(
 
   // New tools (not in stored set) are enabled by default
   for (const name of allToolNames) {
-    if (!storedEnabledSet.has(name) && !storedEnabledNames.includes(name)) {
+    if (!storedEnabledSet.has(name)) {
       // This is a new tool - check if it was explicitly disabled or just new
       // Since we don't track disabled tools, we enable new tools by default
       migratedEnabled.add(name)
