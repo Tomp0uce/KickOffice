@@ -6,7 +6,7 @@
  * Reads manifest templates from manifests-templates/, replaces
  * {{FRONTEND_URL}} and {{BACKEND_URL}} placeholders with values
  * built from environment variables, and writes the resulting
- * manifest files to the project root as pure UTF-8 (no BOM).
+ * manifest files to generated-manifests/ as pure UTF-8 (no BOM).
  *
  * Environment variables:
  *   SERVER_IP       – host IP (required)
@@ -41,16 +41,19 @@ const BACKEND_URL  = process.env.PUBLIC_BACKEND_URL  || `http://${SERVER_IP}:${B
 
 const ROOT_DIR      = path.resolve(__dirname, '..');
 const TEMPLATES_DIR = path.join(ROOT_DIR, 'manifests-templates');
+const OUTPUT_DIR    = path.join(ROOT_DIR, 'generated-manifests');
+
+fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 const templates = [
   {
     src:  path.join(TEMPLATES_DIR, 'manifest-office.template.xml'),
-    dest: path.join(ROOT_DIR, 'manifest-office.xml'),
+    dest: path.join(OUTPUT_DIR, 'manifest-office.xml'),
     label: 'Office (Word / Excel / PowerPoint)',
   },
   {
     src:  path.join(TEMPLATES_DIR, 'manifest-outlook.template.xml'),
-    dest: path.join(ROOT_DIR, 'manifest-outlook.xml'),
+    dest: path.join(OUTPUT_DIR, 'manifest-outlook.xml'),
     label: 'Outlook',
   },
 ];

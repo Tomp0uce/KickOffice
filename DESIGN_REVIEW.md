@@ -429,10 +429,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 ### MEDIUM
 
-#### IM1. Manifest-gen mounts entire project root [OPEN]
+#### IM1. Manifest-gen mounts entire project root [RESOLVED]
 
-- **File**: `docker-compose.yml:5-6`
-- **Details**: Grants script access to `.env`, `.git`, all source code when it only needs `manifests-templates/`.
+> **Status**: Implemented. Script output dir changed from project root to `generated-manifests/`. Volume mounts narrowed to `./scripts:ro`, `./manifests-templates:ro`, and `./generated-manifests` (writable). `.env`, `.git`, and source code are no longer accessible to the container.
 
 #### IM2. Healthcheck hardcodes port 3003 [RESOLVED]
 
@@ -442,10 +441,9 @@ This v3 audit is a **fresh, comprehensive analysis** of the entire codebase. Fin
 
 > **Status**: Implemented. Now uses `npm ci --omit=dev`.
 
-#### IM4. Dev files copied into build context [OPEN]
+#### IM4. Dev files copied into build context [RESOLVED]
 
-- **File**: `frontend/Dockerfile:7`
-- **Details**: `COPY . .` includes `e2e/`, `playwright.config.ts` unnecessarily.
+> **Status**: Implemented. Added `e2e` and `playwright.config.ts` to `frontend/.dockerignore` so they are excluded from the Docker build context.
 
 #### IM5. CORS leaks internal IP [RESOLVED]
 
@@ -847,10 +845,10 @@ _Last updated: 2026-03-01_
 | 🟡 Deferred    | IH3  | External DuckDNS domain as default in .env.example                    |
 | 🟢 Implemented | IH4  | Undeterministic package resolution in Dockerfiles                     |
 | 🟢 Implemented | IH5  | Nginx missing security headers                                        |
-| 🔴 Remaining   | IM1  | Manifest-gen mounts entire project root                               |
+| 🟢 Implemented | IM1  | Manifest-gen mounts entire project root                               |
 | 🟢 Implemented | IM2  | Healthcheck hardcodes port 3003                                       |
 | 🟢 Implemented | IM3  | `npm install --production` deprecated                                 |
-| 🔴 Remaining   | IM4  | Dev files copied into build context                                   |
+| 🟢 Implemented | IM4  | Dev files copied into build context                                   |
 | 🟢 Implemented | IM5  | CORS leaks internal IP                                                |
 | 🟢 Implemented | IM6  | Empty `lang` attribute in index.html                                  |
 | 🟢 Implemented | IM7  | Outlook manifest missing AppDomains                                   |

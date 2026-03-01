@@ -3,7 +3,9 @@ services:
     image: node:22-slim
     container_name: kickoffice-manifest-gen
     volumes:
-      - ./:/app
+      - ./scripts:/app/scripts:ro
+      - ./manifests-templates:/app/manifests-templates:ro
+      - ./generated-manifests:/app/generated-manifests
     working_dir: /app
     environment:
       - SERVER_IP=${SERVER_IP}
