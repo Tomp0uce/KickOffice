@@ -13,6 +13,7 @@ export type OutlookToolName =
   | 'getEmailBody'
   | 'getSelectedText'
   | 'setEmailBody'
+  | 'appendToEmailBody'
   | 'insertTextAtCursor'
   | 'setEmailBodyHtml'
   | 'getEmailSubject'
@@ -197,6 +198,51 @@ const outlookToolDefinitions = createOutlookTools({
             resolve(resolveAsyncResult(result, () => 'Successfully set email body.'))
           },
         )
+      })
+    },
+  },
+
+  appendToEmailBody: {
+    name: 'appendToEmailBody',
+    category: 'write',
+    description:
+      'Append text at the END of the email body without overwriting existing content. Preferred over setEmailBody when you only need to add a signature, postscript, or extra paragraph. Supports Markdown formatting (**bold**, *italic*, - bullets, etc.). Only works in compose mode.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'Text to append at the end of the email body. Supports Markdown formatting.',
+        },
+      },
+      required: ['text'],
+    },
+    executeOutlook: async (mailbox, args: Record<string, any>) => {
+      const { text } = args as Record<string, any>
+      if (!text || typeof text !== 'string') return 'Error: text is required.'
+      if (!mailbox?.item?.body?.getAsync) {
+        return 'Cannot append to email body: compose mode is not available.'
+      }
+
+      const htmlToAppend = renderOfficeRichHtml(text)
+
+      return new Promise<string>((resolve) => {
+        mailbox.item.body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
+          if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
+            resolve('Error: Could not read the current email body to append to it.')
+            return
+          }
+          const existingBody: string = getResult.value || ''
+          const separator = existingBody.trim() ? '<br/><br/>' : ''
+          const newBody = existingBody + separator + DOMPurify.sanitize(htmlToAppend)
+          mailbox.item.body.setAsync(
+            newBody,
+            { coercionType: getOfficeCoercionType().Html },
+            (setResult: any) => {
+              resolve(resolveAsyncResult(setResult, () => 'Successfully appended text to email body.'))
+            },
+          )
+        })
       })
     },
   },
