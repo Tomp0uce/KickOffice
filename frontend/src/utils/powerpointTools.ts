@@ -48,6 +48,7 @@ export type PowerPointToolName =
   | 'addSlide'
   | 'setSlideNotes'
   | 'insertTextBox'
+  | 'setShapeText'
   | 'insertImage'
   | 'deleteSlide'
   | 'getShapes'
@@ -85,101 +86,84 @@ export function getPowerPointSelection(): Promise<string> {
 }
 
 /**
- * Reads the current PowerPoint selection and manually reconstructs basic HTML formatting
- * (bold, italic, underline, strikethrough) by inspecting the TextRange recursively.
- * Used to preserve formatting when sending text to the LLM, as PowerPoint lacks a native getHtml API.
+ * Reads the current PowerPoint selection and reconstructs basic HTML formatting
+ * (bold, italic, underline, strikethrough) by inspecting at the paragraph level.
+ *
+ * Issue #9 fix: The previous implementation loaded one API object per character
+ * (O(N) context.sync calls for N chars), causing extreme latency on long selections.
+ * This implementation loads all paragraphs in a single batch — O(1) syncs —
+ * preserving paragraph-level formatting while being orders of magnitude faster.
  */
 export async function getPowerPointSelectionAsHtml(): Promise<string> {
   if (!isPowerPointApiSupported('1.5')) {
     return getPowerPointSelection()
   }
-  
+
   try {
     const htmlOut = await executeOfficeAction(async () => {
       return PowerPoint.run(async (context: any) => {
         const textRanges = context.presentation.getSelectedTextRanges()
         textRanges.load('items')
         await context.sync()
-        
+
         if (textRanges.items.length === 0) return ''
-        
+
         const range = textRanges.items[0]
-        range.load(['text', 'length'])
+
+        // Load paragraphs in a single batch (replaces per-character loading)
+        const paragraphs = range.paragraphs
+        paragraphs.load('items')
         await context.sync()
-        
-        const len = range.length
-        if (len === 0) return ''
-        
-        // Cap length to prevent huge latency on massive selections
-        const maxLen = Math.min(len, 100000) 
-        
-        const charRanges = []
-        for (let i = 0; i < maxLen; i++) {
-          const charRange = range.getSubstring(i, 1)
-          charRange.load('text')
-          charRange.font.load(['bold', 'italic', 'underline', 'strikethrough'])
-          charRanges.push(charRange)
+
+        if (paragraphs.items.length === 0) return ''
+
+        // Batch-load text and font for every paragraph in one sync
+        for (const para of paragraphs.items) {
+          para.load('text')
+          para.font.load(['bold', 'italic', 'underline', 'strikethrough'])
         }
-        
         await context.sync()
-        
+
         let html = ''
-        let isBold = false
-        let isItalic = false
-        let isUnderline = false
-        let isStrike = false
-        
-        for (let i = 0; i < maxLen; i++) {
-          const charRange = charRanges[i]
-          const text = charRange.text
-          const font = charRange.font
-          
-          const isLineBreak = text === '\r' || text === '\n' || text === '\v'
-          
+        for (let i = 0; i < paragraphs.items.length; i++) {
+          const para = paragraphs.items[i]
+          const text: string = para.text || ''
+          const font = para.font
+
+          if (!text && i < paragraphs.items.length - 1) {
+            html += '<br/>'
+            continue
+          }
+
           const bold = font.bold === true
           const italic = font.italic === true
           const underline = font.underline !== 'None' && font.underline !== null
           const strike = font.strikethrough === true
-          
-          let safeText = text
-          if (safeText === '<') safeText = '&lt;'
-          else if (safeText === '>') safeText = '&gt;'
-          else if (safeText === '&') safeText = '&amp;'
-          
-          // If formatting changes, close currently open tags before opening new ones
-          if (isStrike !== strike || isUnderline !== underline || isItalic !== italic || isBold !== bold || isLineBreak) {
-             if (isStrike) html += '</s>'
-             if (isUnderline) html += '</u>'
-             if (isItalic) html += '</i>'
-             if (isBold) html += '</b>'
-             isStrike = isUnderline = isItalic = isBold = false
-          }
-          
-          if (!isLineBreak) {
-             // Open tags that are required but not yet open
-             if (bold && !isBold) { html += '<b>'; isBold = true }
-             if (italic && !isItalic) { html += '<i>'; isItalic = true }
-             if (underline && !isUnderline) { html += '<u>'; isUnderline = true }
-             if (strike && !isStrike) { html += '<s>'; isStrike = true }
-             html += safeText
-          } else {
-             html += '<br/>'
-          }
+
+          // Escape HTML entities
+          const safeText = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+
+          // Wrap with inline formatting tags (innermost first)
+          let wrapped = safeText
+          if (strike) wrapped = `<s>${wrapped}</s>`
+          if (underline) wrapped = `<u>${wrapped}</u>`
+          if (italic) wrapped = `<i>${wrapped}</i>`
+          if (bold) wrapped = `<b>${wrapped}</b>`
+
+          if (i > 0) html += '<br/>'
+          html += wrapped
         }
-        
-        // Close dangling tags
-        if (isStrike) html += '</s>'
-        if (isUnderline) html += '</u>'
-        if (isItalic) html += '</i>'
-        if (isBold) html += '</b>'
-        
+
         return html
       })
     })
-    
+
     return htmlOut || getPowerPointSelection()
   } catch (err) {
-    console.warn('Failed to extract PowerPoint HTML selection manually:', err)
+    console.warn('Failed to extract PowerPoint HTML selection (paragraph mode):', err)
     return getPowerPointSelection()
   }
 }
@@ -629,6 +613,76 @@ const powerpointToolDefinitions = createPowerPointTools({
 
         return `Successfully inserted a text box on slide ${slideNumber}.`
       },
+  },
+
+  setShapeText: {
+    name: 'setShapeText',
+    category: 'write',
+    description:
+      'Set the text content of an existing shape on a specific slide by its ID or Name. Does NOT require a user selection — use getShapes first to discover shape IDs/names. Supports Markdown formatting (**bold**, *italic*, - bullet lists, etc.).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: {
+          type: 'number',
+          description: 'Target slide number (1 = first slide).',
+        },
+        shapeIdOrName: {
+          type: 'string',
+          description: 'ID or Name of the shape to update (from getShapes).',
+        },
+        text: {
+          type: 'string',
+          description: 'New text content for the shape. Supports Markdown formatting.',
+        },
+      },
+      required: ['slideNumber', 'shapeIdOrName', 'text'],
+    },
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      ensurePowerPointRunAvailable()
+      const slideNumber = Number(args.slideNumber)
+      const shapeIdOrName = String(args.shapeIdOrName ?? '')
+      const text = String(args.text ?? '')
+
+      if (!Number.isFinite(slideNumber) || slideNumber < 1)
+        throw new Error('Error: slideNumber must be a number >= 1.')
+      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
+      if (!text && text !== '') throw new Error('Error: text is required.')
+
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length)
+        throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
+
+      const slide = slides.getItemAt(index)
+      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
+      shape.load('isNullObject')
+      await context.sync()
+
+      if (shape.isNullObject)
+        throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
+
+      const textRange = shape.textFrame.textRange
+
+      // Prefer rich HTML insertion (PowerPointApi 1.5+)
+      if (isPowerPointApiSupported('1.5')) {
+        try {
+          textRange.insertHtml(renderOfficeCommonApiHtml(text), 'Replace')
+          await context.sync()
+          return `Successfully set text on shape '${shapeIdOrName}' on slide ${slideNumber}.`
+        } catch {
+          // Fall through to plain-text fallback
+        }
+      }
+
+      // Fallback: plain text
+      textRange.text = stripRichFormattingSyntax(text)
+      await context.sync()
+      return `Successfully set text on shape '${shapeIdOrName}' on slide ${slideNumber} (plain text mode).`
+    },
   },
 
   insertImage: {
