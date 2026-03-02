@@ -26,48 +26,24 @@ export type ExcelToolName =
   | 'getSelectedCells'
   | 'setCellValue'
   | 'getWorksheetData'
-  | 'addDataValidation'
   | 'createTable'
-  | 'copyRange'
   | 'insertFormula'
   | 'fillFormulaDown'
   | 'formatRange'
   | 'sortRange'
-  | 'applyAutoFilter'
-  | 'removeAutoFilter'
   | 'getWorksheetInfo'
-  | 'renameWorksheet'
-  | 'deleteWorksheet'
-  | 'activateWorksheet'
   | 'getDataFromSheet'
-  | 'freezePanes'
-  | 'addHyperlink'
-  | 'addCellComment'
-  | 'insertRow'
-  | 'insertColumn'
-  | 'deleteRow'
-  | 'deleteColumn'
-  | 'mergeCells'
-  | 'setCellNumberFormat'
   | 'clearRange'
-  | 'getCellFormula'
   | 'searchAndReplace'
-  | 'autoFitColumns'
   | 'addWorksheet'
-  | 'setColumnWidth'
-  | 'setRowHeight'
-  | 'protectWorksheet'
   | 'getNamedRanges'
-  | 'setNamedRange'
   | 'applyConditionalFormatting'
-  | 'getConditionalFormattingRules'
   | 'batchSetCellValues'
   | 'batchProcessRange'
   | 'findData'
-  | 'duplicateWorksheet'
-  | 'hideUnhideRowColumn'
   | 'getAllObjects'
   | 'manageObject'
+  | 'eval_officejs'
 
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
@@ -195,99 +171,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  addDataValidation: {
-    name: 'addDataValidation',
-    category: 'write',
-    description:
-      'Apply data validation rules to a range (dropdown list, number/date limits, text length, or custom formula).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Target range address (e.g., "A2:A100"). Uses selection if omitted.',
-        },
-        validationType: {
-          type: 'string',
-          description: 'Validation type to apply.',
-          enum: ['list', 'wholeNumber', 'decimal', 'date', 'textLength', 'custom'],
-        },
-        listSource: {
-          type: 'string',
-          description: 'For list validation, comma-separated values or a range reference (e.g., "A,B,C" or "=$F$1:$F$10").',
-        },
-        operator: {
-          type: 'string',
-          description: 'Comparison operator for number/date/textLength validations.',
-          enum: ['between', 'notBetween', 'equalTo', 'notEqualTo', 'greaterThan', 'greaterThanOrEqual', 'lessThan', 'lessThanOrEqual'],
-        },
-        formula1: {
-          type: 'string',
-          description: 'Primary formula/value for validation rule.',
-        },
-        formula2: {
-          type: 'string',
-          description: 'Secondary formula/value for between/notBetween.',
-        },
-      },
-      required: [],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const {
-        address,
-        validationType = 'list',
-        listSource = 'A,B,C',
-        operator = 'between',
-        formula1 = '0',
-        formula2,
-      } = args
-
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
-
-        const operatorMap: Record<string, any> = {
-          between: Excel.DataValidationOperator.between,
-          notBetween: Excel.DataValidationOperator.notBetween,
-          equalTo: Excel.DataValidationOperator.equalTo,
-          notEqualTo: Excel.DataValidationOperator.notEqualTo,
-          greaterThan: Excel.DataValidationOperator.greaterThan,
-          greaterThanOrEqual: Excel.DataValidationOperator.greaterThanOrEqualTo,
-          lessThan: Excel.DataValidationOperator.lessThan,
-          lessThanOrEqual: Excel.DataValidationOperator.lessThanOrEqualTo,
-        }
-
-        if (validationType === 'list') {
-          range.dataValidation.rule = { list: { inCellDropDown: true, source: listSource } }
-        } else if (validationType === 'custom') {
-          range.dataValidation.rule = { custom: { formula: formula1 } }
-        } else {
-          const validationBody = {
-            formula1,
-            ...(formula2 ? { formula2 } : {}),
-            operator: operatorMap[operator] ?? Excel.DataValidationOperator.between,
-          }
-
-          const rule: Record<string, any> = {}
-          if (validationType === 'wholeNumber') rule.wholeNumber = validationBody
-          if (validationType === 'decimal') rule.decimal = validationBody
-          if (validationType === 'date') rule.date = validationBody
-          if (validationType === 'textLength') rule.textLength = validationBody
-          range.dataValidation.rule = rule
-        }
-
-        range.dataValidation.errorAlert = {
-          title: 'Invalid value',
-          message: 'The entered value does not match data validation rules.',
-          style: Excel.DataValidationAlertStyle.stop,
-          showAlert: true,
-        }
-
-        await context.sync()
-        return `Successfully applied ${validationType} data validation${address ? ` on ${address}` : ' on selection'}`
-      },
-  },
-
   createTable: {
     name: 'createTable',
     category: 'write',
@@ -328,43 +211,6 @@ const excelToolDefinitions = createExcelTools({
         table.load('name')
         await context.sync()
         return `Successfully created table "${table.name}"${address ? ` from ${address}` : ' from selection'}`
-      },
-  },
-
-  copyRange: {
-    name: 'copyRange',
-    category: 'write',
-    description:
-      'Copy values, formulas, and number formats from a source range to a destination range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sourceAddress: {
-          type: 'string',
-          description: 'Source range address (e.g., "A1:C20").',
-        },
-        destinationAddress: {
-          type: 'string',
-          description: 'Top-left destination address or destination range (e.g., "E1").',
-        },
-      },
-      required: ['sourceAddress', 'destinationAddress'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { sourceAddress, destinationAddress } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const sourceRange = sheet.getRange(sourceAddress)
-        sourceRange.load('values, formulas, numberFormat, rowCount, columnCount')
-        await context.sync()
-
-        const destinationRange = sheet.getRange(destinationAddress).getResizedRange(sourceRange.rowCount - 1, sourceRange.columnCount - 1)
-        destinationRange.values = sourceRange.values
-        destinationRange.formulas = sourceRange.formulas
-        destinationRange.numberFormat = sourceRange.numberFormat
-
-        await context.sync()
-        return `Successfully copied ${sourceAddress} to ${destinationAddress}`
       },
   },
 
@@ -864,64 +710,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  applyAutoFilter: {
-    name: 'applyAutoFilter',
-    category: 'write',
-    description: 'Apply auto filter to the selected range so users can filter data by column values.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeExcel: async (context) => {
-      
-        const range = context.workbook.getSelectedRange()
-        range.load('address')
-        await context.sync()
-
-        try {
-          const sheet = range.worksheet
-          sheet.autoFilter.apply(range)
-          await context.sync()
-          return 'Successfully applied auto filter to the selected range'
-        } catch {
-          // Fallback: highlight header row
-          const headerRow = range.getRow(0)
-          headerRow.format.fill.color = '#0078d4'
-          headerRow.format.font.color = '#FFFFFF'
-          headerRow.format.font.bold = true
-          await context.sync()
-          return 'Applied header formatting (auto filter API not available in this context)'
-        }
-      },
-  },
-
-  removeAutoFilter: {
-    name: 'removeAutoFilter',
-    category: 'write',
-    description: 'Remove auto filter from a worksheet.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sheetName: {
-          type: 'string',
-          description: 'Optional worksheet name. Uses active worksheet if omitted.',
-        },
-      },
-      required: [],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { sheetName } = args as Record<string, any>
-      
-        const sheet = sheetName
-          ? context.workbook.worksheets.getItem(sheetName)
-          : context.workbook.worksheets.getActiveWorksheet()
-        sheet.autoFilter.remove()
-        await context.sync()
-        return `Successfully removed auto filter from worksheet "${sheetName ?? 'active'}"`
-      },
-  },
-
   getWorksheetInfo: {
     name: 'getWorksheetInfo',
     category: 'read',
@@ -961,82 +749,6 @@ const excelToolDefinitions = createExcelTools({
           null,
           2,
         )
-      },
-  },
-
-  renameWorksheet: {
-    name: 'renameWorksheet',
-    category: 'write',
-    description: 'Rename an existing worksheet.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        currentName: {
-          type: 'string',
-          description: 'Current worksheet name.',
-        },
-        newName: {
-          type: 'string',
-          description: 'New worksheet name.',
-        },
-      },
-      required: ['currentName', 'newName'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { currentName, newName } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getItem(currentName)
-        sheet.name = newName
-        await context.sync()
-        return `Successfully renamed worksheet "${currentName}" to "${newName}"`
-      },
-  },
-
-  deleteWorksheet: {
-    name: 'deleteWorksheet',
-    category: 'write',
-    description: 'Delete a worksheet by name.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Worksheet name to delete.',
-        },
-      },
-      required: ['name'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { name } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getItem(name)
-        sheet.delete()
-        await context.sync()
-        return `Successfully deleted worksheet "${name}"`
-      },
-  },
-
-  activateWorksheet: {
-    name: 'activateWorksheet',
-    category: 'write',
-    description: 'Activate a worksheet by name.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Worksheet name to activate.',
-        },
-      },
-      required: ['name'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { name } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getItem(name)
-        sheet.activate()
-        await context.sync()
-        return `Successfully activated worksheet "${name}"`
       },
   },
 
@@ -1080,307 +792,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  freezePanes: {
-    name: 'freezePanes',
-    category: 'write',
-    description: 'Freeze or unfreeze worksheet panes by rows, columns, or anchor cell.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        mode: {
-          type: 'string',
-          description: 'Freeze mode to apply.',
-          enum: ['rows', 'columns', 'at', 'unfreeze'],
-        },
-        count: {
-          type: 'number',
-          description: 'Row or column count for rows/columns mode.',
-        },
-        address: {
-          type: 'string',
-          description: 'Anchor range address for mode="at" (e.g., "C3").',
-        },
-      },
-      required: ['mode'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { mode, count = 1, address } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-
-        if (mode === 'rows') {
-          sheet.freezePanes.freezeRows(count)
-        } else if (mode === 'columns') {
-          sheet.freezePanes.freezeColumns(count)
-        } else if (mode === 'at') {
-          if (!address) {
-            throw new Error('address is required when mode is "at"')
-          }
-          sheet.freezePanes.freezeAt(sheet.getRange(address))
-        } else {
-          sheet.freezePanes.unfreeze()
-        }
-
-        await context.sync()
-        return `Successfully applied freeze panes mode "${mode}"`
-      },
-  },
-
-  addHyperlink: {
-    name: 'addHyperlink',
-    category: 'write',
-    description: 'Add a clickable hyperlink to a cell or range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Target cell/range address (e.g., "A1").',
-        },
-        hyperlinkAddress: {
-          type: 'string',
-          description: 'Hyperlink URL or mailto value.',
-        },
-        textToDisplay: {
-          type: 'string',
-          description: 'Optional displayed text.',
-        },
-        screenTip: {
-          type: 'string',
-          description: 'Optional tooltip text.',
-        },
-      },
-      required: ['address', 'hyperlinkAddress'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, hyperlinkAddress, textToDisplay, screenTip } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = sheet.getRange(address)
-        range.hyperlink = {
-          address: hyperlinkAddress,
-          ...(textToDisplay ? { textToDisplay } : {}),
-          ...(screenTip ? { screenTip } : {}),
-        }
-
-        await context.sync()
-        return `Successfully added hyperlink to ${address}`
-      },
-  },
-
-  addCellComment: {
-    name: 'addCellComment',
-    category: 'write',
-    description: 'Add a comment (note) to a cell range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Target cell/range address (e.g., "B2").',
-        },
-        text: {
-          type: 'string',
-          description: 'Comment text.',
-        },
-      },
-      required: ['address', 'text'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, text } = args as Record<string, any>
-      
-        const comments = context.workbook.comments
-        comments.add(address, text)
-        await context.sync()
-        return `Successfully added comment to ${address}`
-      },
-  },
-
-  insertRow: {
-    name: 'insertRow',
-    category: 'write',
-    description: 'Insert one or more rows at the specified position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        rowIndex: {
-          type: 'number',
-          description: 'The 1-based row number where to insert (e.g., 5 inserts before row 5)',
-        },
-        count: {
-          type: 'number',
-          description: 'Number of rows to insert (default: 1)',
-        },
-      },
-      required: ['rowIndex'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { rowIndex, count = 1 } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
-        range.insert(Excel.InsertShiftDirection.down)
-        await context.sync()
-        return `Successfully inserted ${count} row(s) at position ${rowIndex}`
-      },
-  },
-
-  insertColumn: {
-    name: 'insertColumn',
-    category: 'write',
-    description: 'Insert one or more columns at the specified position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        columnLetter: {
-          type: 'string',
-          description: 'Column letter where to insert (e.g., "C" inserts before column C)',
-        },
-        count: {
-          type: 'number',
-          description: 'Number of columns to insert (default: 1)',
-        },
-      },
-      required: ['columnLetter'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { columnLetter, count = 1 } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const startColNum = colToInt(columnLetter.toUpperCase())
-        const endCol = intToCol(startColNum + count - 1)
-        const range = sheet.getRange(`${columnLetter}:${endCol}`)
-        range.insert(Excel.InsertShiftDirection.right)
-        await context.sync()
-        return `Successfully inserted ${count} column(s) at position ${columnLetter}`
-      },
-  },
-
-  deleteRow: {
-    name: 'deleteRow',
-    category: 'write',
-    description: 'Delete one or more rows at the specified position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        rowIndex: {
-          type: 'number',
-          description: 'The 1-based row number to delete',
-        },
-        count: {
-          type: 'number',
-          description: 'Number of rows to delete (default: 1)',
-        },
-      },
-      required: ['rowIndex'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { rowIndex, count = 1 } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = sheet.getRange(`${rowIndex}:${rowIndex + count - 1}`)
-        range.delete(Excel.DeleteShiftDirection.up)
-        await context.sync()
-        return `Successfully deleted ${count} row(s) at position ${rowIndex}`
-      },
-  },
-
-  deleteColumn: {
-    name: 'deleteColumn',
-    category: 'write',
-    description: 'Delete one or more columns at the specified position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        columnLetter: {
-          type: 'string',
-          description: 'Column letter to delete (e.g., "C")',
-        },
-        count: {
-          type: 'number',
-          description: 'Number of columns to delete (default: 1)',
-        },
-      },
-      required: ['columnLetter'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { columnLetter, count = 1 } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const startColNum = colToInt(columnLetter.toUpperCase())
-        const endCol = intToCol(startColNum + count - 1)
-        const range = sheet.getRange(`${columnLetter}:${endCol}`)
-        range.delete(Excel.DeleteShiftDirection.left)
-        await context.sync()
-        return `Successfully deleted ${count} column(s) at position ${columnLetter}`
-      },
-  },
-
-  mergeCells: {
-    name: 'mergeCells',
-    category: 'format',
-    description: 'Merge or unmerge the selected cells or a specific range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Optional range address (e.g., "A1:C1"). Uses selection if not provided.',
-        },
-        merge: {
-          type: 'boolean',
-          description: 'True to merge, false to unmerge (default: true)',
-        },
-      },
-      required: [],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, merge = true } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
-
-        if (merge) {
-          range.merge()
-        } else {
-          range.unmerge()
-        }
-        await context.sync()
-        return `Successfully ${merge ? 'merged' : 'unmerged'} cells${address ? ` at ${address}` : ''}`
-      },
-  },
-
-  setCellNumberFormat: {
-    name: 'setCellNumberFormat',
-    category: 'format',
-    description:
-      'Set the number format for a range of cells (e.g., currency, percentage, date format).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Optional range address. Uses selection if not provided.',
-        },
-        format: {
-          type: 'string',
-          description:
-            'Number format string. Examples: "#,##0.00" (number), "$#,##0.00" (currency), "0.00%" (percentage), "yyyy-mm-dd" (date), "0" (integer)',
-        },
-      },
-      required: ['format'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, format } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
-        range.numberFormat = range.values.map((row: any[]) => row.map(() => format))
-        await context.sync()
-        return `Successfully set number format "${format}"${address ? ` for ${address}` : ' for selection'}`
-      },
-  },
-
   clearRange: {
     name: 'clearRange',
     category: 'write',
@@ -1419,41 +830,6 @@ const excelToolDefinitions = createExcelTools({
 
         await context.sync()
         return `Successfully cleared ${clearType}${address ? ` from ${address}` : ' from selection'}`
-      },
-  },
-
-  getCellFormula: {
-    name: 'getCellFormula',
-    category: 'read',
-    description: 'Get the formula (if any) from a specific cell or the selected range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Optional cell address (e.g., "A1"). Uses selection if not provided.',
-        },
-      },
-      required: [],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange()
-        range.load('formulas, formulasLocal, values, address')
-        await context.sync()
-
-        return JSON.stringify(
-          {
-            address: range.address,
-            formulas: range.formulas,
-            formulasLocal: range.formulasLocal,
-            values: range.values,
-          },
-          null,
-          2,
-        )
       },
   },
 
@@ -1507,32 +883,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  autoFitColumns: {
-    name: 'autoFitColumns',
-    category: 'format',
-    description: 'Auto-fit column widths to match their content for the selected range or the entire used range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Optional range address. If omitted, auto-fits the used range columns.',
-        },
-      },
-      required: [],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = address ? sheet.getRange(address) : sheet.getUsedRange()
-        range.format.autofitColumns()
-        range.format.autofitRows()
-        await context.sync()
-        return `Successfully auto-fitted columns and rows${address ? ` for ${address}` : ''}`
-      },
-  },
-
   addWorksheet: {
     name: 'addWorksheet',
     category: 'write',
@@ -1557,38 +907,6 @@ const excelToolDefinitions = createExcelTools({
         return `Successfully created and activated worksheet "${sheet.name}"`
       },
   },
-
-  setColumnWidth: {
-    name: 'setColumnWidth',
-    category: 'format',
-    description: 'Set the width of one or more columns.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        columnLetter: {
-          type: 'string',
-          description: 'Column letter (e.g., "A") or range (e.g., "A:D")',
-        },
-        width: {
-          type: 'number',
-          description: 'Column width in points',
-        },
-      },
-      required: ['columnLetter', 'width'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { columnLetter, width } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const colRange = columnLetter.includes(':')
-          ? sheet.getRange(columnLetter)
-          : sheet.getRange(`${columnLetter}:${columnLetter}`)
-        colRange.format.columnWidth = width
-        await context.sync()
-        return `Successfully set column ${columnLetter} width to ${width}`
-      },
-  },
-
 
   setRowHeight: {
     name: 'setRowHeight',
@@ -2244,6 +1562,35 @@ const excelToolDefinitions = createExcelTools({
       }
 
       return JSON.stringify({ charts: allCharts, pivotTables: allPivots }, null, 2)
+    },
+  },
+
+  eval_officejs: {
+    name: 'eval_officejs',
+    category: 'write',
+    description: "Execute arbitrary Office.js code within an Excel.run context. Use this as an escape hatch for operations not covered by dedicated tools: sorting, autofilter, freeze panes, hyperlinks, row/column insert/delete/resize/hide, data validation, number formats, cell comments, named ranges, sheet rename/duplicate/protect/activate, autofit, conditional formatting inspection, etc. The code runs inside `Excel.run(async (context) => { ... })` with `context` (Excel.RequestContext) and `Excel` global available. Always call `await context.sync()` before returning.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: {
+          type: 'string',
+          description: "JavaScript code to execute. Has access to `context` (Excel.RequestContext) and `Excel` global. Must be valid async JS. Return a value to get it as result. Example: `const sheet = context.workbook.worksheets.getActiveWorksheet(); sheet.getRange('A1:D100').sort.apply([{key:0,ascending:true}]); await context.sync(); return 'Sorted column A ascending.';`",
+        },
+        explanation: {
+          type: 'string',
+          description: 'Brief explanation of what this code does.',
+        },
+      },
+      required: ['code'],
+    },
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      const { code } = args as Record<string, any>
+      try {
+        const result = await sandboxedEval(code, { context, Excel: typeof Excel !== 'undefined' ? Excel : undefined })
+        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+      } catch (err: any) {
+        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+      }
     },
   },
 })

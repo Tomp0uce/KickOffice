@@ -43,18 +43,11 @@ function createPowerPointTools(definitions: Record<PowerPointToolName, PowerPoin
 export type PowerPointToolName =
   | 'getSelectedText'
   | 'replaceSelectedText'
-  | 'getSlideCount'
   | 'getSlideContent'
   | 'addSlide'
-  | 'setSlideNotes'
-  | 'insertTextBox'
   | 'setShapeText'
-  | 'insertImage'
   | 'deleteSlide'
   | 'getShapes'
-  | 'deleteShape'
-  | 'setShapeFill'
-  | 'moveResizeShape'
   | 'getAllSlidesOverview'
   | 'eval_powerpointjs'
 
@@ -372,25 +365,6 @@ const powerpointToolDefinitions = createPowerPointTools({
     },
   },
 
-  getSlideCount: {
-    name: 'getSlideCount',
-    category: 'read',
-    description: 'Get the total number of slides in the active PowerPoint presentation.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executePowerPoint: async (context: any) => {
-      ensurePowerPointRunAvailable()
-      
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-        return String(slides.items.length)
-      },
-  },
-
   getSlideContent: {
     name: 'getSlideContent',
     category: 'read',
@@ -490,131 +464,6 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
   },
 
-  setSlideNotes: {
-    name: 'setSlideNotes',
-    category: 'write',
-    description: 'Set speaker notes for a given slide (requires PowerPointApi 1.4+).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: {
-          type: 'number',
-          description: 'Slide number to update (1 = first slide).',
-        },
-        notesText: {
-          type: 'string',
-          description: 'Speaker notes content to place in the notes area.',
-        },
-      },
-      required: ['slideNumber', 'notesText'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-
-      if (!isPowerPointApiSupported('1.4')) {
-        throw new Error('Error: setSlideNotes requires PowerPointApi 1.4 or newer.')
-      }
-
-      const slideNumber = Number(args.slideNumber)
-      const notesText = String(args.notesText ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
-      }
-
-      
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-
-        const index = Math.trunc(slideNumber) - 1
-        if (index >= slides.items.length) {
-          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
-        }
-
-        const slide = slides.getItemAt(index)
-        const notesSlide = (slide as any).notesSlide
-        if (!notesSlide?.shapes?.addTextBox) {
-          throw new Error('Error: notesSlide is not available in this PowerPoint runtime.')
-        }
-
-        const notesBox = notesSlide.shapes.addTextBox(notesText)
-        notesBox.left = 20
-        notesBox.top = 20
-        notesBox.width = 680
-        notesBox.height = 300
-        await context.sync()
-
-        return `Successfully updated notes for slide ${slideNumber}.`
-      },
-  },
-
-  insertTextBox: {
-    name: 'insertTextBox',
-    category: 'write',
-    description: 'Insert a text box into a specific slide with optional position and size. Content supports Markdown formatting for rich text rendering.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: {
-          type: 'number',
-          description: 'Target slide number (1 = first slide).',
-        },
-        text: {
-          type: 'string',
-          description: 'Text to insert in the text box.',
-        },
-        left: { type: 'number', description: 'Left position in points.' },
-        top: { type: 'number', description: 'Top position in points.' },
-        width: { type: 'number', description: 'Text box width in points.' },
-        height: { type: 'number', description: 'Text box height in points.' },
-      },
-      required: ['slideNumber', 'text'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
-      }
-
-      const text = String(args.text ?? '')
-      if (!text) {
-        throw new Error('Error: text is required.')
-      }
-
-      
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-
-        const index = Math.trunc(slideNumber) - 1
-        if (index >= slides.items.length) {
-          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
-        }
-
-        const slide = slides.getItemAt(index)
-        // addTextBox requires plain text — create with stripped version initially
-        const shape = slide.shapes.addTextBox(stripRichFormattingSyntax(text))
-        shape.left = Number.isFinite(args.left) ? Number(args.left) : 50
-        shape.top = Number.isFinite(args.top) ? Number(args.top) : 50
-        shape.width = Number.isFinite(args.width) ? Number(args.width) : 500
-        shape.height = Number.isFinite(args.height) ? Number(args.height) : 120
-        await context.sync()
-
-        // Try to upgrade to rich HTML formatting (requires PowerPointApi 1.5+)
-        if (isPowerPointApiSupported('1.5')) {
-          try {
-            shape.textFrame.textRange.insertHtml(renderOfficeCommonApiHtml(text), 'Replace')
-            await context.sync()
-          } catch {
-            // insertHtml not available in this context — plain text already set
-          }
-        }
-
-        return `Successfully inserted a text box on slide ${slideNumber}.`
-      },
-  },
-
   setShapeText: {
     name: 'setShapeText',
     category: 'write',
@@ -683,63 +532,6 @@ const powerpointToolDefinitions = createPowerPointTools({
       await context.sync()
       return `Successfully set text on shape '${shapeIdOrName}' on slide ${slideNumber} (plain text mode).`
     },
-  },
-
-  insertImage: {
-    name: 'insertImage',
-    category: 'write',
-    description: 'Insert a base64 image into a specific slide with optional position and size.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: {
-          type: 'number',
-          description: 'Target slide number (1 = first slide).',
-        },
-        base64Image: {
-          type: 'string',
-          description: 'Image payload as raw base64 or data URL.',
-        },
-        left: { type: 'number', description: 'Left position in points.' },
-        top: { type: 'number', description: 'Top position in points.' },
-        width: { type: 'number', description: 'Image width in points.' },
-        height: { type: 'number', description: 'Image height in points.' },
-      },
-      required: ['slideNumber', 'base64Image'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) {
-        throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
-      }
-
-      const base64ImageRaw = String(args.base64Image ?? '').trim()
-      if (!base64ImageRaw) {
-        throw new Error('Error: base64Image is required.')
-      }
-      const base64Image = base64ImageRaw.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '')
-
-      
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-
-        const index = Math.trunc(slideNumber) - 1
-        if (index >= slides.items.length) {
-          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
-        }
-
-        const slide = slides.getItemAt(index)
-        const shape = slide.shapes.addImage(base64Image)
-        shape.left = Number.isFinite(args.left) ? Number(args.left) : 50
-        shape.top = Number.isFinite(args.top) ? Number(args.top) : 50
-        shape.width = Number.isFinite(args.width) ? Number(args.width) : 320
-        shape.height = Number.isFinite(args.height) ? Number(args.height) : 180
-        await context.sync()
-
-        return `Successfully inserted an image on slide ${slideNumber}.`
-      },
   },
 
   deleteSlide: {
@@ -816,130 +608,6 @@ const powerpointToolDefinitions = createPowerPointTools({
         }
       })
       return JSON.stringify(details, null, 2)
-    },
-  },
-
-  deleteShape: {
-    name: 'deleteShape',
-    category: 'write',
-    description: 'Delete a shape from a slide by its ID or Name.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
-        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape to delete.' },
-      },
-      required: ['slideNumber', 'shapeIdOrName'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
-      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
-
-      const slides = context.presentation.slides
-      slides.load('items')
-      await context.sync()
-      const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
-
-      const slide = slides.getItemAt(index)
-      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
-      shape.load('isNullObject')
-      await context.sync()
-
-      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
-
-      shape.delete()
-      await context.sync()
-      return `Successfully deleted shape '${shapeIdOrName}' from slide ${slideNumber}.`
-    },
-  },
-
-  setShapeFill: {
-    name: 'setShapeFill',
-    category: 'write',
-    description: 'Set the fill color of a shape on a slide.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
-        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape.' },
-        color: { type: 'string', description: 'Hex color code (e.g., "#FF0000").' },
-      },
-      required: ['slideNumber', 'shapeIdOrName', 'color'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      const color = String(args.color ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
-      if (!shapeIdOrName || !color) throw new Error('Error: shapeIdOrName and color are required.')
-
-      const slides = context.presentation.slides
-      slides.load('items')
-      await context.sync()
-      const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
-
-      const slide = slides.getItemAt(index)
-      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
-      shape.load('isNullObject')
-      await context.sync()
-
-      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found.`)
-
-      shape.fill.setSolidColor(color)
-      await context.sync()
-      return `Successfully set fill color of shape '${shapeIdOrName}' to ${color}.`
-    },
-  },
-
-  moveResizeShape: {
-    name: 'moveResizeShape',
-    category: 'write',
-    description: 'Move and/or resize a shape on a slide. Missing measurements will be left unchanged.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
-        shapeIdOrName: { type: 'string', description: 'ID or Name of the shape.' },
-        left: { type: 'number', description: 'New left position in points.' },
-        top: { type: 'number', description: 'New top position in points.' },
-        width: { type: 'number', description: 'New width in points.' },
-        height: { type: 'number', description: 'New height in points.' },
-      },
-      required: ['slideNumber', 'shapeIdOrName'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
-      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
-
-      const slides = context.presentation.slides
-      slides.load('items')
-      await context.sync()
-      const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
-
-      const slide = slides.getItemAt(index)
-      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
-      shape.load('isNullObject')
-      await context.sync()
-
-      if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found.`)
-
-      if (Number.isFinite(args.left)) shape.left = Number(args.left)
-      if (Number.isFinite(args.top)) shape.top = Number(args.top)
-      if (Number.isFinite(args.width)) shape.width = Number(args.width)
-      if (Number.isFinite(args.height)) shape.height = Number(args.height)
-
-      await context.sync()
-      return `Successfully moved/resized shape '${shapeIdOrName}'.`
     },
   },
 

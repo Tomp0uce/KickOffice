@@ -11,19 +11,14 @@ import { generateVisualDiff } from './common'
 
 export type OutlookToolName =
   | 'getEmailBody'
-  | 'getSelectedText'
   | 'setEmailBody'
   | 'appendToEmailBody'
   | 'insertTextAtCursor'
-  | 'setEmailBodyHtml'
   | 'getEmailSubject'
   | 'setEmailSubject'
   | 'getEmailRecipients'
   | 'addRecipient'
   | 'getEmailSender'
-  | 'getEmailDate'
-  | 'getAttachments'
-  | 'insertHtmlAtCursor'
   | 'eval_outlookjs'
 
 
@@ -134,36 +129,6 @@ const outlookToolDefinitions = createOutlookTools({
           getOfficeCoercionType().Text,
           (result: any) => {
             resolve(resolveAsyncResult(result, (value) => value || ''))
-          },
-        )
-      })
-    },
-  },
-
-  getSelectedText: {
-    name: 'getSelectedText',
-    category: 'read',
-    description:
-      'Get the currently selected text in the email compose window. Returns empty string if nothing is selected or not in compose mode.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeOutlook: async (mailbox) => {
-      if (!mailbox?.item) return ''
-      if (typeof mailbox.item.getSelectedDataAsync !== 'function') {
-        return 'Selection reading is not available in this context.'
-      }
-      return new Promise<string>((resolve) => {
-        mailbox.item.getSelectedDataAsync(
-          getOfficeCoercionType().Text,
-          (result: any) => {
-            if (result.status === getOfficeAsyncStatus()?.Succeeded && result.value?.data) {
-              resolve(result.value.data)
-            } else {
-              resolve('')
-            }
           },
         )
       })
@@ -288,38 +253,6 @@ const outlookToolDefinitions = createOutlookTools({
             resolve(resolveAsyncResult(result, () => diffTracking
               ? 'Inserted visual diff: insertions in blue/underline, deletions in red/strikethrough.'
               : 'Successfully inserted text at cursor.'))
-          },
-        )
-      })
-    },
-  },
-
-  setEmailBodyHtml: {
-    name: 'setEmailBodyHtml',
-    category: 'write',
-    description: 'Replace the full email body with HTML content (compose mode).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        html: {
-          type: 'string',
-          description: 'The HTML content to set as the whole email body',
-        },
-      },
-      required: ['html'],
-    },
-    executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { html } = args as Record<string, any>
-      if (!mailbox?.item?.body?.setAsync) {
-        return 'Cannot set HTML email body: compose mode is not available.'
-      }
-
-      return new Promise<string>((resolve) => {
-        mailbox.item.body.setAsync(
-          DOMPurify.sanitize(html),
-          { coercionType: getOfficeCoercionType().Html },
-          (result: any) => {
-            resolve(resolveAsyncResult(result, () => 'Successfully set HTML email body.'))
           },
         )
       })
@@ -481,92 +414,6 @@ const outlookToolDefinitions = createOutlookTools({
       if (!sender) return ''
 
       return JSON.stringify(normalizeRecipient(sender))
-    },
-  },
-
-  getEmailDate: {
-    name: 'getEmailDate',
-    category: 'read',
-    description: 'Get creation date/time for the current email item (read mode).',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeOutlook: async (mailbox) => {
-      if (!mailbox?.item) return 'No email item available.'
-
-      const value = mailbox.item.dateTimeCreated
-      if (!value) {
-        return 'Email creation date is not available in this context.'
-      }
-
-      const date = value instanceof Date ? value : new Date(value)
-      return Number.isNaN(date.getTime()) ? String(value) : date.toISOString()
-    },
-  },
-
-  getAttachments: {
-    name: 'getAttachments',
-    category: 'read',
-    description: 'List attachments of the current email.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeOutlook: async (mailbox) => {
-      if (!mailbox?.item) return 'No email item available.'
-
-      if (typeof mailbox.item.getAttachmentsAsync === 'function') {
-        return new Promise<string>((resolve) => {
-          mailbox.item.getAttachmentsAsync((result: any) => {
-            if (result.status === getOfficeAsyncStatus()?.Succeeded && Array.isArray(result.value)) {
-              resolve(JSON.stringify(result.value))
-            } else {
-              resolve(`Error listing attachments: ${result.error?.message || 'unknown error'}`)
-            }
-          })
-        })
-      }
-
-      if (Array.isArray(mailbox.item.attachments)) {
-        return JSON.stringify(mailbox.item.attachments)
-      }
-
-      return 'Attachments are not available in this context.'
-    },
-  },
-
-  insertHtmlAtCursor: {
-    name: 'insertHtmlAtCursor',
-    category: 'write',
-    description: 'Insert raw HTML at the cursor position in the email body (compose mode). Only use this for pre-formatted HTML content. For normal text or Markdown content, prefer insertTextAtCursor.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        html: {
-          type: 'string',
-          description: 'The HTML content to insert at the cursor position',
-        },
-      },
-      required: ['html'],
-    },
-    executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { html } = args as Record<string, any>
-      if (!mailbox?.item?.body?.setSelectedDataAsync) {
-        return 'Cannot insert HTML at cursor: compose mode is not available.'
-      }
-
-      return new Promise<string>((resolve) => {
-        mailbox.item.body.setSelectedDataAsync(
-          DOMPurify.sanitize(html),
-          { coercionType: getOfficeCoercionType().Html },
-          (result: any) => {
-            resolve(resolveAsyncResult(result, () => 'Successfully inserted HTML at cursor.'))
-          },
-        )
-      })
     },
   },
 
