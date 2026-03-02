@@ -1,11 +1,14 @@
 import { Router } from 'express'
+import { createRequire } from 'module'
 import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
-import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import * as xlsx from 'xlsx'
 import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'
+
+const require = createRequire(import.meta.url)
+const pdfParse = require('pdf-parse')
 
 const uploadRouter = Router()
 
