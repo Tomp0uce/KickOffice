@@ -331,3 +331,146 @@ Bien que meilleur, le formatage Word dépend encore trop de la sélection, empê
 ## Conclusion
 
 La force d'Open_Excel réside dans **l'intelligence de son architecture** plutôt que dans le nombre de ses outils. En adoptant l'auto-injection de contexte, des outils adressables et des prompts guidant le workflow, KickOffice deviendra un agent proactif capable de transformer radicalement l'expérience utilisateur sur toute la suite Office.
+
+---
+
+## Suivi d'implémentation
+
+> Dernière mise à jour : 2 Mars 2026 — Branch `claude/implement-agent-mode-analysis-kesh2`
+
+### Tableau de statut
+
+| #   | Problème                            | Criticité   | Statut          | Commit(s) |
+| --- | ----------------------------------- | ----------- | --------------- | --------- |
+| 1   | Injection auto de contexte document | 🔴 CRITIQUE | ✅ Implémenté   | `1af3379`, `da09ee5` |
+| 2   | Outils dépendants de la sélection   | 🔴 CRITIQUE | ✅ Implémenté   | `901f47f`, `2450a84`, `da09ee5` |
+| 3   | `modifyObject` create/update/delete | 🔴 CRITIQUE | ✅ Implémenté   | `901f47f` |
+| 4   | Prompt système enrichi + workflows  | 🟠 HAUTE    | ✅ Implémenté   | `ce070e0`, `7a088d3` |
+| 5   | `getAllObjects` global discovery    | 🟠 HAUTE    | ✅ Implémenté   | `901f47f` |
+| 6   | Boucle agent robuste                | 🟡 MOYENNE  | ✅ Vérifié      | (existant) |
+| 7   | Directive « read first »            | 🟡 MOYENNE  | ✅ Implémenté   | `ce070e0`, `7a088d3` |
+| 8   | Trop d'outils dédiés                | 🟠 HAUTE    | ✅ Implémenté   | `7a088d3` |
+| 9   | Mise en forme texte cassée          | 🔴 CRITIQUE | ✅ Implémenté   | `2450a84`, `0b8977f`, `da09ee5` |
+
+### Détail par point
+
+---
+
+#### ✅ Point 1 — Injection automatique de contexte
+
+**Fichier :** `frontend/src/utils/officeDocumentContext.ts`
+**Injection :** `frontend/src/composables/useAgentLoop.ts` (lignes ~601-614)
+
+Quatre fonctions créées, appelées automatiquement avant chaque requête LLM :
+
+| App            | Données injectées dans `<doc_context>`                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| **Excel**      | `activeSheet`, `selectedRange`, `totalSheets`, `sheets[]` (name, rows, columns)                |
+| **PowerPoint** | `totalSlides`, `slides[]` (slideNumber, title)                                                  |
+| **Outlook**    | `itemType` (compose/read), `subject`, `sender`, `recipients`, `bodySnippet`                     |
+| **Word**       | `pageCount`, `wordCount`, `paragraphCount`, `tableCount`, `hasImages`                           |
+
+---
+
+#### ✅ Point 2 — Outils adressables (non dépendants de la sélection)
+
+- **Excel** : `createChart` + `modifyObject` → remplacés par `manageObject(sheetName, source)` — cible n'importe quelle feuille/plage sans toucher à la sélection.
+- **PowerPoint** : `setShapeText(slideNumber, shapeIdOrName)` — cible une forme par ID/nom sans sélection utilisateur.
+- **Word** : `applyStyle(paragraphIndex)` — cible un paragraphe par index sans dépendre du curseur.
+
+---
+
+#### ✅ Point 3 — `manageObject` create / update / delete
+
+**Fichier :** `frontend/src/utils/excelTools.ts`
+
+Outil unique `manageObject` avec :
+- `operation : 'create' | 'update' | 'delete'`
+- `objectType : 'chart' | 'pivotTable'`
+- Paramètres explicites : `sheetName`, `source`, `chartType`, `title`, `anchor`, `name`
+
+Remplace complètement `createChart` (dépendant sélection) et `modifyObject` (suppression seule).
+
+---
+
+#### ✅ Point 4 — Prompts système enrichis + workflows agent
+
+**Fichier :** `frontend/src/composables/useAgentPrompts.ts`
+
+Les 4 prompts hôtes ont été réécrits avec :
+- Section **"Agent Workflow — ALWAYS Follow This Order"** : séquence read → explore → act explicite
+- **Tool Inventory** complet par catégorie (READ / WRITE / FORMAT / ADVANCED)
+- Mention des opérations couvertes par `eval_*` pour guider le modèle sur l'escape hatch
+- Directives de batch, de formatage Markdown et de langue
+
+---
+
+#### ✅ Point 5 — `getAllObjects` scope workbook
+
+**Fichier :** `frontend/src/utils/excelTools.ts`
+
+Paramètre `allSheets` (défaut `true`) : scan workbook-wide en 2 syncs groupés.
+Retourne pour chaque objet : `name`, `id`, `sheetName` — permettant d'agir sur des graphiques de n'importe quelle feuille.
+
+---
+
+#### ✅ Point 6 — Boucle agent robuste
+
+**Fichier :** `frontend/src/composables/useAgentLoop.ts`
+
+Sérialisation conforme au format OpenAI :
+- Messages assistant : `{ role: 'assistant', content, tool_calls[] }`
+- Résultats d'outils : `{ role: 'tool', tool_call_id, content }`
+
+Protections supplémentaires : détection de boucle (même signature d'outil → message d'erreur), rollback atomique si abandon en cours d'exécution.
+
+---
+
+#### ✅ Point 7 — Directive « read first »
+
+Présente dans les 4 prompts hôtes :
+- **Excel** : « Read doc_context before calling any tool »
+- **Word** : « ALWAYS start by reading the document »
+- **PowerPoint** : « ALWAYS call getAllSlidesOverview first »
+- **Outlook** : « Read doc_context block before calling any tool »
+
+---
+
+#### ✅ Point 8 — Réduction du nombre d'outils (116 → 57)
+
+**Commit :** `7a088d3`
+
+| App            | Avant | Après | Réduction |
+| -------------- | ----- | ----- | --------- |
+| **Excel**      | 43    | 21    | −51%      |
+| **Word**       | 42    | 17    | −60%      |
+| **PowerPoint** | 16    | 9     | −44%      |
+| **Outlook**    | 15    | 10    | −33%      |
+| **Total**      | **116** | **57** | **−51%** |
+
+Ajout de **`eval_officejs`** pour Excel (manquant) — escape hatch couvrant : tri, filtres, gel, validation, formats numériques, liens, commentaires, lignes/colonnes, protection, etc.
+
+Outils supprimés routés vers `eval_*` (exemples) :
+- **Excel** : `insertRow/Column`, `sortRange`, `freezePanes`, `addDataValidation`, `setCellNumberFormat`, `addHyperlink`, `autoFitColumns`, `duplicateWorksheet`…
+- **Word** : `insertParagraph`, `setFontName`, `insertPageBreak`, `insertBookmark`, `insertHeaderFooter`, `setParagraphFormat`…
+- **PPT** : `setSlideNotes`, `insertTextBox`, `insertImage`, `deleteShape`, `setShapeFill`, `moveResizeShape`
+- **Outlook** : `getEmailDate`, `getAttachments`, `insertHtmlAtCursor`, `setEmailBodyHtml`
+
+---
+
+#### ✅ Point 9 — Mise en forme texte corrigée
+
+**PowerPoint — lecture HTML** (`powerpointTools.ts`) :
+- Avant : 1 000 appels API pour lire 1 000 caractères (char-by-char)
+- Après : chargement par paragraphe en batch (2 syncs pour toute la sélection)
+
+**PowerPoint — `setShapeText`** (`powerpointTools.ts`) :
+- Nouvel outil ciblant une forme par `slideNumber` + `shapeIdOrName`
+- Utilise `textRange.insertHtml()` (API 1.5+) avec fallback texte brut
+
+**Outlook — `appendToEmailBody`** (`outlookTools.ts`) :
+- Nouveau : lit le corps existant, ajoute le nouveau contenu à la fin (non destructif)
+- Supporte le Markdown + `DOMPurify.sanitize` pour la sécurité
+
+**Word — `applyStyle`** (bonus, `wordTools.ts`) :
+- Ajout de `paragraphIndex` : formate un paragraphe ciblé sans dépendre de la sélection
