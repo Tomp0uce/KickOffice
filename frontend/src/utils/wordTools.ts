@@ -10,43 +10,18 @@ import { generateVisualDiff } from './common'
 export type WordToolName =
   | 'getSelectedText'
   | 'getDocumentContent'
+  | 'getDocumentHtml'
+  | 'getDocumentProperties'
   | 'insertText'
   | 'replaceSelectedText'
   | 'appendText'
-  | 'insertParagraph'
   | 'formatText'
   | 'searchAndReplace'
-  | 'getDocumentProperties'
   | 'insertTable'
   | 'insertList'
-  | 'deleteText'
-  | 'clearFormatting'
-  | 'setFontName'
-  | 'insertPageBreak'
-  | 'getRangeInfo'
-  | 'selectText'
-  | 'insertImage'
-  | 'getTableInfo'
-  | 'insertBookmark'
-  | 'goToBookmark'
-  | 'insertContentControl'
-  | 'findText'
-  | 'applyTaggedFormatting'
-  | 'setParagraphFormat'
-  | 'insertHyperlink'
-  | 'getDocumentHtml'
-  | 'modifyTableCell'
-  | 'addTableRow'
-  | 'addTableColumn'
-  | 'deleteTableRowColumn'
-  | 'formatTableCell'
-  | 'insertHeaderFooter'
-  | 'insertFootnote'
   | 'addComment'
   | 'getComments'
-  | 'setPageSetup'
   | 'getSpecificParagraph'
-  | 'insertSectionBreak'
   | 'applyStyle'
   | 'getSelectedTextWithFormatting'
   | 'eval_wordjs'
@@ -386,61 +361,6 @@ const wordToolDefinitions = createWordTools({
     },
   },
 
-  insertParagraph: {
-    name: 'insertParagraph',
-    category: 'format',
-    description: 'Insert a new paragraph at the specified location.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          description: 'The paragraph text',
-        },
-        location: {
-          type: 'string',
-          description:
-            'Where to insert: "After" (after cursor/selection), "Before" (before cursor), "Start" (start of doc), or "End" (end of doc). Default is "After".',
-          enum: ['After', 'Before', 'Start', 'End'],
-        },
-        style: {
-          type: 'string',
-          description: 'Optional Word built-in style: Normal, Heading1, Heading2, Heading3, Quote, etc.',
-          enum: [
-            'Normal',
-            'Heading1',
-            'Heading2',
-            'Heading3',
-            'Heading4',
-            'Quote',
-            'IntenseQuote',
-            'Title',
-            'Subtitle',
-          ],
-        },
-      },
-      required: ['text'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { text, location = 'After', style } = args
-      let range
-      const htmlText = renderOfficeRichHtml(text)
-
-      if (location === 'Start' || location === 'End') {
-        const body = context.document.body
-        range = body.insertHtml(htmlText, location)
-      } else {
-        const selectionRange = context.document.getSelection()
-        range = selectionRange.insertHtml(htmlText, location as 'After' | 'Before')
-      }
-      if (style) {
-        range.styleBuiltIn = style as any
-      }
-      await context.sync()
-      return `Successfully inserted paragraph at ${location}`
-    },
-  },
-
   formatText: {
     name: 'formatText',
     category: 'format',
@@ -667,158 +587,6 @@ const wordToolDefinitions = createWordTools({
       await context.sync()
       return `Successfully inserted ${listType} list with ${items.length} items`
     },
-  },
-
-  deleteText: {
-    name: 'deleteText',
-    category: 'write',
-    description:
-      'Delete the currently selected text or a specific range. If no text is selected, this will delete at the cursor position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        direction: {
-          type: 'string',
-          description: 'Direction to delete if nothing selected: "Before" (backspace) or "After" (delete key)',
-          enum: ['Before', 'After'],
-        },
-      },
-      required: [],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { direction = 'After' } = args
-      
-        const range = context.document.getSelection()
-        range.load('text')
-        await context.sync()
-
-        if (range.text && range.text.length > 0) {
-          range.delete()
-        } else {
-          if (direction === 'After') {
-            range.insertText('', 'After')
-          } else {
-            range.insertText('', 'Before')
-          }
-        }
-        await context.sync()
-        return 'Successfully deleted text'
-      },
-  },
-
-  clearFormatting: {
-    name: 'clearFormatting',
-    category: 'format',
-    description: 'Clear all formatting from the selected text, returning it to default style.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeWord: async (context) => {
-      
-        const range = context.document.getSelection()
-        range.font.bold = false
-        range.font.italic = false
-        range.font.underline = 'None'
-        range.styleBuiltIn = 'Normal'
-        await context.sync()
-        return 'Successfully cleared formatting'
-      },
-  },
-
-  setFontName: {
-    name: 'setFontName',
-    category: 'format',
-    description: 'Set the font name/family for the selected text (e.g., Arial, Times New Roman, Calibri).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        fontName: {
-          type: 'string',
-          description: 'The font name to apply (e.g., "Arial", "Times New Roman", "Calibri", "Consolas")',
-        },
-      },
-      required: ['fontName'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { fontName } = args as Record<string, any>
-      
-        const range = context.document.getSelection()
-        range.font.name = fontName
-        await context.sync()
-        return `Successfully set font to ${fontName}`
-      },
-  },
-
-  insertPageBreak: {
-    name: 'insertPageBreak',
-    category: 'write',
-    description: 'Insert a page break at the current cursor position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        location: {
-          type: 'string',
-          description: 'Where to insert: "Before", "After", "Start", or "End"',
-          enum: ['Before', 'After', 'Start', 'End'],
-        },
-      },
-      required: [],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { location = 'After' } = args
-      
-        const range = context.document.getSelection()
-        // insertBreak only supports Before and After for page breaks
-        const insertLoc = location === 'Start' || location === 'Before' ? 'Before' : 'After'
-        range.insertBreak('Page', insertLoc)
-        await context.sync()
-        return `Successfully inserted page break ${location.toLowerCase()}`
-      },
-  },
-
-  getRangeInfo: {
-    name: 'getRangeInfo',
-    category: 'read',
-    description: 'Get detailed information about the current selection including text, formatting, and position.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeWord: async (context) => {
-      
-        const range = context.document.getSelection()
-        range.load([
-          'text',
-          'style',
-          'font/name',
-          'font/size',
-          'font/bold',
-          'font/italic',
-          'font/underline',
-          'font/color',
-        ])
-        await context.sync()
-
-        return JSON.stringify(
-          {
-            text: range.text || '',
-            style: range.style,
-            font: {
-              name: range.font.name,
-              size: range.font.size,
-              bold: range.font.bold,
-              italic: range.font.italic,
-              underline: range.font.underline,
-              color: range.font.color,
-            },
-          },
-          null,
-          2,
-        )
-      },
   },
 
   selectText: {
@@ -1768,10 +1536,10 @@ const wordToolDefinitions = createWordTools({
   applyStyle: {
     name: 'applyStyle',
     category: 'format',
-    description: 'Apply a Word builtin paragraph style to the current selection or paragraph. '
+    description: 'Apply a Word builtin paragraph style to the current selection, a specific paragraph by index, or the paragraph at cursor. '
       + 'Use this to set headings (Heading1-9), body text (Normal), special styles (Title, Subtitle, Quote, etc.). '
       + 'Builtin styles work across all languages and appear in the Word Style Gallery. '
-      + 'Target "current-paragraph" to style only the paragraph containing the cursor.',
+      + 'Use paragraphIndex (from getDocumentContent or getSpecificParagraph) to target a paragraph without requiring user selection.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1789,18 +1557,37 @@ const wordToolDefinitions = createWordTools({
             'NoSpacing', 'ListParagraph',
           ],
         },
+        paragraphIndex: {
+          type: 'number',
+          description: 'Zero-based index of the paragraph to style (from getSpecificParagraph or getDocumentContent). When provided, targets that paragraph directly without requiring a user selection.',
+        },
         target: {
           type: 'string',
-          description: 'Where to apply: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
+          description: 'Where to apply when paragraphIndex is not provided: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
           enum: ['selection', 'current-paragraph'],
         },
       },
       required: ['styleBuiltIn'],
     },
     executeWord: async (context, args: Record<string, any>) => {
-      const { styleBuiltIn, target = 'selection' } = args
-      const selection = context.document.getSelection()
+      const { styleBuiltIn, paragraphIndex, target = 'selection' } = args
 
+      if (paragraphIndex !== undefined && paragraphIndex !== null) {
+        const idx = Number(paragraphIndex)
+        const paragraphs = context.document.body.paragraphs
+        paragraphs.load('items')
+        await context.sync()
+
+        if (idx < 0 || idx >= paragraphs.items.length) {
+          return `Error: paragraphIndex ${idx} is out of bounds. Document has ${paragraphs.items.length} paragraphs (0–${paragraphs.items.length - 1}).`
+        }
+
+        paragraphs.items[idx].styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+        await context.sync()
+        return `Applied style "${styleBuiltIn}" to paragraph at index ${idx}.`
+      }
+
+      const selection = context.document.getSelection()
       if (target === 'current-paragraph') {
         const para = selection.paragraphs.getFirst()
         para.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
