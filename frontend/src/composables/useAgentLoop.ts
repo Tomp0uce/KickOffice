@@ -15,6 +15,12 @@ import { extractTextFromHtml, reassembleWithFragments, getPreservationInstructio
 import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
+import {
+  getExcelDocumentContext,
+  getPowerPointDocumentContext,
+  getOutlookDocumentContext,
+  getWordDocumentContext,
+} from '@/utils/officeDocumentContext'
 
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
 
@@ -591,6 +597,24 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const systemPrompt = customSystemPrompt.value || agentPrompt(localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français')
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
+
+    // Inject document context into the last user message (not shown in UI — messages is a new array copy)
+    try {
+      let docContextJson = ''
+      if (hostIsExcel) docContextJson = await getExcelDocumentContext()
+      else if (hostIsPowerPoint) docContextJson = await getPowerPointDocumentContext()
+      else if (hostIsOutlook) docContextJson = await getOutlookDocumentContext()
+      else docContextJson = await getWordDocumentContext()
+
+      if (docContextJson) {
+        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+        if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
+          messages[lastUserIdx].content += `\n\n<doc_context>\n${docContextJson}\n</doc_context>`
+        }
+      }
+    } catch (ctxErr) {
+      console.warn('[AgentLoop] Failed to fetch document context', ctxErr)
+    }
 
     // Inject vision images as multipart content into the last user message
     if (visionImages && visionImages.length > 0) {
