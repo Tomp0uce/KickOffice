@@ -31,7 +31,6 @@ export type ExcelToolName =
   | 'copyRange'
   | 'insertFormula'
   | 'fillFormulaDown'
-  | 'createChart'
   | 'formatRange'
   | 'sortRange'
   | 'applyAutoFilter'
@@ -68,7 +67,7 @@ export type ExcelToolName =
   | 'duplicateWorksheet'
   | 'hideUnhideRowColumn'
   | 'getAllObjects'
-  | 'modifyObject'
+  | 'manageObject'
 
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
@@ -461,17 +460,35 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  createChart: {
-    name: 'createChart',
+  manageObject: {
+    name: 'manageObject',
     category: 'write',
     description:
-      'Create a chart from the currently selected data range. Supports various chart types.',
+      'Create, update, or delete charts and pivot tables. For create/update, specify an explicit sheetName and source range so the agent can target any sheet without depending on the user\'s current selection.',
     inputSchema: {
       type: 'object',
       properties: {
+        operation: {
+          type: 'string',
+          enum: ['create', 'update', 'delete'],
+          description: 'The operation to perform.',
+        },
+        objectType: {
+          type: 'string',
+          enum: ['chart', 'pivotTable'],
+          description: 'The type of object to manage.',
+        },
+        sheetName: {
+          type: 'string',
+          description: 'Name of the worksheet to operate on. If omitted, uses the active sheet.',
+        },
+        source: {
+          type: 'string',
+          description: 'For create/update: data range address used as the chart source (e.g. "A1:D50"). Required for create.',
+        },
         chartType: {
           type: 'string',
-          description: 'Type of chart to create',
+          description: 'For chart create/update: chart type.',
           enum: [
             'ColumnClustered',
             'ColumnStacked',
@@ -486,55 +503,104 @@ const excelToolDefinitions = createExcelTools({
         },
         title: {
           type: 'string',
-          description: 'Optional chart title',
+          description: 'For chart create/update: chart title.',
+        },
+        name: {
+          type: 'string',
+          description: 'For update/delete: name of the existing chart or pivot table to target.',
+        },
+        anchor: {
+          type: 'string',
+          description: 'For chart create: cell address where the chart top-left corner will be placed (e.g. "F1"). Defaults to a position beside the source data.',
         },
       },
-      required: ['chartType'],
+      required: ['operation', 'objectType'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { chartType, title } = args as Record<string, any>
-      
-        const range = context.workbook.getSelectedRange()
-        // We load values to ensure Excel has fully evaluated the range before generating the chart
-        range.load(['address', 'values'])
+      const { operation, objectType, sheetName, source, chartType, title, name, anchor } = args as Record<string, any>
+
+      const chartTypeMap: Record<string, any> = {
+        ColumnClustered: Excel.ChartType.columnClustered,
+        ColumnStacked: Excel.ChartType.columnStacked,
+        Line: Excel.ChartType.line,
+        LineMarkers: Excel.ChartType.lineMarkers,
+        Pie: Excel.ChartType.pie,
+        BarClustered: Excel.ChartType.barClustered,
+        Area: Excel.ChartType.area,
+        Doughnut: Excel.ChartType.doughnut,
+        XYScatter: Excel.ChartType.xyscatter,
+      }
+
+      // Resolve target sheet
+      const sheet = sheetName
+        ? context.workbook.worksheets.getItem(sheetName)
+        : context.workbook.worksheets.getActiveWorksheet()
+
+      if (operation === 'create') {
+        if (objectType === 'chart') {
+          if (!source) return 'Error: source range is required to create a chart.'
+          const dataRange = sheet.getRange(source)
+          dataRange.load('values')
+          await context.sync()
+
+          if (!dataRange.values || (dataRange.values.length <= 1 && dataRange.values[0]?.length <= 1)) {
+            return 'Error: source range is too small. Provide a range with headers and data (at least 2 rows or 2 columns).'
+          }
+
+          const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
+          const chart = sheet.charts.add(excelChartType, dataRange, Excel.ChartSeriesBy.auto)
+
+          if (title) chart.title.text = title
+          chart.width = 400
+          chart.height = 300
+
+          if (anchor) {
+            const anchorRange = sheet.getRange(anchor)
+            chart.setPosition(anchorRange, undefined)
+          }
+
+          await context.sync()
+          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}.`
+        }
+
+        if (objectType === 'pivotTable') {
+          if (!source) return 'Error: source range is required to create a pivot table.'
+          if (!name) return 'Error: name is required to create a pivot table (used as the pivot table name).'
+          const destRange = anchor ? sheet.getRange(anchor) : sheet.getRange('A1')
+          sheet.pivotTables.add(source, destRange, name)
+          await context.sync()
+          return `Successfully created pivot table "${name}" from range ${source}.`
+        }
+      }
+
+      if (operation === 'update') {
+        if (objectType === 'chart') {
+          if (!name) return 'Error: name is required to update a chart.'
+          const chart = sheet.charts.getItem(name)
+          if (chartType) chart.chartType = chartTypeMap[chartType] || chart.chartType
+          if (title) chart.title.text = title
+          if (source) {
+            const newDataRange = sheet.getRange(source)
+            chart.setData(newDataRange, Excel.ChartSeriesBy.auto)
+          }
+          await context.sync()
+          return `Successfully updated chart "${name}".`
+        }
+      }
+
+      if (operation === 'delete') {
+        if (!name) return 'Error: name is required to delete an object.'
+        if (objectType === 'chart') {
+          sheet.charts.getItem(name).delete()
+        } else {
+          sheet.pivotTables.getItem(name).delete()
+        }
         await context.sync()
+        return `Successfully deleted ${objectType} "${name}"${sheetName ? ` from sheet "${sheetName}"` : ''}.`
+      }
 
-        const sheet = range.worksheet
-        const chartTypeMap: Record<string, any> = {
-          ColumnClustered: Excel.ChartType.columnClustered,
-          ColumnStacked: Excel.ChartType.columnStacked,
-          Line: Excel.ChartType.line,
-          LineMarkers: Excel.ChartType.lineMarkers,
-          Pie: Excel.ChartType.pie,
-          BarClustered: Excel.ChartType.barClustered,
-          Area: Excel.ChartType.area,
-          Doughnut: Excel.ChartType.doughnut,
-          XYScatter: Excel.ChartType.xyscatter,
-        }
-
-        const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
-        
-        // Use 'auto' series but if range is 1 cell, Excel might fail.
-        if (range.values.length <= 1 && range.values[0].length <= 1) {
-          return 'Error: Invalid selection. Please select a larger data range including headers and values before creating a chart.'
-        }
-
-        const chart = sheet.charts.add(excelChartType, range, Excel.ChartSeriesBy.auto)
-
-        if (title) {
-          chart.title.text = title
-        }
-
-        chart.width = 400
-        chart.height = 300
-
-        // Explicitly re-select the original data range. 
-        // Excel by default selects the newly created chart, which breaks subsequent createChart calls or range operations.
-        range.select()
-
-        await context.sync()
-        return `Successfully created ${chartType} chart${title ? ` with title "${title}"` : ''} and re-selected original data range.`
-      },
+      return `Error: unsupported operation "${operation}" for objectType "${objectType}".`
+    },
   },
 
   formatRange: {
@@ -2122,54 +2188,63 @@ const excelToolDefinitions = createExcelTools({
   getAllObjects: {
     name: 'getAllObjects',
     category: 'read',
-    description: 'Get all charts and pivot tables on the active worksheet.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: []
-    },
-    executeExcel: async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet()
-      const charts = sheet.charts
-      const pivotTables = sheet.pivotTables
-      charts.load('items/name, items/id')
-      pivotTables.load('items/name, items/id')
-      await context.sync()
-
-      const result = {
-        charts: charts.items.map(c => ({ name: c.name, id: c.id })),
-        pivotTables: pivotTables.items.map(p => ({ name: p.name, id: p.id }))
-      }
-      return JSON.stringify(result, null, 2)
-    }
-  },
-
-  modifyObject: {
-    name: 'modifyObject',
-    category: 'write',
-    description: 'Delete a chart or pivot table by its name or ID.',
+    description: 'List all charts and pivot tables. By default scans the entire workbook (all sheets). Pass allSheets: false to limit to the active sheet only.',
     inputSchema: {
       type: 'object',
       properties: {
-        objectType: { type: 'string', enum: ['chart', 'pivotTable'], description: 'The type of object' },
-        name: { type: 'string', description: 'The name of the object to delete' }
+        allSheets: {
+          type: 'boolean',
+          description: 'When true (default), list objects from ALL sheets. When false, list only the active sheet.',
+        },
       },
-      required: ['objectType', 'name']
+      required: [],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { objectType, name } = args as Record<string, any>
-      const sheet = context.workbook.worksheets.getActiveWorksheet()
-      
-      if (objectType === 'chart') {
-        const chart = sheet.charts.getItem(name)
-        chart.delete()
-      } else {
-        const pivot = sheet.pivotTables.getItem(name)
-        pivot.delete()
+      const allSheets = args.allSheets !== false // default true
+
+      if (!allSheets) {
+        const sheet = context.workbook.worksheets.getActiveWorksheet()
+        sheet.load('name')
+        const charts = sheet.charts
+        const pivotTables = sheet.pivotTables
+        charts.load('items/name, items/id')
+        pivotTables.load('items/name, items/id')
+        await context.sync()
+
+        return JSON.stringify(
+          {
+            charts: charts.items.map((c: any) => ({ name: c.name, id: c.id, sheetName: sheet.name })),
+            pivotTables: pivotTables.items.map((p: any) => ({ name: p.name, id: p.id, sheetName: sheet.name })),
+          },
+          null,
+          2,
+        )
+      }
+
+      // Workbook-wide scan
+      const worksheets = context.workbook.worksheets
+      worksheets.load('items/name')
+      await context.sync()
+
+      for (const sheet of worksheets.items) {
+        sheet.charts.load('items/name, items/id')
+        sheet.pivotTables.load('items/name, items/id')
       }
       await context.sync()
-      return `Successfully deleted ${objectType} ${name}`
-    }
+
+      const allCharts: any[] = []
+      const allPivots: any[] = []
+      for (const sheet of worksheets.items) {
+        for (const c of sheet.charts.items) {
+          allCharts.push({ name: c.name, id: c.id, sheetName: sheet.name })
+        }
+        for (const p of sheet.pivotTables.items) {
+          allPivots.push({ name: p.name, id: p.id, sheetName: sheet.name })
+        }
+      }
+
+      return JSON.stringify({ charts: allCharts, pivotTables: allPivots }, null, 2)
+    },
   },
 })
 
