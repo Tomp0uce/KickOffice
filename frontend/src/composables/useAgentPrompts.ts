@@ -104,7 +104,7 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
 
 **FORMAT:**
 - \`formatText\` — Bold, italic, underline, color, highlight on selection
-- \`applyStyle\` — Apply Word built-in styles (Heading1, Heading2, Normal, etc.)
+- \`applyStyle\` — Apply Word built-in styles (Heading1, Heading2, Normal, etc.) — supports \`paragraphIndex\` for targeting without selection
 - \`setFontName\` — Set font family
 
 **ADVANCED:**

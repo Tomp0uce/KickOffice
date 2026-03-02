@@ -153,7 +153,10 @@ export function getOutlookDocumentContext(): Promise<string> {
           ? `${item.from.displayName || ''} <${item.from.emailAddress || ''}>`.trim()
           : ''
 
-      const contextObj: Record<string, any> = { subject, sender }
+      // itemType: 'message' | 'appointment' — compose vs read determined by presence of setAsync
+      const itemType: string = item.itemType || (item.body?.setAsync ? 'compose' : 'read')
+
+      const contextObj: Record<string, any> = { itemType, subject, sender }
 
       // Try to read recipients (compose mode only)
       if (item.to?.getAsync) {
@@ -188,7 +191,7 @@ export function getOutlookDocumentContext(): Promise<string> {
 }
 
 /**
- * Word — lightweight document stats: page count, word count.
+ * Word — document stats: page count, word count, paragraph count, table count, has images.
  */
 export async function getWordDocumentContext(): Promise<string> {
   try {
@@ -199,12 +202,26 @@ export async function getWordDocumentContext(): Promise<string> {
       return Word.run(async (context: any) => {
         const props = context.document.properties
         props.load(['pageCount', 'wordCount'])
+
+        const body = context.document.body
+        const paragraphs = body.paragraphs
+        paragraphs.load('items')
+
+        const tables = body.tables
+        tables.load('items')
+
+        const inlinePictures = body.inlinePictures
+        inlinePictures.load('items')
+
         await context.sync()
 
         return JSON.stringify(
           {
             pageCount: props.pageCount,
             wordCount: props.wordCount,
+            paragraphCount: paragraphs.items.length,
+            tableCount: tables.items.length,
+            hasImages: inlinePictures.items.length > 0,
           },
           null,
           2,

@@ -1768,10 +1768,10 @@ const wordToolDefinitions = createWordTools({
   applyStyle: {
     name: 'applyStyle',
     category: 'format',
-    description: 'Apply a Word builtin paragraph style to the current selection or paragraph. '
+    description: 'Apply a Word builtin paragraph style to the current selection, a specific paragraph by index, or the paragraph at cursor. '
       + 'Use this to set headings (Heading1-9), body text (Normal), special styles (Title, Subtitle, Quote, etc.). '
       + 'Builtin styles work across all languages and appear in the Word Style Gallery. '
-      + 'Target "current-paragraph" to style only the paragraph containing the cursor.',
+      + 'Use paragraphIndex (from getDocumentContent or getSpecificParagraph) to target a paragraph without requiring user selection.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1789,18 +1789,37 @@ const wordToolDefinitions = createWordTools({
             'NoSpacing', 'ListParagraph',
           ],
         },
+        paragraphIndex: {
+          type: 'number',
+          description: 'Zero-based index of the paragraph to style (from getSpecificParagraph or getDocumentContent). When provided, targets that paragraph directly without requiring a user selection.',
+        },
         target: {
           type: 'string',
-          description: 'Where to apply: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
+          description: 'Where to apply when paragraphIndex is not provided: "selection" (whole selection) or "current-paragraph" (paragraph at cursor). Default: "selection".',
           enum: ['selection', 'current-paragraph'],
         },
       },
       required: ['styleBuiltIn'],
     },
     executeWord: async (context, args: Record<string, any>) => {
-      const { styleBuiltIn, target = 'selection' } = args
-      const selection = context.document.getSelection()
+      const { styleBuiltIn, paragraphIndex, target = 'selection' } = args
 
+      if (paragraphIndex !== undefined && paragraphIndex !== null) {
+        const idx = Number(paragraphIndex)
+        const paragraphs = context.document.body.paragraphs
+        paragraphs.load('items')
+        await context.sync()
+
+        if (idx < 0 || idx >= paragraphs.items.length) {
+          return `Error: paragraphIndex ${idx} is out of bounds. Document has ${paragraphs.items.length} paragraphs (0–${paragraphs.items.length - 1}).`
+        }
+
+        paragraphs.items[idx].styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
+        await context.sync()
+        return `Applied style "${styleBuiltIn}" to paragraph at index ${idx}.`
+      }
+
+      const selection = context.document.getSelection()
       if (target === 'current-paragraph') {
         const para = selection.paragraphs.getFirst()
         para.styleBuiltIn = styleBuiltIn as Word.BuiltInStyleName
