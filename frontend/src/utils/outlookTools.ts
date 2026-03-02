@@ -11,9 +11,7 @@ import { generateVisualDiff } from './common'
 
 export type OutlookToolName =
   | 'getEmailBody'
-  | 'setEmailBody'
-  | 'appendToEmailBody'
-  | 'insertTextAtCursor'
+  | 'writeEmailBody'
   | 'getEmailSubject'
   | 'setEmailSubject'
   | 'getEmailRecipients'
@@ -135,129 +133,71 @@ const outlookToolDefinitions = createOutlookTools({
     },
   },
 
-  setEmailBody: {
-    name: 'setEmailBody',
+  writeEmailBody: {
+    name: 'writeEmailBody',
     category: 'write',
-    description:
-      'Replace the entire email body with the provided text. Only works in compose mode.',
+    description: 'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists). Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode.',
     inputSchema: {
       type: 'object',
       properties: {
-        text: {
+        content: {
           type: 'string',
-          description: 'The text to set as the email body',
+          description: 'The content to write in Markdown format.',
         },
-      },
-      required: ['text'],
-    },
-    executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { text } = args as Record<string, any>
-      if (!mailbox?.item?.body?.setAsync) {
-        return 'Cannot set email body: compose mode is not available.'
-      }
-      return new Promise<string>((resolve) => {
-        mailbox.item.body.setAsync(
-          text,
-          { coercionType: getOfficeCoercionType().Text },
-          (result: any) => {
-            resolve(resolveAsyncResult(result, () => 'Successfully set email body.'))
-          },
-        )
-      })
-    },
-  },
-
-  appendToEmailBody: {
-    name: 'appendToEmailBody',
-    category: 'write',
-    description:
-      'Append text at the END of the email body without overwriting existing content. Preferred over setEmailBody when you only need to add a signature, postscript, or extra paragraph. Supports Markdown formatting (**bold**, *italic*, - bullets, etc.). Only works in compose mode.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
+        mode: {
           type: 'string',
-          description: 'Text to append at the end of the email body. Supports Markdown formatting.',
-        },
-      },
-      required: ['text'],
-    },
-    executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { text } = args as Record<string, any>
-      if (!text || typeof text !== 'string') return 'Error: text is required.'
-      if (!mailbox?.item?.body?.getAsync) {
-        return 'Cannot append to email body: compose mode is not available.'
-      }
-
-      const htmlToAppend = renderOfficeRichHtml(text)
-
-      return new Promise<string>((resolve) => {
-        mailbox.item.body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
-          if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
-            resolve('Error: Could not read the current email body to append to it.')
-            return
-          }
-          const existingBody: string = getResult.value || ''
-          const separator = existingBody.trim() ? '<br/><br/>' : ''
-          const newBody = existingBody + separator + DOMPurify.sanitize(htmlToAppend)
-          mailbox.item.body.setAsync(
-            newBody,
-            { coercionType: getOfficeCoercionType().Html },
-            (setResult: any) => {
-              resolve(resolveAsyncResult(setResult, () => 'Successfully appended text to email body.'))
-            },
-          )
-        })
-      })
-    },
-  },
-
-  insertTextAtCursor: {
-    name: 'insertTextAtCursor',
-    category: 'write',
-    description: 'Insert Markdown-formatted text at the cursor position in the email body (compose mode). The text is automatically converted to rich HTML before insertion. Use Markdown: **bold**, *italic*, - bullets, 1. numbered lists, indented sub-items (2 spaces).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          description: 'The text to insert at the cursor position',
+          description: 'How to write the content: "Replace" (full overwrite), "Append" (add to end), or "Insert" (add at cursor). Default: "Append".',
+          enum: ['Replace', 'Append', 'Insert'],
         },
         diffTracking: {
           type: 'boolean',
-          description: 'R17: When true, compares the inserted text with the currently selected text and shows a visual diff (insertions in blue/underline, deletions in red/strikethrough). Useful for proofreading corrections in compose mode. Default: false.',
+          description: 'When mode is "Insert", shows a visual diff comparing content with current selection. Requires originalText. Default: false.',
         },
         originalText: {
           type: 'string',
-          description: 'Required when diffTracking is true: the original text to compare against.',
+          description: 'Required if diffTracking is true: the original text to compare against.',
         },
       },
-      required: ['text'],
+      required: ['content'],
     },
     executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { text, diffTracking = false, originalText = '' } = args
-      if (!mailbox?.item?.body?.setSelectedDataAsync) {
-        return 'Cannot insert text at cursor: compose mode is not available.'
-      }
+      const { content, mode = 'Append', diffTracking = false, originalText = '' } = args
+      if (!mailbox?.item?.body) return 'Cannot write email body: compose mode is not available.'
 
-      // R17: if diffTracking is requested, generate a visual diff instead of raw text
-      const html = diffTracking && originalText
-        ? generateVisualDiff(originalText, text)
-        : renderOfficeRichHtml(text)
+      const html = diffTracking && mode === 'Insert' && originalText
+        ? generateVisualDiff(originalText, content)
+        : renderOfficeRichHtml(content)
 
       return new Promise<string>((resolve) => {
-        mailbox.item.body.setSelectedDataAsync(
-          html,
-          { coercionType: getOfficeCoercionType().Html },
-          (result: any) => {
-            resolve(resolveAsyncResult(result, () => diffTracking
-              ? 'Inserted visual diff: insertions in blue/underline, deletions in red/strikethrough.'
-              : 'Successfully inserted text at cursor.'))
-          },
-        )
+        const body = mailbox.item.body
+        
+        if (mode === 'Replace') {
+          body.setAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
+            resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'))
+          })
+        } else if (mode === 'Append') {
+          body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
+            if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
+              resolve('Error: Could not read body to append.')
+              return
+            }
+            const existing = getResult.value || ''
+            const separator = existing.trim() ? '<br/><br/>' : ''
+            const newBody = existing + separator + DOMPurify.sanitize(html)
+            body.setAsync(newBody, { coercionType: getOfficeCoercionType().Html }, (setResult: any) => {
+              resolve(resolveAsyncResult(setResult, () => 'Successfully appended to email body.'))
+            })
+          })
+        } else {
+          // Insert at cursor
+          body.setSelectedDataAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
+            resolve(resolveAsyncResult(res, () => diffTracking ? 'Inserted visual diff.' : 'Successfully inserted at cursor.'))
+          })
+        }
       })
     },
   },
+
 
   getEmailSubject: {
     name: 'getEmailSubject',

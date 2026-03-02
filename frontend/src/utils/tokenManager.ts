@@ -92,19 +92,31 @@ export function prepareMessagesForContext(allMessages: ChatRequestMessage[], sys
 
   selectedMessages.sort((a, b) => a.index - b.index)
 
-  // Ensure tool_calls logic integrity
-  // If an assistant message has tool_calls, but the subsequent tool messages were pruned,
-  // we should remove those tool_calls from the assistant message to prevent API errors.
+  // Ensure tool_calls logic integrity per individual tool_call_id
+  // If an assistant message has tool_calls, strip only the ones with no matching tool response
   const finalMessages = selectedMessages.map(entry => entry.message)
+
+  // Collect all tool_call_ids that have a matching 'tool' response in the selected messages
+  const respondedToolCallIds = new Set<string>()
+  for (const msg of finalMessages) {
+    if (msg.role === 'tool' && 'tool_call_id' in msg) {
+      respondedToolCallIds.add(msg.tool_call_id)
+    }
+  }
+
   for (let i = 0; i < finalMessages.length; i++) {
     const msg = finalMessages[i]
     if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
-      // Check if the next messages are the tool responses
-      const hasMatchingTools = finalMessages.slice(i + 1).some(m => m.role === 'tool')
-      if (!hasMatchingTools) {
-        // Strip tool_calls if we pruned the tool responses
+      // Filter out only the tool_calls that have no matching tool response
+      const answeredCalls = msg.tool_calls.filter(tc => respondedToolCallIds.has(tc.id))
+      if (answeredCalls.length === 0) {
+        // No responses at all → strip all tool_calls
         delete msg.tool_calls
+      } else if (answeredCalls.length < msg.tool_calls.length) {
+        // Some orphaned tool_calls → strip only those
+        msg.tool_calls = answeredCalls
       }
+      // If all answered → keep as-is
     }
   }
 

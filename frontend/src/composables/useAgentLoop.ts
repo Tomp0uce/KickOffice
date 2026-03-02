@@ -1,7 +1,7 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
 import { nextTick, ref, type Ref } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, categorizeError } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -308,7 +308,16 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   })
 
   function buildChatMessages(systemPrompt: string): ChatMessage[] {
-    return [{ role: 'system', content: systemPrompt }, ...history.value.map(m => ({ role: m.role, content: m.content }))]
+    const msgs: ChatRequestMessage[] = [{ role: 'system', content: systemPrompt }]
+    for (const m of history.value) {
+      if (m.rawMessages && m.rawMessages.length > 0) {
+        // This includes the assistant message and all tool responses from that turn
+        msgs.push(...m.rawMessages)
+      } else {
+        msgs.push({ role: m.role, content: m.content })
+      }
+    }
+    return msgs as ChatMessage[]
   }
 
   const { getOfficeSelection, getOfficeSelectionAsHtml } = useOfficeSelection({
@@ -341,7 +350,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const startTime = Date.now()
     const timeoutMs = maxIter * 60 * 1000 // up to 1 minute per iteration allowed
     let currentMessages: ChatRequestMessage[] = [...messages]
-    let lastToolSignature: string | null = null
+    // Sliding window of last N signatures to detect repetitive loops (P6)
+    const LOOP_WINDOW_SIZE = 5
+    const LOOP_REPEAT_THRESHOLD = 2
+    const recentSignatures: string[] = []
     let toolsWereExecuted = false // Track if any tools were successfully executed
     currentAction.value = t('agentAnalyzing')
     history.value.push(createDisplayMessage('assistant', ''))
@@ -359,6 +371,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
+      let truncatedByLength = false
       try {
         let streamStarted = false
         await chatStream({
@@ -390,6 +403,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
               }
             }
           },
+          onFinishReason: (finishReason) => {
+            if (finishReason === 'length') truncatedByLength = true
+          },
           onUsage: accumulateUsage,
         })
         response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
@@ -405,16 +421,28 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           messageCount: currentMessages.length,
           error: err,
         })
-        // Display user-friendly message for credential errors
-        if (isCredentialError(err)) {
+        const errInfo = categorizeError(err)
+        if (errInfo.type === 'auth') {
           currentAssistantMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
         } else {
-          currentAssistantMessage.content = t('failedToResponse')
-          console.error('[AgentLoop] chatStream error details:', err)
+          currentAssistantMessage.content = t(errInfo.i18nKey)
         }
         currentAction.value = ''
         break
       }
+
+      // Handle finish_reason: "length" — model was cut off mid-response (P7)
+      if (truncatedByLength) {
+        currentAction.value = ''
+        if (!currentAssistantMessage.content?.trim()) {
+          currentAssistantMessage.content = t('errorTruncated')
+        } else {
+          // Append warning to existing content
+          currentAssistantMessage.content += `\n\n${t('errorTruncated')}`
+        }
+        break
+      }
+
       const choice = response.choices?.[0]
       if (!choice) break
       const assistantMsg = choice.message
@@ -440,13 +468,21 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
 
         const toolResult = await executeAgentToolCall(toolCall, enabledToolDefs, currentAssistantMessage, currentAction, getActionLabelForCategory, scrollToBottom)
-        if (toolResult.signature === lastToolSignature) {
-          toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You just executed this exact tool with the same arguments. It is a loop. Stop or change your arguments.' })
-        } else {
-          lastToolSignature = toolResult.signature || lastToolSignature
-          if (toolResult.success) toolsWereExecuted = true
-          toolResults.push({ tool_call_id: toolResult.tool_call_id, content: toolResult.content })
+        const sig = toolResult.signature
+
+        // Sliding window loop detection (P6)
+        if (sig) {
+          recentSignatures.push(sig)
+          if (recentSignatures.length > LOOP_WINDOW_SIZE) recentSignatures.shift()
+          const sigCount = recentSignatures.filter(s => s === sig).length
+          if (sigCount >= LOOP_REPEAT_THRESHOLD) {
+            toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You have called this exact tool with the same arguments multiple times in a row. This is a loop. Stop repeating and try a different approach.' })
+            continue
+          }
         }
+
+        if (toolResult.success) toolsWereExecuted = true
+        toolResults.push({ tool_call_id: toolResult.tool_call_id, content: toolResult.content })
       }
 
       // If aborted mid-tool-loop, rollback partial state by removing incomplete assistant message
@@ -465,6 +501,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         currentMessages.push({ role: 'tool', tool_call_id: toolResult.tool_call_id, content: toolResult.content })
       }
       currentAction.value = t('agentAnalyzing')
+    }
+
+    // P8: Persist full tool call sequence in history so subsequent turns have context
+    const initialMsgCount = messages.length
+    const newMessages = currentMessages.slice(initialMsgCount)
+    if (newMessages.length > 0) {
+      currentAssistantMessage.rawMessages = newMessages
     }
 
     if (abortedByUser) {
@@ -530,10 +573,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (err instanceof Error && err.name === 'AbortError') return
       console.error('[AgentLoop] Smart reply chatStream failed', err)
       const lastMessage = history.value[history.value.length - 1]
-      if (isCredentialError(err)) {
+      const errInfo = categorizeError(err)
+      if (errInfo.type === 'auth') {
         lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
       } else {
-        lastMessage.content = t('failedToResponse')
+        lastMessage.content = t(errInfo.i18nKey)
       }
     }
   }
@@ -749,11 +793,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)
-        if (isCredentialError(error)) {
-          messageUtil.warning(t('credentialsRequired'))
-        } else {
-          messageUtil.error(t('failedToResponse'))
-        }
+        const errInfo = categorizeError(error)
+        messageUtil.error(t(errInfo.i18nKey))
+
       }
     } finally {
       currentAction.value = ''
@@ -940,13 +982,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           if (err.name === 'AbortError') return
           console.error('[AgentLoop] Quick action chatStream failed', err)
           const lastMessage = history.value[history.value.length - 1]
-          if (isCredentialError(err)) {
+          const errInfo = categorizeError(err)
+          if (errInfo.type === 'auth') {
             lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
             messageUtil.warning(t('credentialsRequired'))
           } else {
-            console.error('[AgentLoop] agent loop failed', err)
-            lastMessage.content = t('failedToResponse')
-            messageUtil.error(t('failedToResponse'))
+            lastMessage.content = t(errInfo.i18nKey)
+            messageUtil.error(t(errInfo.i18nKey))
           }
         }
       }

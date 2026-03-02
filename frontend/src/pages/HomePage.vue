@@ -251,7 +251,8 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     label: t("clean"),
     icon: Eraser,
     mode: "immediate",
-    systemPrompt: "You are a data cleaning expert.",
+    systemPrompt:
+      "You are a data cleaning expert. Use 'setCellRange' to fix values/formulas and 'clearRange' to remove junk.",
     tooltipKey: "excelClean_tooltip",
   },
   {
@@ -259,7 +260,8 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     label: t("beautify"),
     icon: Brush,
     mode: "immediate",
-    systemPrompt: "You are an Excel formatting expert.",
+    systemPrompt:
+      "You are an Excel formatting expert. Use 'formatRange' for visual styles and 'setCellRange' for number formats or conditional formatting.",
     tooltipKey: "excelBeautify_tooltip",
   },
   {

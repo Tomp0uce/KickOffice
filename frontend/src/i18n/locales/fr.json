@@ -396,5 +396,10 @@
   "credentialsRequired": "Veuillez configurer vos identifiants dans Paramètres > Compte pour utiliser cette fonctionnalité.",
   "credentialsRequiredTitle": "Authentification requise",
   "rememberCredentialsLabel": "Mémoriser les identifiants",
-  "rememberCredentialsDescription": "Conserver les identifiants entre les sessions"
+  "rememberCredentialsDescription": "Conserver les identifiants entre les sessions",
+  "errorTimeout": "La requête a expiré (timeout). Le modèle met trop de temps à répondre — réessayez ou simplifiez votre demande.",
+  "errorNetwork": "Erreur de connexion au serveur. Vérifiez votre connexion réseau et réessayez.",
+  "errorRateLimit": "Trop de requêtes — limite atteinte. Attendez quelques secondes et réessayez.",
+  "errorServer": "Erreur interne du serveur. Consultez les logs du backend ou réessayez plus tard.",
+  "errorTruncated": "⚠️ La réponse a été tronquée : le nombre de tokens maximum a été atteint. Simplifiez votre demande ou augmentez la limite."
 }
