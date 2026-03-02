@@ -24,11 +24,10 @@ function createExcelTools(definitions: Record<ExcelToolName, ExcelToolTemplate>)
 
 export type ExcelToolName =
   | 'getSelectedCells'
-  | 'setCellValue'
+  | 'setCellRange'
   | 'getWorksheetData'
   | 'createTable'
-  | 'insertFormula'
-  | 'fillFormulaDown'
+  | 'modifyStructure'
   | 'formatRange'
   | 'sortRange'
   | 'getWorksheetInfo'
@@ -38,8 +37,6 @@ export type ExcelToolName =
   | 'addWorksheet'
   | 'getNamedRanges'
   | 'applyConditionalFormatting'
-  | 'batchSetCellValues'
-  | 'batchProcessRange'
   | 'findData'
   | 'getAllObjects'
   | 'manageObject'
@@ -98,49 +95,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  setCellValue: {
-    name: 'setCellValue',
-    category: 'write',
-    description:
-      'Set a value in a specific cell or range. Use A1-style notation for the address (e.g., "A1", "B2:D5").',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Cell address in A1 notation (e.g., "A1", "B2:D5")',
-        },
-        value: {
-          type: 'string',
-          description: 'The value to set. For multiple cells, provide a JSON 2D array like [["a","b"],["c","d"]]',
-        },
-      },
-      required: ['address', 'value'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, value } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const range = sheet.getRange(address)
-
-        // Try to parse as JSON array for multi-cell values
-        try {
-          const parsed = JSON.parse(value)
-          if (Array.isArray(parsed)) {
-            range.values = parsed
-          } else {
-            range.values = [[parsed]]
-          }
-        } catch {
-          // Single value
-          const num = Number(value)
-          range.values = [[isNaN(num) ? value : num]]
-        }
-
-        await context.sync()
-        return `Successfully set value at ${address}`
-      },
-  },
 
   getWorksheetData: {
     name: 'getWorksheetData',
@@ -214,97 +168,194 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  insertFormula: {
-    name: 'insertFormula',
+  setCellRange: {
+    name: 'setCellRange',
     category: 'write',
     description:
-      'Insert an Excel formula at a specific cell address. The formula should start with "=" (e.g., "=SUM(A1:A10)", "=AVERAGE(B2:B20)").',
+      'PREFERRED tool for ALL write operations in Excel. Write values OR formulas to a range, apply formatting, and optionally fill down a formula to a larger range — all in one call. Use `copyToRange` to fill a formula from the first row of `address` down to a larger range (e.g., address="C2:C2", copyToRange="C2:C50"). For multi-cell writes, always prefer passing a 2D array to `values` over calling this tool multiple times.',
     inputSchema: {
       type: 'object',
       properties: {
         address: {
           type: 'string',
-          description: 'Cell address where the formula will be inserted (e.g., "A11")',
+          description: 'Target cell or range in A1 notation (e.g., "A1", "B2:D10"). Required.',
         },
-        formula: {
+        sheetName: {
           type: 'string',
-          description: 'The Excel formula to insert (e.g., "=SUM(A1:A10)")',
+          description: 'Optional worksheet name. Uses active sheet if omitted.',
+        },
+        values: {
+          type: 'array',
+          description: 'A 2D array of values to write, e.g. [["Name","Score"],["Alice",95]]. Use null to skip a cell. Mutually exclusive with `formulas`.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+        formulas: {
+          type: 'array',
+          description: 'A 2D array of formulas to write, e.g. [["=SUM(A2:A10)"],["=AVERAGE(B2:B10)"]]. Each formula must start with "=". Mutually exclusive with `values`.',
+          items: { type: 'array', items: { type: 'string' } },
+        },
+        formatting: {
+          type: 'object',
+          description: 'Optional formatting to apply to the range after writing.',
+          properties: {
+            bold: { type: 'boolean' },
+            fillColor: { type: 'string', description: 'Hex color (e.g., "#FFFF00")' },
+            fontColor: { type: 'string', description: 'Hex color (e.g., "#000000")' },
+            numberFormat: { type: 'string', description: 'Number format string (e.g., "0.00%", "#,##0", "dd/mm/yyyy")' },
+            horizontalAlignment: { type: 'string', enum: ['Left', 'Center', 'Right'] },
+          },
+        },
+        copyToRange: {
+          type: 'string',
+          description: 'Optional. Fill the formula/values from `address` down to a larger range (e.g., "C2:C50"). The source range (`address`) must be the first row of this range.',
         },
       },
-      required: ['address', 'formula'],
+      required: ['address'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { address, formula } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const cell = sheet.getRange(address)
-        const formulaLocale = getExcelFormulaLanguage()
+      const { address, sheetName, values, formulas, formatting, copyToRange } = args
+      const formulaLocale = getExcelFormulaLanguage()
 
+      const sheet = sheetName
+        ? context.workbook.worksheets.getItem(sheetName)
+        : context.workbook.worksheets.getActiveWorksheet()
+
+      const range = sheet.getRange(address)
+
+      // Write values or formulas
+      if (formulas) {
         if (formulaLocale === 'fr') {
-          cell.formulasLocal = [[formula]]
+          range.formulasLocal = formulas
         } else {
-          cell.formulas = [[formula]]
+          range.formulas = formulas
         }
+      } else if (values !== undefined) {
+        range.values = values
+      }
 
-        cell.format.font.bold = true
+      // Apply formatting
+      if (formatting) {
+        if (formatting.bold !== undefined) range.format.font.bold = formatting.bold
+        if (formatting.fillColor) range.format.fill.color = formatting.fillColor
+        if (formatting.fontColor) range.format.font.color = formatting.fontColor
+        if (formatting.numberFormat) range.numberFormat = [[formatting.numberFormat]]
+        if (formatting.horizontalAlignment) {
+          const alignMap: Record<string, any> = {
+            Left: Excel.HorizontalAlignment.left,
+            Center: Excel.HorizontalAlignment.center,
+            Right: Excel.HorizontalAlignment.right,
+          }
+          range.format.horizontalAlignment = alignMap[formatting.horizontalAlignment] ?? Excel.HorizontalAlignment.general
+        }
+      }
+
+      await context.sync()
+
+      // Fill-down to copyToRange
+      if (copyToRange) {
+        const fullRange = sheet.getRange(copyToRange)
+        range.autoFill(fullRange, Excel.AutoFillType.fillDefault)
         await context.sync()
-        return `Successfully inserted ${formulaLocale === 'fr' ? 'localized French' : 'English'} formula "${formula}" at ${address}`
-      },
+        return `Successfully wrote to ${address} and filled down to ${copyToRange}`
+      }
+
+      return `Successfully wrote to ${address}${sheetName ? ` on sheet "${sheetName}"` : ''}`
+    },
   },
 
-  fillFormulaDown: {
-    name: 'fillFormulaDown',
+  modifyStructure: {
+    name: 'modifyStructure',
     category: 'write',
     description:
-      'Insert an Excel formula into the first cell of a range and fill it down to all rows in that range. This is much more efficient than calling insertFormula repeatedly for each row. The formula should reference the first row and Excel will automatically adjust relative references for each subsequent row. For example, to apply "=A2*B2" from C2 to C100, use startCell="C2", endCell="C100", formula="=A2*B2".',
+      'Insert, delete, hide, unhide, or freeze rows/columns. Use this instead of eval_officejs for structural changes. Examples: insert 3 rows before row 5, delete column B, hide rows 10-15, freeze the first row.',
     inputSchema: {
       type: 'object',
       properties: {
-        startCell: {
+        operation: {
           type: 'string',
-          description: 'The first cell address where the formula starts (e.g., "C2")',
+          enum: ['insert', 'delete', 'hide', 'unhide', 'freeze', 'unfreeze'],
+          description: 'Operation to perform.',
         },
-        endCell: {
+        dimension: {
           type: 'string',
-          description: 'The last cell address where the formula should be filled to (e.g., "C100")',
+          enum: ['rows', 'columns'],
+          description: 'Whether to operate on rows or columns.',
         },
-        formula: {
+        reference: {
           type: 'string',
-          description: 'The Excel formula for the first row (e.g., "=A2*B2"). Relative references will auto-adjust for each row.',
+          description: 'Row number(s) or column letter(s) to target, e.g. "5" (row 5), "3:7" (rows 3-7), "B" (column B), "B:D" (columns B-D). For freeze, use the first row/column number to freeze before (e.g., "2" freezes row 1).',
+        },
+        count: {
+          type: 'number',
+          description: 'Number of rows/columns to insert (for insert operation). Defaults to 1.',
+        },
+        sheetName: {
+          type: 'string',
+          description: 'Optional worksheet name. Uses active sheet if omitted.',
         },
       },
-      required: ['startCell', 'endCell', 'formula'],
+      required: ['operation', 'dimension'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { startCell, endCell, formula } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const formulaLocale = getExcelFormulaLanguage()
+      const { operation, dimension, reference, count = 1, sheetName } = args
 
-        // Set the formula in the first cell
-        const firstCell = sheet.getRange(startCell)
-        if (formulaLocale === 'fr') {
-          firstCell.formulasLocal = [[formula]]
+      const sheet = sheetName
+        ? context.workbook.worksheets.getItem(sheetName)
+        : context.workbook.worksheets.getActiveWorksheet()
+
+      if (operation === 'freeze' || operation === 'unfreeze') {
+        if (operation === 'unfreeze') {
+          sheet.freezePanes.unfreeze()
         } else {
-          firstCell.formulas = [[formula]]
+          const ref = parseInt(reference, 10) || 1
+          if (dimension === 'rows') {
+            sheet.freezePanes.freezeRows(ref)
+          } else {
+            sheet.freezePanes.freezeColumns(ref)
+          }
         }
         await context.sync()
+        return `Successfully ${operation}d ${dimension}`
+      }
 
-        // Now select the full range and fill down from the first cell
-        const fullRange = sheet.getRange(`${startCell}:${endCell}`)
-        fullRange.load('rowCount')
-        await context.sync()
-
-        if (fullRange.rowCount > 1) {
-          // Use the first cell as source and fill down to the rest
-          const sourceRange = sheet.getRange(`${startCell}:${startCell}`)
-          sourceRange.autoFill(fullRange, Excel.AutoFillType.fillDefault)
-          await context.sync()
+      if (dimension === 'rows') {
+        const rangeRef = reference ? `${reference}:${reference.includes(':') ? reference.split(':')[1] : reference}` : '1:1'
+        const rowRange = sheet.getRange(rangeRef)
+        if (operation === 'insert') {
+          rowRange.insert(Excel.InsertShiftDirection.down)
+          if (count > 1) {
+            // Insert additional rows
+            for (let i = 1; i < count; i++) {
+              const insertRef = reference ? `${reference}:${reference}` : '1:1'
+              sheet.getRange(insertRef).insert(Excel.InsertShiftDirection.down)
+            }
+          }
+        } else if (operation === 'delete') {
+          rowRange.delete(Excel.DeleteShiftDirection.up)
+        } else if (operation === 'hide') {
+          rowRange.rowHidden = true
+        } else if (operation === 'unhide') {
+          rowRange.rowHidden = false
         }
+      } else {
+        const colRef = reference || 'A:A'
+        const colRange = sheet.getRange(colRef)
+        if (operation === 'insert') {
+          colRange.insert(Excel.InsertShiftDirection.right)
+        } else if (operation === 'delete') {
+          colRange.delete(Excel.DeleteShiftDirection.left)
+        } else if (operation === 'hide') {
+          colRange.columnHidden = true
+        } else if (operation === 'unhide') {
+          colRange.columnHidden = false
+        }
+      }
 
-        return `Successfully filled formula "${formula}" from ${startCell} to ${endCell}`
-      },
+      await context.sync()
+      return `Successfully ${operation}d ${dimension}${reference ? ` ${reference}` : ''}${sheetName ? ` on sheet "${sheetName}"` : ''}`
+    },
   },
+
 
   manageObject: {
     name: 'manageObject',
@@ -897,7 +948,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { name } = args as Record<string, any>
       
         const sheet = context.workbook.worksheets.add(name || undefined)
@@ -908,34 +959,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  setRowHeight: {
-    name: 'setRowHeight',
-    category: 'format',
-    description: 'Set the height of one or more rows.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        rowIndex: {
-          type: 'number',
-          description: 'The 1-based row number',
-        },
-        height: {
-          type: 'number',
-          description: 'Row height in points',
-        },
-      },
-      required: ['rowIndex', 'height'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { rowIndex, height } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const rowRange = sheet.getRange(`${rowIndex}:${rowIndex}`)
-        rowRange.format.rowHeight = height
-        await context.sync()
-        return `Successfully set row ${rowIndex} height to ${height}`
-      },
-  },
 
   protectWorksheet: {
     name: 'protectWorksheet',
@@ -972,7 +995,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['action'],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const {
         sheetName,
         action,
@@ -1310,80 +1333,6 @@ const excelToolDefinitions = createExcelTools({
       },
   },
 
-  batchSetCellValues: {
-    name: 'batchSetCellValues',
-    category: 'write',
-    description:
-      'Set values for multiple individual cells in a single operation. Much more efficient than calling setCellValue repeatedly. Use this whenever you need to modify more than 2 cells (e.g., translating, cleaning, or transforming cell contents). Provide an array of {address, value} pairs. For ranges larger than 100 cells, process in chunks of 50-100 cells at a time.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        cells: {
-          type: 'array',
-          description: 'Array of cell updates. Each item has an "address" (A1 notation) and a "value" (the new cell content).',
-          items: {
-            type: 'object',
-            // @ts-expect-error ToolProperty doesn't natively support nested array items schema
-            properties: {
-              address: { type: 'string', description: 'Cell address in A1 notation (e.g., "A1")' },
-              value: { type: 'string', description: 'New value for the cell' },
-            },
-            required: ['address', 'value'],
-          },
-        },
-      },
-      required: ['cells'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { cells } = args as Record<string, any>
-      if (!Array.isArray(cells) || cells.length === 0) {
-        throw new Error('Error: cells array is empty or invalid')
-      }
-      const sheet = context.workbook.worksheets.getActiveWorksheet()
-      for (const cell of cells) {
-        const range = sheet.getRange(cell.address)
-        const num = Number(cell.value)
-        range.values = [[isNaN(num) || cell.value === '' ? cell.value : num]]
-      }
-      await context.sync()
-      return `Successfully updated ${cells.length} cells`
-    },
-  },
-
-  batchProcessRange: {
-    name: 'batchProcessRange',
-    category: 'write',
-    description: 'BETA: Process an entire contiguous range in one go (like A1:C5). Provide a 2D array of values. Empty arrays or nulls will skip the cell update or clear it. OVERWRITE NOTE: Be careful to read the cells first if you are unsure whether they are empty, as this will overwrite any existing data in the specified range.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        address: {
-          type: 'string',
-          description: 'Target range address in A1 notation (e.g., "A1:A50", "B2:D10")',
-        },
-        values: {
-          type: 'array',
-          description: 'A 2D array of new values matching the range dimensions. Example for a single-column range of 3 rows: [["value1"],["value2"],["value3"]].',
-          items: {
-            type: 'array',
-            items: { type: 'string' },
-          },
-        },
-      },
-      required: ['address', 'values'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { address, values } = args as Record<string, any>
-      if (!Array.isArray(values) || values.length === 0) {
-        throw new Error('Error: values array is empty or invalid')
-      }
-      const sheet = context.workbook.worksheets.getActiveWorksheet()
-      const range = sheet.getRange(address)
-      range.values = values
-      await context.sync()
-      return `Successfully updated range ${address} (${values.length} rows × ${values[0]?.length || 0} columns)`
-    },
-  },
 
   findData: {
     name: 'findData',
@@ -1449,59 +1398,6 @@ const excelToolDefinitions = createExcelTools({
     },
   },
 
-  duplicateWorksheet: {
-    name: 'duplicateWorksheet',
-    category: 'write',
-    description: 'Duplicate an existing worksheet.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        sourceName: { type: 'string', description: 'Name of the sheet to duplicate' },
-        newName: { type: 'string', description: 'Name for the new copied sheet' }
-      },
-      required: ['sourceName'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { sourceName, newName } = args as Record<string, any>
-      const sheet = context.workbook.worksheets.getItem(sourceName)
-      const copy = sheet.copy()
-      if (newName) copy.name = newName
-      await context.sync()
-      return `Successfully duplicated worksheet ${sourceName}${newName ? ' to ' + newName : ''}`
-    }
-  },
-
-  hideUnhideRowColumn: {
-    name: 'hideUnhideRowColumn',
-    category: 'format',
-    description: 'Hide or unhide specific rows or columns.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        dimension: { type: 'string', enum: ['rows', 'columns'], description: 'Whether to modify rows or columns' },
-        reference: { type: 'string', description: 'Row number(s) e.g. "5:10" or "5", or column letter(s) e.g. "C" or "C:E"' },
-        action: { type: 'string', enum: ['hide', 'unhide'], description: 'Action to perform' }
-      },
-      required: ['dimension', 'reference', 'action']
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { dimension, reference, action } = args as Record<string, any>
-      const sheet = context.workbook.worksheets.getActiveWorksheet()
-      const isRow = dimension === 'rows'
-      
-      let refStr = String(reference)
-      if (!refStr.includes(':')) refStr = `${refStr}:${refStr}`
-
-      const range = sheet.getRange(refStr)
-      if (isRow) {
-        range.rowHidden = action === 'hide'
-      } else {
-        range.columnHidden = action === 'hide'
-      }
-      await context.sync()
-      return `Successfully ${action}d ${dimension} ${reference}`
-    }
-  },
 
   getAllObjects: {
     name: 'getAllObjects',

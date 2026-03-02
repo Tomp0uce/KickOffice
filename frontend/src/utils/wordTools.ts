@@ -12,18 +12,27 @@ export type WordToolName =
   | 'getDocumentContent'
   | 'getDocumentHtml'
   | 'getDocumentProperties'
-  | 'insertText'
-  | 'replaceSelectedText'
-  | 'appendText'
+  | 'insertContent'
   | 'formatText'
   | 'searchAndReplace'
-  | 'insertTable'
-  | 'insertList'
   | 'addComment'
   | 'getComments'
   | 'getSpecificParagraph'
   | 'applyStyle'
   | 'getSelectedTextWithFormatting'
+  | 'findText'
+  | 'applyTaggedFormatting'
+  | 'setParagraphFormat'
+  | 'insertHyperlink'
+  | 'modifyTableCell'
+  | 'addTableRow'
+  | 'addTableColumn'
+  | 'deleteTableRowColumn'
+  | 'formatTableCell'
+  | 'insertHeaderFooter'
+  | 'insertFootnote'
+  | 'setPageSetup'
+  | 'insertSectionBreak'
   | 'eval_wordjs'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
@@ -192,174 +201,75 @@ const wordToolDefinitions = createWordTools({
     },
   },
 
-  insertText: {
-    name: 'insertText',
+  insertContent: {
+    name: 'insertContent',
     category: 'write',
-    description: 'Insert text at the current cursor position in the Word document.',
+    description: 'The PREFERRED tool for adding any content to Word. Supports text, tables, and lists via Markdown. Can insert at cursor, start/end of document, or replace selection. Handles styling and list structure automatically.',
     inputSchema: {
       type: 'object',
       properties: {
-        text: {
+        content: {
           type: 'string',
-          description: 'The text to insert',
+          description: 'The content to insert in Markdown format. Tables and lists are supported.',
         },
         location: {
           type: 'string',
-          description: 'Where to insert: "Start", "End", "Before", "After", or "Replace"',
+          description: 'Where to insert relative to the selection: "Start", "End", "Before", "After", or "Replace" (default). Use "End" to append to the document.',
           enum: ['Start', 'End', 'Before', 'After', 'Replace'],
         },
-      },
-      required: ['text'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { text, location = 'End' } = args
-      // R1: read insertion context (list detection + document styles) in 2 syncs
-      const { inList, styles } = await readInsertionContext(context)
-      const html = renderOfficeRichHtml(text)
-      const adjustedHtml = inList ? stripOuterListTags(html) : html
-      // R1: inject document-level font/spacing into <p> and <li> elements
-      const styledHtml = applyInheritedStyles(adjustedHtml, styles)
-      const range = context.document.getSelection()
-      const insertedRange = range.insertHtml(styledHtml, location as any)
-      await context.sync()  // execute the insertHtml
-      // R14: post-process headings to apply Word builtin heading styles
-      await applyHeadingBuiltinStyles(context, insertedRange, html)
-      return `Successfully inserted text at ${location}`
-    },
-  },
-
-  replaceSelectedText: {
-    name: 'replaceSelectedText',
-    category: 'write',
-    description: 'Replace the currently selected text with new text. CRITICAL: When correcting typos or making small modifications within a large block of text, NEVER use replaceSelectedText to replace the entire text block, as this destroys complex document layouts. ALWAYS use searchAndReplace to make surgical, targeted changes.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        newText: {
+        target: {
           type: 'string',
-          description: 'The new text to replace the selection with',
+          description: 'Target for insertion: "Selection" (default) or "Body" (entire document). Use "Body" with location "End" to append to document.',
+          enum: ['Selection', 'Body'],
         },
         preserveFormatting: {
           type: 'boolean',
-          description: 'Keep the original font styling (name, size, color, bold, italic, underline, highlight) from the selected text. Default: true.',
-        },
-        diffTracking: {
-          type: 'boolean',
-          description: 'R17: When true, instead of replacing the selection, show a visual diff: insertions in blue/underline, deletions in red/strikethrough. Useful for proofreading and corrections. Default: false.',
+          description: 'When replacing selection, keep the original font styles. Default: true.',
         },
       },
-      required: ['newText'],
+      required: ['content'],
     },
     executeWord: async (context, args: Record<string, any>) => {
-      const { newText, preserveFormatting = true, diffTracking = false } = args as Record<string, any>
-      const range = context.document.getSelection()
-      range.load('text,styleBuiltIn,font/name,font/size,font/bold,font/italic,font/underline,font/color,font/highlightColor')
-      // R15: load paragraph-level spacing/alignment from first paragraph (not available on Range)
-      const firstPara = range.paragraphs.getFirst()
-      firstPara.load('alignment,spaceBefore,spaceAfter')
-      await context.sync()
-
-      if (!range.text || range.text.length === 0) {
-        throw new Error('Error: No text selected. Select text in the document, then try again.')
-      }
-
-      // R17: diffTracking mode — show visual diff instead of replacing directly
-      if (diffTracking) {
-        const diffHtml = generateVisualDiff(range.text, newText)
-        range.insertHtml(diffHtml, 'Replace')
+      const { content, location = 'Replace', target = 'Selection', preserveFormatting = true } = args
+      
+      const range = target === 'Body' ? context.document.body.getRange() : context.document.getSelection()
+      
+      // Load context styles for inheritance
+      const { inList, styles } = await readInsertionContext(context)
+      
+      // If replacing and preserving formatting, we save the font props
+      let savedFont: any = null
+      if (location === 'Replace' && preserveFormatting && target === 'Selection') {
+        range.load('font/name,font/size,styleBuiltIn')
         await context.sync()
-        return 'Inserted text with visual diff: insertions shown in blue/underline, deletions in red/strikethrough.'
-      }
-
-      // Capture all formatting before additional syncs invalidate cached values
-      const savedFontName = range.font.name
-      const savedFontSize = range.font.size
-      const savedFontColor = range.font.color
-      const savedHighlightColor = range.font.highlightColor
-      const savedStyleBuiltIn = range.styleBuiltIn
-      // R15: paragraph-level properties (from first paragraph)
-      const savedAlignment = firstPara.alignment
-      const savedSpaceBefore = firstPara.spaceBefore
-      const savedSpaceAfter = firstPara.spaceAfter
-
-      // Detect list context to avoid double-bullets
-      const inList = await isInsertionInList(context)
-      const html = renderOfficeRichHtml(newText)
-      
-      // We pass the saved font name and size to applyInheritedStyles so the new text
-      // matches the selection context natively by default, but inline styles in the HTML
-      // (like colors returned by the LLM) will override it locally.
-      const inheritedStyles: InheritedStyles = {
-        fontFamily: savedFontName || '',
-        fontSize: savedFontSize ? `${savedFontSize}pt` : '',
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        color: '', // Do NOT force the original color here, let Word default to it or let inline HTML override it
-        marginTop: savedSpaceBefore ? `${savedSpaceBefore}pt` : '0pt',
-        marginBottom: savedSpaceAfter ? `${savedSpaceAfter}pt` : '0pt',
-      }
-      
-      const adjustedHtml = inList ? stripOuterListTags(html) : html
-      const styledHtml = applyInheritedStyles(adjustedHtml, inheritedStyles)
-      const insertedRange = range.insertHtml(styledHtml, 'Replace')
-
-      if (preserveFormatting) {
-        insertedRange.font.name = savedFontName
-        insertedRange.font.size = savedFontSize
-        // CRITICAL FIX: We do NOT restore font.color or font.highlightColor onto the entire range natively.
-        // Doing so forces Word to override any internal <span> colors generated by the LLM. 
-      }
-
-      await context.sync()  // execute insertHtml + font restoration
-
-      // R15: restore paragraph spacing/alignment on each inserted paragraph
-      if (preserveFormatting) {
-        try {
-          const insertedParas = insertedRange.paragraphs
-          insertedParas.load('items')
-          await context.sync()
-          for (const p of insertedParas.items) {
-            if (savedStyleBuiltIn && savedStyleBuiltIn !== 'Normal') p.styleBuiltIn = savedStyleBuiltIn as any
-            if (savedAlignment) p.alignment = savedAlignment
-            if (savedSpaceBefore != null) p.spaceBefore = savedSpaceBefore
-            if (savedSpaceAfter != null) p.spaceAfter = savedSpaceAfter
-          }
-          await context.sync()
-        } catch {
-          // Best-effort: paragraph spacing restoration may fail in some runtimes
+        savedFont = {
+          name: range.font.name,
+          size: range.font.size,
+          style: range.styleBuiltIn,
         }
       }
 
-      // R14: post-process headings to apply Word builtin heading styles
+      const html = renderOfficeRichHtml(content)
+      const adjustedHtml = inList ? stripOuterListTags(html) : html
+      const styledHtml = applyInheritedStyles(adjustedHtml, styles)
+      
+      const insertedRange = range.insertHtml(styledHtml, location as any)
+      
+      if (savedFont && preserveFormatting) {
+        insertedRange.font.name = savedFont.name
+        insertedRange.font.size = savedFont.size
+        // We don't force color here to allow markdown bold/italic/color to work
+      }
+
+      await context.sync()
+      
+      // Post-process headings
       await applyHeadingBuiltinStyles(context, insertedRange, html)
-      return preserveFormatting
-        ? 'Successfully replaced selected text while preserving layout formatting'
-        : 'Successfully replaced selected text'
+      
+      return `Successfully inserted content at ${location} of ${target}`
     },
   },
 
-  appendText: {
-    name: 'appendText',
-    category: 'write',
-    description: 'Append text to the end of the document.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: {
-          type: 'string',
-          description: 'The text to append',
-        },
-      },
-      required: ['text'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { text } = args as Record<string, any>
-      const body = context.document.body
-      body.insertHtml(renderOfficeRichHtml(text), 'End')
-      await context.sync()
-      return 'Successfully appended text to document'
-    },
-  },
 
   formatText: {
     name: 'formatText',
@@ -501,309 +411,9 @@ const wordToolDefinitions = createWordTools({
       },
   },
 
-  insertTable: {
-    name: 'insertTable',
-    category: 'write',
-    description: 'Insert a table at the current cursor position.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        rows: {
-          type: 'number',
-          description: 'Number of rows',
-        },
-        columns: {
-          type: 'number',
-          description: 'Number of columns',
-        },
-        data: {
-          type: 'array',
-          description: 'Optional 2D array of cell values',
-          items: {
-            type: 'array',
-            items: { type: 'string' },
-          },
-        },
-      },
-      required: ['rows', 'columns'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { rows, columns, data } = args as Record<string, any>
-      
-        const range = context.document.getSelection()
 
-        // Create table data with markdown stripped for raw cells
-        const tableData: string[][] = (data || Array(rows).fill(null).map(() => Array(columns).fill('')))
-          .map((row: string[]) => row.map((cell: string) => stripRichFormattingSyntax(cell || '')))
 
-        const table = range.insertTable(rows, columns, 'After', tableData)
-        table.styleBuiltIn = 'GridTable1Light'
 
-        await context.sync()
-        return `Successfully inserted ${rows}x${columns} table`
-      },
-  },
-
-  insertList: {
-    name: 'insertList',
-    category: 'write',
-    description: 'Insert a bulleted or numbered list at the current position. Each item can be a plain string or an object {text, children} for nested sub-items.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        items: {
-          type: 'array',
-          description:
-            'Array of list items. Each entry is either a plain string or an object {text: string, children?: string[]} for nested sub-items.',
-          items: { type: 'object' },
-        },
-        listType: {
-          type: 'string',
-          description: 'Type of list: "bullet" or "number"',
-          enum: ['bullet', 'number'],
-        },
-      },
-      required: ['items', 'listType'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { items, listType } = args as Record<string, any>
-      const range = context.document.getSelection()
-
-      let topLevelIndex = 0
-      const markdownLines: string[] = []
-
-      for (const item of items) {
-        const text = typeof item === 'string' ? item : (item.text ?? '')
-        const marker = listType === 'bullet' ? '-' : `${++topLevelIndex}.`
-        markdownLines.push(`${marker} ${text}`)
-
-        const children: string[] = typeof item === 'object' && Array.isArray(item.children) ? item.children : []
-        for (const child of children) {
-          markdownLines.push(listType === 'bullet' ? `  - ${child}` : `  1. ${child}`)
-        }
-      }
-
-      range.insertHtml(renderOfficeRichHtml(markdownLines.join('\n')), 'After')
-      await context.sync()
-      return `Successfully inserted ${listType} list with ${items.length} items`
-    },
-  },
-
-  selectText: {
-    name: 'selectText',
-    category: 'write',
-    description: 'Select all text in the document or specific location.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        scope: {
-          type: 'string',
-          description: 'What to select: "All" for entire document',
-          enum: ['All'],
-        },
-      },
-      required: ['scope'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { scope } = args as Record<string, any>
-      
-        if (scope === 'All') {
-          const body = context.document.body
-          body.select()
-          await context.sync()
-          return 'Successfully selected all text'
-        }
-        return 'Invalid scope'
-      },
-  },
-
-  insertImage: {
-    name: 'insertImage',
-    category: 'write',
-    description: 'Insert an image from a URL at the current cursor position. The image URL must be accessible.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        imageUrl: {
-          type: 'string',
-          description: 'The URL of the image to insert',
-        },
-        width: {
-          type: 'number',
-          description: 'Optional width in points',
-        },
-        height: {
-          type: 'number',
-          description: 'Optional height in points',
-        },
-        location: {
-          type: 'string',
-          description: 'Where to insert: "Before", "After", "Start", "End", or "Replace"',
-          enum: ['Before', 'After', 'Start', 'End', 'Replace'],
-        },
-      },
-      required: ['imageUrl'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { imageUrl, width, height, location = 'After' } = args
-      
-        const range = context.document.getSelection()
-        const image = range.insertInlinePictureFromBase64(imageUrl, location as any)
-
-        if (width) image.width = width
-        if (height) image.height = height
-
-        await context.sync()
-        return `Successfully inserted image at ${location}`
-      },
-  },
-
-  getTableInfo: {
-    name: 'getTableInfo',
-    category: 'read',
-    description: 'Get information about tables in the document, including row and column counts.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-    },
-    executeWord: async (context) => {
-      
-        const tables = context.document.body.tables
-        tables.load(['items'])
-        await context.sync()
-
-        const tableInfos = []
-        for (let i = 0; i < tables.items.length; i++) {
-          const table = tables.items[i]
-          table.load(['rowCount', 'values'])
-          await context.sync()
-
-          const columnCount = table.values && table.values[0] ? table.values[0].length : 0
-
-          tableInfos.push({
-            index: i,
-            rowCount: table.rowCount,
-            columnCount,
-          })
-        }
-
-        return JSON.stringify(
-          {
-            tableCount: tables.items.length,
-            tables: tableInfos,
-          },
-          null,
-          2,
-        )
-      },
-  },
-
-  insertBookmark: {
-    name: 'insertBookmark',
-    category: 'write',
-    description: 'Insert a bookmark at the current selection to mark a location in the document.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'The name of the bookmark (must be unique, no spaces allowed)',
-        },
-      },
-      required: ['name'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { name } = args as Record<string, any>
-      
-        const range = context.document.getSelection()
-
-        const bookmarkName = name.replace(/\s+/g, '_')
-
-        const contentControl = range.insertContentControl()
-        contentControl.tag = `bookmark_${bookmarkName}`
-        contentControl.title = bookmarkName
-        contentControl.appearance = 'Tags'
-
-        await context.sync()
-        return `Successfully inserted bookmark: ${bookmarkName}`
-      },
-  },
-
-  goToBookmark: {
-    name: 'goToBookmark',
-    category: 'write',
-    description: 'Navigate to a previously created bookmark in the document.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'The name of the bookmark to navigate to',
-        },
-      },
-      required: ['name'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { name } = args as Record<string, any>
-      
-        const bookmarkName = name.replace(/\s+/g, '_')
-        const contentControls = context.document.contentControls
-        contentControls.load(['items'])
-        await context.sync()
-
-        for (const cc of contentControls.items) {
-          cc.load(['tag', 'title'])
-          await context.sync()
-
-          if (cc.tag === `bookmark_${bookmarkName}` || cc.title === bookmarkName) {
-            cc.select()
-            await context.sync()
-            return `Successfully navigated to bookmark: ${bookmarkName}`
-          }
-        }
-
-        return `Bookmark not found: ${bookmarkName}`
-      },
-  },
-
-  insertContentControl: {
-    name: 'insertContentControl',
-    category: 'write',
-    description:
-      'Insert a content control (a container for content) at the current selection. Useful for creating structured documents.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'The title of the content control',
-        },
-        tag: {
-          type: 'string',
-          description: 'Optional tag for programmatic identification',
-        },
-        appearance: {
-          type: 'string',
-          description: 'Visual appearance of the control',
-          enum: ['BoundingBox', 'Tags', 'Hidden'],
-        },
-      },
-      required: ['title'],
-    },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { title, tag, appearance = 'BoundingBox' } = args
-      
-        const range = context.document.getSelection()
-        const contentControl = range.insertContentControl()
-        contentControl.title = title
-        if (tag) contentControl.tag = tag
-        contentControl.appearance = appearance as Word.ContentControlAppearance
-
-        await context.sync()
-        return `Successfully inserted content control: ${title}`
-      },
-  },
 
   findText: {
     name: 'findText',

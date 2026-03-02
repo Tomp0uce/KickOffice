@@ -42,10 +42,9 @@ function createPowerPointTools(definitions: Record<PowerPointToolName, PowerPoin
 
 export type PowerPointToolName =
   | 'getSelectedText'
-  | 'replaceSelectedText'
+  | 'insertContent'
   | 'getSlideContent'
   | 'addSlide'
-  | 'setShapeText'
   | 'deleteSlide'
   | 'getShapes'
   | 'getAllSlidesOverview'
@@ -341,29 +340,59 @@ const powerpointToolDefinitions = createPowerPointTools({
     },
   },
 
-  replaceSelectedText: {
-    name: 'replaceSelectedText',
+  insertContent: {
+    name: 'insertContent',
     category: 'write',
-    description: 'Replace the currently selected PowerPoint text with new content. The text will be rendered from Markdown to HTML before insertion. You can use Markdown formatting: **bold**, *italic*, bullet lists (- item), numbered lists (1. item), and headings (## Heading). Indented sub-items are supported for nested lists.',
+    description: 'The PREFERRED tool for adding or replacing content in PowerPoint. Supports Markdown (bold, italic, bullets). Can target a specific shape by ID/Name or the current selection. Handles style inheritance automatically.',
     inputSchema: {
       type: 'object',
       properties: {
-        newText: {
+        content: {
           type: 'string',
-          description: 'The replacement text to insert in place of the current selection.',
+          description: 'The content to insert in Markdown format.',
+        },
+        slideNumber: {
+          type: 'number',
+          description: 'Optional: Target slide number (1 = first slide). Required if shapeIdOrName is provided.',
+        },
+        shapeIdOrName: {
+          type: 'string',
+          description: 'Optional: ID or Name of the shape to update (from getShapes). If omitted, replaces current selection.',
         },
       },
-      required: ['newText'],
+      required: ['content'],
     },
-    executeCommon: async (args: Record<string, any>) => {
-      const { newText } = args as Record<string, any>
-      if (!newText || typeof newText !== 'string') {
-        throw new Error('Error: newText is required and must be a string.')
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      const { content, slideNumber, shapeIdOrName } = args
+      
+      if (shapeIdOrName) {
+        if (!slideNumber) throw new Error('Error: slideNumber is required when shapeIdOrName is provided.')
+        
+        const slides = context.presentation.slides
+        const idx = Math.trunc(Number(slideNumber)) - 1
+        const slide = slides.getItemAt(idx)
+        const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
+        shape.load('isNullObject')
+        await context.sync()
+
+        if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
+        
+        const textRange = shape.textFrame.textRange
+        if (isPowerPointApiSupported('1.5')) {
+          textRange.insertHtml(renderOfficeCommonApiHtml(content), 'Replace')
+        } else {
+          textRange.text = stripRichFormattingSyntax(content)
+        }
+        await context.sync()
+        return `Successfully set content on shape '${shapeIdOrName}' on slide ${slideNumber}.`
+      } else {
+        // Replace current selection
+        await insertIntoPowerPoint(content)
+        return 'Successfully replaced selected text in PowerPoint.'
       }
-      await insertIntoPowerPoint(newText)
-      return 'Successfully replaced selected text in PowerPoint.'
     },
   },
+
 
   getSlideContent: {
     name: 'getSlideContent',
@@ -464,75 +493,7 @@ const powerpointToolDefinitions = createPowerPointTools({
       },
   },
 
-  setShapeText: {
-    name: 'setShapeText',
-    category: 'write',
-    description:
-      'Set the text content of an existing shape on a specific slide by its ID or Name. Does NOT require a user selection — use getShapes first to discover shape IDs/names. Supports Markdown formatting (**bold**, *italic*, - bullet lists, etc.).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        slideNumber: {
-          type: 'number',
-          description: 'Target slide number (1 = first slide).',
-        },
-        shapeIdOrName: {
-          type: 'string',
-          description: 'ID or Name of the shape to update (from getShapes).',
-        },
-        text: {
-          type: 'string',
-          description: 'New text content for the shape. Supports Markdown formatting.',
-        },
-      },
-      required: ['slideNumber', 'shapeIdOrName', 'text'],
-    },
-    executePowerPoint: async (context: any, args: Record<string, any>) => {
-      ensurePowerPointRunAvailable()
-      const slideNumber = Number(args.slideNumber)
-      const shapeIdOrName = String(args.shapeIdOrName ?? '')
-      const text = String(args.text ?? '')
 
-      if (!Number.isFinite(slideNumber) || slideNumber < 1)
-        throw new Error('Error: slideNumber must be a number >= 1.')
-      if (!shapeIdOrName) throw new Error('Error: shapeIdOrName is required.')
-      if (!text && text !== '') throw new Error('Error: text is required.')
-
-      const slides = context.presentation.slides
-      slides.load('items')
-      await context.sync()
-
-      const index = Math.trunc(slideNumber) - 1
-      if (index >= slides.items.length)
-        throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
-
-      const slide = slides.getItemAt(index)
-      const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
-      shape.load('isNullObject')
-      await context.sync()
-
-      if (shape.isNullObject)
-        throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
-
-      const textRange = shape.textFrame.textRange
-
-      // Prefer rich HTML insertion (PowerPointApi 1.5+)
-      if (isPowerPointApiSupported('1.5')) {
-        try {
-          textRange.insertHtml(renderOfficeCommonApiHtml(text), 'Replace')
-          await context.sync()
-          return `Successfully set text on shape '${shapeIdOrName}' on slide ${slideNumber}.`
-        } catch {
-          // Fall through to plain-text fallback
-        }
-      }
-
-      // Fallback: plain text
-      textRange.text = stripRichFormattingSyntax(text)
-      await context.sync()
-      return `Successfully set text on shape '${shapeIdOrName}' on slide ${slideNumber} (plain text mode).`
-    },
-  },
 
   deleteSlide: {
     name: 'deleteSlide',

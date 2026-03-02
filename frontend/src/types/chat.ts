@@ -15,6 +15,7 @@ export interface DisplayMessage {
   imageSrc?: string
   richHtml?: string
   toolCalls?: ToolCallPart[]
+  rawMessages?: any[]
 }
 
 export interface QuickAction {

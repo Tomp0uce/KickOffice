@@ -391,5 +391,10 @@
   "credentialsRequired": "Please configure your credentials in Settings > Account to use this feature.",
   "credentialsRequiredTitle": "Authentication required",
   "rememberCredentialsLabel": "Remember credentials",
-  "rememberCredentialsDescription": "Keep credentials saved between sessions"
+  "rememberCredentialsDescription": "Keep credentials saved between sessions",
+  "errorTimeout": "Request timed out. The model took too long to respond — try again or simplify your request.",
+  "errorNetwork": "Connection error. Check your network connection and try again.",
+  "errorRateLimit": "Too many requests — rate limit reached. Wait a few seconds and try again.",
+  "errorServer": "Internal server error. Check the backend logs or try again later.",
+  "errorTruncated": "⚠️ Response truncated: maximum token limit reached. Simplify your request or increase the limit."
 }

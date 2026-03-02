@@ -5,8 +5,20 @@ if (!BACKEND_URL) {
   throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env')
 }
 
-const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 45_000
-const RETRY_DELAYS_MS = [1_000, 3_000, 5_000] as const
+// Timeouts by model tier — reasoning models need more time (up to 6 min LLM + overhead)
+const BASE_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 180_000
+const TIMEOUT_BY_TIER: Record<string, number> = {
+  reasoning: 360_000,
+  standard: 180_000,
+  fast: 120_000,
+}
+
+function getTimeoutForTier(modelTier?: string): number {
+  if (modelTier && TIMEOUT_BY_TIER[modelTier]) return TIMEOUT_BY_TIER[modelTier]
+  return BASE_TIMEOUT_MS
+}
+
+const RETRY_DELAYS_MS = [1_500, 4_000] as const
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -16,6 +28,44 @@ function wait(ms: number): Promise<void> {
 
 function isRetryableError(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Error categorisation — exposes structured info for user-facing messages
+// ────────────────────────────────────────────────────────────────────────────
+export type ErrorType = 'timeout' | 'network' | 'rate_limit' | 'auth' | 'server' | 'unknown'
+
+export interface CategorizedError {
+  type: ErrorType
+  /** i18n key to use in the UI */
+  i18nKey: string
+}
+
+export function categorizeError(error: unknown): CategorizedError {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return { type: 'unknown', i18nKey: 'generationStop' }
+  }
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    return { type: 'timeout', i18nKey: 'errorTimeout' }
+  }
+  if (error instanceof TypeError) {
+    // Fetch TypeError typically means network unreachable
+    return { type: 'network', i18nKey: 'errorNetwork' }
+  }
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase()
+  if (msg.includes('401') || msg.includes('credentials') || msg.includes('x-user-key') || msg.includes('x-user-email')) {
+    return { type: 'auth', i18nKey: 'credentialsRequired' }
+  }
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many')) {
+    return { type: 'rate_limit', i18nKey: 'errorRateLimit' }
+  }
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('internal server')) {
+    return { type: 'server', i18nKey: 'errorServer' }
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return { type: 'timeout', i18nKey: 'errorTimeout' }
+  }
+  return { type: 'unknown', i18nKey: 'failedToResponse' }
 }
 
 function createTimeoutSignal(timeoutMs: number, externalSignal?: AbortSignal): { signal: AbortSignal; cleanup: () => void } {
@@ -46,11 +96,12 @@ function createTimeoutSignal(timeoutMs: number, externalSignal?: AbortSignal): {
   }
 }
 
-async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Promise<Response> {
+async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}, modelTier?: string): Promise<Response> {
   let attempt = 0
+  const timeoutMs = getTimeoutForTier(modelTier)
 
   while (true) {
-    const { signal, cleanup } = createTimeoutSignal(REQUEST_TIMEOUT_MS, init.signal ?? undefined)
+    const { signal, cleanup } = createTimeoutSignal(timeoutMs, init.signal ?? undefined)
 
     try {
       return await fetch(url, {
@@ -64,7 +115,12 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}): Pr
       }
 
       const isPost = init.method?.toUpperCase() === 'POST'
-      const shouldRetry = attempt < RETRY_DELAYS_MS.length && isRetryableError(error) && !isPost
+      // Allow 1 retry on POST for timeout/network errors (transient failures)
+      const maxPostRetries = 1
+      const shouldRetry =
+        attempt < RETRY_DELAYS_MS.length &&
+        isRetryableError(error) &&
+        (!isPost || attempt < maxPostRetries)
       if (!shouldRetry) {
         throw error
       }
@@ -164,7 +220,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
     body: JSON.stringify({ messages, modelTier, tools, stream_options: { include_usage: true } }),
     signal: abortSignal,
-  })
+  }, modelTier)
 
   if (!res.ok) {
     const err = await res.text()
@@ -193,6 +249,13 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
       try {
         const parsed = JSON.parse(data)
+
+        // Detect error objects embedded in the SSE stream
+        if (parsed.error) {
+          const errMsg = parsed.error.message || JSON.stringify(parsed.error)
+          throw new Error(`Stream error: ${errMsg}`)
+        }
+
         const finishReason = parsed.choices?.[0]?.finish_reason ?? null
         if (finishReason !== null) {
           onFinishReason?.(finishReason)
@@ -213,8 +276,12 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
             totalTokens: parsed.usage.total_tokens ?? 0,
           })
         }
-      } catch {
-        // Skip malformed JSON lines
+      } catch (parseError) {
+        // Only re-throw if it was our own explicit stream error; skip malformed JSON
+        if (parseError instanceof Error && parseError.message.startsWith('Stream error:')) {
+          throw parseError
+        }
+        // Otherwise skip malformed JSON line silently
       }
     }
   }
