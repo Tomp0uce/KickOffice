@@ -1,14 +1,11 @@
 import { Router } from 'express'
-import { createRequire } from 'module'
 import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
+import { PDFParse } from 'pdf-parse'
 import mammoth from 'mammoth'
 import * as xlsx from 'xlsx'
 import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'
-
-const require = createRequire(import.meta.url)
-const pdfParse = require('pdf-parse')
 
 const uploadRouter = Router()
 
@@ -50,7 +47,9 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
     // PDF Extraction
     if (mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
-      const data = await pdfParse(file.buffer)
+      const parser = new PDFParse({ data: file.buffer })
+      const data = await parser.getText()
+      await parser.destroy()
       extractedText = data.text
     } 
     // DOCX Extraction
