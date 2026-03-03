@@ -9,7 +9,8 @@ COPY frontend/package.json frontend/package-lock.json ./frontend/
 
 # Install dependencies (from frontend directory where package.json expects ../office-word-diff)
 WORKDIR /build/frontend
-RUN npm ci
+# Use npm install instead of npm ci for better compatibility with local file dependencies
+RUN npm install --no-audit --no-fund
 
 # Copy frontend source
 COPY frontend/ ./

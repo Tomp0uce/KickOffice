@@ -647,7 +647,7 @@ import {
   setUserEmail,
   getRememberCredentials,
   setRememberCredentials as setRememberCredentialsPersist,
-  migrateFromSessionStorage,
+  migrateFromPlaintext,
 } from "@/utils/credentialStorage";
 import { localStorageKey } from "@/utils/enum";
 import { getExcelToolDefinitions } from "@/utils/excelTools";
@@ -683,24 +683,24 @@ const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
 const darkMode = useStorage(localStorageKey.darkMode, false);
 
 // Credential storage with secure persistence
-const litellmUserKey = ref(getUserKey());
-const litellmUserEmail = ref(getUserEmail());
+const litellmUserKey = ref('');
+const litellmUserEmail = ref('');
 const rememberCredentials = ref(getRememberCredentials());
 
 // Watch for credential changes and persist them
-watch(litellmUserKey, (value) => {
-  setUserKey(value);
+watch(litellmUserKey, async (value) => {
+  await setUserKey(value);
 });
 
-watch(litellmUserEmail, (value) => {
-  setUserEmail(value);
+watch(litellmUserEmail, async (value) => {
+  await setUserEmail(value);
 });
 
-watch(rememberCredentials, (value) => {
-  setRememberCredentialsPersist(value);
+watch(rememberCredentials, async (value) => {
+  await setRememberCredentialsPersist(value);
   // Reload credentials after migration
-  litellmUserKey.value = getUserKey();
-  litellmUserEmail.value = getUserEmail();
+  litellmUserKey.value = await getUserKey();
+  litellmUserEmail.value = await getUserEmail();
 });
 
 const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
@@ -1147,11 +1147,11 @@ onBeforeMount(() => {
   checkBackend();
 });
 
-onMounted(() => {
-  // Migrate old credentials from sessionStorage if needed
-  migrateFromSessionStorage();
-  // Reload credentials after migration
-  litellmUserKey.value = getUserKey();
-  litellmUserEmail.value = getUserEmail();
+onMounted(async () => {
+  // Migrate old plaintext credentials if needed
+  await migrateFromPlaintext();
+  // Load credentials (will be decrypted if needed)
+  litellmUserKey.value = await getUserKey();
+  litellmUserEmail.value = await getUserEmail();
 });
 </script>

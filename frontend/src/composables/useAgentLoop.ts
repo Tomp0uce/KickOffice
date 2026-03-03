@@ -25,6 +25,52 @@ import {
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
 
 
+/**
+ * Safe JSON stringify with depth and circular reference checks
+ * Prevents DoS attacks via deeply nested objects
+ */
+function safeStringify(obj: unknown, maxDepth = 10): string {
+  const seen = new WeakSet()
+
+  function stringify(value: unknown, depth: number): string {
+    // Check depth limit
+    if (depth > maxDepth) {
+      return '"[Max depth exceeded]"'
+    }
+
+    // Handle primitives
+    if (value === null) return 'null'
+    if (value === undefined) return 'undefined'
+    if (typeof value === 'string') return JSON.stringify(value)
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      if (seen.has(value)) return '"[Circular]"'
+      seen.add(value)
+
+      const items = value.map(item => stringify(item, depth + 1))
+      return `[${items.join(',')}]`
+    }
+
+    // Handle objects
+    if (typeof value === 'object') {
+      if (seen.has(value)) return '"[Circular]"'
+      seen.add(value)
+
+      const entries = Object.entries(value).map(([k, v]) => {
+        return `${JSON.stringify(k)}:${stringify(v, depth + 1)}`
+      })
+      return `{${entries.join(',')}}`
+    }
+
+    // Fallback for functions, symbols, etc.
+    return '"[Unsupported type]"'
+  }
+
+  return stringify(obj, 0)
+}
+
 interface ToolCallFunction {
   name: string
   arguments: string
@@ -156,7 +202,8 @@ export async function executeAgentToolCall(
     return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
   }
 
-  const signature = `${toolName}${JSON.stringify(toolArgs)}`
+  // Use safe stringify to prevent DoS via deeply nested objects
+  const signature = `${toolName}${safeStringify(toolArgs)}`
   let result = ''
   let success = false
 
@@ -367,6 +414,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       iteration++
+
+      // Enforce max iterations limit
+      if (iteration > maxIter) {
+        currentAssistantMessage.content += `\n\n⚠️ ${t('agentMaxIterationsReached')}`
+        break
+      }
       currentAction.value = t('agentAnalyzing')
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
@@ -810,6 +863,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
   async function applyQuickAction(actionKey: string) {
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
+    // Prevent quick actions from running while another request is in progress
+    if (loading.value || abortController.value) {
+      return messageUtil.warning(t('requestInProgress') || 'A request is already in progress. Please wait or stop the current request.')
+    }
     const selectedQuickAction = hostIsExcel
       ? excelQuickActions.value.find(a => a.key === actionKey)
       : hostIsPowerPoint
