@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Azure/LiteLLM Compatibility**: Fixed message payload compatibility with Azure OpenAI and LiteLLM proxies by removing empty `tool_calls` arrays from assistant messages. These providers reject messages with `tool_calls: []`, causing agent failures when no tools are invoked.
 - **Word Proofreading Empty Response**: Fixed issue where proofreading in Word displayed "empty response" error after successfully adding comments via the `addComment` tool.
 - **Outlook Reply Language Detection**: Outlook reply quick action now properly detects the language of the original email and responds in the same language, overriding the configured reply language setting.
 
