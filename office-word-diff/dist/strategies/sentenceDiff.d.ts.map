@@ -1,0 +1,1 @@
+{"version":3,"file":"sentenceDiff.d.ts","sourceRoot":"","sources":["../../src/strategies/sentenceDiff.js"],"names":[],"mappings":"AA4GA;;;;;;;;;;;;GAYG;AACH,mDARW,IAAI,CAAC,cAAc,SACnB,IAAI,CAAC,KAAK,SACV,MAAM,SACN,MAAM,kBAEJ,OAAO,CAAC;IAAC,QAAQ,EAAE,MAAM,CAAC;IAAC,UAAU,EAAE,MAAM,CAAC;IAAC,SAAS,EAAE,MAAM,CAAA;CAAC,CAAC,CAmH9E"}
