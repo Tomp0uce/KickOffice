@@ -446,11 +446,15 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const choice = response.choices?.[0]
       if (!choice) break
       const assistantMsg = choice.message
-      currentMessages.push({
+      const assistantMsgForHistory: ChatRequestMessage = {
         role: 'assistant',
         content: assistantMsg.content || '',
-        tool_calls: assistantMsg.tool_calls,
-      })
+      }
+      // Only include tool_calls if non-empty (Azure/LiteLLM rejects empty arrays)
+      if (assistantMsg.tool_calls?.length) {
+        assistantMsgForHistory.tool_calls = assistantMsg.tool_calls
+      }
+      currentMessages.push(assistantMsgForHistory)
       if (assistantMsg.content) currentAssistantMessage.content = assistantMsg.content
       if (!assistantMsg.tool_calls?.length) {
         currentAction.value = ''

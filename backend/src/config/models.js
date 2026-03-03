@@ -83,18 +83,34 @@ function getPublicModels() {
 }
 
 /**
+ * Sanitizes messages to remove empty tool_calls arrays (Azure/LiteLLM rejects them).
+ * @param {Array<object>} messages
+ * @returns {Array<object>}
+ */
+function sanitizeMessages(messages) {
+  return messages.map(msg => {
+    if (msg.role === 'assistant' && Array.isArray(msg.tool_calls) && msg.tool_calls.length === 0) {
+      const { tool_calls, ...rest } = msg
+      return rest
+    }
+    return msg
+  })
+}
+
+/**
  * Builds the request body for the LLM API.
  * @param {ChatBodyParams} params
  * @returns {Record<string, unknown>}
  */
 function buildChatBody({ modelTier, modelConfig, messages, temperature, maxTokens, stream, tools }) {
   const modelId = modelConfig.id
+  const sanitizedMessages = sanitizeMessages(messages)
   const supportsLegacyParams = !isChatGptModel(modelId)
   const reasoningEffort = isGpt5Model(modelId) ? (modelConfig.reasoningEffort || undefined) : undefined
   const canUseSamplingParams = !isGpt5Model(modelId)
   const body = {
     model: modelId,
-    messages,
+    messages: sanitizedMessages,
     stream,
   }
 
