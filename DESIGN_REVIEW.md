@@ -51,22 +51,20 @@ The frontend Dockerfile context is `./frontend`, but `office-word-diff` is at `.
 
 ### C0c. Synology DS416play Compatibility Issues
 **File**: `docker-compose.yml`, Dockerfiles
-**Status**: IMMEDIATE FIX REQUIRED
+**Status**: FIXED
 
-The Synology DS416play has limited resources and ARM architecture:
-- **CPU**: Marvell Armada 385 (ARMv7/arm64)
-- **RAM**: 1GB
-- **Docker**: Container Manager with limited build capabilities
+The Synology DS416play has an Intel Celeron processor that is **NOT compatible with Alpine Linux**. Alpine uses musl libc which executes instructions (AVX) that the Celeron doesn't support, causing "Illegal instruction (core dumped)" errors.
 
-**Issues**:
-1. `node:22-slim` may not have ARM64 support for older Synology models
-2. npm build may fail due to memory constraints (1GB RAM)
-3. Multi-stage builds require significant temp storage
+**Requirements**:
+- **MUST use `node:22-slim`** (Debian-based, glibc) — NOT Alpine
+- **MUST use `nginx:stable`** (Debian-based) — NOT nginx:alpine
+- Pre-build images on a more powerful machine if build is too slow
+- Consider `--max-old-space-size=512` for memory-constrained builds
 
-**Recommendations**:
-- Use `node:22-alpine` instead of `node:22-slim` (smaller, ARM-compatible)
-- Add `--max-old-space-size=512` to Node.js builds to limit memory
-- Consider pre-building images on a more powerful machine
+**DO NOT USE on Synology DS416play**:
+- `node:*-alpine` — causes "Illegal instruction" on Celeron CPUs
+- `nginx:alpine` — same issue with musl libc
+- Any musl-based images
 
 ---
 
