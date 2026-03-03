@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import { GLOBAL_STYLE_INSTRUCTIONS } from '@/utils/constant'
+import { getSkillForHost, type OfficeHost } from '@/skills'
 
 export interface UseAgentPromptsOptions {
   t: (key: string) => string
@@ -246,12 +247,27 @@ ${COMMON_SHELL_INSTRUCTIONS}`
 
   const agentPrompt = (lang: string) => {
     let base = ''
-    if (hostIsOutlook) base = outlookAgentPrompt(lang)
-    else if (hostIsPowerPoint) base = powerPointAgentPrompt(lang)
-    else if (hostIsExcel) base = excelAgentPrompt(lang)
-    else base = wordAgentPrompt(lang)
-    
-    return `${base}${userProfilePromptBlock()}\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+    let hostType: OfficeHost = 'Word'
+
+    if (hostIsOutlook) {
+      base = outlookAgentPrompt(lang)
+      hostType = 'Outlook'
+    } else if (hostIsPowerPoint) {
+      base = powerPointAgentPrompt(lang)
+      hostType = 'PowerPoint'
+    } else if (hostIsExcel) {
+      base = excelAgentPrompt(lang)
+      hostType = 'Excel'
+    } else {
+      base = wordAgentPrompt(lang)
+      hostType = 'Word'
+    }
+
+    // Inject skills after base prompt, before user profile
+    const skills = getSkillForHost(hostType)
+    const skillsSection = skills ? `\n\n# Office.js Skills and Best Practices\n\n${skills}\n\n` : ''
+
+    return `${base}${skillsSection}${userProfilePromptBlock()}\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
   }
 
   return { agentPrompt }

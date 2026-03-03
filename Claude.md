@@ -131,10 +131,17 @@ Any contract change should update both backend and frontend in the same change s
 
 Current host/tool landscape (keep in mind for tool/agent changes):
 
-- Word tools: 40 tools (high-count set, including `eval_wordjs` via SES sandbox) + 2 general tools.
+- Word tools: 41 tools (includes `proposeRevision` for format-preserving edits, `eval_wordjs` via SES sandbox) + 2 general tools.
 - Excel tools: 45 tools (high-count set, including `eval_officejs` and OpenExcel ports) + 2 general tools.
-- PowerPoint tools: 15 tools (slides, shapes, notes, modify, and `eval_powerpointjs`) + 2 general tools.
+- PowerPoint tools: 16 tools (includes `proposeShapeTextRevision` for diff reporting, slides, shapes, notes, and `eval_powerpointjs`) + 2 general tools.
 - Outlook tools: 14 tools (mail compose/read helpers and `eval_outlookjs`) + 2 general tools.
+- **Total**: 129 tools across all hosts (up from 127)
+
+**Agent Stability Features** (implemented):
+- **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
+- **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
+- **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps office-word-diff library with cascading fallback strategies)
+- **Sandbox Enhancement**: Host filtering in `sandbox.ts` prevents cross-namespace API access (e.g., Word API blocked in Excel context)
 
 ## 6) Backend Editing Guidelines
 
