@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Message Timestamps**: Chat messages now display the creation time (HH:MM format) for better conversation context tracking
+
+### Fixed
+
+- **Credential Decryption Error Handling**: Improved error handling in credential storage. Corrupted encrypted data in localStorage is now automatically cleaned up when decryption fails, preventing repeated console errors
+- **Reverse Proxy Compatibility**: Enabled Express `trust proxy` setting for proper operation behind Synology/nginx reverse proxies. Fixes rate limiting errors (`ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`) when running behind a reverse proxy
+
+---
+
+## [Previous Unreleased v4]
+
+### Added
+
 - **Complete Documentation Overhaul**:
   - **README.md**: Full rewrite with accurate project overview, architecture diagram, model tiers, agent stability system, tool summary (129 tools), and proper credits for inspiration projects (word-GPT-Plus, excel-ai-assistant, office-word-diff, Redink)
   - **CLAUDE.md**: Streamlined agent guide with architecture quick reference, working principles, critical rules, and commit/PR workflow

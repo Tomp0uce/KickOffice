@@ -43,9 +43,10 @@
       <div
         class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left"
       >
-        <div
-          class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
-        >
+        <div class="flex flex-col gap-1">
+          <div
+            class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
+          >
           <template
             v-for="(segment, idx) in item.segments"
             :key="`${item.key}-segment-${idx}`"
@@ -102,6 +103,13 @@
             class="mt-2 max-w-full rounded-md"
             alt="Generated image"
           />
+          </div>
+          <div
+            v-if="item.message.timestamp"
+            class="text-[10px] text-secondary/60 px-1"
+          >
+            {{ formatTime(item.message.timestamp) }}
+          </div>
         </div>
         <div v-if="item.message.role === 'assistant'" class="flex gap-1">
           <CustomButton
@@ -221,6 +229,13 @@ function onThoughtToggle(
 }
 
 const liveAnnouncement = ref("");
+
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
 
 watch(
   () => props.history.length,

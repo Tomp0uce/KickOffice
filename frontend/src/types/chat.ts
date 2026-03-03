@@ -16,6 +16,7 @@ export interface DisplayMessage {
   richHtml?: string
   toolCalls?: ToolCallPart[]
   rawMessages?: any[]
+  timestamp?: number
 }
 
 export interface QuickAction {

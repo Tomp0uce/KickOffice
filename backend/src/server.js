@@ -30,6 +30,10 @@ const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '600000', 
 
 const app = express()
 
+// Trust proxy for Synology/nginx reverse proxy compatibility
+// Allows express-rate-limit to correctly identify client IPs via X-Forwarded-For
+app.set('trust proxy', true)
+
 const chatLimiter = rateLimit({
   windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
   max: CHAT_RATE_LIMIT_MAX,
