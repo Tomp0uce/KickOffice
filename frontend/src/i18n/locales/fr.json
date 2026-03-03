@@ -98,6 +98,8 @@
   "generationStop": "Génération arrêtée",
   "agentAnalyzing": "⏳ Analyse de la demande...",
   "agentStoppedByUser": "🛑 Processus arrêté par l'utilisateur.",
+  "agentMaxIterationsReached": "Nombre maximum d'itérations atteint. L'agent a accompli autant que possible dans la limite configurée.",
+  "requestInProgress": "Une requête est déjà en cours. Veuillez patienter ou arrêter la requête actuelle.",
   "agentActionRunning": "🛠️ Exécution de l'outil...",
   "agentActionReading": "📖 Lecture du document...",
   "agentActionFormatting": "🎨 Mise en forme du texte...",

@@ -72,18 +72,50 @@ chatRouter.post('/', async (req, res) => {
     const decoder = new TextDecoder()
     let clientDisconnected = false
 
-    // Track client disconnection
-    res.on('close', () => { clientDisconnected = true })
+    // Track client disconnection and cancel upstream reader
+    res.on('close', () => {
+      clientDisconnected = true
+      // Cancel upstream reader to stop draining the response
+      reader.cancel().catch(() => {
+        // Ignore cancel errors - connection is already closed
+      })
+    })
 
     try {
       while (true) {
         if (clientDisconnected) break
-        const { done, value } = await reader.read()
+
+        // Add read timeout to prevent hanging requests
+        const readPromise = reader.read()
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Read timeout')), 30000) // 30s timeout
+        })
+
+        let readResult
+        try {
+          readResult = await Promise.race([readPromise, timeoutPromise])
+        } catch (readError) {
+          if (clientDisconnected) break
+          throw readError
+        }
+
+        const { done, value } = readResult
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
 
+        // Check if client disconnected before writing
+        if (clientDisconnected) break
+
         // Check write result for backpressure
-        const canContinue = res.write(chunk)
+        let canContinue
+        try {
+          canContinue = res.write(chunk)
+        } catch (writeError) {
+          // Client disconnected during write
+          if (clientDisconnected) break
+          throw writeError
+        }
+
         if (!canContinue && !clientDisconnected) {
           // Wait for drain before continuing
           await new Promise(resolve => {
@@ -97,7 +129,11 @@ chatRouter.post('/', async (req, res) => {
       // Flush any remaining bytes in the decoder
       const finalChunk = decoder.decode()
       if (finalChunk && !clientDisconnected) {
-        res.write(finalChunk)
+        try {
+          res.write(finalChunk)
+        } catch {
+          // Ignore write errors if client disconnected
+        }
       }
       systemLog('INFO', 'POST /api/chat stream completed successfully')
     } catch (streamError) {
@@ -106,6 +142,13 @@ chatRouter.post('/', async (req, res) => {
         systemLog('ERROR', 'Stream error:', streamError)
       }
     } finally {
+      // Cancel reader if still active
+      try {
+        await reader.cancel()
+      } catch {
+        // Ignore cancel errors
+      }
+
       if (!res.writableEnded) {
         res.end()
       }

@@ -55,6 +55,15 @@ const infoLimiter = rateLimit({
   message: { error: 'Too many requests.' },
 })
 
+// Rate limiter for file upload endpoint to prevent memory exhaustion
+const uploadLimiter = rateLimit({
+  windowMs: 60_000, // 1 minute
+  max: 10, // max 10 uploads per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many upload requests. Please try again later.' },
+})
+
 const allowedOrigins = [FRONTEND_URL]
 if (PUBLIC_FRONTEND_URL) {
   allowedOrigins.push(PUBLIC_FRONTEND_URL)
@@ -129,10 +138,20 @@ app.use((req, res, next) => {
   }
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    // Validate origin for CSRF protection
+    const origin = req.headers.origin || req.headers.referer
+    const isValidOrigin = origin && allowedOrigins.some(allowed => origin.startsWith(allowed))
+
     // Skip CSRF check for requests authenticated via the X-User-Key header
     // (Office add-in requests can't reliably carry cookies cross-origin)
     const isKeyAuthenticated = !!req.headers['x-user-key']
+
     if (!isKeyAuthenticated) {
+      // Enforce origin validation for non-key-authenticated requests
+      if (!isValidOrigin) {
+        return res.status(403).json({ error: 'Invalid origin' })
+      }
+
       const headerToken = req.headers['x-csrf-token']
       if (!headerToken || headerToken !== token) {
         return res.status(403).json({ error: 'Invalid CSRF token' })
@@ -149,7 +168,7 @@ app.use(infoLimiter, healthRouter)
 app.use(infoLimiter, modelsRouter)
 app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRouter)
 app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
-app.use('/api/upload', ensureUserCredentials, uploadRouter)
+app.use('/api/upload', ensureUserCredentials, uploadLimiter, uploadRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

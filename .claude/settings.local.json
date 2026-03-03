@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(cd:*)",
+      "Bash(head:*)",
+      "Bash(cd \"/c/Users/DavidCarrara/Downloads/Projets Git/KickOffice/backend\" && node --check src/server.js 2>&1)",
+      "Bash(echo not found:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git checkout:*)",
+      "Bash(git:*)",
+      "Bash(mkdir:*)",
+      "Bash(gh pr:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "Bash(xargs grep:*)",
+      "Bash(npm search:*)",
+      "Bash(where npm:*)",
+      "Bash(npm:*)",
+      "Bash(where.exe:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(test:*)",
+      "Bash(.github/pr_body.md:*)"
+    ]
+  }
+}

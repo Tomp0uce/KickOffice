@@ -13,6 +13,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Security Hardening (10 Critical Issues from DESIGN_REVIEW v4)**:
+  - **CSRF Protection**: Added explicit origin validation to CSRF middleware. POST/PUT/PATCH/DELETE requests without X-User-Key header now require valid origin from allowlist
+  - **Credential Encryption**: Replaced XOR obfuscation with Web Crypto API (AES-GCM 256-bit encryption) for credentials stored in localStorage. SessionStorage credentials remain unencrypted (session-only)
+  - **Rate Limiting**: Added IP-based rate limiter to `/api/upload` endpoint (10 uploads/min) to prevent memory exhaustion DoS attacks
+  - **Stream Abort Handling**: Fixed hanging requests and resource leaks in streaming chat endpoint. Now properly calls `reader.cancel()` on client disconnect, adds 30s read timeout, and handles write errors after disconnection
+  - **Safe JSON Stringify**: Added `safeStringify()` function with depth validation (max 10 levels) and circular reference detection to prevent DoS via deeply nested tool arguments
+  - **Agent Iteration Limit**: Enforced explicit iteration count check in agent loop. User-configured `agentMaxIterations` setting is now respected instead of only timeout-based enforcement
+  - **Quick Actions Loading State**: Quick actions now check `loading.value` and `abortController` before execution to prevent duplicate requests and history corruption
+  - **Docker npm ci Compatibility**: Changed `npm ci` to `npm install` in frontend Dockerfile for better compatibility with local file dependencies on Synology NAS
 - **Docker Build Failure**: Fixed critical Docker build issues preventing deployment on Synology NAS:
   - Changed frontend build context from `./frontend` to root (`.`) to include `office-word-diff` dependency
   - Restructured `frontend/Dockerfile` to properly copy local `office-word-diff` library

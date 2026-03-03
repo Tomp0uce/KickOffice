@@ -240,11 +240,15 @@ npm run test:e2e      # Playwright tests
 
 - **API keys server-side only** — Never sent to client
 - **CORS restricted** — Frontend origin only
-- **Rate limiting** — IP-based on chat/image endpoints
-- **SES sandbox** — Safe dynamic code execution
+- **Rate limiting** — IP-based on chat, image, and upload endpoints
+- **Credential encryption** — Web Crypto API (AES-GCM 256-bit) for stored credentials
+- **CSRF protection** — Origin validation for state-changing requests
+- **Stream abort handling** — Proper cleanup and timeout for streaming connections
+- **SES sandbox** — Safe dynamic code execution with host isolation
 - **Code validation** — Pre-execution checks for Office.js patterns
 - **Helmet headers** — HSTS, X-Frame-Options, X-Content-Type-Options
 - **DOMPurify** — XSS protection with strict allowlists
+- **Safe JSON handling** — Depth validation and circular reference detection
 - **No third-party services** — Privacy-first, no telemetry
 
 ---

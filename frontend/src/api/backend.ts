@@ -142,22 +142,22 @@ function getCsrfToken(): string {
   return ''
 }
 
-function getUserCredentialHeaders(): Record<string, string> {
-  const userKey = getUserKey()
-  const userEmail = getUserEmail()
+async function getUserCredentialHeaders(): Promise<Record<string, string>> {
+  const userKey = await getUserKey()
+  const userEmail = await getUserEmail()
   const headers: Record<string, string> = {}
   if (userKey) headers['X-User-Key'] = userKey
   if (userEmail) headers['X-User-Email'] = userEmail
-  
+
   const csrf = getCsrfToken()
   if (csrf) headers['x-csrf-token'] = csrf
-  
+
   return headers
 }
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`, {
-    headers: { ...getUserCredentialHeaders() }
+    headers: { ...(await getUserCredentialHeaders()) }
   })
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
   return res.json()
@@ -166,7 +166,7 @@ export async function fetchModels(): Promise<Record<string, ModelInfo>> {
 export async function healthCheck(): Promise<boolean> {
   try {
     const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/health`, {
-      headers: { ...getUserCredentialHeaders() }
+      headers: { ...(await getUserCredentialHeaders()) }
     })
     return res.ok
   } catch {
@@ -217,7 +217,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
+    headers: { 'Content-Type': 'application/json', ...(await getUserCredentialHeaders()) },
     body: JSON.stringify({ messages, modelTier, tools, stream_options: { include_usage: true } }),
     signal: abortSignal,
   }, modelTier)
@@ -306,7 +306,7 @@ export interface ImageGenerateOptions {
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getUserCredentialHeaders() },
+    headers: { 'Content-Type': 'application/json', ...(await getUserCredentialHeaders()) },
     body: JSON.stringify(options),
   })
 
@@ -335,7 +335,7 @@ export async function uploadFile(file: File): Promise<{ filename: string; extrac
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/upload`, {
     method: 'POST',
-    headers: { ...getUserCredentialHeaders() },
+    headers: { ...(await getUserCredentialHeaders()) },
     body: formData,
   })
 
