@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Agent Stability System (Three Pillars)**:
+  - **Skills System (Pillar 2)**: Office.js best practices automatically injected into agent prompts. Five skill documents (common + Word/Excel/PowerPoint/Outlook-specific) teach the model THE PROXY PATTERN, 5 critical rules (always load, always sync, use try/catch, check empty selections, prefer dedicated tools), and host-specific patterns. Reduces common Office.js errors (missing load/sync, wrong namespaces, undefined properties) through defensive prompting.
+  - **Code Validator (Pillar 3)**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts`. Blocks execution if code is missing `context.sync()`, missing `.load()` before property reads, uses wrong namespace (e.g., Word API in Excel), contains infinite loops, or uses dangerous operations (`eval()`, `new Function()`). Provides validation feedback to the model for self-correction. Warnings for missing try/catch, excessive sync calls, incorrect Excel array formats, and large hardcoded ranges.
+  - **Diffing Integration (Pillar 1)**: Format-preserving text editing tools that apply surgical changes while keeping formatting intact. Word's `proposeRevision` tool computes word-level diffs and applies only insertions/deletions, preserving bold/italic/colors/fonts on unchanged text, with optional Track Changes integration. PowerPoint's `proposeShapeTextRevision` tool provides diff statistics with full text replacement (API limitation). Uses `office-word-diff` library with cascading fallback strategies (token → sentence → block).
+  - **Sandbox Enhancement**: Host filtering in `sandbox.ts` prevents cross-namespace API access, blocking Word/Excel/PowerPoint APIs in wrong contexts.
+  - **Tool Count**: Increased from 127 to 129 tools (Word: 40→41 with `proposeRevision`, PowerPoint: 15→16 with `proposeShapeTextRevision`).
 - **Secure Credential Persistence**: Added "Remember credentials" toggle in Settings > Account. Credentials are now stored with XOR obfuscation + Base64 encoding in localStorage when enabled, falling back to sessionStorage when disabled. Automatic migration from legacy sessionStorage format.
 - **Smart Scroll Behavior**: Improved chat scroll UX with context-aware scrolling:
   - Scrolls to bottom when sending a user message

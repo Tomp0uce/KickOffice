@@ -2,6 +2,7 @@ import type { ToolProperty, ExcelToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import { localStorageKey } from './enum'
 import { sandboxedEval } from './sandbox'
+import { validateOfficeCode } from './officeCodeValidator'
 
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
@@ -1464,28 +1465,98 @@ const excelToolDefinitions = createExcelTools({
   eval_officejs: {
     name: 'eval_officejs',
     category: 'write',
-    description: "Execute arbitrary Office.js code within an Excel.run context. Use this as an escape hatch for operations not covered by dedicated tools: sorting, autofilter, freeze panes, hyperlinks, row/column insert/delete/resize/hide, data validation, number formats, cell comments, named ranges, sheet rename/duplicate/protect/activate, autofit, conditional formatting inspection, etc. The code runs inside `Excel.run(async (context) => { ... })` with `context` (Excel.RequestContext) and `Excel` global available. Always call `await context.sync()` before returning.",
+    description: `Execute custom Office.js code within an Excel.run context.
+
+**USE THIS TOOL ONLY WHEN:**
+- No dedicated tool exists for your operation
+- Operations like: sorting, autofilter, freeze panes, hyperlinks, row/column operations, data validation, number formats, cell comments, named ranges, sheet operations, etc.
+
+**REQUIRED CODE STRUCTURE:**
+\`\`\`javascript
+try {
+  const sheet = context.workbook.worksheets.getActiveWorksheet();
+  const range = sheet.getUsedRange();
+
+  range.load('values,address');
+  await context.sync();
+
+  // Your operations here
+
+  await context.sync();
+  return { success: true, result: 'Operation completed' };
+} catch (error) {
+  return { success: false, error: error.message };
+}
+\`\`\`
+
+**CRITICAL RULES:**
+1. ALWAYS call \`.load()\` before reading properties
+2. ALWAYS call \`await context.sync()\` after load and after modifications
+3. ALWAYS wrap in try/catch
+4. ONLY use Excel namespace (not Word, PowerPoint)
+5. Values MUST be 2D arrays: \`range.values = [[value]]\``,
     inputSchema: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description: "JavaScript code to execute. Has access to `context` (Excel.RequestContext) and `Excel` global. Must be valid async JS. Return a value to get it as result. Example: `const sheet = context.workbook.worksheets.getActiveWorksheet(); sheet.getRange('A1:D100').sort.apply([{key:0,ascending:true}]); await context.sync(); return 'Sorted column A ascending.';`",
+          description: 'JavaScript code following the template. Must include load(), sync(), and try/catch.',
         },
         explanation: {
           type: 'string',
-          description: 'Brief explanation of what this code does.',
+          description: 'Brief explanation of what this code does (required for audit trail).',
         },
       },
-      required: ['code'],
+      required: ['code', 'explanation'],
     },
     executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-      const { code } = args as Record<string, any>
+      const { code, explanation } = args
+
+      // Validate code BEFORE execution
+      const validation = validateOfficeCode(code, 'Excel')
+
+      if (!validation.valid) {
+        return JSON.stringify({
+          success: false,
+          error: 'Code validation failed. Fix the errors below and try again.',
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+          suggestion: 'Refer to the Office.js skill document for correct patterns. Remember: Excel values must be 2D arrays.',
+          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+        }, null, 2)
+      }
+
+      // Log warnings but proceed
+      if (validation.warnings.length > 0) {
+        console.warn('[eval_officejs] Validation warnings:', validation.warnings)
+      }
+
       try {
-        const result = await sandboxedEval(code, { context, Excel: typeof Excel !== 'undefined' ? Excel : undefined })
-        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+        // Execute in sandbox with host restriction
+        const result = await sandboxedEval(
+          code,
+          {
+            context,
+            Excel: typeof Excel !== 'undefined' ? Excel : undefined,
+            Office: typeof Office !== 'undefined' ? Office : undefined,
+          },
+          'Excel'  // Restrict to Excel namespace only
+        )
+
+        return JSON.stringify({
+          success: true,
+          result: result ?? null,
+          explanation,
+          warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+        }, null, 2)
       } catch (err: any) {
-        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+        return JSON.stringify({
+          success: false,
+          error: err.message || String(err),
+          explanation,
+          codeExecuted: code.slice(0, 200) + '...',
+          hint: 'Check that all properties are loaded before access, and context.sync() is called.',
+        }, null, 2)
       }
     },
   },

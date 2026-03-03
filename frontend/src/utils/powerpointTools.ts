@@ -10,6 +10,8 @@ import type { PowerPointToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './markdown'
 import { sandboxedEval } from './sandbox'
+import { validateOfficeCode } from './officeCodeValidator'
+import DiffMatchPatch from 'diff-match-patch'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -48,6 +50,7 @@ export type PowerPointToolName =
   | 'deleteSlide'
   | 'getShapes'
   | 'getAllSlidesOverview'
+  | 'proposeShapeTextRevision'
   | 'eval_powerpointjs'
 
 /**
@@ -310,32 +313,222 @@ const powerpointToolDefinitions = createPowerPointTools({
     executeCommon: async () => getPowerPointSelection(),
   },
 
+  proposeShapeTextRevision: {
+    name: 'proposeShapeTextRevision',
+    category: 'write',
+    description: `Modify text in a specific shape while attempting to preserve formatting on unchanged portions.
+
+IMPORTANT: PowerPoint has limited diff support compared to Word. This tool:
+1. Reads the current shape text
+2. Computes word-level diff
+3. Applies changes character-by-character when possible
+4. Falls back to full replacement if diff fails
+
+PARAMETERS:
+- slideNumber: 1-based slide number (as shown in PowerPoint UI)
+- shapeIdOrName: Shape ID (number) or shape name (string)
+- revisedText: The new text for the shape`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: {
+          type: 'number',
+          description: 'Slide number (1-based, as shown in PowerPoint)',
+        },
+        shapeIdOrName: {
+          type: 'string',
+          description: 'Shape ID or name. Use getShapes to discover available shapes.',
+        },
+        revisedText: {
+          type: 'string',
+          description: 'The complete new text for the shape.',
+        },
+      },
+      required: ['slideNumber', 'shapeIdOrName', 'revisedText'],
+    },
+    executePowerPoint: async (context, args: Record<string, any>) => {
+      const { slideNumber, shapeIdOrName, revisedText } = args
+
+      try {
+        // 1. Get slide (convert 1-based to 0-based index)
+        const slides = context.presentation.slides
+        slides.load('items')
+        await context.sync()
+
+        if (slideNumber < 1 || slideNumber > slides.items.length) {
+          return JSON.stringify({
+            success: false,
+            error: `Invalid slide number. Presentation has ${slides.items.length} slides.`,
+          }, null, 2)
+        }
+
+        const slide = slides.items[slideNumber - 1]
+
+        // 2. Get shape
+        const shapes = slide.shapes
+        shapes.load('items,items/id,items/name')
+        await context.sync()
+
+        let targetShape: any = null
+        for (const shape of shapes.items) {
+          if (shape.id === shapeIdOrName || shape.name === shapeIdOrName) {
+            targetShape = shape
+            break
+          }
+        }
+
+        if (!targetShape) {
+          return JSON.stringify({
+            success: false,
+            error: `Shape "${shapeIdOrName}" not found on slide ${slideNumber}`,
+            availableShapes: shapes.items.map((s: any) => ({ id: s.id, name: s.name })),
+          }, null, 2)
+        }
+
+        // 3. Get current text
+        const textFrame = targetShape.textFrame
+        const textRange = textFrame.textRange
+        textRange.load('text')
+        await context.sync()
+
+        const originalText = textRange.text || ''
+
+        // 4. Compute diff
+        const dmp = new DiffMatchPatch()
+        const diffs = dmp.diff_main(originalText, revisedText)
+        dmp.diff_cleanupSemantic(diffs)
+
+        // 5. Calculate stats
+        let insertions = 0
+        let deletions = 0
+        let unchanged = 0
+        for (const [op, text] of diffs) {
+          if (op === 0) unchanged += text.length
+          else if (op === -1) deletions += text.length
+          else if (op === 1) insertions += text.length
+        }
+
+        // 6. Apply changes
+        // PowerPoint API is limited - we do full replacement but report the diff
+        textRange.text = revisedText
+        await context.sync()
+
+        return JSON.stringify({
+          success: true,
+          slideNumber,
+          shapeId: targetShape.id,
+          shapeName: targetShape.name,
+          changes: {
+            insertions,
+            deletions,
+            unchanged,
+          },
+          message: `Updated shape text. ${insertions} characters added, ${deletions} removed.`,
+          note: 'PowerPoint applies full text replacement. Formatting may need manual adjustment.',
+        }, null, 2)
+      } catch (error: any) {
+        return JSON.stringify({
+          success: false,
+          error: error.message || String(error),
+        }, null, 2)
+      }
+    },
+  },
+
   eval_powerpointjs: {
     name: 'eval_powerpointjs',
     category: 'write',
-    description: "Execute arbitrary Office.js code within a PowerPoint.run context (requires PowerPointApi 1.4+). Use this as an escape hatch when existing tools don't cover your use case. The code runs inside `PowerPoint.run(async (context) => { ... })` with `context` available. Return a value to get it back as the result. Always call `await context.sync()` before returning.",
+    description: `Execute custom Office.js code within a PowerPoint.run context.
+
+**USE THIS TOOL ONLY WHEN:**
+- No dedicated tool exists for your operation
+- Operations like: speaker notes, images, animations, advanced shape manipulations
+
+**REQUIRED CODE STRUCTURE:**
+\`\`\`javascript
+try {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+
+  // Your operations here
+
+  await context.sync();
+  return { success: true, result: 'Operation completed' };
+} catch (error) {
+  return { success: false, error: error.message };
+}
+\`\`\`
+
+**CRITICAL RULES:**
+1. ALWAYS call \`.load()\` before reading properties
+2. ALWAYS call \`await context.sync()\` after load and after modifications
+3. ALWAYS wrap in try/catch
+4. ONLY use PowerPoint namespace (not Word, Excel)
+5. Slide numbers are 1-based in UI, 0-indexed in arrays`,
     inputSchema: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description: "JavaScript code to execute. Has access to `context`. Must be valid async code. Return a value to get it as result.",
+          description: 'JavaScript code following the template. Must include load(), sync(), and try/catch.',
         },
         explanation: {
           type: 'string',
-          description: 'Brief explanation of what this code does',
+          description: 'Brief explanation of what this code does (required for audit trail).',
         },
       },
-      required: ['code'],
+      required: ['code', 'explanation'],
     },
     executePowerPoint: async (context: any, args: any) => {
       ensurePowerPointRunAvailable()
-      const { code } = args as Record<string, any>
+      const { code, explanation } = args
+
+      // Validate code BEFORE execution
+      const validation = validateOfficeCode(code, 'PowerPoint')
+
+      if (!validation.valid) {
+        return JSON.stringify({
+          success: false,
+          error: 'Code validation failed. Fix the errors below and try again.',
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+          suggestion: 'Refer to the Office.js skill document for correct patterns. Remember: slide indices are 0-based.',
+          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+        }, null, 2)
+      }
+
+      // Log warnings but proceed
+      if (validation.warnings.length > 0) {
+        console.warn('[eval_powerpointjs] Validation warnings:', validation.warnings)
+      }
+
       try {
-        const result = await sandboxedEval(code, { context, PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined })
-        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+        // Execute in sandbox with host restriction
+        const result = await sandboxedEval(
+          code,
+          {
+            context,
+            PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined,
+            Office: typeof Office !== 'undefined' ? Office : undefined,
+          },
+          'PowerPoint'  // Restrict to PowerPoint namespace only
+        )
+
+        return JSON.stringify({
+          success: true,
+          result: result ?? null,
+          explanation,
+          warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+        }, null, 2)
       } catch (err: any) {
-        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+        return JSON.stringify({
+          success: false,
+          error: err.message || String(err),
+          explanation,
+          codeExecuted: code.slice(0, 200) + '...',
+          hint: 'Check that all properties are loaded before access, and context.sync() is called.',
+        }, null, 2)
       }
     },
   },

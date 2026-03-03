@@ -6,6 +6,7 @@ import DOMPurify from 'dompurify'
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
+import { validateOfficeCode } from './officeCodeValidator'
 
 import { generateVisualDiff } from './common'
 
@@ -360,28 +361,96 @@ const outlookToolDefinitions = createOutlookTools({
   eval_outlookjs: {
     name: 'eval_outlookjs',
     category: 'write',
-    description: "Execute arbitrary Office.js code within the Outlook mailbox context. Use this as an escape hatch when existing tools don't cover your use case. The code runs inside an async context with `mailbox` available, representing `Office.context.mailbox`. Return a value to get it back as the result.",
+    description: `Execute custom Office.js code within the Outlook mailbox context.
+
+**USE THIS TOOL ONLY WHEN:**
+- No dedicated tool exists for your operation
+- Operations like: attachments, HTML manipulation, advanced metadata
+
+**REQUIRED CODE STRUCTURE:**
+\`\`\`javascript
+try {
+  return new Promise((resolve, reject) => {
+    mailbox.item.subject.getAsync((result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) {
+        resolve({ success: true, result: result.value });
+      } else {
+        reject({ success: false, error: result.error.message });
+      }
+    });
+  });
+} catch (error) {
+  return { success: false, error: error.message };
+}
+\`\`\`
+
+**CRITICAL RULES:**
+1. Outlook uses CALLBACKS not async/await (wrap in Promise)
+2. ALWAYS wrap in try/catch
+3. ONLY use Office.context.mailbox APIs
+4. Check AsyncResultStatus before reading result.value`,
     inputSchema: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description: "JavaScript code to execute. Has access to `mailbox` (Office.context.mailbox). Must be valid async code. Return a value to get it as result. Example: `return new Promise((resolve) => { mailbox.item.subject.getAsync((res) => resolve(res.value)); })`",
+          description: 'JavaScript code following the template. Must use callbacks and Promise wrapper.',
         },
         explanation: {
           type: 'string',
-          description: 'Brief explanation of what this code does',
+          description: 'Brief explanation of what this code does (required for audit trail).',
         },
       },
-      required: ['code'],
+      required: ['code', 'explanation'],
     },
     executeOutlook: async (mailbox, args: Record<string, any>) => {
-      const { code } = args as Record<string, any>
+      const { code, explanation } = args
+
+      // Validate code BEFORE execution
+      // Note: Outlook doesn't use context.sync(), so validation is less strict
+      const validation = validateOfficeCode(code, 'Outlook')
+
+      if (!validation.valid) {
+        return JSON.stringify({
+          success: false,
+          error: 'Code validation failed. Fix the errors below and try again.',
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+          suggestion: 'Refer to the Office.js skill document for correct patterns. Remember: Outlook uses callbacks, not async/await.',
+          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+        }, null, 2)
+      }
+
+      // Log warnings but proceed
+      if (validation.warnings.length > 0) {
+        console.warn('[eval_outlookjs] Validation warnings:', validation.warnings)
+      }
+
       try {
-        const result = await sandboxedEval(code, { mailbox, Office: typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined })
-        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+        // Execute in sandbox with host restriction
+        const result = await sandboxedEval(
+          code,
+          {
+            mailbox,
+            Office: typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined,
+          },
+          'Outlook'  // Restrict to Outlook namespace only
+        )
+
+        return JSON.stringify({
+          success: true,
+          result: result ?? null,
+          explanation,
+          warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+        }, null, 2)
       } catch (err: any) {
-        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+        return JSON.stringify({
+          success: false,
+          error: err.message || String(err),
+          explanation,
+          codeExecuted: code.slice(0, 200) + '...',
+          hint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
+        }, null, 2)
       }
     },
   },

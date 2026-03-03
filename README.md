@@ -50,6 +50,72 @@ Models are configured **server-side only** (in `backend/.env`). Users cannot add
 
 ---
 
+## Agent Stability Features
+
+KickOffice implements three complementary systems to ensure reliable Office.js code execution and format preservation:
+
+### 1. Skills System (Defensive Prompting)
+
+Office.js best practices are automatically injected into agent prompts for each host application:
+
+- **THE PROXY PATTERN**: Core concept explaining Office.js object lifecycle (proxy → load → sync → access)
+- **5 Critical Rules**: Always load() before reading, always sync() after writing, use try/catch, check empty selections, prefer dedicated tools
+- **Host-Specific Guidance**:
+  - **Word**: proposeRevision for format-preserving edits, range vs selection patterns
+  - **Excel**: 2D array requirements, localized formula syntax, getUsedRange() best practices
+  - **PowerPoint**: Slide indexing (0-based arrays, 1-based UI), bullet point guidelines, shape text access
+  - **Outlook**: Callback patterns (not async/await), compose vs read mode, language matching
+
+**Impact**: Reduces common Office.js errors (missing load/sync, wrong namespaces, undefined properties) by teaching the model correct patterns upfront.
+
+### 2. Code Validator (Pre-Execution Safety)
+
+All `eval_*` tools validate code before execution:
+
+**Critical Errors (Block Execution)**:
+- Missing `await context.sync()` - Required to commit changes
+- Missing `.load()` before property reads - Prevents undefined values
+- Wrong namespace usage - Can't use Word API in Excel context
+- Infinite loops - `while(true)` and `for(;;)` blocked
+- Dangerous operations - `eval()` and `new Function()` blocked
+
+**Warnings (Allow Execution)**:
+- Missing try/catch block
+- Too many sync() calls (performance issue)
+- Excel: Direct .values assignment without 2D array
+- Large hardcoded ranges (suggest getUsedRange())
+
+**Feedback Loop**: Validation errors are returned to the model with helpful suggestions, allowing self-correction and retry.
+
+### 3. Diffing Integration (Format Preservation)
+
+Surgical text editing that preserves formatting on unchanged portions:
+
+**Word: `proposeRevision` Tool**
+- Computes word-level diff between original and revised text
+- Applies only insertions/deletions, keeping unchanged text intact
+- Preserves bold, italic, colors, fonts on unchanged words
+- Optional Track Changes integration for user review
+- Cascading fallback strategies: token → sentence → block
+
+**PowerPoint: `proposeShapeTextRevision` Tool**
+- Computes diff for change statistics
+- Reports insertions/deletions/unchanged characters
+- Full replacement (PowerPoint API limitation) with diff feedback
+
+**Use Cases**: Fixing typos, rewriting sentences, editing paragraphs while preserving complex formatting.
+
+### Tool Count
+
+- **Word**: 41 tools (including proposeRevision, eval_wordjs)
+- **Excel**: 45 tools (including eval_officejs)
+- **PowerPoint**: 16 tools (including proposeShapeTextRevision, eval_powerpointjs)
+- **Outlook**: 14 tools (including eval_outlookjs)
+- **General**: 6 shared tools (executeBash, vfsWriteFile, vfsReadFile, vfsListFiles, getCurrentDate, calculateMath)
+- **Total**: 129 tools across all hosts
+
+---
+
 ## Deployment (Docker on Synology NAS)
 
 ### Prerequisites

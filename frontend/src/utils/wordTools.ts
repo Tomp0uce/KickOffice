@@ -2,6 +2,8 @@ import type { WordToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import DiffMatchPatch from 'diff-match-patch'
 import { sandboxedEval } from './sandbox'
+import { validateOfficeCode } from './officeCodeValidator'
+import { applyRevisionToSelection, previewDiffStats, hasComplexContent } from './wordDiffUtils'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './markdown'
 
@@ -33,6 +35,7 @@ export type WordToolName =
   | 'insertFootnote'
   | 'setPageSetup'
   | 'insertSectionBreak'
+  | 'proposeRevision'
   | 'eval_wordjs'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
@@ -1236,31 +1239,176 @@ const wordToolDefinitions = createWordTools({
     },
   },
 
+  proposeRevision: {
+    name: 'proposeRevision',
+    category: 'write',
+    description: `**PREFERRED TOOL** for modifying existing text. Computes a word-level diff and applies only the changes, preserving formatting (bold, italic, colors, fonts) on unchanged portions.
+
+HOW IT WORKS:
+1. Reads the currently selected text
+2. Computes diff between original and your revised version
+3. Applies only insertions/deletions, keeping unchanged text intact
+4. Optionally shows changes in Word's Track Changes
+
+WHEN TO USE:
+- Fixing typos or grammatical errors
+- Rewriting phrases or sentences
+- Editing paragraphs while preserving formatting
+- Any modification where the user wants to keep existing styles
+
+WHEN NOT TO USE:
+- Adding entirely new content (use insertContent instead)
+- Replacing with tables or complex structures (use insertContent)
+- The selection is empty (nothing to revise)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        revisedText: {
+          type: 'string',
+          description: 'The complete revised version of the selected text. Write the full text as you want it to appear - the system will compute what changed.',
+        },
+        enableTrackChanges: {
+          type: 'boolean',
+          description: 'Show changes in Word Track Changes UI so user can review/accept/reject. Default: true.',
+        },
+      },
+      required: ['revisedText'],
+    },
+    executeWord: async (context, args: Record<string, any>) => {
+      const { revisedText, enableTrackChanges = true } = args
+
+      // Validate input
+      if (!revisedText || typeof revisedText !== 'string') {
+        return JSON.stringify({
+          success: false,
+          error: 'revisedText is required and must be a string',
+        }, null, 2)
+      }
+
+      // Apply revision using diff algorithm
+      const result = await applyRevisionToSelection(context, revisedText, enableTrackChanges)
+
+      return JSON.stringify({
+        success: result.success,
+        strategy: result.strategy,
+        changes: {
+          insertions: result.insertions,
+          deletions: result.deletions,
+          unchanged: result.unchanged,
+        },
+        message: result.message,
+        trackChangesEnabled: enableTrackChanges,
+      }, null, 2)
+    },
+  },
+
   eval_wordjs: {
     name: 'eval_wordjs',
     category: 'write',
-    description: "Execute arbitrary Office.js code within a Word.run context. Use this as an escape hatch when existing tools don't cover your use case. The code runs inside `Word.run(async (context) => { ... })` with `context` available. Return a value to get it back as the result. Always call `await context.sync()` before returning.",
+    description: `Execute custom Office.js code within a Word.run context.
+
+**USE THIS TOOL ONLY WHEN:**
+- No dedicated tool exists for your operation
+- You need to perform a complex multi-step operation
+- You're doing something unusual not covered by other tools
+
+**REQUIRED CODE STRUCTURE:**
+Your code MUST follow this template:
+
+\`\`\`javascript
+try {
+  // 1. Get reference to document/range
+  const range = context.document.getSelection();
+
+  // 2. Load required properties BEFORE reading them
+  range.load('text,font/bold,font/size');
+  await context.sync();
+
+  // 3. Check for valid state
+  if (!range.text) {
+    return { success: false, error: 'No text selected' };
+  }
+
+  // 4. Perform your operations
+  range.font.bold = true;
+
+  // 5. Commit changes with sync
+  await context.sync();
+
+  // 6. Return result
+  return { success: true, result: 'Operation completed' };
+} catch (error) {
+  return { success: false, error: error.message };
+}
+\`\`\`
+
+**CRITICAL RULES:**
+1. ALWAYS call \`.load()\` before reading any property
+2. ALWAYS call \`await context.sync()\` after load and after modifications
+3. ALWAYS wrap in try/catch
+4. ONLY use Word namespace (not Excel, PowerPoint)`,
     inputSchema: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description: "JavaScript code to execute. Has access to `context` (Word.RequestContext). Must be valid async code. Return a value to get it as result. Example: `const doc = context.document; const paras = doc.paragraphs; paras.load('text'); await context.sync(); return paras.items[0].text;`",
+          description: 'JavaScript code following the template above. Must include load(), sync(), and try/catch.',
         },
         explanation: {
           type: 'string',
-          description: 'Brief explanation of what this code does',
+          description: 'Brief explanation of what this code does (required for audit trail).',
         },
       },
-      required: ['code'],
+      required: ['code', 'explanation'],
     },
     executeWord: async (context, args: Record<string, any>) => {
-      const { code } = args as Record<string, any>
+      const { code, explanation } = args
+
+      // Validate code BEFORE execution
+      const validation = validateOfficeCode(code, 'Word')
+
+      if (!validation.valid) {
+        return JSON.stringify({
+          success: false,
+          error: 'Code validation failed. Fix the errors below and try again.',
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+          suggestion: 'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
+          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+        }, null, 2)
+      }
+
+      // Log warnings but proceed
+      if (validation.warnings.length > 0) {
+        console.warn('[eval_wordjs] Validation warnings:', validation.warnings)
+      }
+
       try {
-        const result = await sandboxedEval(code, { context, Word: typeof Word !== 'undefined' ? Word : undefined })
-        return JSON.stringify({ success: true, result: result ?? null }, null, 2)
+        // Execute in sandbox with host restriction
+        const result = await sandboxedEval(
+          code,
+          {
+            context,
+            Word: typeof Word !== 'undefined' ? Word : undefined,
+            Office: typeof Office !== 'undefined' ? Office : undefined,
+          },
+          'Word'  // Restrict to Word namespace only
+        )
+
+        return JSON.stringify({
+          success: true,
+          result: result ?? null,
+          explanation,
+          warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+        }, null, 2)
       } catch (err: any) {
-        return JSON.stringify({ success: false, error: err.message || String(err) }, null, 2)
+        return JSON.stringify({
+          success: false,
+          error: err.message || String(err),
+          explanation,
+          codeExecuted: code.slice(0, 200) + '...',
+          hint: 'Check that all properties are loaded before access, and context.sync() is called.',
+        }, null, 2)
       }
     },
   },
