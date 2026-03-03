@@ -356,7 +356,14 @@ BEFORE drafting the reply, you MUST internally analyze the email thread and dete
 - Keep the reply proportional to the original email length and the user's intent complexity.
 - OUTPUT ONLY the reply text, ready to send. No meta-commentary, no "Here is your reply".
 - Do NOT include a subject line ("Objet:", "Subject:"). Start directly with the greeting.
-- The user's input describes their INTENT for the reply (what they want to convey), not the literal text to send. Transform it into a professional email reply.`,
+- The user's input describes their INTENT for the reply (what they want to convey), not the literal text to send. Transform it into a professional email reply.
+
+## CRITICAL EMAIL HISTORY PRESERVATION RULE
+**NEVER DELETE THE EMAIL HISTORY/THREAD:**
+- When using writeEmailBody tool, you MUST ALWAYS use mode: "Append" (NOT "Replace")
+- The email body contains the original message thread which must be preserved
+- Your reply should be added BEFORE the existing thread (Outlook will handle positioning)
+- NEVER use mode: "Replace" as it would delete the entire conversation history`,
     user: (text: string, language: string) =>
       `## Email thread to reply to:
 ${text}
