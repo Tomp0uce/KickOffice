@@ -137,7 +137,7 @@ const outlookToolDefinitions = createOutlookTools({
   writeEmailBody: {
     name: 'writeEmailBody',
     category: 'write',
-    description: 'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists). Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode.',
+    description: 'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists). Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode. CRITICAL: When replying/forwarding, ALWAYS use mode "Append" to preserve email history. NEVER use "Replace" on replies as it deletes the conversation thread.',
     inputSchema: {
       type: 'object',
       properties: {

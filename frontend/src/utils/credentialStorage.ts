@@ -9,9 +9,12 @@ const ENCRYPTION_KEY_NAME = 'ko_encryption_key'
 
 /**
  * Get or create an encryption key using Web Crypto API
+ * Stores key in localStorage if rememberCredentials is enabled, otherwise sessionStorage
  */
 async function getEncryptionKey(): Promise<CryptoKey> {
-  let keyData = sessionStorage.getItem(ENCRYPTION_KEY_NAME)
+  const remember = getRememberCredentials()
+  const storage = remember ? localStorage : sessionStorage
+  let keyData = storage.getItem(ENCRYPTION_KEY_NAME)
 
   if (!keyData) {
     // Generate a new random key
@@ -24,7 +27,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     // Export and store the key
     const exported = await crypto.subtle.exportKey('jwk', key)
     keyData = JSON.stringify(exported)
-    sessionStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
+    storage.setItem(ENCRYPTION_KEY_NAME, keyData)
     return key
   }
 
@@ -175,6 +178,8 @@ export async function setRememberCredentials(value: boolean): Promise<void> {
     // Migrate from sessionStorage to localStorage (with encryption)
     const key = sessionStorage.getItem('litellmUserKey')
     const email = sessionStorage.getItem('litellmUserEmail')
+    const encryptionKey = sessionStorage.getItem(ENCRYPTION_KEY_NAME)
+
     if (key) {
       const encrypted = await encryptValue(key)
       safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, encrypted)
@@ -185,17 +190,29 @@ export async function setRememberCredentials(value: boolean): Promise<void> {
       safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, encrypted)
       sessionStorage.removeItem('litellmUserEmail')
     }
+    // Migrate encryption key to localStorage
+    if (encryptionKey) {
+      safeSetItem(ENCRYPTION_KEY_NAME, encryptionKey)
+      sessionStorage.removeItem(ENCRYPTION_KEY_NAME)
+    }
   } else if (!value && wasRemembering) {
     // Migrate from localStorage to sessionStorage (with decryption)
     const key = await getCredential('litellmUserKey', true)
     const email = await getCredential('litellmUserEmail', true)
+    const encryptionKey = localStorage.getItem(ENCRYPTION_KEY_NAME)
+
     if (key) {
       sessionStorage.setItem('litellmUserKey', key)
     }
     if (email) {
       sessionStorage.setItem('litellmUserEmail', email)
     }
-    // Clear from localStorage
+    // Migrate encryption key to sessionStorage
+    if (encryptionKey) {
+      sessionStorage.setItem(ENCRYPTION_KEY_NAME, encryptionKey)
+      localStorage.removeItem(ENCRYPTION_KEY_NAME)
+    }
+    // Clear credentials from localStorage
     localStorage.removeItem(`${STORAGE_PREFIX}litellmUserKey`)
     localStorage.removeItem(`${STORAGE_PREFIX}litellmUserEmail`)
   }
@@ -223,8 +240,9 @@ export function clearCredentials(): void {
   sessionStorage.removeItem('litellmUserEmail')
   localStorage.removeItem(`${STORAGE_PREFIX}litellmUserKey`)
   localStorage.removeItem(`${STORAGE_PREFIX}litellmUserEmail`)
-  // Clear encryption key
+  // Clear encryption key from both storages
   sessionStorage.removeItem(ENCRYPTION_KEY_NAME)
+  localStorage.removeItem(ENCRYPTION_KEY_NAME)
 }
 
 /**

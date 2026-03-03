@@ -54,7 +54,13 @@ Office.context.mailbox.item.body.setAsync(
 );
 ```
 
-### Rule 4: Prepend/Append instead of Replace when possible
+### Rule 4: NEVER delete email history in replies
+
+**CRITICAL PROTECTION RULE:**
+- When replying to or forwarding an email, the body ALWAYS contains the original email thread/history
+- You MUST NEVER use mode "Replace" when writing a reply or forward
+- ONLY use mode "Append" (add new content at the end) or "Insert" (add at cursor)
+- The email history is SACRED and must be preserved at all costs
 
 **Safer — preserves existing content:**
 ```javascript
@@ -64,6 +70,12 @@ Office.context.mailbox.item.body.prependAsync(
   (result) => { }
 );
 ```
+
+**How to detect if it's a reply/forward:**
+- If the email body contains quoted text (lines starting with ">")
+- If the body contains "From:", "Sent:", "To:", "Subject:" headers
+- If the body contains previous messages in the thread
+- **Default assumption: treat ALL emails as potential replies — always use "Append" unless explicitly creating a NEW email**
 
 ### Rule 5: Reply in the SAME language as the original email
 
@@ -116,9 +128,14 @@ const body = await new Promise((resolve, reject) => {
 ### For WRITING:
 | Tool | When to use |
 |------|-------------|
-| `writeEmailBody` | **PREFERRED** — Write with mode: Append/Insert/Replace |
+| `writeEmailBody` | **PREFERRED** — Write with mode: "Append" (add to end), "Insert" (at cursor), or "Replace" (NEW emails ONLY) |
 | `setEmailSubject` | Update subject |
 | `addRecipient` | Add To/CC/BCC recipients |
+
+**CRITICAL: writeEmailBody mode selection:**
+- **"Append"** (DEFAULT) — Use for replies/forwards. Adds content at the end, preserving email history
+- **"Insert"** — Use when user has selected specific text to replace within their draft
+- **"Replace"** — **ONLY for brand NEW emails**. NEVER use on replies/forwards as it deletes the thread history
 
 ### ESCAPE HATCH:
 | Tool | When to use |
