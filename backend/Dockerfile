@@ -1,6 +1,6 @@
-FROM node:22-slim
-# install wget for healthcheck
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+FROM node:22-alpine
+# Install wget for healthcheck (not included in alpine by default)
+RUN apk add --no-cache wget
 
 WORKDIR /app
 

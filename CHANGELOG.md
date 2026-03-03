@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Complete Documentation Overhaul**:
+  - **README.md**: Full rewrite with accurate project overview, architecture diagram, model tiers, agent stability system, tool summary (129 tools), and proper credits for inspiration projects (word-GPT-Plus, excel-ai-assistant, office-word-diff, Redink)
+  - **CLAUDE.md**: Streamlined agent guide with architecture quick reference, working principles, critical rules, and commit/PR workflow
+  - **DESIGN_REVIEW.md v4**: Complete fresh audit with 43 issues (10 CRITICAL, 9 HIGH, 12 MEDIUM, 8 LOW, 4 DEAD CODE), including new Docker build issues and dead code analysis
+
+### Fixed
+
+- **Docker Build Failure**: Fixed critical Docker build issues preventing deployment on Synology NAS:
+  - Changed frontend build context from `./frontend` to root (`.`) to include `office-word-diff` dependency
+  - Restructured `frontend/Dockerfile` to properly copy local `office-word-diff` library
+  - Changed base images from `node:22-slim` to `node:22-alpine` for better ARM/Synology compatibility
+  - Added `wget` installation in backend Dockerfile for Alpine compatibility
+
+---
+
+## [Previous Unreleased]
+
+### Added
+
 - **Agent Stability System (Three Pillars)**:
   - **Skills System (Pillar 2)**: Office.js best practices automatically injected into agent prompts. Five skill documents (common + Word/Excel/PowerPoint/Outlook-specific) teach the model THE PROXY PATTERN, 5 critical rules (always load, always sync, use try/catch, check empty selections, prefer dedicated tools), and host-specific patterns. Reduces common Office.js errors (missing load/sync, wrong namespaces, undefined properties) through defensive prompting.
   - **Code Validator (Pillar 3)**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts`. Blocks execution if code is missing `context.sync()`, missing `.load()` before property reads, uses wrong namespace (e.g., Word API in Excel), contains infinite loops, or uses dangerous operations (`eval()`, `new Function()`). Provides validation feedback to the model for self-correction. Warnings for missing try/catch, excessive sync calls, incorrect Excel array formats, and large hardcoded ranges.

@@ -1,12 +1,22 @@
 # KickOffice
 
-AI-powered add-in for Microsoft Office applications. Provides a chat interface, document manipulation agent, and quick AI actions (translate, polish, summarize, email reply, presentation helpers, etc.) directly inside Word, Excel, PowerPoint, and Outlook.
+AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 129 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
 
-Built for **professional environments**: all LLM traffic goes through a controlled backend server (no API keys on the client), and no data is sent to third-party services.
+**Built for enterprise environments**: API keys never reach the client, all LLM traffic flows through a controlled backend, and no data is sent to third-party services.
 
-Based on the [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) open-source project, heavily modified for enterprise use.
+---
 
-Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) (MIT License), with additional adaptations for KickOffice.
+## Features
+
+- **Chat Interface** — Converse with AI directly within Office apps
+- **Autonomous Agent** — 129 tools for document manipulation, data analysis, and automation
+- **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
+- **Image Generation** — Create and insert AI-generated images into documents
+- **Format Preservation** — Word-level diffing preserves formatting when editing text
+- **Multi-Host Support** — Word (41 tools), Excel (45 tools), PowerPoint (16 tools), Outlook (14 tools)
+- **Secure Sandbox** — SES-based execution environment for safe dynamic code
+- **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents
+- **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
 
 ---
 
@@ -27,163 +37,125 @@ Also based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant
                                   .env file
 ```
 
-- **Frontend**: Vue 3 task pane add-in loaded inside Office apps. Handles UI, chat, agent tool execution (Word API calls run locally in the browser).
-- **Backend**: Express.js proxy server. Holds all secrets (API keys), exposes `/api/chat` (streaming, supports tool calls), `/api/chat/sync` (synchronous fallback), `/api/image`, `/api/models`, and `/health`.
-  - IP-based rate limiting is enabled for `/api/chat*` and `/api/image` to reduce DoS risk and control API credit consumption.
-  - Validation and proxy errors are logged server-side with endpoint + HTTP status, including 4xx responses to simplify incident diagnosis.
-  - Request logging uses Morgan middleware for consistent HTTP access logs across endpoints.
-  - HTTP security headers are enforced with Helmet (HSTS, X-Frame-Options, X-Content-Type-Options, etc.), with CSP and COEP disabled for Office add-in compatibility.
-  - Upstream AI provider error payloads are kept in server logs only; client responses use a generic `502` error message to avoid leaking infrastructure details.
-- **LLM API**: Any OpenAI-compatible endpoint. For testing: OpenAI API directly. For production: Azure-hosted LiteLLM proxy with dedicated endpoints.
+### Frontend
+Vue 3 task pane loaded inside Office apps. Handles UI, chat, and agent tool execution (Office.js API calls run locally in the browser).
+
+### Backend
+Express.js proxy server. Holds all secrets (API keys), validates requests, rate-limits by IP, and exposes:
+- `POST /api/chat` — Streaming chat with SSE
+- `POST /api/chat/sync` — Synchronous chat for agent tool loops
+- `POST /api/image` — Image generation
+- `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV)
+- `GET /api/models` — Available model tiers
+- `GET /health` — Health check
+
+### LLM API
+Any OpenAI-compatible endpoint. For testing: OpenAI API directly. For production: Azure-hosted LiteLLM proxy.
 
 ---
 
 ## Model Tiers
 
-Models are configured **server-side only** (in `backend/.env`). Users cannot add or modify models. Three tiers:
+Models are configured **server-side only** in `backend/.env`. Three tiers:
 
-| Tier        | Purpose          | Default Model                       | Use Case                       |
-| ----------- | ---------------- | ----------------------------------- | ------------------------------ |
-| `standard`  | Normal tasks     | `gpt-5.1`                           | Chat, writing, analysis        |
-| `reasoning` | Complex tasks    | `gpt-5.1` (`reasoning_effort=high`) | Multi-step reasoning, planning |
-| `image`     | Image generation | `gpt-image-1`                       | Generate images                |
+| Tier | Purpose | Default Model | Use Case |
+|------|---------|---------------|----------|
+| `standard` | Normal tasks | `gpt-5.1` | Chat, writing, analysis |
+| `reasoning` | Complex tasks | `gpt-5.1` + `reasoning_effort=high` | Multi-step reasoning, planning |
+| `image` | Image generation | `gpt-image-1` | Generate images |
 
 ---
 
-## Agent Stability Features
+## Agent Stability System
 
-KickOffice implements three complementary systems to ensure reliable Office.js code execution and format preservation:
+KickOffice implements three complementary systems for reliable Office.js code execution:
 
 ### 1. Skills System (Defensive Prompting)
-
-Office.js best practices are automatically injected into agent prompts for each host application:
-
-- **THE PROXY PATTERN**: Core concept explaining Office.js object lifecycle (proxy → load → sync → access)
+Office.js best practices automatically injected into agent prompts:
+- **THE PROXY PATTERN**: Explains Office.js object lifecycle (proxy → load → sync → access)
 - **5 Critical Rules**: Always load() before reading, always sync() after writing, use try/catch, check empty selections, prefer dedicated tools
-- **Host-Specific Guidance**:
-  - **Word**: proposeRevision for format-preserving edits, range vs selection patterns
-  - **Excel**: 2D array requirements, localized formula syntax, getUsedRange() best practices
-  - **PowerPoint**: Slide indexing (0-based arrays, 1-based UI), bullet point guidelines, shape text access
-  - **Outlook**: Callback patterns (not async/await), compose vs read mode, language matching
-
-**Impact**: Reduces common Office.js errors (missing load/sync, wrong namespaces, undefined properties) by teaching the model correct patterns upfront.
+- **Host-Specific Guidance**: Word, Excel, PowerPoint, Outlook patterns
 
 ### 2. Code Validator (Pre-Execution Safety)
-
 All `eval_*` tools validate code before execution:
-
-**Critical Errors (Block Execution)**:
-- Missing `await context.sync()` - Required to commit changes
-- Missing `.load()` before property reads - Prevents undefined values
-- Wrong namespace usage - Can't use Word API in Excel context
-- Infinite loops - `while(true)` and `for(;;)` blocked
-- Dangerous operations - `eval()` and `new Function()` blocked
-
-**Warnings (Allow Execution)**:
-- Missing try/catch block
-- Too many sync() calls (performance issue)
-- Excel: Direct .values assignment without 2D array
-- Large hardcoded ranges (suggest getUsedRange())
-
-**Feedback Loop**: Validation errors are returned to the model with helpful suggestions, allowing self-correction and retry.
+- **Blocked**: Missing sync(), missing load(), wrong namespace, infinite loops, eval()/new Function()
+- **Warnings**: Missing try/catch, excessive sync calls, incorrect array formats
 
 ### 3. Diffing Integration (Format Preservation)
-
-Surgical text editing that preserves formatting on unchanged portions:
-
-**Word: `proposeRevision` Tool**
-- Computes word-level diff between original and revised text
-- Applies only insertions/deletions, keeping unchanged text intact
-- Preserves bold, italic, colors, fonts on unchanged words
-- Optional Track Changes integration for user review
-- Cascading fallback strategies: token → sentence → block
-
-**PowerPoint: `proposeShapeTextRevision` Tool**
-- Computes diff for change statistics
-- Reports insertions/deletions/unchanged characters
-- Full replacement (PowerPoint API limitation) with diff feedback
-
-**Use Cases**: Fixing typos, rewriting sentences, editing paragraphs while preserving complex formatting.
-
-### Tool Count
-
-- **Word**: 41 tools (including proposeRevision, eval_wordjs)
-- **Excel**: 45 tools (including eval_officejs)
-- **PowerPoint**: 16 tools (including proposeShapeTextRevision, eval_powerpointjs)
-- **Outlook**: 14 tools (including eval_outlookjs)
-- **General**: 6 shared tools (executeBash, vfsWriteFile, vfsReadFile, vfsListFiles, getCurrentDate, calculateMath)
-- **Total**: 129 tools across all hosts
+Word-level surgical editing via `office-word-diff` library:
+- **Word `proposeRevision`**: Applies only insertions/deletions, preserving formatting on unchanged text
+- **PowerPoint `proposeShapeTextRevision`**: Diff statistics with full replacement
+- **Cascading strategies**: Token → Sentence → Block fallback
 
 ---
 
-## Deployment (Docker on Synology NAS)
+## Tool Summary
+
+| Host | Tools | Highlights |
+|------|-------|------------|
+| **Word** | 41 | `proposeRevision` (format-preserving edits), `eval_wordjs`, tables, comments, Track Changes |
+| **Excel** | 45 | `eval_officejs`, formulas, charts, conditional formatting, data validation |
+| **PowerPoint** | 16 | `proposeShapeTextRevision`, slides, shapes, speaker notes, images |
+| **Outlook** | 14 | `eval_outlookjs`, email body/subject, recipients, attachments |
+| **General** | 6 | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations |
+| **Total** | **129** | |
+
+---
+
+## Quick Actions
+
+### Word
+Translate, Polish, Academic, Summary, Grammar Check
+
+### Excel
+Clean, Beautify, Formula, Transform, Highlight
+
+### PowerPoint
+Bullets, Speaker Notes, Impact, Shrink, Visual
+
+### Outlook
+Smart Reply, Formalize, Concise, Proofread, Extract Tasks
+
+---
+
+## Deployment (Docker)
 
 ### Prerequisites
-
-- Synology NAS with Container Manager (Docker)
-- IP: `192.168.50.10` (configurable)
-- OpenAI API key (for testing)
+- Docker with Compose
+- OpenAI API key (or LiteLLM proxy)
 
 ### Steps
 
-1. **Clone the repository** on the NAS or copy the project to `/volume1/docker/kickoffice/`
-
-2. **Create environment files**:
-
+1. **Clone and configure**:
    ```bash
-   # Root .env – server IP and ports (used by docker-compose + manifest generation)
+   git clone https://github.com/your-org/kickoffice.git
+   cd kickoffice
    cp .env.example .env
-   # Edit .env if your NAS IP or ports differ from the defaults
-
-   # Backend .env – LLM API key and model config
    cp backend/.env.example backend/.env
-   # Edit backend/.env and set your LLM_API_KEY
+   # Edit backend/.env and set LLM_API_KEY
    ```
 
-3. **Build and start**:
-
+2. **Build and start**:
    ```bash
    docker compose up -d --build
    ```
 
-   > The `manifest-gen` init service (Node.js) automatically generates two
-   > manifests from the templates in `manifests-templates/`:
-   >
-   > - `manifest-office.xml` — Word, Excel, PowerPoint (TaskPaneApp)
-   > - `manifest-outlook.xml` — Outlook (MailApp)
-   >
-   > URLs are built from `SERVER_IP`, `FRONTEND_PORT`, and `BACKEND_PORT`
-   > defined in the root `.env`. No manual URL editing is required.
-   >
-   > Optional cleanup (once generation is done):
-   >
-   > ```bash
-   > docker compose rm -f manifest-gen
-   > ```
-   >
-   > This removes the stopped init container from status views; it will be recreated automatically on the next `docker compose up`.
+3. **Verify**:
+   - Backend: `curl http://localhost:3003/health`
+   - Frontend: Open `http://localhost:3002`
+   - Models: `curl http://localhost:3003/api/models`
 
-4. **Verify**:
-   - Backend health: `curl http://192.168.50.10:3003/health`
-   - Frontend: open `http://192.168.50.10:3002` in a browser
-   - Models endpoint: `curl http://192.168.50.10:3003/api/models`
+4. **Install Office add-ins**:
+   - Sideload `manifest-office.xml` in Word/Excel/PowerPoint
+   - Sideload `manifest-outlook.xml` in Outlook
 
-5. **Install the Office add-ins**:
-   - Sideload `manifest-office.xml` in Word / Excel / PowerPoint via Insert > My Add-ins > Upload My Add-in
-   - Sideload `manifest-outlook.xml` in Outlook via the same dialog
-   - Or configure a shared catalog in Trust Center Settings
+### Docker Services
 
-### Docker Compose Details
-
-| Container                 | Port | Image                                | Notes                                                                                     |
-| ------------------------- | ---- | ------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `kickoffice-manifest-gen` | —    | Node 18 Alpine (init)                | Generates manifests, then exits (can be removed with `docker compose rm -f manifest-gen`) |
-| `kickoffice-backend`      | 3003 | Node 22 Alpine                       |                                                                                           |
-| `kickoffice-frontend`     | 3002 | Nginx Alpine (serving built Vue app) |                                                                                           |
-
-Both containers use `PUID=1026` / `PGID=100` for Synology compatibility.
-
-The backend container has a built-in health check (`/health` endpoint, every 30s).
+| Container | Port | Description |
+|-----------|------|-------------|
+| `kickoffice-manifest-gen` | — | Generates manifests from templates (init, can be removed) |
+| `kickoffice-backend` | 3003 | Express.js API server with health check |
+| `kickoffice-frontend` | 3002 | Nginx serving Vue app |
 
 ---
 
@@ -191,416 +163,136 @@ The backend container has a built-in health check (`/health` endpoint, every 30s
 
 ```
 KickOffice/
-├── backend/
-│   ├── Dockerfile
-│   ├── .env.example          # Model config + API keys (copy to .env)
-│   ├── package.json
+├── backend/                    # Express.js API server
 │   └── src/
-│       ├── server.js         # Express entry point: middleware setup, route mounting (80 lines)
-│       ├── config/
-│       │   ├── env.js        # Environment variable loading (PORT, FRONTEND_URL, rate limits)
-│       │   └── models.js     # Model tier config, buildChatBody(), isGpt5Model(), isChatGptModel()
-│       ├── middleware/
-│       │   ├── auth.js       # ensureLlmApiKey — checks API key is configured server-side
-│       │   └── validate.js   # validateTemperature, validateMaxTokens, validateTools, validateImagePayload
-│       ├── routes/
-│       │   ├── chat.js       # POST /api/chat (streaming), POST /api/chat/sync (agent tool loop)
-│       │   ├── health.js     # GET /health
-│       │   ├── image.js      # POST /api/image
-│       │   ├── models.js     # GET /api/models
-│       │   └── upload.js     # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
-│       ├── services/
-│       │   └── llmClient.js  # Centralized LLM API client (chat, image, error handling)
-│       └── utils/
-│           └── http.js       # fetchWithTimeout, logAndRespond, sanitizeErrorText
-├── frontend/
-│   ├── Dockerfile            # Multi-stage: build + nginx
-│   ├── nginx.conf
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── playwright.config.ts  # E2E test configuration
-│   ├── e2e/                   # Playwright E2E tests
-│   │   └── navigation.spec.ts
-│   ├── index.html
+│       ├── server.js           # Entry point
+│       ├── config/             # env.js, models.js
+│       ├── middleware/         # auth.js, validate.js
+│       ├── routes/             # chat, image, upload, models, health
+│       ├── services/           # llmClient.js
+│       └── utils/              # http.js, logger.js
+├── frontend/                   # Vue 3 + TypeScript
 │   └── src/
-│       ├── main.ts           # Office.js init + Vue app mount + dark mode
-│       ├── App.vue
-│       ├── api/
-│       │   ├── backend.ts    # HTTP client (fetch with timeout/retry, SSE parsing)
-│       │   └── common.ts     # Word document insertion helpers (replace/append)
-│       ├── components/
-│       │   ├── chat/
-│       │   │   ├── ChatHeader.vue       # New Chat / Settings buttons
-│       │   │   ├── ChatInput.vue        # Text input, model selector, checkboxes
-│       │   │   ├── ChatMessageList.vue  # Message history display + action buttons
-│       │   │   ├── MarkdownRenderer.vue # Markdown + <think> tag rendering
-│       │   │   └── QuickActionsBar.vue  # Quick action buttons (per host)
-│       │   ├── CustomButton.vue
-│       │   ├── CustomInput.vue
-│       │   ├── Message.vue              # Toast notifications
-│       │   ├── SettingCard.vue
-│       │   ├── SettingSection.vue
-│       │   └── SingleSelect.vue
-│       ├── composables/
-│       │   ├── useAgentLoop.ts      # Agent interaction flow and API fetching loop
-│       │   ├── useAgentPrompts.ts   # System prompt builders and user profile context
-│       │   ├── useImageActions.ts   # Image generation, insertion (Word/PPT), clipboard
-│       │   ├── useOfficeInsert.ts   # Unified document insertion for all hosts
-│       │   └── useOfficeSelection.ts# Extraction of text from Word/Excel/PPT/Outlook APIs
-│       ├── i18n/
-│       │   └── locales/
-│       │       ├── en.json   # English UI strings (200+ keys)
-│       │       └── fr.json   # French UI strings
-│       ├── pages/
-│       │   ├── HomePage.vue      # Orchestration: chat + agent + image + quick actions (265 lines)
-│       │   └── SettingsPage.vue  # Settings: language, profile, prompts, tools, models
-│       ├── router/
-│       ├── types/
-│       │   └── chat.ts           # DisplayMessage, QuickAction, RenderSegment
-│       └── utils/
-│           ├── constant.ts           # Built-in prompts (Word, Excel, PowerPoint, Outlook)
-│           ├── enum.ts               # localStorage keys
-│           ├── generalTools.ts       # 2 general tools: getCurrentDate, calculateMath
-│           ├── excelTools.ts         # 45 Excel API tools (for agent, inc. eval_officejs)
-│           ├── hostDetection.ts      # isWord, isExcel, isPowerPoint, isOutlook
-│           ├── outlookTools.ts       # 14 Outlook API tools (for agent, inc. eval_outlookjs)
-│           ├── powerpointTools.ts    # 15 PowerPoint tools (slides, shapes, modify, eval_powerpointjs)
-│           ├── wordFormatter.ts      # Markdown-to-Word conversion engine
-│           ├── wordTools.ts          # 40 Word API tools (for agent, inc. eval_wordjs)
-│           ├── officeAction.ts       # Office.js error handling wrapper
-│           ├── officeOutlook.ts      # Outlook-specific API helpers
-│           ├── savedPrompts.ts       # Custom prompt management (localStorage)
-│           ├── toolStorage.ts        # LocalStorage enabled tools persistence
-│           ├── tokenManager.ts       # Message token optimization
-│           ├── markdown.ts           # Markdown parsing helpers
-│           ├── common.ts             # Shared option lists
-│           └── message.ts            # Toast notification helpers
-├── manifests-templates/
-│   ├── manifest-office.template.xml    # TaskPaneApp template (Word/Excel/PowerPoint)
-│   └── manifest-outlook.template.xml   # MailApp template (Outlook)
-├── scripts/
-│   └── generate-manifests.js           # Node.js script: templates → manifests (URL substitution)
-├── .env.example              # Root env vars: SERVER_IP, ports (copy to .env)
+│       ├── api/                # backend.ts (HTTP client)
+│       ├── components/         # Chat UI, settings components
+│       ├── composables/        # useAgentLoop, useImageActions, etc.
+│       ├── i18n/               # en.json, fr.json
+│       ├── pages/              # HomePage, SettingsPage
+│       ├── skills/             # Office.js best practices (5 files)
+│       ├── types/              # TypeScript definitions
+│       └── utils/              # Tools (word, excel, ppt, outlook), validators
+├── office-word-diff/           # Word diffing library (Apache 2.0)
+├── manifests-templates/        # XML templates for Office add-ins
+├── scripts/                    # generate-manifests.js
 ├── docker-compose.yml
-├── manifest-office.xml       # Generated at docker-compose up (do not edit by hand)
-├── manifest-outlook.xml      # Generated at docker-compose up (do not edit by hand)
-└── README.md
+└── .env.example
 ```
-
----
-
-## Implementation Status
-
-### Core Infrastructure
-
-- [x] Backend Express server with CORS and JSON parsing
-- [x] LLM API proxy (streaming + synchronous)
-- [x] Image generation proxy endpoint
-- [x] IP-based rate limiting on `/api/chat*` and `/api/image`
-- [x] HTTP security headers via Helmet middleware (CSP and COEP disabled for Office add-in compatibility)
-- [x] Health check endpoint (`GET /health`)
-- [x] Model configuration via `.env` (3 tiers: standard, reasoning, image)
-- [x] Models endpoint (`GET /api/models`) - exposes labels only, no secrets
-- [x] Centralized backend error-response logging for all 4xx/5xx API responses
-- [x] Docker Compose for Synology NAS (ports 3002/3003, PUID/PGID)
-- [x] Backend Dockerfile with health check
-- [x] Frontend Dockerfile (multi-stage build + nginx)
-- [x] Office add-in manifests: TaskPaneApp (Word/Excel/PowerPoint) + MailApp (Outlook)
-
-### Frontend - Chat Interface
-
-- [x] Chat UI with message history (user/assistant bubbles)
-- [x] Streaming responses (SSE parsing)
-- [x] Model tier selector (dropdown from backend-provided list)
-- [x] New chat / clear history
-- [x] Stop generation button
-- [x] Copy to clipboard
-- [x] Insert into document (replace / append)
-- [x] Include selected text from Word in messages
-- [x] Word formatting toggle (markdown-to-Word conversion)
-- [x] `<think>` tag parsing (collapsible reasoning display)
-- [x] Backend online/offline indicator with auto-reconnect check
-- [x] Image generation mode (UI + backend integration, with auto-selection detection)
-- [x] Dynamic output language matching (AI automatically replies in the language of the selected text for all quick actions)
-- [x] Auto-scrolls to the start of long AI responses for better readability
-- [x] Localized tooltips for quick actions across all hosts
-- [x] Secure credential persistence with "Remember me" option (obfuscated localStorage with session fallback)
-- [x] Smart scroll behavior: scrolls to bottom on send, to message top on receive, to bottom on startup
-
-### Frontend - Agent Mode
-
-- [x] Ask mode / Agent mode toggle
-- [x] Agent loop: sends tools to LLM via `/api/chat/sync`, executes locally, loops
-- [x] OpenAI function-calling format for tool definitions
-- [x] Tool execution status display in chat
-- [x] Max iterations limit (configurable)
-- [x] Secure `ses` sandbox for dynamic JS execution (`eval_officejs`, `eval_wordjs`, `eval_powerpointjs`, `eval_outlookjs`)
-- [x] File processing for agent mode (PDF, DOCX, XLSX, CSV uploads via `/api/upload`)
-- [x] 40 Word tools: getSelectedText, insertText, replaceSelectedText, appendText, insertParagraph, formatText, searchAndReplace, getDocumentContent, getDocumentProperties, insertTable, insertList, deleteText, clearFormatting, setFontName, insertPageBreak, getRangeInfo, selectText, insertImage, getTableInfo, insertBookmark, goToBookmark, insertContentControl, findText, applyTaggedFormatting, setParagraphFormat, insertHyperlink, getDocumentHtml, modifyTableCell, addTableRow, addTableColumn, deleteTableRowColumn, formatTableCell, insertHeaderFooter, insertFootnote, addComment, getComments, setPageSetup, getSpecificParagraph, insertSectionBreak, eval_wordjs
-- [x] 45 Excel tools: getSelectedCells, setCellValue, getWorksheetData, addDataValidation, createTable, copyRange, insertFormula, fillFormulaDown, createChart, formatRange, sortRange, applyAutoFilter, removeAutoFilter, getWorksheetInfo, renameWorksheet, deleteWorksheet, activateWorksheet, getDataFromSheet, freezePanes, addHyperlink, addCellComment, insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, setCellNumberFormat, clearRange, getCellFormula, searchAndReplace, autoFitColumns, addWorksheet, setColumnWidth, setRowHeight, protectWorksheet, getNamedRanges, setNamedRange, applyConditionalFormatting, getConditionalFormattingRules, eval_officejs, findData, duplicateWorksheet, hideUnhideRowColumn, getAllObjects, modifyObject
-- [x] 15 PowerPoint tools: getSelectedText, replaceSelectedText, getSlideCount, getSlideContent, addSlide, setSlideNotes, insertTextBox, insertImage, deleteSlide, getShapes, deleteShape, setShapeFill, moveResizeShape, getAllSlidesOverview, eval_powerpointjs
-- [x] 14 Outlook tools: getEmailBody, getSelectedText, setEmailBody, insertTextAtCursor, setEmailBodyHtml, getEmailSubject, setEmailSubject, getEmailRecipients, addRecipient, getEmailSender, getEmailDate, getAttachments, insertHtmlAtCursor, eval_outlookjs
-- [x] 2 General tools: getCurrentDate, calculateMath
-
-### Frontend - Quick Actions (Word)
-
-- [x] Translate (with target language)
-- [x] Polish / Rewrite
-- [x] Academic rewriting
-- [x] Summary
-- [x] Grammar check
-- [x] Customizable built-in prompts (editable in settings)
-
-### Frontend - Quick Actions (Excel)
-
-- [x] Clean (normalize whitespace, trim, remove duplicates)
-- [x] Beautify (format cell content for readability)
-- [x] Formula (generate an Excel formula from a natural-language description)
-- [x] Transform (restructure or transpose data in the selection)
-- [x] Highlight (suggest conditional formatting rules for the selection)
-
-### Frontend - Quick Actions (Outlook)
-
-- [x] Smart Reply (pre-fills prompt, user completes intent, sends with email context)
-- [x] Formalize (transforms draft into professional email)
-- [x] Concise (reduces text by 30-50% while keeping key info)
-- [x] Proofread (grammar and spelling correction only, preserves style)
-- [x] Extract Tasks (extracts summary, key points, and required actions from email)
-
-### Frontend - Quick Actions (PowerPoint)
-
-- [x] Bullets (convert selected text to concise bullet-point list)
-- [x] Speaker Notes (generate conversational presenter notes from slide content)
-- [x] Impact / Punchify (rewrite text in punchy headline/marketing style)
-- [x] Shrink (reduce text length by ~30% while preserving key info)
-- [x] Visual (draft mode: generate an image prompt for slide visuals)
-
-### Frontend - PowerPoint Support
-
-- [x] PowerPoint host detection (`isPowerPoint()`)
-- [x] Manifest `<Host xsi:type="Presentation">` with `PrimaryCommandSurface` in TabHome
-- [x] Text selection via Common API (`getSelectedDataAsync` with `CoercionType.Text`)
-- [x] Text insertion via Common API (`setSelectedDataAsync` with `CoercionType.Html` to preserve bullets/formatting)
-- [x] 15 PowerPoint agent tools (`getSelectedText`, `replaceSelectedText`, `getSlideCount`, `getSlideContent`, `addSlide`, `setSlideNotes`, `insertTextBox`, `insertImage`, `deleteSlide`, `getShapes`, `deleteShape`, `setShapeFill`, `moveResizeShape`, `getAllSlidesOverview`, `eval_powerpointjs`)
-- [x] Requirement-set-aware behavior (`PowerPointApi 1.4+` check for speaker notes)
-- [x] PowerPoint-specific agent prompt (slide-first, concise, visual-oriented)
-- [x] PowerPoint-specific built-in prompts (customizable)
-
-### Frontend - Settings
-
-- [x] UI language selector (French / English)
-- [x] Reply language selector
-- [x] Agent max iterations setting
-- [x] User profile settings (first name, last name, gender)
-- [x] Backend status display
-- [x] Configured models display (read-only)
-- [x] Custom prompts management (add/edit/delete)
-- [x] Built-in prompts editor (with reset)
-- [x] Tool enable/disable toggles (with dynamic syncing to the agent loop)
-
-### Internationalization
-
-- [x] i18n framework (vue-i18n)
-- [x] 2 UI locales: English, French
-- [x] 13 reply languages selectable by the user: English, Spanish, French, German, Italian, Portuguese, Simplified Chinese, Japanese, Korean, Dutch, Polish, Arabic, Russian
-
-### Testing
-
-- [x] Playwright E2E test infrastructure (`npm run test:e2e`)
-- [x] Navigation and settings tests
-- [x] Multi-browser support (Chromium, Firefox, WebKit)
-- [ ] Office.js integration tests (requires manual testing due to Office runtime constraints)
-
-### Security
-
-- [x] API keys stored server-side only (never sent to client)
-- [x] CORS restricted to frontend origin
-- [x] No third-party web search or web fetch (removed)
-- [x] No user-configurable API endpoints or models
-- [ ] HTTPS/TLS configuration (needed for production and Office add-in requirement)
-- [ ] Authentication / user login system
-- [x] Rate limiting on backend (chat, image, health, models endpoints)
-- [x] Request logging / audit trail
-- [x] HSTS headers in production mode
-- [x] XSS protection via strict DOMPurify allowlist
-- [x] Credential sanitization in error logs
-- [x] User credential validation (email format, key length)
-- [x] Request timeout middleware (configurable)
-
-### Frontend - Outlook Support
-
-- [x] Outlook host detection (`isOutlook()`)
-- [x] Manifest extension points: `MessageReadCommandSurface` + `MessageComposeCommandSurface`
-- [x] Asynchronous email body retrieval (`body.getAsync`)
-- [x] Selected text retrieval in compose mode (`getSelectedDataAsync`)
-- [x] Email body insertion in compose mode (`body.setAsync`)
-- [x] Subject read/update (`subject.getAsync` / `subject.setAsync`)
-- [x] Recipient read/update (`to/cc/bcc.getAsync` / `addAsync`)
-- [x] Sender/date/attachments access (`from|sender`, `dateTimeCreated`, `attachments|getAttachmentsAsync`)
-- [x] Cursor insertion for plain text + HTML (`body.setSelectedDataAsync`)
-- [x] Full HTML body replacement (`body.setAsync` with `CoercionType.Html`)
-- [x] Outlook-specific standard and agent prompts
-- [x] `ReadWriteMailbox` permission
-
-### Known Open Issues
-
-See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) (v2, 2026-02-22) for the full audit with 28 open issues organized by severity.
-
-| Priority | Issue                                                     | Status  |
-| -------- | --------------------------------------------------------- | ------- |
-| CRITICAL | Agent max iterations setting silently capped at 10        | ❌ TODO |
-| CRITICAL | `.env.example` contains invalid `reasoning_effort=none`   | ❌ TODO |
-| CRITICAL | Quick actions bypass loading/abort state                  | ❌ TODO |
-| HIGH     | Chat history grows unbounded in localStorage              | ❌ TODO |
-| HIGH     | Token manager uses character count instead of token count | ❌ TODO |
-| MEDIUM   | Accessibility (ARIA attributes) incomplete                | ❌ TODO |
-| MEDIUM   | No confirmation dialog for "New Chat"                     | ❌ TODO |
-| BUILD    | No unit test infrastructure (vitest)                      | ❌ TODO |
-| BUILD    | No linting/formatting configuration (ESLint + Prettier)   | ❌ TODO |
-| BUILD    | No CI pipeline for automated testing on PRs               | ❌ TODO |
-
-### Not Yet Implemented
-
-- [ ] User authentication and authorization
-- [ ] HTTPS/TLS (required for production Office add-in sideloading)
-- [ ] Azure deployment configuration (production server)
-- [ ] Chat export (save conversation to file)
-- [ ] Token usage tracking / cost monitoring
-- [ ] Admin dashboard for model configuration (currently .env only)
-- [ ] Multi-user support / user preferences stored server-side
-- [ ] Offline mode / graceful degradation when backend is down
-- [ ] Unit test coverage (vitest)
-- [ ] ESLint + Prettier configuration
 
 ---
 
 ## Development
 
-### Backend (local)
-
+### Backend
 ```bash
 cd backend
-cp .env.example .env   # Fill in LLM_API_KEY
+cp .env.example .env  # Set LLM_API_KEY
 npm install
-npm run dev            # Starts on port 3003 with --watch
+npm run dev           # Port 3003 with --watch
 ```
 
-### Frontend (local)
-
+### Frontend
 ```bash
 cd frontend
 npm install
-npm run dev            # Starts on port 3002 with HMR
+npm run dev           # Port 3002 with HMR
 ```
 
-### Environment Variables
-
-For deterministic versioning in deployments, set `APP_VERSION` before `docker compose up --build` (typically in CI), for example:
-
+### Testing
 ```bash
-export APP_VERSION="$(node -p "require('./frontend/package.json').version")+$(git rev-parse --short HEAD)"
-docker compose up -d --build
-```
-
-#### Root (`.env`)
-
-| Variable        | Description                                                                                                    | Default                |
-| --------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| `SERVER_IP`     | Host machine IP address                                                                                        | `192.168.50.10`        |
-| `FRONTEND_PORT` | Published port for the frontend                                                                                | `3002`                 |
-| `BACKEND_PORT`  | Published port for the backend                                                                                 | `3003`                 |
-| `APP_VERSION`   | Frontend version shown in Settings (passed as Docker build arg). Set by CI on deploy, e.g. `1.0.0+<short_sha>` | (empty, auto-fallback) |
-
-#### Backend (`backend/.env`)
-
-| Variable                          | Description                                                                            | Default                     |
-| --------------------------------- | -------------------------------------------------------------------------------------- | --------------------------- |
-| `PORT`                            | Backend port                                                                           | `3003`                      |
-| `FRONTEND_URL`                    | Allowed CORS origin                                                                    | `http://192.168.50.10:3002` |
-| `LLM_API_BASE_URL`                | OpenAI-compatible API base URL                                                         | `https://api.openai.com/v1` |
-| `LLM_API_KEY`                     | API key for LLM provider                                                               | (required)                  |
-| `MAX_TOOLS`                       | Max number of tools accepted by `/api/chat/sync`                                       | `128`                       |
-| `CHAT_RATE_LIMIT_WINDOW_MS`       | Rate-limit window for `/api/chat*` (milliseconds)                                      | `60000`                     |
-| `CHAT_RATE_LIMIT_MAX`             | Max requests per IP during chat window                                                 | `20`                        |
-| `IMAGE_RATE_LIMIT_WINDOW_MS`      | Rate-limit window for `/api/image` (milliseconds)                                      | `60000`                     |
-| `IMAGE_RATE_LIMIT_MAX`            | Max requests per IP during image window                                                | `5`                         |
-| `MODEL_STANDARD`                  | Model ID for standard tasks                                                            | `gpt-5.1`                   |
-| `MODEL_STANDARD_REASONING_EFFORT` | Reasoning effort for standard model (`low`, `medium`, `high`; omit to use API default) | (omitted)                   |
-| `MODEL_REASONING`                 | Model ID for complex tasks                                                             | `gpt-5.1`                   |
-| `MODEL_REASONING_EFFORT`          | Reasoning effort for reasoning model                                                   | `high`                      |
-| `MODEL_IMAGE`                     | Model ID for image generation                                                          | `gpt-image-1`               |
-
-#### Frontend (`frontend/.env`)
-
-| Variable                  | Description                                       | Default                 |
-| ------------------------- | ------------------------------------------------- | ----------------------- |
-| `VITE_BACKEND_URL`        | Backend URL (build-time)                          | `http://localhost:3003` |
-| `VITE_REQUEST_TIMEOUT_MS` | HTTP request timeout in milliseconds (build-time) | `45000`                 |
-| `VITE_VERBOSE_LOGGING`    | Enable verbose console logging (`true` / `false`) | (disabled)              |
-
----
-
-## Production Deployment (Azure)
-
-For production, the architecture stays the same but:
-
-1. **Server**: Azure VM or App Service instead of Synology NAS
-2. **LLM**: LiteLLM proxy (OpenAI-compatible format) instead of direct OpenAI API
-3. **TLS**: HTTPS required for Office add-in (configure nginx with certificates or use Azure Front Door)
-4. **Manifest**: `manifest-office.xml` and `manifest-outlook.xml` are auto-generated at `docker compose up`. You can remove the stopped init container with `docker compose rm -f manifest-gen`; it will be recreated on next startup. Update `SERVER_IP` / ports in the root `.env` to change all URLs
-5. **Auth**: Add authentication middleware to the backend
-
-Update `backend/.env`:
-
-```env
-LLM_API_BASE_URL=https://your-litellm-proxy.azure.com/v1
-LLM_API_KEY=your-litellm-key
-FRONTEND_URL=https://kickoffice.yourdomain.com
+cd frontend
+npm run test:e2e      # Playwright tests
 ```
 
 ---
 
-## Credits
+## Environment Variables
 
-### Based on [WordGPT Plus](https://github.com/Kuingsmile/word-GPT-Plus) by Kuingsmile (MIT License)
+### Root (`.env`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_IP` | Host machine IP | `192.168.50.10` |
+| `FRONTEND_PORT` | Frontend port | `3002` |
+| `BACKEND_PORT` | Backend port | `3003` |
 
-The following was directly reused or adapted from WordGPT Plus:
-
-- **`wordFormatter.ts`** — Markdown-to-Word conversion engine: parses headings, bold, italic, code blocks, and lists, then applies Word built-in styles via `Word.run()`
-- **`api/common.ts`** — Document insertion logic: replace / append / newLine insertion modes using the Word.js API
-- **Chat UI architecture** — Vue 3 task pane structure, message history (user/assistant bubbles), streaming SSE parsing, stop-generation button
-- **Built-in prompt structure** (`constant.ts`) — `buildInPrompt` pattern with translate, polish, academic rewrite, summary, and grammar-check prompts
-- **Settings page architecture** (`SettingsPage.vue`) — custom prompt management (add/edit/delete), built-in prompt editor with per-prompt reset
-- **i18n framework** — `vue-i18n` integration and locale file structure
-
-Removed from WordGPT Plus for KickOffice:
-
-- Multi-provider LLM support (OpenAI, Azure, Gemini, etc.) → single controlled backend endpoint
-- User-side API key and endpoint configuration → admin-only via `backend/.env`
-- Web search / web fetch features (privacy)
-
-Added or extended for KickOffice:
-
-- Backend Express proxy server (API keys never reach the client)
-- Docker deployment for Synology NAS (PUID/PGID, health check, multi-stage frontend build)
-- Extended from Word-only to Word + Excel + PowerPoint + Outlook
-- Model tier system (standard / reasoning / image), configured server-side only
-- French translations added to the i18n locale files
-- Image generation support
+### Backend (`backend/.env`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLM_API_KEY` | API key for LLM provider | (required) |
+| `LLM_API_BASE_URL` | OpenAI-compatible base URL | `https://api.openai.com/v1` |
+| `MODEL_STANDARD` | Standard model ID | `gpt-5.1` |
+| `MODEL_REASONING` | Reasoning model ID | `gpt-5.1` |
+| `MODEL_REASONING_EFFORT` | Reasoning effort level | `high` |
+| `MODEL_IMAGE` | Image model ID | `gpt-image-1` |
 
 ---
 
-### Based on [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) by ilberpy (MIT License)
+## Security
 
-The following was directly reused or adapted from excel-ai-assistant:
+- **API keys server-side only** — Never sent to client
+- **CORS restricted** — Frontend origin only
+- **Rate limiting** — IP-based on chat/image endpoints
+- **SES sandbox** — Safe dynamic code execution
+- **Code validation** — Pre-execution checks for Office.js patterns
+- **Helmet headers** — HSTS, X-Frame-Options, X-Content-Type-Options
+- **DOMPurify** — XSS protection with strict allowlists
+- **No third-party services** — Privacy-first, no telemetry
 
-- **Tool definition schema** — the `{ name, description, inputSchema, execute }` pattern (originally a LangChain tool format) was adapted to the OpenAI function-calling JSON schema format and applied to all tool sets (Word, Excel, general)
-- **Excel tool set** (`excelTools.ts`) — tool names, descriptions, and parameter schemas for Excel operations (data validation, tables, worksheet navigation, freeze panes, hyperlinks/comments, worksheet protection, named ranges, conditional formatting, etc.) were derived from excel-ai-assistant's tool catalogue and extended for advanced spreadsheet workflows; implementations were rewritten using `Excel.run()` directly
-- **Agent loop pattern** — the core loop (send tools to LLM → detect `tool_calls` in response → execute locally → feed result back → repeat) was adapted from excel-ai-assistant's LangChain agent to a custom TypeScript implementation
-- **Formula language localization** — concept of detecting the user's configured formula language (`getExcelFormulaLanguage()`, fr/en) to match locale-specific function names
+---
 
-Removed from excel-ai-assistant for KickOffice:
+## Credits & Inspirations
 
-- LangChain dependency entirely → direct OpenAI-compatible API calls
-- Python/server-side Excel bindings → replaced by client-side `Excel.run()` (Office.js)
-- Standalone script architecture → integrated into the unified Office add-in frontend
+KickOffice builds upon several excellent open-source projects:
+
+### [word-GPT-Plus](https://github.com/Kuingsmile/word-GPT-Plus) (MIT License)
+The original foundation for the Word add-in architecture. Directly reused or adapted:
+- **`wordFormatter.ts`** — Markdown-to-Word conversion engine
+- **Chat UI architecture** — Vue 3 task pane, message bubbles, SSE streaming
+- **Built-in prompt structure** — Translate, polish, academic, summary patterns
+- **Settings page architecture** — Custom prompt management
+- **i18n framework** — vue-i18n integration
+
+### [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) (MIT License)
+Inspired the Excel tooling and agent loop pattern:
+- **Tool definition schema** — `{ name, description, inputSchema, execute }` pattern
+- **Excel tool set** — Tool names, descriptions, parameter schemas
+- **Agent loop pattern** — Send tools → detect tool_calls → execute → loop
+- **Formula localization** — Locale-specific function names (en/fr)
+
+### [office-word-diff](https://github.com/yuch85/office-word-diff) (Apache 2.0)
+Integrated as a local package for format-preserving text editing:
+- **Word-level diffing** — Token mapping with formatting preservation
+- **Track Changes integration** — Native Word revision tracking
+- **Cascading strategies** — Token → Sentence → Block fallback
+- **diff-match-patch extension** — Google's algorithm with word-mode
+
+### [Redink](https://github.com/LawDigital/redink) (MIT License)
+Conceptual inspiration for document comparison and revision workflows.
+
+---
+
+## License
+
+This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. Third-party dependencies retain their original licenses.
+
+---
+
+## Known Issues
+
+See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for the complete audit with issues organized by severity.
+
+**Critical**:
+- Agent max iterations silently capped at 10
+- `.env.example` contains invalid `reasoning_effort=none`
+- Quick actions bypass loading/abort state
+
+See the design review for full details and recommendations.

@@ -52,8 +52,8 @@ services:
 
   kickoffice-frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         VITE_BACKEND_URL: ${PUBLIC_BACKEND_URL:-http://${SERVER_IP}:${BACKEND_PORT}}
         VITE_APP_VERSION: ${APP_VERSION:-}
