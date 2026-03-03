@@ -73,11 +73,11 @@ async function encryptValue(plaintext: string): Promise<string> {
 /**
  * Decrypt a string using Web Crypto API
  */
-async function decryptValue(encrypted: string): Promise<string> {
+async function decryptValue(encrypted: string, key?: string): Promise<string> {
   if (!encrypted) return ''
 
   try {
-    const key = await getEncryptionKey()
+    const cryptoKey = await getEncryptionKey()
 
     // Decode from base64
     const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0))
@@ -88,13 +88,18 @@ async function decryptValue(encrypted: string): Promise<string> {
 
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
-      key,
+      cryptoKey,
       ciphertext
     )
 
     return new TextDecoder().decode(decrypted)
   } catch (error) {
     console.error('[CredentialStorage] Decryption failed:', error)
+    // Clear corrupted data when decryption fails
+    if (key) {
+      console.warn(`[CredentialStorage] Clearing corrupted data for key: ${key}`)
+      localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+    }
     // Return empty string if decryption fails
     return ''
   }
@@ -122,7 +127,7 @@ async function getCredential(key: string, remember: boolean): Promise<string> {
   if (remember) {
     const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
     if (!encrypted) return ''
-    return decryptValue(encrypted)
+    return decryptValue(encrypted, key)
   }
   return sessionStorage.getItem(key) || ''
 }

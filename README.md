@@ -17,6 +17,8 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
 - **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents
 - **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
+- **Reverse Proxy Support** — Compatible with Synology/nginx reverse proxies
+- **Message Timestamps** — Chat messages display creation time for better context
 
 ---
 

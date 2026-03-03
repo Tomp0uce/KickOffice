@@ -1,35 +1,65 @@
 ## Summary
 
-Fix Docker build compatibility for Synology DS416play NAS with Intel Celeron processor.
+This PR fixes three critical issues affecting production deployments and user experience:
 
-## Problem
+1. **Credential decryption errors** causing console spam when encrypted data becomes corrupted
+2. **Rate limiting failures** when running behind Synology/nginx reverse proxies
+3. **Missing timestamps** in chat messages for better conversation context
 
-Alpine Linux images (`node:*-alpine`, `nginx:alpine`) cause **"Illegal instruction (core dumped)"** errors on Synology DS416play because:
-- Alpine uses **musl libc** which executes AVX instructions
-- Intel Celeron processors don't support these instructions
-- This causes immediate crashes when running Node.js or nginx
+## Changes
 
-Additionally, `office-word-diff` was missing from `package-lock.json`, causing `npm ci` to fail.
+### 🔧 Backend Fixes
 
-## Solution
+**Reverse Proxy Compatibility** (`backend/src/server.js`)
+- Enabled Express `trust proxy` setting to allow `express-rate-limit` to correctly identify client IPs via `X-Forwarded-For` header
+- Fixes `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` error when running behind Synology NAS or nginx reverse proxies
 
-### Docker Images
-- `node:22-alpine` → `node:22-slim` (Debian/glibc)
-- `nginx:alpine` → `nginx:stable` (Debian-based)
+### 🎨 Frontend Improvements
 
-### Package Lock
-- Added `office-word-diff` to `package-lock.json` for `npm ci` compatibility
+**Credential Storage Error Handling** (`frontend/src/utils/credentialStorage.ts`)
+- Enhanced `decryptValue()` to accept optional `key` parameter for identifying corrupted data
+- Automatically clears corrupted encrypted credentials from localStorage when decryption fails
+- Prevents repeated `OperationError` console spam on subsequent page loads
 
-### Documentation
-- Updated DESIGN_REVIEW.md with correct Synology compatibility requirements
-- Updated CHANGELOG.md with fix details
+**Message Timestamps** (`frontend/src/types/chat.ts`, `frontend/src/composables/useImageActions.ts`, `frontend/src/components/chat/ChatMessageList.vue`)
+- Added `timestamp` field to `DisplayMessage` interface
+- Automatically capture message creation time in `createDisplayMessage()`
+- Display time in HH:MM format below each message with subtle styling (10px, 60% opacity)
 
-## Test plan
+### 📝 Documentation
 
-- [ ] Run `docker compose build --no-cache`
-- [ ] Run `docker compose up -d`
-- [ ] Verify all containers start without "Illegal instruction" errors
-- [ ] Test backend health: `curl http://localhost:3003/health`
-- [ ] Test frontend loads at `http://localhost:3002`
+- Updated `README.md` with new features: reverse proxy support and message timestamps
+- Updated `CHANGELOG.md` with detailed description of all fixes
 
-🤖 Generated with [Claude Code](https://claude.ai/code)
+## Testing
+
+**Reverse Proxy Fix**:
+- ✅ Backend starts without `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` error
+- ✅ Rate limiting works correctly with `X-Forwarded-For` header
+
+**Credential Storage**:
+- ✅ Corrupted encrypted data is automatically cleaned from localStorage
+- ✅ No repeated decryption errors in console on page reload
+- ✅ New credentials are stored and retrieved correctly
+
+**Message Timestamps**:
+- ✅ All new messages display creation time
+- ✅ Time format is concise (HH:MM)
+- ✅ Styling is subtle and doesn't interfere with message content
+- ✅ Timestamp only appears when available (backward compatible)
+
+## Validation
+
+- [x] Backend builds successfully
+- [x] Frontend builds successfully
+- [x] No TypeScript errors
+- [x] Changes aligned with CLAUDE.md guidelines
+- [x] Documentation updated
+
+## Related Issues
+
+Fixes console errors reported in Synology Docker deployments and improves chat UX with message timestamps.
+
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

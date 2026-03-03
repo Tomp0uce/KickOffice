@@ -37,7 +37,8 @@ export function useImageActions(t: (key: string) => string) {
 
   function createDisplayMessage(role: DisplayMessage['role'], content: string, imageSrc?: string): DisplayMessage {
     const id = globalThis.crypto?.randomUUID?.() || `message-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    return { id, role, content, imageSrc }
+    const timestamp = Date.now()
+    return { id, role, content, imageSrc, timestamp }
   }
 
   function cleanContent(content: string): string {
