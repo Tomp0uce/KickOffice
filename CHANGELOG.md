@@ -16,8 +16,10 @@ All notable changes to this project will be documented in this file.
 - **Docker Build Failure**: Fixed critical Docker build issues preventing deployment on Synology NAS:
   - Changed frontend build context from `./frontend` to root (`.`) to include `office-word-diff` dependency
   - Restructured `frontend/Dockerfile` to properly copy local `office-word-diff` library
-  - Changed base images from `node:22-slim` to `node:22-alpine` for better ARM/Synology compatibility
-  - Added `wget` installation in backend Dockerfile for Alpine compatibility
+  - Added `office-word-diff` to `package-lock.json` for `npm ci` compatibility
+- **Synology DS416play Compatibility**: Alpine Linux images cause "Illegal instruction" errors on Celeron CPUs (musl libc uses AVX instructions not supported by older processors):
+  - Changed `node:22-alpine` to `node:22-slim` (Debian/glibc)
+  - Changed `nginx:alpine` to `nginx:stable` (Debian-based)
 
 ---
 

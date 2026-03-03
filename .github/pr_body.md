@@ -1,29 +1,35 @@
-## Description
+## Summary
 
-This PR introduces critical advanced capabilities, fundamentally bridging the feature gap between KickOffice and OpenExcel while expanding these features across the entire Office suite.
+Fix Docker build compatibility for Synology DS416play NAS with Intel Celeron processor.
 
-### Key Features:
+## Problem
 
-1. **Secure Dynamic Execution (`ses` Sandbox)**:
-   - Introduced `sandbox.ts` and `lockdown.ts`.
-   - Added new escape-hatch tools (`eval_officejs`, `eval_wordjs`, `eval_powerpointjs`, `eval_outlookjs`) permitting the agent to run dynamically generated JavaScript safely inside a compartment.
-2. **File Processing via Backend**:
-   - Added the `/api/upload` route integrating `multer`, `pdf-parse`, `mammoth`, and `xlsx` for parsing local files entirely securely on the backend.
-   - Files are automatically sent to the LLM context through `<attachments>`, enabling it to synthesize external datasets into Office files.
-3. **Advanced Excel Tools (Ported from OpenExcel)**:
-   - `findData`: Regex and case-sensitive cross-sheet search.
-   - `duplicateWorksheet`, `hideUnhideRowColumn`.
-   - `getAllObjects`: Chart and pivot discovery.
-   - `modifyObject`: Chart and pivot deletion operations.
-4. **Prompt Optimization**:
-   - Upgraded system prompts enforcing `batchProcessRange` to drastically reduce iterative overhead from `set_cell_range`, optimizing large dataset transforms.
-   - Documented explicit overwrite warnings to safeguard user data.
+Alpine Linux images (`node:*-alpine`, `nginx:alpine`) cause **"Illegal instruction (core dumped)"** errors on Synology DS416play because:
+- Alpine uses **musl libc** which executes AVX instructions
+- Intel Celeron processors don't support these instructions
+- This causes immediate crashes when running Node.js or nginx
 
-### Documentation Updates
+Additionally, `office-word-diff` was missing from `package-lock.json`, causing `npm ci` to fail.
 
-- `README.md`, `agents.md`, and `CHANGELOG.md` have been fully updated to reflect the new feature implementations, configuration requirements, and API additions.
+## Solution
 
-### Impacts Validated
+### Docker Images
+- `node:22-alpine` → `node:22-slim` (Debian/glibc)
+- `nginx:alpine` → `nginx:stable` (Debian-based)
 
-- New tool additions have been implicitly accommodated by `toolStorage.ts` automatically marking them as enabled by default.
-- UI features seamlessly ignore UI-breaking loops. All changes pass the TS compiler check (`tsc --noEmit`).
+### Package Lock
+- Added `office-word-diff` to `package-lock.json` for `npm ci` compatibility
+
+### Documentation
+- Updated DESIGN_REVIEW.md with correct Synology compatibility requirements
+- Updated CHANGELOG.md with fix details
+
+## Test plan
+
+- [ ] Run `docker compose build --no-cache`
+- [ ] Run `docker compose up -d`
+- [ ] Verify all containers start without "Illegal instruction" errors
+- [ ] Test backend health: `curl http://localhost:3003/health`
+- [ ] Test frontend loads at `http://localhost:3002`
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
