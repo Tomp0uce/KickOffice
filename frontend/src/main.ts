@@ -13,11 +13,19 @@ window.Office.onReady(async () => {
   markOfficeReady()
   detectOfficeHost()
 
-  // Initialize rememberCredentials to true on first launch
+  // BUGFIX: Initialize rememberCredentials carefully to avoid breaking existing credentials
   // Office Add-ins MUST persist credentials in localStorage (sessionStorage is wiped on restart)
   if (localStorage.getItem('rememberCredentials') === null) {
-    console.info('[KickOffice] First launch detected — enabling credential persistence')
-    await setRememberCredentials(true)
+    // Check if user has existing credentials in sessionStorage before forcing localStorage
+    const hasSessionCreds = sessionStorage.getItem('litellmUserKey') || sessionStorage.getItem('ko_cred_litellmUserKey')
+
+    if (hasSessionCreds) {
+      console.info('[KickOffice] Existing credentials found in sessionStorage, keeping rememberCredentials=false for now')
+      // User will need to explicitly enable "remember credentials" to persist them
+    } else {
+      console.info('[KickOffice] First launch detected — enabling credential persistence')
+      await setRememberCredentials(true)
+    }
   }
 
   const app = createApp(App)
