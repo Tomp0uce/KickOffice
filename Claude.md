@@ -179,7 +179,27 @@ Current host/tool landscape (keep in mind for tool/agent changes):
   - Reflect implemented capabilities without speculative roadmap edits.
   - **Keep the model tiers table in sync** with `backend/src/config/models.js` and `backend/.env.example`.
 
-## 8) PowerPoint Agent
+## 8) Product Requirements Document (PRD.md) Guidelines
+
+**CRITICAL: Always update PRD.md when adding or modifying features.**
+
+- **When to update**: Every time you add, modify, or remove a user-facing feature, update `PRD.md` to reflect the change.
+- **What to include**:
+  - Feature descriptions from a **user perspective**
+  - Business logic and acceptance criteria
+  - User personas and use cases
+  - Constraints and limitations
+- **What NOT to include**:
+  - Technical implementation details
+  - Code snippets or code examples
+  - Library names, framework names, or specific technologies
+  - File paths, function names, or class names
+  - Architecture diagrams or technical workflows
+- **Keep it high-level**: The PRD is a product document, not a technical specification. Focus on **what** the product does and **why**, not **how** it's implemented.
+- **Single source of truth**: The PRD should be the authoritative reference for product features. When implementing new features, read the PRD first to understand the requirements.
+- **Language**: PRD.md must be written in **English**.
+
+## 9) PowerPoint Agent
 
 - **Persona**: Expert in visual communication and public speaking.
 - **Style**: Concise, punchy, structured (bullet points), slide-oriented.
@@ -187,7 +207,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **API layer**: Uses the Office Common API (`Office.context.document.getSelectedDataAsync` / `setSelectedDataAsync`) with `CoercionType.Text`. Unlike Word or Excel, PowerPoint has no host-specific `run()` context. Text interaction is limited to the active text selection within a shape.
 - **Quick actions**: Bullets, Speaker Notes, Impact (Punchify), Shrink, Visual (draft mode).
 
-## 9) Known Issues to Watch For
+## 10) Known Issues to Watch For
 
 **ALWAYS consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) before making architectural changes.**
 
@@ -199,7 +219,7 @@ This document is the single source of truth for:
 
 Do not duplicate issue tracking here — refer to the authoritative document.
 
-## 10) Validation Checklist Before Commit
+## 11) Validation Checklist Before Commit
 
 - Run at least one relevant build/check command (frontend and/or backend depending on change).
 - Verify touched UI flows if applicable.
@@ -210,7 +230,7 @@ Do not duplicate issue tracking here — refer to the authoritative document.
 - If changing tool definitions: verify the tool count stays under `MAX_TOOLS` (default 128).
 - **If modifying Dockerfiles**: Ensure only Debian-based images are used (`node:22-slim`, `nginx:stable`). Never introduce Alpine variants (`node:*-alpine`, `nginx:alpine`). See §2 for hardware compatibility requirements.
 
-## 11) Commit/PR Quality Bar
+## 12) Commit/PR Quality Bar
 
 - Commit title should describe user-facing impact.
 - PR summary should include:
@@ -219,23 +239,24 @@ Do not duplicate issue tracking here — refer to the authoritative document.
   - how it was validated,
   - any compatibility notes.
 
-## 12) Pull Request Workflow
+## 13) Pull Request Workflow
 
 When the user asks to create a Pull Request, **always follow this exact sequence**:
 
-1. **Update `README.md`**: Add the newly developed features directly to the README. Be concise, list the features clearly, and avoid detailing the underlying code implementation.
-2. **Update `CHANGELOG.md`**: Add an entry for the new version/changes. Use a standard changelog format. Clearly outline the user-facing changes (features, fixes, improvements) without deep technical implementation details. Include the link to the PR if known, or mention the PR branch/name.
-3. **Stage & Commit**:
+1. **Update `PRD.md`**: If the changes include new or modified features, update the PRD to reflect these changes from a **user perspective** (no technical implementation details).
+2. **Update `README.md`**: Add the newly developed features directly to the README. Be concise, list the features clearly, and avoid detailing the underlying code implementation.
+3. **Update `CHANGELOG.md`**: Add an entry for the new version/changes. Use a standard changelog format. Clearly outline the user-facing changes (features, fixes, improvements) without deep technical implementation details. Include the link to the PR if known, or mention the PR branch/name.
+4. **Stage & Commit**:
    - Use `git add .` to stage changes.
    - Use `git commit -m "feat: your concise commit message"`
    - **Important**: If chaining commands, use PowerShell syntax `;` (e.g., `git add .; git commit -m "..."`), NOT `&&`.
-4. **Push to Remote**: `git push origin <branch_name>`
-5. **Draft the PR**:
+5. **Push to Remote**: `git push origin <branch_name>`
+6. **Draft the PR**:
    - Create a temporary markdown file (e.g., `.github/pr_body.md`) containing the detailed PR body outlining the changes. This avoids multi-line string escaping errors in PowerShell.
    - Run the GitHub CLI command: `gh pr create --title "feat: Your PR Title" --body-file .github/pr_body.md`
-6. **Notify the User**: Confirm the PR creation and provide the generated link.
+7. **Notify the User**: Confirm the PR creation and provide the generated link.
 
-## 13)  Strict Agent Instructions
+## 14) Strict Agent Instructions
 
 1. **Restricted Scope:** You must STRICTLY remain within the current working directory (kickoffice).
 2. **No Outside Access:** You are strictly forbidden from reading, listing, or modifying files outside of this directory (for example, absolutely no reading of `~/.claude/settings.json` or any other file in `~/`).

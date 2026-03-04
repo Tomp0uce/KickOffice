@@ -4,15 +4,26 @@
  * Can use localStorage if "remember credentials" is explicitly enabled.
  */
 
+import { isCryptoAvailable, logCryptoStatus } from './cryptoPolyfill'
+
 const STORAGE_PREFIX = 'ko_cred_'
 const ENCRYPTION_KEY_NAME = 'ko_encryption_key'
+
+// Log crypto availability on module load
+logCryptoStatus()
 
 /**
  * Get or create an encryption key using Web Crypto API
  * Stores key in localStorage if rememberCredentials is enabled, otherwise sessionStorage
  * BUGFIX: Check both storages to avoid losing the key during migration
+ * BUGFIX: Return null if crypto.subtle is not available (fallback to plaintext)
  */
-async function getEncryptionKey(): Promise<CryptoKey> {
+async function getEncryptionKey(): Promise<CryptoKey | null> {
+  // Check if Web Crypto API is available
+  if (!isCryptoAvailable()) {
+    return null
+  }
+
   const remember = getRememberCredentials()
   const primaryStorage = remember ? localStorage : sessionStorage
   const fallbackStorage = remember ? sessionStorage : localStorage
@@ -58,12 +69,20 @@ async function getEncryptionKey(): Promise<CryptoKey> {
 
 /**
  * Encrypt a string using Web Crypto API
+ * Falls back to plaintext if crypto is not available
  */
 async function encryptValue(plaintext: string): Promise<string> {
   if (!plaintext) return ''
 
   try {
     const key = await getEncryptionKey()
+
+    // If crypto is not available, return plaintext
+    if (!key) {
+      console.warn('[CredentialStorage] Crypto not available, storing plaintext')
+      return plaintext
+    }
+
     const iv = crypto.getRandomValues(new Uint8Array(12)) // 12 bytes for AES-GCM
     const encoded = new TextEncoder().encode(plaintext)
 
@@ -82,19 +101,40 @@ async function encryptValue(plaintext: string): Promise<string> {
     return btoa(String.fromCharCode(...combined))
   } catch (error) {
     console.error('[CredentialStorage] Encryption failed:', error)
-    // Fallback to plaintext if encryption fails (shouldn't happen)
+    // Fallback to plaintext if encryption fails
     return plaintext
   }
 }
 
 /**
  * Decrypt a string using Web Crypto API
+ * If crypto is not available, assumes plaintext and returns as-is
  */
 async function decryptValue(encrypted: string, key?: string): Promise<string> {
   if (!encrypted) return ''
 
   try {
     const cryptoKey = await getEncryptionKey()
+
+    // If crypto is not available, assume plaintext
+    if (!cryptoKey) {
+      console.warn('[CredentialStorage] Crypto not available, treating as plaintext')
+      // Check if it looks like base64 (encrypted data) - if so, we have a problem
+      try {
+        atob(encrypted)
+        // If we get here, it's base64 but we can't decrypt it
+        console.error('[CredentialStorage] Found encrypted data but crypto is not available')
+        if (key) {
+          console.warn(`[CredentialStorage] Clearing unusable encrypted data for key: ${key}`)
+          localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+          sessionStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+        }
+        return ''
+      } catch {
+        // Not base64, so it's plaintext - return as-is
+        return encrypted
+      }
+    }
 
     // Decode from base64
     const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0))
@@ -116,6 +156,8 @@ async function decryptValue(encrypted: string, key?: string): Promise<string> {
     if (key) {
       console.warn(`[CredentialStorage] Clearing corrupted data for key: ${key}`)
       localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+      sessionStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+      sessionStorage.removeItem(key) // Also try unprefixed key
     }
     // Return empty string if decryption fails
     return ''
@@ -336,7 +378,18 @@ export async function migrateFromPlaintext(): Promise<void> {
  * Used to validate before making API requests
  */
 export async function areCredentialsConfigured(): Promise<boolean> {
-  const key = await getUserKey()
-  const email = await getUserEmail()
-  return key.length > 0 && email.length > 0
+  try {
+    const key = await getUserKey()
+    const email = await getUserEmail()
+    const hasCredentials = key.length > 0 && email.length > 0
+
+    if (!hasCredentials) {
+      console.warn('[CredentialStorage] Credentials not configured - key or email missing')
+    }
+
+    return hasCredentials
+  } catch (error) {
+    console.error('[CredentialStorage] Error checking credentials:', error)
+    return false
+  }
 }

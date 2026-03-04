@@ -136,6 +136,21 @@
                 >
               </div>
             </SettingCard>
+
+            <!-- Crypto Warning -->
+            <SettingCard v-if="!cryptoAvailable">
+              <div class="flex items-start gap-2 rounded-md bg-yellow-50 p-2">
+                <span class="text-2xl">⚠️</span>
+                <div class="flex flex-col gap-1">
+                  <span class="text-sm font-semibold text-yellow-800">
+                    {{ t("cryptoNotAvailableTitle") }}
+                  </span>
+                  <span class="text-xs text-yellow-700">
+                    {{ t("cryptoNotAvailableMessage") }}
+                  </span>
+                </div>
+              </div>
+            </SettingCard>
           </div>
 
           <!-- General Settings -->
@@ -671,6 +686,7 @@ import {
   persistEnabledTools,
 } from "@/utils/toolStorage";
 import { i18n } from "@/i18n";
+import { isCryptoAvailable } from "@/utils/cryptoPolyfill";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -686,6 +702,7 @@ const darkMode = useStorage(localStorageKey.darkMode, false);
 const litellmUserKey = ref('');
 const litellmUserEmail = ref('');
 const rememberCredentials = ref(getRememberCredentials());
+const cryptoAvailable = ref(isCryptoAvailable());
 
 // Watch for credential changes and persist them
 watch(litellmUserKey, async (value) => {

@@ -5,6 +5,7 @@
  */
 import type { DisplayMessage } from '@/types/chat'
 import { snapshotVfs, restoreVfs } from '@/utils/vfs'
+import { randomUUID } from '@/utils/cryptoPolyfill'
 
 export interface VfsFile {
   path: string
@@ -117,7 +118,7 @@ export async function createSession(hostType: string, name?: string): Promise<Ch
   const db = await openDB()
   const now = Date.now()
   const session: ChatSession = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     hostType,
     name: name ?? 'New Chat',
     messages: [],
