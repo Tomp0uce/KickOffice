@@ -10,11 +10,25 @@ const ENCRYPTION_KEY_NAME = 'ko_encryption_key'
 /**
  * Get or create an encryption key using Web Crypto API
  * Stores key in localStorage if rememberCredentials is enabled, otherwise sessionStorage
+ * BUGFIX: Check both storages to avoid losing the key during migration
  */
 async function getEncryptionKey(): Promise<CryptoKey> {
   const remember = getRememberCredentials()
-  const storage = remember ? localStorage : sessionStorage
-  let keyData = storage.getItem(ENCRYPTION_KEY_NAME)
+  const primaryStorage = remember ? localStorage : sessionStorage
+  const fallbackStorage = remember ? sessionStorage : localStorage
+
+  // Try primary storage first
+  let keyData = primaryStorage.getItem(ENCRYPTION_KEY_NAME)
+
+  // BUGFIX: If not found in primary, check fallback storage (migration case)
+  if (!keyData) {
+    keyData = fallbackStorage.getItem(ENCRYPTION_KEY_NAME)
+    // If found in fallback, migrate it to primary
+    if (keyData) {
+      primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
+      console.info('[CredentialStorage] Migrated encryption key to', remember ? 'localStorage' : 'sessionStorage')
+    }
+  }
 
   if (!keyData) {
     // Generate a new random key
@@ -27,7 +41,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
     // Export and store the key
     const exported = await crypto.subtle.exportKey('jwk', key)
     keyData = JSON.stringify(exported)
-    storage.setItem(ENCRYPTION_KEY_NAME, keyData)
+    primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
     return key
   }
 
@@ -125,14 +139,46 @@ function safeSetItem(key: string, value: string): void {
 
 /**
  * Get credential from the appropriate storage (with decryption for localStorage)
+ * BUGFIX: Check both storages as fallback to avoid losing credentials during migration
  */
 async function getCredential(key: string, remember: boolean): Promise<string> {
   if (remember) {
+    // Try encrypted localStorage first
     const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
-    if (!encrypted) return ''
-    return decryptValue(encrypted, key)
+    if (encrypted) {
+      const decrypted = await decryptValue(encrypted, key)
+      if (decrypted) return decrypted
+    }
+
+    // BUGFIX: Fallback to sessionStorage (migration case)
+    const sessionValue = sessionStorage.getItem(key)
+    if (sessionValue) {
+      console.info(`[CredentialStorage] Found credential "${key}" in sessionStorage, migrating to localStorage`)
+      // Migrate to encrypted localStorage
+      await setCredential(key, sessionValue, true)
+      return sessionValue
+    }
+
+    return ''
   }
-  return sessionStorage.getItem(key) || ''
+
+  // Using sessionStorage
+  const sessionValue = sessionStorage.getItem(key)
+  if (sessionValue) return sessionValue
+
+  // BUGFIX: Fallback to encrypted localStorage (migration case)
+  const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
+  if (encrypted) {
+    const decrypted = await decryptValue(encrypted, key)
+    if (decrypted) {
+      console.info(`[CredentialStorage] Found credential "${key}" in localStorage, migrating to sessionStorage`)
+      // Migrate to sessionStorage
+      sessionStorage.setItem(key, decrypted)
+      return decrypted
+    }
+  }
+
+  return ''
 }
 
 /**
@@ -283,4 +329,14 @@ export async function migrateFromPlaintext(): Promise<void> {
       safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, encrypted)
     }
   }
+}
+
+/**
+ * Check if credentials are configured
+ * Used to validate before making API requests
+ */
+export async function areCredentialsConfigured(): Promise<boolean> {
+  const key = await getUserKey()
+  const email = await getUserEmail()
+  return key.length > 0 && email.length > 0
 }

@@ -15,13 +15,14 @@ import { extractTextFromHtml, reassembleWithFragments, getPreservationInstructio
 import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
-import { setLastRichContext, clearLastRichContext } from '@/utils/richContextStore'
+import { setLastRichContext, clearLastRichContext, getLastRichContext } from '@/utils/richContextStore'
 import {
   getExcelDocumentContext,
   getPowerPointDocumentContext,
   getOutlookDocumentContext,
   getWordDocumentContext,
 } from '@/utils/officeDocumentContext'
+import { areCredentialsConfigured } from '@/utils/credentialStorage'
 
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
 
@@ -771,6 +772,14 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       return messageUtil.error(t('backendOffline'))
     }
 
+    // BUGFIX: Validate credentials are configured before sending request
+    const hasCredentials = await areCredentialsConfigured()
+    if (!hasCredentials) {
+      loading.value = false
+      messageUtil.error(t('credentialsRequired'))
+      return
+    }
+
     if (userInput.value.trim() === textToSend) {
       userInput.value = ''
       adjustTextareaHeight()
@@ -873,6 +882,14 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
   async function applyQuickAction(actionKey: string) {
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
+
+    // BUGFIX: Validate credentials are configured before sending request
+    const hasCredentials = await areCredentialsConfigured()
+    if (!hasCredentials) {
+      messageUtil.error(t('credentialsRequired'))
+      return
+    }
+
     // Prevent quick actions from running while another request is in progress
     if (loading.value || abortController.value) {
       return messageUtil.warning(t('requestInProgress') || 'A request is already in progress. Please wait or stop the current request.')

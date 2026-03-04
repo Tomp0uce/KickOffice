@@ -17,7 +17,7 @@ This document provides operational guidance for AI coding agents working in this
 | [AGENT_MODE_ANALYSIS.md](./AGENT_MODE_ANALYSIS.md) | Agent execution mode analysis — streaming vs sync performance comparison |
 | [INTEGRATION_PLAN.md](./INTEGRATION_PLAN.md) | Technical integration roadmap and implementation strategy |
 | [REPORT-openexcel-kickoffice-comparison.md](./REPORT-openexcel-kickoffice-comparison.md) | OpenExcel vs KickOffice feature comparison — chat UX, conversation management, tool status, stats bar |
-
+| [PRD.md](./PRD.md) | Product Requirements Document — Single source of truth for product features, user personas, acceptance criteria, and business logic. **Read this before implementing new features.** |
 ## 2) Product and Architecture Snapshot
 
 KickOffice is a Microsoft Office add-in with:
