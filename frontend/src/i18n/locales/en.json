@@ -392,6 +392,8 @@
   "litellmCredentialsMissing": "Credentials not configured",
   "credentialsRequired": "Please configure your credentials in Settings > Account to use this feature.",
   "credentialsRequiredTitle": "Authentication required",
+  "cryptoNotAvailableTitle": "Encryption not available",
+  "cryptoNotAvailableMessage": "Web Crypto API is not available (insecure context). Credentials will be stored unencrypted. Please ensure the app is running over HTTPS.",
   "rememberCredentialsLabel": "Remember credentials",
   "rememberCredentialsDescription": "Keep credentials saved between sessions",
   "errorTimeout": "Request timed out. The model took too long to respond — try again or simplify your request.",

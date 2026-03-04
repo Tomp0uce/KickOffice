@@ -397,6 +397,8 @@
   "litellmCredentialsMissing": "Identifiants non configurés",
   "credentialsRequired": "Veuillez configurer vos identifiants dans Paramètres > Compte pour utiliser cette fonctionnalité.",
   "credentialsRequiredTitle": "Authentification requise",
+  "cryptoNotAvailableTitle": "Chiffrement non disponible",
+  "cryptoNotAvailableMessage": "L'API Web Crypto n'est pas disponible (contexte non sécurisé). Les identifiants seront stockés sans chiffrement. Assurez-vous que l'application fonctionne sur HTTPS.",
   "rememberCredentialsLabel": "Mémoriser les identifiants",
   "rememberCredentialsDescription": "Conserver les identifiants entre les sessions",
   "errorTimeout": "La requête a expiré (timeout). Le modèle met trop de temps à répondre — réessayez ou simplifiez votre demande.",

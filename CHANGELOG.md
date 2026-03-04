@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Credential Storage & Crypto API Fallback**: Fixed critical issue where credentials disappear when Web Crypto API is unavailable (HTTP contexts or insecure environments). Added polyfill for `crypto.randomUUID()` and graceful fallback to unencrypted storage when `crypto.subtle` is not available. User receives clear warning in Settings when encryption is not available. Improved error handling and validation to prevent credentials from being silently lost
 - **Credential Decryption Error Handling**: Improved error handling in credential storage. Corrupted encrypted data in localStorage is now automatically cleaned up when decryption fails, preventing repeated console errors
 - **Reverse Proxy Compatibility**: Enabled Express `trust proxy` setting for proper operation behind Synology/nginx reverse proxies. Fixes rate limiting errors (`ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`) when running behind a reverse proxy
 
