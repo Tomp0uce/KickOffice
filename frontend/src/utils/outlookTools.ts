@@ -9,6 +9,8 @@ import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 
 import { generateVisualDiff } from './common'
+import { getLastRichContext, setLastRichContext } from './richContextStore'
+import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver'
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -115,7 +117,7 @@ const outlookToolDefinitions = createOutlookTools({
     name: 'getEmailBody',
     category: 'read',
     description:
-      'Get the full body text of the current email. Works in both read and compose mode.',
+      'Get the full body text of the current email. Works in both read and compose mode. Automatically captures images for preservation when modifying the email later.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -123,6 +125,37 @@ const outlookToolDefinitions = createOutlookTools({
     },
     executeOutlook: async (mailbox) => {
       if (!mailbox?.item) return 'No email item available.'
+
+      // First get HTML to capture images for preservation
+      const htmlPromise = new Promise<string>((resolve, reject) => {
+        mailbox.item.body.getAsync(
+          getOfficeCoercionType().Html,
+          (result: any) => {
+            if (result.status === getOfficeAsyncStatus()?.Succeeded) {
+              resolve(result.value || '')
+            } else {
+              reject(new Error('Failed to get HTML'))
+            }
+          },
+        )
+      })
+
+      try {
+        const htmlContent = await htmlPromise
+        if (htmlContent) {
+          const richContext = extractTextFromHtml(htmlContent)
+          // Store rich context for later use by writeEmailBody
+          if (richContext.hasRichContent) {
+            setLastRichContext(richContext)
+          }
+          // Return clean text
+          return richContext.cleanText || ''
+        }
+      } catch (err) {
+        console.warn('[getEmailBody] Failed to get HTML, falling back to text', err)
+      }
+
+      // Fallback to plain text
       return new Promise<string>((resolve) => {
         mailbox.item.body.getAsync(
           getOfficeCoercionType().Text,
@@ -137,7 +170,7 @@ const outlookToolDefinitions = createOutlookTools({
   writeEmailBody: {
     name: 'writeEmailBody',
     category: 'write',
-    description: 'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists). Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode. CRITICAL: When replying/forwarding, ALWAYS use mode "Append" to preserve email history. NEVER use "Replace" on replies as it deletes the conversation thread.',
+    description: 'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists) and automatically preserves images from the original email. Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode. CRITICAL: When replying/forwarding, ALWAYS use mode "Append" to preserve email history. NEVER use "Replace" on replies as it deletes the conversation thread. When improving/modifying existing email content, use mode "Replace" to update the email body while preserving images.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -165,9 +198,18 @@ const outlookToolDefinitions = createOutlookTools({
       const { content, mode = 'Append', diffTracking = false, originalText = '' } = args
       if (!mailbox?.item?.body) return 'Cannot write email body: compose mode is not available.'
 
+      // Check if we have preserved rich content (images) to reassemble
+      const richContext = getLastRichContext()
+      let processedContent = content
+
+      // If the content contains {{PRESERVE_N}} placeholders and we have a rich context, reassemble
+      if (richContext?.hasRichContent && content.includes('{{PRESERVE_')) {
+        processedContent = reassembleWithFragments(content, richContext)
+      }
+
       const html = diffTracking && mode === 'Insert' && originalText
-        ? generateVisualDiff(originalText, content)
-        : renderOfficeRichHtml(content)
+        ? generateVisualDiff(originalText, processedContent)
+        : renderOfficeRichHtml(processedContent)
 
       return new Promise<string>((resolve) => {
         const body = mailbox.item.body

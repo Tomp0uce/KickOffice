@@ -7,10 +7,19 @@ import { i18n } from './i18n'
 import router from './router'
 import { localStorageKey } from './utils/enum'
 import { detectOfficeHost, markOfficeReady } from './utils/hostDetection'
+import { setRememberCredentials, getRememberCredentials } from './utils/credentialStorage'
 
-window.Office.onReady(() => {
+window.Office.onReady(async () => {
   markOfficeReady()
   detectOfficeHost()
+
+  // Initialize rememberCredentials to true on first launch
+  // Office Add-ins MUST persist credentials in localStorage (sessionStorage is wiped on restart)
+  if (localStorage.getItem('rememberCredentials') === null) {
+    console.info('[KickOffice] First launch detected — enabling credential persistence')
+    await setRememberCredentials(true)
+  }
+
   const app = createApp(App)
 
   // Use raw localStorage for dark mode

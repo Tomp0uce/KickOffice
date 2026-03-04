@@ -162,9 +162,16 @@ async function setCredential(key: string, value: string, remember: boolean): Pro
 
 /**
  * Check if "remember credentials" is enabled
+ * Defaults to true for Office Add-ins since sessionStorage is not persistent across sessions
  */
 export function getRememberCredentials(): boolean {
-  return localStorage.getItem('rememberCredentials') === 'true'
+  const value = localStorage.getItem('rememberCredentials')
+  // Default to true if not explicitly set (first launch)
+  // Office Add-ins MUST use localStorage because sessionStorage is wiped on restart
+  if (value === null) {
+    return true
+  }
+  return value === 'true'
 }
 
 /**
