@@ -11,9 +11,11 @@ This document provides operational guidance for AI coding agents working in this
 
 | File                                   | Purpose                                                                                                     |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Code audit v3 — 162 issues across backend, frontend, infra (13 CRITICAL, 34 HIGH, 58 MEDIUM, 28 LOW, 29 dead code) |
-| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority (HIGH/MEDIUM/LOW)                                           |
-| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions                                                |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Code audit — issues by severity (CRITICAL/HIGH/MEDIUM/LOW) with status tracking |
+| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions |
+| [AGENT_MODE_ANALYSIS.md](./AGENT_MODE_ANALYSIS.md) | Agent execution mode analysis — streaming vs sync performance comparison |
+| [INTEGRATION_PLAN.md](./INTEGRATION_PLAN.md) | Technical integration roadmap and implementation strategy |
 | [REPORT-openexcel-kickoffice-comparison.md](./REPORT-openexcel-kickoffice-comparison.md) | OpenExcel vs KickOffice feature comparison — chat UX, conversation management, tool status, stats bar |
 
 ## 2) Product and Architecture Snapshot
@@ -24,6 +26,15 @@ KickOffice is a Microsoft Office add-in with:
 - `backend/` (Express, modular): secure proxy for model calls and model configuration exposure.
 - `manifests-templates/`: manifest templates used to generate runtime manifests.
 - `scripts/generate-manifests.js`: script that generates `manifest-office.xml` and `manifest-outlook.xml` from root `.env`.
+
+### Docker & Deployment Constraints
+
+**CRITICAL Hardware Compatibility Requirement**:
+- **MUST use `node:22-slim`** (Debian-based, glibc) for all Node.js containers
+- **MUST use `nginx:stable`** (Debian-based) for frontend serving
+- **DO NOT use Alpine Linux images** (`node:*-alpine`, `nginx:alpine`) — incompatible with older Intel Celeron processors (Synology DS416play) due to musl libc + AVX instruction issues
+
+See DESIGN_REVIEW.md §C0c for full context. This constraint is already enforced in `backend/Dockerfile`, `frontend/Dockerfile`, and `docker-compose.yml`.
 
 ### Frontend architecture (post-refactor)
 
@@ -110,7 +121,7 @@ Frontend changes touching image flow must keep support for both payload styles u
 - Keep compatibility with OpenAI-compatible providers that may differ on parameter support.
 - `ChatGPT-*` model IDs do not support `temperature` / token-limit parameters in current backend logic (`isChatGptModel` check).
 - GPT-5 models use `max_completion_tokens` while non-GPT-5 chat models use `max_tokens` (`isGpt5Model` check).
-- **CRITICAL**: `reasoning_effort` parameter behavior varies by model. The value `'none'` is NOT a valid OpenAI API value and causes empty responses when used with tools. Valid values are `'low'`, `'medium'`, `'high'`. When reasoning is not needed, **omit the parameter entirely** rather than sending `'none'`. See DESIGN_REVIEW.md v2 C2 for the `.env.example` issue.
+- **CRITICAL**: `reasoning_effort` parameter behavior varies by model. The value `'none'` is NOT a valid OpenAI API value and causes empty responses when used with tools. Valid values are `'low'`, `'medium'`, `'high'`. When reasoning is not needed, **omit the parameter entirely** rather than sending `'none'`. See DESIGN_REVIEW.md for historical context.
 - If model plumbing is changed, update backend validation + request shaping + frontend expectations together.
 
 Any contract change should update both backend and frontend in the same change set.
@@ -131,11 +142,12 @@ Any contract change should update both backend and frontend in the same change s
 
 Current host/tool landscape (keep in mind for tool/agent changes):
 
-- Word tools: 41 tools (includes `proposeRevision` for format-preserving edits, `eval_wordjs` via SES sandbox) + 2 general tools.
-- Excel tools: 45 tools (high-count set, including `eval_officejs` and OpenExcel ports) + 2 general tools.
-- PowerPoint tools: 16 tools (includes `proposeShapeTextRevision` for diff reporting, slides, shapes, notes, and `eval_powerpointjs`) + 2 general tools.
-- Outlook tools: 14 tools (mail compose/read helpers and `eval_outlookjs`) + 2 general tools.
-- **Total**: 129 tools across all hosts (up from 127)
+- Word tools: 41 tools (includes `proposeRevision` for format-preserving edits, `eval_wordjs` via SES sandbox)
+- Excel tools: 45 tools (high-count set, including `eval_officejs` and OpenExcel ports)
+- PowerPoint tools: 16 tools (includes `proposeShapeTextRevision` for diff reporting, slides, shapes, notes, and `eval_powerpointjs`)
+- Outlook tools: 14 tools (mail compose/read helpers and `eval_outlookjs`)
+- General tools: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
+- **Total**: 129 tools across all hosts
 
 **Agent Stability Features** (implemented):
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
@@ -154,6 +166,8 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **`buildChatBody` in `config/models.js` is the single source of truth** for request shaping. When changing model parameters, update this function and ensure both streaming and sync paths are tested.
 - **Do not send `reasoning_effort: 'none'` to the API**. Either omit the parameter or use a valid value (`low`, `medium`, `high`).
 - **CI Pipelines**: The `.github/workflows/bump-version.yml` action relies on `permissions: contents: write` to allow the GitHub Actions bot to push version bumps back to the repository. No manual configuration in the repository settings is needed as the workflow file overrides the default read-only token permissions explicitly.
+- **Node.js Version Constraint**: Both `backend/package.json` and `frontend/package.json` specify `"engines": { "node": ">=20.19.0 || >=22.0.0" }`. When updating Dockerfiles or CI configuration, maintain Node.js 22 compatibility.
+- **Docker Image Constraint**: All Dockerfiles MUST use Debian-based images (`node:22-slim`, `nginx:stable`). DO NOT use Alpine variants due to hardware incompatibility with older Intel Celeron processors (musl libc + AVX issues). See §2 and DESIGN_REVIEW.md §C0c.
 
 ## 7) Documentation Guidelines
 
@@ -169,17 +183,21 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 - **Persona**: Expert in visual communication and public speaking.
 - **Style**: Concise, punchy, structured (bullet points), slide-oriented.
-- **System prompt basis**: "Tu es un expert en présentations PowerPoint. Ton but est d'aider l'utilisateur à créer des diapositives claires et percutantes. Tu privilégies les listes à puces, les phrases courtes et le style direct. Tu peux aussi rédiger des notes pour l'orateur qui sont, à l'inverse, conversationnelles et engageantes."
+- **System prompt basis**: "You are an expert in PowerPoint presentations. Your goal is to help the user create clear and impactful slides. You favor bullet points, short sentences, and direct style. You can also write speaker notes that are, in contrast, conversational and engaging."
 - **API layer**: Uses the Office Common API (`Office.context.document.getSelectedDataAsync` / `setSelectedDataAsync`) with `CoercionType.Text`. Unlike Word or Excel, PowerPoint has no host-specific `run()` context. Text interaction is limited to the active text selection within a shape.
 - **Quick actions**: Bullets, Speaker Notes, Impact (Punchify), Shrink, Visual (draft mode).
 
 ## 9) Known Issues to Watch For
 
-For the most up-to-date list of known issues, architectural gaps, and proposed fixes, always refer to the [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) (v2) file. This document serves as the single source of truth for technical debt and active blocking issues. Key issues to be aware of:
+**ALWAYS consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) before making architectural changes.**
 
-- **C1**: Agent max iterations setting is silently capped at 10 regardless of user setting.
-- **C2**: `.env.example` contains invalid `reasoning_effort=none` which breaks tool use with GPT-5 models.
-- **C3**: Quick actions bypass loading/abort state, preventing stop and risking history corruption.
+This document is the single source of truth for:
+- Issue inventory (CRITICAL/HIGH/MEDIUM/LOW severity)
+- Fix status tracking (✅ FIXED / open)
+- Architectural gaps and technical debt
+- Recommended remediation strategies
+
+Do not duplicate issue tracking here — refer to the authoritative document.
 
 ## 10) Validation Checklist Before Commit
 
@@ -190,6 +208,7 @@ For the most up-to-date list of known issues, architectural gaps, and proposed f
 - If changing templates, manifest generation, ports, or host URLs: regenerate manifests and verify both outputs are updated as expected.
 - If changing model parameters in `config/models.js`: test both streaming (quick actions) AND sync (chat) paths.
 - If changing tool definitions: verify the tool count stays under `MAX_TOOLS` (default 128).
+- **If modifying Dockerfiles**: Ensure only Debian-based images are used (`node:22-slim`, `nginx:stable`). Never introduce Alpine variants (`node:*-alpine`, `nginx:alpine`). See §2 for hardware compatibility requirements.
 
 ## 11) Commit/PR Quality Bar
 
@@ -215,3 +234,9 @@ When the user asks to create a Pull Request, **always follow this exact sequence
    - Create a temporary markdown file (e.g., `.github/pr_body.md`) containing the detailed PR body outlining the changes. This avoids multi-line string escaping errors in PowerShell.
    - Run the GitHub CLI command: `gh pr create --title "feat: Your PR Title" --body-file .github/pr_body.md`
 6. **Notify the User**: Confirm the PR creation and provide the generated link.
+
+## 13)  Strict Agent Instructions
+
+1. **Restricted Scope:** You must STRICTLY remain within the current working directory (kickoffice).
+2. **No Outside Access:** You are strictly forbidden from reading, listing, or modifying files outside of this directory (for example, absolutely no reading of `~/.claude/settings.json` or any other file in `~/`).
+3. **Focus:** Ignore your own system configuration settings when you review code. Focus solely on the source code and files present in this repository.

@@ -15,6 +15,7 @@ import { extractTextFromHtml, reassembleWithFragments, getPreservationInstructio
 import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
+import { setLastRichContext, clearLastRichContext } from '@/utils/richContextStore'
 import {
   getExcelDocumentContext,
   getPowerPointDocumentContext,
@@ -386,12 +387,19 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (hostIsOutlook) appToolDefs = getOutlookToolDefinitions()
     else if (hostIsPowerPoint) appToolDefs = getPowerPointToolDefinitions()
     else if (hostIsExcel) appToolDefs = getExcelToolDefinitions()
-    
+
     const generalToolDefs = getGeneralToolDefinitions()
     const allToolDefs = [...generalToolDefs, ...appToolDefs]
     const enabledToolNames = getEnabledToolNamesFromStorage(allToolDefs.map(def => def.name))
     const enabledToolDefs = allToolDefs.filter(def => enabledToolNames.has(def.name))
     const tools = enabledToolDefs.map(def => ({ type: 'function' as const, function: { name: def.name, description: def.description, parameters: def.inputSchema as Record<string, any> } }))
+
+    // Add preservation instruction to system prompt if we have rich content
+    const richContext = getLastRichContext()
+    if (richContext?.hasRichContent && messages[0]?.role === 'system') {
+      messages[0].content += getPreservationInstruction(richContext)
+    }
+
     let iteration = 0
     const maxIter = Number(agentMaxIterations.value) || 10
     const startTime = Date.now()
@@ -426,26 +434,21 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
       let truncatedByLength = false
       try {
-        let streamStarted = false
         await chatStream({
           messages: contextSafeMessages,
           modelTier,
           tools,
           abortSignal: abortController.value?.signal,
           onStream: (text) => {
-            if (!streamStarted) {
-              streamStarted = true
-              currentAction.value = ''
-            }
+            // Clear action indicator only when actual content arrives
+            currentAction.value = ''
             currentAssistantMessage.content = text
             response.choices[0].message.content = text
             scrollToBottom().catch(console.error)
           },
           onToolCallDelta: (toolCallDeltas) => {
-            if (!streamStarted) {
-              streamStarted = true
-              currentAction.value = ''
-            }
+            // Clear action indicator only when tool calls arrive
+            currentAction.value = ''
             for (const delta of toolCallDeltas) {
               const idx = delta.index
               if (!response.choices[0].message.tool_calls[idx]) {
@@ -652,12 +655,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const htmlPromise = new Promise<string>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000)
         }).catch(() => '') as Promise<string>
-        
+
         try {
           const htmlContent = await Promise.race([getOfficeSelectionAsHtml({ includeOutlookSelectedText: true }), htmlPromise])
           if (htmlContent) {
              const richContext = extractTextFromHtml(htmlContent)
              localSelectedText = richContext.cleanText || localSelectedText
+             // Store rich context globally so tools can access it (especially for Outlook image preservation)
+             if (richContext.hasRichContent) {
+               setLastRichContext(richContext)
+             }
           } else {
              localSelectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
           }
@@ -734,6 +741,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
   }
 
   async function sendMessage(payload?: string, files?: File[]) {
+    // Clear any previous rich context at the start of a new request
+    clearLastRichContext()
+
     let textToSend = ''
 
     if (payload) {
@@ -753,7 +763,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (loading.value) {
       return
     }
-    
+
     loading.value = true
 
     if (!backendOnline.value) {

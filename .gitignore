@@ -26,3 +26,6 @@ generated-manifests/*.xml
 
 # Docker volumes
 backend-data/
+
+# Local Claude settings
+.claude/
