@@ -1,7 +1,7 @@
 import { Ref } from 'vue'
 
 import { detectOfficeHost } from './hostDetection'
-import { renderOfficeRichHtml, stripRichFormattingSyntax } from './markdown'
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './markdown'
 
 function insertHtmlWithCommonApi(html: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -23,7 +23,7 @@ class WordFormatter {
   static async insertFormattedResult(result: string, insertType: Ref<string>): Promise<void> {
     if (!result || !result.trim()) return
 
-    const html = renderOfficeRichHtml(result)
+    const html = renderOfficeCommonApiHtml(result)
     const host = detectOfficeHost()
 
     if (host !== 'Word') {

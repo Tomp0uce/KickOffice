@@ -12,6 +12,27 @@
         @delete-session="handleDeleteSession"
       />
 
+      <div
+        v-if="showNewChatConfirm"
+        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
+      >
+        <p class="text-[13px] font-medium leading-tight text-main">{{ t('newChatConfirm') }}</p>
+        <div class="mt-1 flex justify-end gap-2">
+          <button
+            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
+            @click="showNewChatConfirm = false"
+          >
+            {{ t('cancel') }}
+          </button>
+          <button
+            class="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-bg-tertiary"
+            @click="confirmNewChat"
+          >
+            {{ t('confirm') }}
+          </button>
+        </div>
+      </div>
+
       <QuickActionsBar
         v-model:selected-prompt-id="selectedPromptId"
         :quick-actions="quickActions"
@@ -155,6 +176,7 @@ const selectedPromptId = ref('')
 const customSystemPrompt = ref('')
 const draftFocusGlow = ref(false)
 const backendOnline = ref(false)
+const showNewChatConfirm = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
 const hostIsExcel = isExcel()
@@ -512,8 +534,18 @@ function goToSettings() {
 
 async function startNewChat() {
   if (history.value.length > 0) {
-    if (!window.confirm(t('newChatConfirm'))) return
+    showNewChatConfirm.value = true
+    return
   }
+  await executeNewChat()
+}
+
+async function confirmNewChat() {
+  showNewChatConfirm.value = false
+  await executeNewChat()
+}
+
+async function executeNewChat() {
   if (loading.value) stopGeneration()
   await sessionManager.newSession()
   resetSessionStats()

@@ -19,16 +19,9 @@
       <div
         role="status"
         class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-        :class="
-          backendOnline
-            ? 'bg-green-100 text-green-700'
-            : 'bg-red-100 text-red-700'
-        "
+        :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
       >
-        <div
-          class="h-2 w-2 rounded-full"
-          :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
-        />
+        <div class="h-2 w-2 rounded-full" :class="backendOnline ? 'bg-green-500' : 'bg-red-500'" />
         {{ backendOnline ? backendOnlineLabel : backendOfflineLabel }}
       </div>
     </div>
@@ -45,14 +38,16 @@
       >
         <div class="flex flex-col gap-1">
           <div
+            v-show="
+              item.segments.some(s => s.type !== 'text' || s.text.trim() !== '') ||
+              (item.message.toolCalls && item.message.toolCalls.length > 0) ||
+              item.message.imageSrc
+            "
             class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
           >
-            <template
-              v-for="(segment, idx) in item.segments"
-              :key="`${item.key}-segment-${idx}`"
-            >
+            <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
               <MarkdownRenderer
-                v-if="segment.type === 'text'"
+                v-if="segment.type === 'text' && segment.text.trim() !== ''"
                 :content="segment.text"
               />
               <!-- Enhanced thinking block with brain icon + streaming dots -->
@@ -66,9 +61,7 @@
                   @click="toggleThought(item.key, idx)"
                 >
                   <component
-                    :is="
-                      isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight
-                    "
+                    :is="isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight"
                     :size="10"
                   />
                   <Brain :size="10" />
@@ -78,8 +71,7 @@
                     v-if="
                       loading &&
                       idx === item.segments.length - 1 &&
-                      item.key ===
-                        historyWithSegments[historyWithSegments.length - 1]?.key
+                      item.key === historyWithSegments[historyWithSegments.length - 1]?.key
                     "
                     class="animate-pulse ml-1"
                     >...</span
@@ -92,11 +84,7 @@
                 >
               </div>
             </template>
-            <ToolCallBlock
-              v-for="tc in item.message.toolCalls"
-              :key="tc.id"
-              :tool-call="tc"
-            />
+            <ToolCallBlock v-for="tc in item.message.toolCalls" :key="tc.id" :tool-call="tc" />
             <img
               v-if="item.message.imageSrc"
               :src="item.message.imageSrc"
@@ -104,10 +92,7 @@
               alt="Generated image"
             />
           </div>
-          <div
-            v-if="item.message.timestamp"
-            class="text-[10px] text-secondary/60 px-1"
-          >
+          <div v-if="item.message.timestamp" class="text-[10px] text-secondary/60 px-1">
             {{ formatTime(item.message.timestamp) }}
           </div>
         </div>
@@ -142,6 +127,28 @@
         </div>
       </div>
     </div>
+
+    <!-- Agent Action Indicator (Transferred from StatsBar) -->
+    <div
+      v-if="
+        currentAction ||
+        (loading && history.length > 0 && history[history.length - 1].role !== 'assistant')
+      "
+      class="flex items-end gap-4 assistant mt-2"
+    >
+      <div class="flex min-w-0 flex-1 flex-col gap-1 items-start text-left">
+        <div
+          class="max-w-[95%] rounded-md border border-border-secondary px-3 py-2 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
+        >
+          <div class="flex items-center gap-2 text-accent" role="status" aria-live="polite">
+            <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
+            <Terminal :size="12" v-if="currentAction" />
+            <span class="truncate" v-if="currentAction">{{ currentAction }}</span>
+            <span v-else class="animate-pulse">▊</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -154,76 +161,69 @@ import {
   FileText,
   Plus,
   Sparkles,
-} from "lucide-vue-next";
-import { computed, ref, watch } from "vue";
+  Terminal,
+} from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
 
-import CustomButton from "@/components/CustomButton.vue";
-import MarkdownRenderer from "@/components/chat/MarkdownRenderer.vue";
-import ToolCallBlock from "@/components/chat/ToolCallBlock.vue";
-import type { DisplayMessage, RenderSegment } from "@/types/chat";
+import CustomButton from '@/components/CustomButton.vue'
+import MarkdownRenderer from '@/components/chat/MarkdownRenderer.vue'
+import ToolCallBlock from '@/components/chat/ToolCallBlock.vue'
+import type { DisplayMessage, RenderSegment } from '@/types/chat'
 
 const props = defineProps<{
-  history: DisplayMessage[];
+  history: DisplayMessage[]
   historyWithSegments: Array<{
-    key: string;
-    message: DisplayMessage;
-    segments: RenderSegment[];
-  }>;
-  currentAction: string;
-  loading: boolean;
-  backendOnline: boolean;
-  emptyTitle: string;
-  emptySubtitle: string;
-  backendOnlineLabel: string;
-  backendOfflineLabel: string;
-  replaceSelectedText: string;
-  appendToSelection: string;
-  copyToClipboard: string;
-  thoughtProcessLabel: string;
-}>();
+    key: string
+    message: DisplayMessage
+    segments: RenderSegment[]
+  }>
+  currentAction: string
+  loading: boolean
+  backendOnline: boolean
+  emptyTitle: string
+  emptySubtitle: string
+  backendOnlineLabel: string
+  backendOfflineLabel: string
+  replaceSelectedText: string
+  appendToSelection: string
+  copyToClipboard: string
+  thoughtProcessLabel: string
+}>()
 
 defineEmits<{
-  (
-    e: "insert-message",
-    message: DisplayMessage,
-    type: "replace" | "append",
-  ): void;
-  (e: "copy-message", message: DisplayMessage): void;
-}>();
+  (e: 'insert-message', message: DisplayMessage, type: 'replace' | 'append'): void
+  (e: 'copy-message', message: DisplayMessage): void
+}>()
 
-const containerEl = ref<HTMLElement>();
+const containerEl = ref<HTMLElement>()
 
-const expandedThoughts = ref<Record<string, boolean>>({});
+const expandedThoughts = ref<Record<string, boolean>>({})
 
 function thoughtKey(itemKey: string, segmentIndex: number): string {
-  return `${itemKey}-${segmentIndex}`;
+  return `${itemKey}-${segmentIndex}`
 }
 
 function isThoughtOpen(itemKey: string, segmentIndex: number): boolean {
-  return expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] || false;
+  return expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] || false
 }
 
 function toggleThought(itemKey: string, segmentIndex: number): void {
-  const key = thoughtKey(itemKey, segmentIndex);
-  expandedThoughts.value[key] = !expandedThoughts.value[key];
+  const key = thoughtKey(itemKey, segmentIndex)
+  expandedThoughts.value[key] = !expandedThoughts.value[key]
 }
 
-function onThoughtToggle(
-  itemKey: string,
-  segmentIndex: number,
-  event: Event,
-): void {
-  const detailsEl = event.target as HTMLDetailsElement;
-  expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] = detailsEl.open;
+function onThoughtToggle(itemKey: string, segmentIndex: number, event: Event): void {
+  const detailsEl = event.target as HTMLDetailsElement
+  expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] = detailsEl.open
 }
 
-const liveAnnouncement = ref("");
+const liveAnnouncement = ref('')
 
 function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
+  const date = new Date(timestamp)
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 watch(
@@ -231,36 +231,34 @@ watch(
   (nextLength, previousLength = 0) => {
     // Clean up expandedThoughts for removed messages to prevent memory leaks (PM11)
     if (nextLength < previousLength) {
-      const currentKeys = new Set(
-        props.historyWithSegments.map((item) => item.key),
-      );
+      const currentKeys = new Set(props.historyWithSegments.map(item => item.key))
       for (const key of Object.keys(expandedThoughts.value)) {
-        const itemKey = key.split("-")[0];
+        const itemKey = key.split('-')[0]
         if (!currentKeys.has(itemKey)) {
-          delete expandedThoughts.value[key];
+          delete expandedThoughts.value[key]
         }
       }
     }
 
-    if (nextLength <= previousLength || nextLength === 0) return;
-    const latestMessage = props.history[nextLength - 1];
-    if (!latestMessage) return;
+    if (nextLength <= previousLength || nextLength === 0) return
+    const latestMessage = props.history[nextLength - 1]
+    if (!latestMessage) return
 
-    if (latestMessage.role === "assistant") {
+    if (latestMessage.role === 'assistant') {
       liveAnnouncement.value = latestMessage.content
         ? `Assistant: ${latestMessage.content}`
-        : "Assistant is generating a response.";
-      return;
+        : 'Assistant is generating a response.'
+      return
     }
 
-    if (latestMessage.role === "user") {
-      liveAnnouncement.value = `User: ${latestMessage.content}`;
-      return;
+    if (latestMessage.role === 'user') {
+      liveAnnouncement.value = `User: ${latestMessage.content}`
+      return
     }
 
-    liveAnnouncement.value = latestMessage.content;
+    liveAnnouncement.value = latestMessage.content
   },
-);
+)
 
-defineExpose({ containerEl });
+defineExpose({ containerEl })
 </script>

@@ -117,8 +117,27 @@ export async function getPowerPointDocumentContext(): Promise<string> {
           return { slideNumber: i + 1, title: title || '<No text>' }
         })
 
+        let activeSlideNumber = 1
+        try {
+          if (typeof context.presentation.getSelectedSlides === 'function') {
+            const selectedSlides = context.presentation.getSelectedSlides()
+            selectedSlides.load('items/id')
+            await context.sync()
+            if (selectedSlides.items.length > 0) {
+              const selectedId = selectedSlides.items[0].id
+              const idx = slides.items.findIndex((s: any) => s.id === selectedId)
+              if (idx !== -1) {
+                activeSlideNumber = idx + 1
+              }
+            }
+          }
+        } catch (e) {
+          // ignore error if getSelectedSlides fails
+        }
+
         return JSON.stringify(
           {
+            activeSlideNumber,
             totalSlides: slides.items.length,
             slides: slideInfo,
           },
