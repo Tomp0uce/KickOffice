@@ -178,40 +178,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       await executeOfficeAction(async () => {
         await PowerPoint.run(async (context: any) => {
           const textRange = context.presentation.getSelectedTextRanges().getItemAt(0)
-
-          let styles: InheritedStyles | null = null
-          try {
-            textRange.font.load('name,size,color')
-            await context.sync()
-            styles = {
-              fontFamily: textRange.font.name || '',
-              fontSize: textRange.font.size ? `${textRange.font.size}pt` : '',
-              fontWeight: 'normal',
-              fontStyle: 'normal',
-              color: '', // Do NOT force the original color here, let PowerPoint default to it or let inline HTML override it
-              marginTop: '0pt',
-              marginBottom: '0pt',
-            }
-          } catch (e) {
-            // Ignore if font loading fails
-          }
-
-          // Check for native bullets to prevent double-bullet rendering
-          const nativeBullets = await hasNativeBullets(context, textRange)
-
-          let finalMarkdown = normalizedNewlines
-          if (nativeBullets) {
-            // Shape has native bullets: strip markdown list markers (-, *, 1.) from the LLM response
-            // so they don't get rendered as HTML <ul>/<li> tags, which would cause double-bullets.
-            // But we STILL use insertHtml to preserve inline formatting like **bold** and *italic*.
-            finalMarkdown = stripMarkdownListMarkers(normalizedNewlines)
-          }
-
-          let html = renderOfficeCommonApiHtml(finalMarkdown)
-          if (styles) html = applyInheritedStyles(html, styles)
-          
-          textRange.insertHtml(html, 'Replace')
-
+          await insertMarkdownIntoTextRange(context, textRange, normalizedNewlines)
           await context.sync()
         })
       })
@@ -245,6 +212,37 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       reject(new Error(err?.message || 'setSelectedDataAsync unavailable'))
     }
   })
+}
+
+export async function insertMarkdownIntoTextRange(context: any, textRange: any, text: string) {
+  let styles: InheritedStyles | null = null
+  try {
+    textRange.font.load('name,size,color')
+    await context.sync()
+    styles = {
+      fontFamily: textRange.font.name || '',
+      fontSize: textRange.font.size ? `${textRange.font.size}pt` : '',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      color: '', // Do NOT force the original color here
+      marginTop: '0pt',
+      marginBottom: '0pt',
+    }
+  } catch (e) {
+    // Ignore if font loading fails
+  }
+
+  const nativeBullets = await hasNativeBullets(context, textRange)
+
+  let finalMarkdown = text
+  if (nativeBullets) {
+    finalMarkdown = stripMarkdownListMarkers(text)
+  }
+
+  let html = renderOfficeCommonApiHtml(finalMarkdown)
+  if (styles) html = applyInheritedStyles(html, styles)
+  
+  textRange.insertHtml(html, 'Replace')
 }
 
 function fallbackToText(text: string, resolve: any, reject: any) {
@@ -580,20 +578,39 @@ try {
         if (!slideNumber) throw new Error('Error: slideNumber is required when shapeIdOrName is provided.')
         
         const slides = context.presentation.slides
-        const idx = Math.trunc(Number(slideNumber)) - 1
-        const slide = slides.getItemAt(idx)
-        const shape = slide.shapes.getItemOrNullObject(shapeIdOrName)
-        shape.load('isNullObject')
+        slides.load('items')
         await context.sync()
 
-        if (shape.isNullObject) throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}.`)
+        const idx = Math.trunc(Number(slideNumber)) - 1
+        if (idx < 0 || idx >= slides.items.length) {
+          throw new Error(`Error: Invalid slide number ${slideNumber}`)
+        }
+
+        const slide = slides.items[idx]
+        const shapes = slide.shapes
+        shapes.load('items,items/id,items/name')
+        await context.sync()
+
+        let shape: any = null
+        for (const s of shapes.items) {
+          if (s.id === shapeIdOrName || s.name === shapeIdOrName) {
+            shape = s
+            break
+          }
+        }
+
+        if (!shape) {
+          const availableShapes = shapes.items.map((s: any) => `'${s.name}' (id: ${s.id})`).join(', ')
+          throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}. Available shapes are: ${availableShapes}`)
+        }
         
         const textRange = shape.textFrame.textRange
         if (isPowerPointApiSupported('1.5')) {
           try {
-            textRange.insertHtml(renderOfficeCommonApiHtml(content), 'Replace')
+            const normalizedNewlines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+            await insertMarkdownIntoTextRange(context, textRange, normalizedNewlines)
           } catch (e) {
-            console.warn('insertHtml failed or not available, falling back to text modification', e)
+            console.warn('insertMarkdownIntoTextRange failed, falling back to text modification', e)
             textRange.text = stripRichFormattingSyntax(content)
           }
         } else {

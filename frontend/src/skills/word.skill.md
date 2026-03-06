@@ -21,7 +21,7 @@
 | -------------------- | -------------------------------------------------------------- |
 | `proposeRevision`    | **PREFERRED** for editing existing text. Preserves formatting! |
 | `searchAndReplace`   | Fix specific words/phrases throughout document                 |
-| `insertContent`      | Add new content (supports Markdown tables, lists)              |
+| `insertContent`      | Add new content (Markdown + inline color/style syntax)         |
 | `insertHyperlink`    | Add clickable links                                            |
 | `addComment`         | Add review comments                                            |
 | `insertHeaderFooter` | Add headers/footers                                            |
@@ -29,17 +29,75 @@
 
 ### For FORMATTING:
 
-**CRITICAL RULE FOR FORMATTING**: The `formatText` tool ONLY works on the user's active selection. If you just inserted text (e.g., from a generated response or a PDF), it is NOT selected. You CANNOT format it with `formatText`.
-To format newly inserted text or apply colors without a selection:
+**CRITICAL RULE**: The `formatText` tool ONLY works when text is already selected by the user. If you just inserted text via `insertContent`, it is NOT selected — you CANNOT color/bold it with `formatText` after the fact.
 
-1. Use `applyTaggedFormatting` by inserting text wrapped in `<format>` tags: `<format color='red'>text</format>` or `<format bold='true' size='14'>Heading</format>`.
-2. Or use `searchAndReplace` to find the text and apply formatting by passing the `format` object.
+To apply any formatting (color, bold, italic, underline, highlight, font size…) to newly inserted or existing text, use one of these two workflows:
 
-| Tool                 | When to use                                       |
-| -------------------- | ------------------------------------------------- |
-| `formatText`         | Apply bold, italic, color, highlight to selection |
-| `applyStyle`         | Apply Word styles (Heading 1, Title, Quote...)    |
-| `setParagraphFormat` | Set alignment, spacing, indentation               |
+---
+
+#### WORKFLOW A — Inline syntax in `insertContent` (PREFERRED for full rewrites with formatting)
+
+Embed formatting directly into the `content` string:
+
+| Effect        | Syntax                             | Example                                         |
+| ------------- | ---------------------------------- | ----------------------------------------------- |
+| **Color**     | `[color:#HEX]text[/color]`         | `[color:#228B22]important[/color]` → green text |
+| **Bold**      | `**text**`                         | `**critical**`                                  |
+| **Italic**    | `*text*`                           | `*note*`                                        |
+| **Underline** | `__text__`                         | `__key term__`                                  |
+| **Highlight** | Not in markdown — use Workflow B   |                                                 |
+| **Combined**  | `[color:#CC0000]**error**[/color]` | Red + bold                                      |
+
+Common hex colors: green `#228B22`, red `#CC0000`, blue `#1F4E79`, orange `#D86000`, purple `#7030A0`
+
+Example:
+
+```json
+{
+  "content": "La [color:#228B22]conquête spatiale[/color] a souvent été **racontée** comme une aventure.",
+  "location": "Replace",
+  "target": "Body"
+}
+```
+
+---
+
+#### WORKFLOW B — `applyTaggedFormatting` (PREFERRED when not rewriting the whole text)
+
+Use this to apply any formatting to specific words **already in the document** without replacing everything.
+
+**Step 1** — Insert the document with `<yourTag>` around words to format:
+
+```json
+{
+  "content": "La <highlight>conquête spatiale</highlight> a souvent été racontée…",
+  "location": "Replace",
+  "target": "Body"
+}
+```
+
+**Step 2** — Call `applyTaggedFormatting` to convert the tags to real formatting:
+
+```json
+{
+  "tagName": "highlight",
+  "color": "#228B22",
+  "bold": true
+}
+```
+
+You can pass any combination of: `color`, `bold`, `italic`, `underline`, `strikethrough`, `fontSize`, `fontName`, `highlightColor`, `allCaps`, `superscript`, `subscript`.
+
+---
+
+> ⚠️ **NEVER substitute bold/italic for a requested color.** If the user says "mettre en vert", use `[color:#228B22]` or `applyTaggedFormatting` with `color`. Bold is NOT an acceptable replacement for color.
+
+| Tool                    | When to use                                           |
+| ----------------------- | ----------------------------------------------------- |
+| `formatText`            | Apply formatting to the user's current selection only |
+| `applyTaggedFormatting` | Apply formatting to tagged spans across the document  |
+| `applyStyle`            | Apply Word named styles (Heading 1, Title, Quote…)    |
+| `setParagraphFormat`    | Set alignment, spacing, indentation                   |
 
 ### For TABLES:
 
@@ -62,31 +120,29 @@ To format newly inserted text or apply colors without a selection:
 User wants to modify existing text?
 ├─ YES: Is it a simple word/phrase replacement?
 │   ├─ YES → Use `searchAndReplace`
-│   └─ NO (rewriting sentences/paragraphs) → Use `proposeRevision`
-└─ NO: Adding new content?
-    ├─ YES → Use `insertContent`
-    └─ NO: Something else?
-        ├─ Formatting → Use `formatText` or `applyStyle`
-        ├─ Comments → Use `addComment`
-        ├─ Tables → Use table tools
-        └─ None of above → Use `eval_wordjs`
+│   └─ NO (rewriting paragraphs) → Use `proposeRevision`
+└─ NO: Adding new content or rewriting WITH formatting?
+    ├─ YES, with color/bold/etc → Use `insertContent` with [color:] / **bold** inline syntax
+    ├─ YES, apply formatting to existing doc → Use `applyTaggedFormatting` (Workflow B)
+    ├─ Formatting on user's active selection only → Use `formatText`
+    ├─ Comments → Use `addComment`
+    ├─ Tables → Use table tools
+    └─ None of above → Use `eval_wordjs`
 ```
 
 ## proposeRevision vs insertContent
 
 **Use proposeRevision when:**
 
-- Editing existing text
-- User says "fix", "correct", "improve", "rewrite", "edit"
-- You want to preserve formatting on unchanged portions
-- Track Changes would be helpful for user review
+- Editing existing text (fix, correct, improve, rewrite, edit)
+- You want to preserve existing formatting on unchanged portions
 
 **Use insertContent when:**
 
 - Adding completely new content
-- Creating tables, lists from scratch
-- Appending to document
+- Creating tables or lists from scratch
 - User says "add", "insert", "create", "write"
+- User wants a rewrite **with color/formatting** (use inline syntax)
 
 ## WORD-SPECIFIC API PATTERNS
 
@@ -121,7 +177,6 @@ const paragraphs = context.document.body.paragraphs
 paragraphs.load('items,items/text')
 await context.sync()
 
-// Access by index
 const firstPara = paragraphs.items[0]
 ```
 
@@ -137,20 +192,16 @@ await context.sync()
 
 ### Error: "The property 'text' is not available"
 
-**Cause**: Forgot to load() before reading
 **Fix**: Add `range.load('text')` before `context.sync()`
 
 ### Error: "Cannot read items of undefined"
 
-**Cause**: Trying to access collection without loading
 **Fix**: Add `.load('items')` to the collection
 
 ### Error: "The operation failed because the object doesn't exist"
 
-**Cause**: Range was deleted or document structure changed
 **Fix**: Re-acquire the range reference after structural changes
 
 ### Error: Empty text when selection exists
 
-**Cause**: User selected image/table, not text
 **Fix**: Check and inform user to select text content

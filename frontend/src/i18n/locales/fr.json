@@ -141,6 +141,7 @@
   "filesOversized": "{count} fichier(s) ignoré(s) : taille > 10MB.",
   "filesRejected": "{count} fichier(s) ignoré(s) : format non supporté.",
   "newChatConfirm": "Ceci effacera la conversation en cours. Continuer ?",
+  "deleteSessionConfirm": "Cette conversation sera définitivement supprimée. Continuer ?",
   "noModelResponse": "Le modèle a renvoyé une réponse vide. Réessayez ou consultez les logs du backend.",
   "toolsExecutedSuccessfully": "Actions terminées avec succès. Vérifiez le document pour voir les modifications.",
   "polish": "Réécrire",
