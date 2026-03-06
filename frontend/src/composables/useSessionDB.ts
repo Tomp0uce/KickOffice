@@ -6,6 +6,7 @@
 import type { DisplayMessage } from '@/types/chat'
 import { snapshotVfs, restoreVfs } from '@/utils/vfs'
 import { randomUUID } from '@/utils/cryptoPolyfill'
+import { message as messageUtil } from '@/utils/message'
 
 export interface VfsFile {
   path: string
@@ -152,7 +153,14 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
   const session = await idbGet<ChatSession>(store, sessionId)
   if (!session) return
   // Deep-clone to strip Vue reactive proxies — IDB's structured clone algorithm cannot serialize them
-  const plainMessages: DisplayMessage[] = JSON.parse(JSON.stringify(messages))
+  let plainMessages: DisplayMessage[] = JSON.parse(JSON.stringify(messages))
+  
+  // H6 Fix: Prune chat history to prevent unbounded growth max (200)
+  const MAX_HISTORY = 200
+  if (plainMessages.length > MAX_HISTORY) {
+    plainMessages = plainMessages.slice(plainMessages.length - MAX_HISTORY)
+  }
+
   const newName = (session.name === 'New Chat') ? formatSessionDate(session.createdAt) : session.name
   // Snapshot VFS state for this session
   let vfsFiles: VfsFile[] = []
@@ -161,7 +169,14 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
   } catch (e) {
     console.warn('[SessionDB] Failed to snapshot VFS', e)
   }
-  await idbPut(store, { ...session, messages: plainMessages, vfsFiles, name: newName, updatedAt: Date.now() })
+
+  // H2 Fix: Catch IndexedDB QuotaExceeded errors
+  try {
+    await idbPut(store, { ...session, messages: plainMessages, vfsFiles, name: newName, updatedAt: Date.now() })
+  } catch (putErr) {
+    console.error('[SessionDB] Failed to save session:', putErr)
+    messageUtil.error('Failed to save chat data. Browser local storage might be full.')
+  }
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

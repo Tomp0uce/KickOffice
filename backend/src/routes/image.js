@@ -7,8 +7,11 @@ import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'
 
 const imageRouter = Router()
+const VERBOSE_LOGGING_ENABLED = process.env.VERBOSE_LOGGING === 'true'
+const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-IMAGE]') : () => {}
 
 imageRouter.post('/', async (req, res) => {
+  verboseLog(` /api/image incoming request`)
   const parsedPayload = validateImagePayload(req.body)
   if (parsedPayload.error) {
     return logAndRespond(res, 400, { error: parsedPayload.error }, 'POST /api/image')
@@ -24,6 +27,8 @@ imageRouter.post('/', async (req, res) => {
       },
       userCredentials: req.userCredentials,
     })
+
+    verboseLog(` /api/image upstream payload`, { model: imageModel.id, promptLength: parsedPayload.value.prompt.length })
 
     if (!response.ok) {
       await handleErrorResponse(response, '/api/image')

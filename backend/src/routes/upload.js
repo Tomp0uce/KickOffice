@@ -9,13 +9,17 @@ import { systemLog } from '../utils/logger.js'
 
 const uploadRouter = Router()
 
+const UPLOAD_MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB max file size
+const UPLOAD_MAX_FIELD_SIZE = 1024 // 1KB per non-file field
+const TEXT_MAX_CHARS = 100000 // approx 25-30k tokens context limit
+
 // Configure multer to store files in memory
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fileSize: UPLOAD_MAX_FILE_SIZE,
     fields: 10,
-    fieldSize: 1024, // 1KB per non-file field
+    fieldSize: UPLOAD_MAX_FIELD_SIZE,
   }
 })
 
@@ -47,10 +51,16 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
     // PDF Extraction
     if (mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
-      const parser = new PDFParse({ data: file.buffer })
-      const data = await parser.getText()
-      await parser.destroy()
-      extractedText = data.text
+      try {
+        const parser = new PDFParse({ data: file.buffer })
+        const data = await parser.getText()
+        await parser.destroy()
+        if (!data || !data.text) throw new Error('Empty or unreadable PDF')
+        extractedText = data.text
+      } catch (pdfErr) {
+        systemLog('ERROR', 'PDF extraction failed', pdfErr)
+        return logAndRespond(res, 400, { error: 'Failed to extract text from PDF. The file may be corrupted or encrypted.' }, 'POST /api/upload')
+      }
     } 
     // DOCX Extraction
     else if (
@@ -110,10 +120,8 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     }
 
     // Limit text size to prevent enormous context windows (approx context token limit defense)
-    // 100k chars is roughly 25-30k tokens
-    const MAX_CHARS = 100000 
-    if (extractedText.length > MAX_CHARS) {
-        extractedText = extractedText.substring(0, MAX_CHARS) + '\n\n... [Content truncated due to file size]'
+    if (extractedText.length > TEXT_MAX_CHARS) {
+        extractedText = extractedText.substring(0, TEXT_MAX_CHARS) + '\n\n... [Content truncated due to file size]'
     }
 
     res.json({

@@ -6,7 +6,7 @@
   >
     <!-- Shell activity indicator -->
     <div
-      v-if="currentAction"
+      v-if="currentAction || loading"
       class="flex items-center gap-1.5 text-accent"
       role="status"
       aria-live="polite"
@@ -14,8 +14,11 @@
       <span
         class="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-accent"
       />
-      <Terminal :size="9" />
-      <span class="truncate max-w-[120px]">{{ currentAction }}</span>
+      <Terminal :size="9" v-if="currentAction" />
+      <span class="truncate max-w-[120px]" v-if="currentAction">{{
+        currentAction
+      }}</span>
+      <span v-else class="animate-pulse">▊</span>
     </div>
 
     <!-- Token counts -->
@@ -32,12 +35,19 @@
       >
         ↓{{ formatTokens(sessionStats.outputTokens) }}
       </span>
-      <span
+      <div
         v-if="contextWindowTokens > 0 && sessionStats.inputTokens > 0"
+        class="ml-1 flex items-center gap-1 w-20"
         :title="`Context usage: ${sessionStats.inputTokens} / ${contextWindowTokens} tokens`"
       >
-        {{ contextPct }}%/{{ formatTokens(contextWindowTokens) }}
-      </span>
+        <div class="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
+          <div
+            class="h-full bg-accent transition-all"
+            :style="{ width: contextPct + '%' }"
+          ></div>
+        </div>
+        <span class="text-[9px]">{{ contextPct }}%</span>
+      </div>
     </div>
 
     <!-- Model name -->
@@ -62,6 +72,7 @@ const props = defineProps<{
   modelName?: string;
   contextWindowTokens?: number;
   currentAction?: string;
+  loading?: boolean;
 }>();
 
 const hasStats = computed(

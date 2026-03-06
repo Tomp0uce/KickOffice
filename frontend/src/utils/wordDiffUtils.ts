@@ -79,7 +79,6 @@ export async function applyRevisionToSelection(
     onLog: (msg, level) => {
       if (level === 'error') console.error('[WordDiff]', msg)
       else if (level === 'warn') console.warn('[WordDiff]', msg)
-      else console.log('[WordDiff]', msg)
     },
   })
 

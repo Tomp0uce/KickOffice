@@ -53,7 +53,7 @@ export function categorizeError(error: unknown): CategorizedError {
     return { type: 'network', i18nKey: 'errorNetwork' }
   }
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase()
-  if (msg.includes('401') || msg.includes('credentials') || msg.includes('x-user-key') || msg.includes('x-user-email')) {
+  if (msg.includes('401') || msg.includes('403') || msg.includes('credentials') || msg.includes('x-user-key') || msg.includes('x-user-email')) {
     return { type: 'auth', i18nKey: 'credentialsRequired' }
   }
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many')) {
@@ -238,6 +238,12 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
+    
+    // Safety check against unbounded memory growth (5MB limit)
+    if (buffer.length > 5 * 1024 * 1024) {
+      throw new Error('SSE stream buffer exceeded maximum allowed size')
+    }
+    
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
 

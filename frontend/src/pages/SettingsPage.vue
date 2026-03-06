@@ -52,7 +52,7 @@
         >
           <!-- Account Settings (LiteLLM credentials) -->
           <div
-            v-show="currentTab === 'account'"
+            v-if="currentTab === 'account'"
             role="tabpanel"
             class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
           >
@@ -155,7 +155,7 @@
 
           <!-- General Settings -->
           <div
-            v-show="currentTab === 'general'"
+            v-if="currentTab === 'general'"
             role="tabpanel"
             class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
           >
@@ -335,7 +335,7 @@
 
           <!-- Prompts Settings -->
           <div
-            v-show="currentTab === 'prompts'"
+            v-if="currentTab === 'prompts'"
             role="tabpanel"
             class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1"
           >
@@ -453,7 +453,7 @@
 
           <!-- Built-in Prompts Settings -->
           <div
-            v-show="currentTab === 'builtinPrompts'"
+            v-if="currentTab === 'builtinPrompts'"
             role="tabpanel"
             class="flex w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1"
           >
@@ -566,7 +566,7 @@
 
           <!-- Tools Settings -->
           <div
-            v-show="currentTab === 'tools'"
+            v-if="currentTab === 'tools'"
             role="tabpanel"
             class="w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1"
           >
@@ -699,8 +699,8 @@ const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
 const darkMode = useStorage(localStorageKey.darkMode, false);
 
 // Credential storage with secure persistence
-const litellmUserKey = ref('');
-const litellmUserEmail = ref('');
+const litellmUserKey = ref("");
+const litellmUserEmail = ref("");
 const rememberCredentials = ref(getRememberCredentials());
 const cryptoAvailable = ref(isCryptoAvailable());
 

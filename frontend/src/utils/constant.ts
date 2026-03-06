@@ -108,7 +108,8 @@ Text: ${text}`,
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your primary focus is correcting grammar, spelling, and phrasing.
+      `You are a meticulous proofreader. Your primary focus is strictly correcting grammar, spelling, and typos.
+      CRITICAL INSTRUCTION: You MUST NEVER make stylistic, vocabulary, or phrasing suggestions. Only fix objective errors.
       CRITICAL INSTRUCTION: You MUST NOT return replacement text directly. You MUST use the \`addComment\` tool to suggest corrections to the user.`,
     user: (text: string, language: string) =>
       `Task: Check and correct the grammar of the following text using the \`addComment\` tool.

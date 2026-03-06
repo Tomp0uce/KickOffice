@@ -185,7 +185,9 @@ export async function executeAgentToolCall(
   const toolName = toolCall.function.name
   let toolArgs: Record<string, any> = {}
   try {
-    toolArgs = JSON.parse(toolCall.function.arguments)
+    const parsed = JSON.parse(toolCall.function.arguments)
+    // M3: Runtime object check instead of unchecked type assertion
+    toolArgs = typeof parsed === 'object' && parsed !== null ? parsed : {}
   } catch (parseErr) {
     console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
     if (assistantMessage) {
@@ -429,7 +431,14 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         currentAssistantMessage.content += `\n\n⚠️ ${t('agentMaxIterationsReached')}`
         break
       }
-      currentAction.value = t('agentAnalyzing')
+      
+      // H11: Show "agentAnalyzing" initially, or "agentWaitingForLLM" if tools were just executed and we are generating a response
+      if (iteration === 1) {
+        currentAction.value = t('agentAnalyzing')
+      } else {
+        currentAction.value = t('agentWaitingForLLM')
+      }
+
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
@@ -561,7 +570,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       for (const toolResult of toolResults) {
         currentMessages.push({ role: 'tool', tool_call_id: toolResult.tool_call_id, content: toolResult.content })
       }
-      currentAction.value = t('agentAnalyzing')
+      
+      // H11: Switch status from tool execution to waiting for LLM response
+      currentAction.value = t('agentWaitingForLLM')
     }
 
     // P8: Persist full tool call sequence in history so subsequent turns have context
@@ -605,7 +616,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       messageUtil.error(t('selectEmailPrompt'))
       return
     }
-    const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
+    // M2: Centralized LocalStorage Language Preference with validation
+    const storedLang = localStorage.getItem('localLanguage')
+    const validLangs = ['en', 'fr']
+    const langKey = validLangs.includes(storedLang || '') ? storedLang : 'fr' // Default to fr safely
+    const lang = langKey === 'en' ? 'English' : 'Français'
+    
     const replyPrompt = getOutlookBuiltInPrompt()['reply']
     const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
     const sanitizedEmail = '\\n<email_content>\\n' + emailBody.replace(new RegExp('</?email_content>', 'g'), '') + '\\n<'+'/email_content>\\n'
@@ -683,7 +699,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     return localSelectedText
   }
 
-  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string }>) {
+  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string }>, injectedContext?: string) {
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -696,14 +712,23 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       } catch (err: unknown) {
         console.error('[AgentLoop] image generation failed', err)
         const message = history.value[history.value.length - 1]
-        message.role = 'assistant'; message.content = t('imageError'); message.imageSrc = undefined
+        const errInfo = categorizeError(err)
+        const baseMsg = t(errInfo.i18nKey)
+        const detail = err instanceof Error ? err.message : String(err)
+        message.role = 'assistant'; message.content = `${baseMsg}\n\n${detail}`; message.imageSrc = undefined
       } finally {
         imageLoading.value = false
       }
       await scrollToBottom() // Final scroll after image loads
       return
     }
-    const systemPrompt = customSystemPrompt.value || agentPrompt(localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français')
+
+    // M2: Centralized LocalStorage Language Preference with validation
+    const storedLang = localStorage.getItem('localLanguage')
+    const langKey = ['en', 'fr'].includes(storedLang || '') ? storedLang : 'fr'
+    const lang = langKey === 'en' ? 'English' : 'Français'
+    const systemPrompt = customSystemPrompt.value || agentPrompt(lang)
+    
     const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
@@ -719,6 +744,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
         if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
           messages[lastUserIdx].content += `\n\n<doc_context>\n${docContextJson}\n</doc_context>`
+        }
+      }
+      if (injectedContext) {
+        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+        if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
+          messages[lastUserIdx].content += `\n\n<attached_files>\n${injectedContext}\n</attached_files>`
         }
       }
     } catch (ctxErr) {
@@ -859,13 +890,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
            const sanitizedText = '\\n<document_content>\\n' + selectedText.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
            fullMessage += '\\n\\n[' + selectionLabel + ']: ' + sanitizedText
         }
-        if (extractedFilesContext) {
-           fullMessage += extractedFilesContext
-        }
         history.value[history.value.length - 1].content = fullMessage.trim()
       }
 
-      await processChat(fullMessage.trim(), uploadedImages.length > 0 ? uploadedImages : undefined)
+      await processChat(fullMessage.trim(), uploadedImages.length > 0 ? uploadedImages : undefined, extractedFilesContext)
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)

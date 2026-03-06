@@ -87,6 +87,8 @@
         :session-stats="sessionStats"
         :model-name="selectedModelInfo?.id ?? selectedModelTier"
         :current-action="currentAction"
+        :context-window-tokens="MAX_CONTEXT_CHARS"
+        :loading="loading"
       />
     </div>
   </div>
@@ -103,6 +105,8 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import { useStorage } from "@vueuse/core";
 import {
@@ -546,6 +550,9 @@ function goToSettings() {
 }
 
 async function startNewChat() {
+  if (history.value.length > 0) {
+    if (!window.confirm(t("newChatConfirm"))) return;
+  }
   if (loading.value) stopGeneration();
   await sessionManager.newSession();
   resetSessionStats();
@@ -622,6 +629,14 @@ onBeforeMount(async () => {
   checkBackend();
   backendCheckInterval.value = window.setInterval(checkBackend, 30000);
   await sessionManager.init();
+});
+
+onActivated(() => {
+  loadSavedPrompts();
+});
+
+onDeactivated(() => {
+  if (loading.value) stopGeneration();
 });
 
 onMounted(() => {
