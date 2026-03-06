@@ -361,12 +361,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   function buildChatMessages(systemPrompt: string): ChatMessage[] {
     const msgs: ChatRequestMessage[] = [{ role: 'system', content: systemPrompt }]
     for (const m of history.value) {
-      if (m.rawMessages && m.rawMessages.length > 0) {
-        // This includes the assistant message and all tool responses from that turn
-        msgs.push(...m.rawMessages)
-      } else {
-        msgs.push({ role: m.role, content: m.content })
+      let contentToKeep = m.content;
+      // If the assistant message only had tool calls and no content, ensure it's not totally empty
+      if (m.role === 'assistant' && !contentToKeep?.trim() && m.rawMessages && m.rawMessages.length > 0) {
+        contentToKeep = `[Tools executed internally]`;
       }
+      msgs.push({ role: m.role, content: contentToKeep || '' })
     }
     return msgs as ChatMessage[]
   }
@@ -600,6 +600,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     if (Date.now() - startTime >= timeoutMs) messageUtil.warning(t('recursionLimitExceeded'))
     currentAction.value = ''
+
+    await nextTick()
+    await scrollToVeryBottom()
   }
 
   async function handleSmartReply(userMessage: string) {
@@ -828,7 +831,60 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       } catch (err) {
         console.warn('[AgentLoop] Failed to fetch selection for image generation', err)
       }
-      const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+      let wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+      
+      if (wordCount < 5 && hostIsPowerPoint) {
+        try {
+          const { executeOfficeAction } = await import('@/utils/officeAction')
+          selectedText = await executeOfficeAction(() => {
+            const PPT = (window as any).PowerPoint
+            if (!PPT) return Promise.resolve('')
+            return PPT.run(async (context: any) => {
+              let activeSlideIndex = 0
+              try {
+                if (typeof context.presentation.getSelectedSlides === 'function') {
+                  const selectedSlides = context.presentation.getSelectedSlides()
+                  selectedSlides.load('items/id')
+                  await context.sync()
+                  if (selectedSlides.items.length > 0) {
+                    const slides = context.presentation.slides
+                    slides.load('items/id')
+                    await context.sync()
+                    const selectedId = selectedSlides.items[0].id
+                    const idx = slides.items.findIndex((s: any) => s.id === selectedId)
+                    if (idx !== -1) activeSlideIndex = idx
+                  }
+                }
+              } catch (e) {}
+
+              const slides = context.presentation.slides
+              slides.load('items')
+              await context.sync()
+              if (activeSlideIndex >= slides.items.length) return ''
+              const slide = slides.items[activeSlideIndex]
+
+              const shapes = slide.shapes
+              shapes.load('items')
+              await context.sync()
+
+              for (const shape of shapes.items) {
+                try { shape.textFrame.textRange.load('text') } catch {}
+              }
+              await context.sync()
+
+              const texts = []
+              for (const shape of shapes.items) {
+                try { texts.push((shape.textFrame.textRange.text || '').trim()) } catch {}
+              }
+              return texts.filter(Boolean).join('\n')
+            })
+          })
+          wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+        } catch (e) {
+          console.warn('[AgentLoop] Fallback to PowerPoint slide content failed', e)
+        }
+      }
+
       if (wordCount < 5) {
         loading.value = false
         return messageUtil.error(t('fileExtractError'))
@@ -883,7 +939,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
       // Only append context to standard text chats, not pure image generations
       if (isImageFromSelection) {
-        fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
+        if (hostIsPowerPoint) {
+          fullMessage = t('pptVisualPrefix') + '\n' + selectedText
+        } else {
+          fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
+        }
       } else {
         if (selectedText) {
            const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'

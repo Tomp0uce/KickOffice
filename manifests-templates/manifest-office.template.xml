@@ -28,6 +28,7 @@
   </Hosts>
   <DefaultSettings>
     <SourceLocation DefaultValue="{{FRONTEND_URL}}/index.html" />
+    <RequestedWidth>450</RequestedWidth>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>

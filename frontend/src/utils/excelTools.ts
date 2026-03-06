@@ -465,7 +465,7 @@ const excelToolDefinitions = createExcelTools({
           if (!source) return 'Error: source range is required to create a pivot table.'
           if (!name) return 'Error: name is required to create a pivot table (used as the pivot table name).'
           const destRange = anchor ? sheet.getRange(anchor) : sheet.getRange('A1')
-          sheet.pivotTables.add(source, destRange, name)
+          sheet.pivotTables.add(name, source, destRange)
           await context.sync()
           return `Successfully created pivot table "${name}" from range ${source}.`
         }

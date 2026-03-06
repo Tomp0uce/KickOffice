@@ -360,6 +360,9 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
+      if (typeof searchText === 'string' && searchText.length > 255) {
+        throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
+      }
       
         const body = context.document.body
         const searchResults = body.search(searchText, {
@@ -442,6 +445,9 @@ const wordToolDefinitions = createWordTools({
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
+      if (typeof searchText === 'string' && searchText.length > 255) {
+        throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
+      }
       
         const body = context.document.body
         const searchResults = body.search(searchText, {

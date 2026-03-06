@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1"
-  >
+  <div class="flex justify-between rounded-sm border border-[#33ABC6]/20 bg-surface/90 p-1">
     <div class="flex flex-1 items-center gap-2 text-accent">
       <img
         src="/Logo.png"
@@ -9,8 +7,8 @@
         class="h-8 w-8 rounded-sm border border-black/10 bg-white object-contain p-0.5"
       />
       <div class="flex flex-col leading-none">
-        <span class="text-sm font-semibold text-main">{{ t("appTitle") }}</span>
-        <span class="text-[10px] text-[#33ABC6]">{{ t("appSubtitle") }}</span>
+        <span class="text-sm font-semibold text-main">{{ t('appTitle') }}</span>
+        <span class="text-[10px] text-[#33ABC6]">{{ t('appSubtitle') }}</span>
       </div>
     </div>
 
@@ -18,7 +16,7 @@
     <div class="relative flex items-center" ref="dropdownRef">
       <button
         type="button"
-        class="flex items-center gap-1 px-2 py-1 rounded text-xs text-secondary hover:bg-bg-tertiary transition-colors max-w-[120px]"
+        class="flex flex-1 items-center gap-1 px-2 py-1 rounded text-xs text-secondary hover:bg-bg-tertiary transition-colors max-w-[200px]"
         :disabled="loading"
         :title="currentSessionName"
         @click="dropdownOpen = !dropdownOpen"
@@ -43,15 +41,13 @@
           type="button"
           class="w-full flex items-center gap-2 px-3 py-2 text-xs border-b border-border-secondary transition-colors"
           :class="
-            loading
-              ? 'text-secondary cursor-not-allowed'
-              : 'text-accent hover:bg-bg-tertiary'
+            loading ? 'text-secondary cursor-not-allowed' : 'text-accent hover:bg-bg-tertiary'
           "
           :disabled="loading"
           @click="handleNewChat"
         >
           <Plus :size="13" />
-          {{ t("newChat", "New Chat") }}
+          {{ t('newChat', 'New Chat') }}
         </button>
 
         <!-- Session list -->
@@ -62,9 +58,7 @@
             type="button"
             class="flex items-center justify-between px-3 py-2 text-xs w-full text-left transition-colors"
             :class="[
-              session.id === currentSessionId
-                ? 'bg-bg-tertiary'
-                : 'hover:bg-bg-tertiary',
+              session.id === currentSessionId ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary',
               loading && session.id !== currentSessionId
                 ? 'opacity-50 cursor-not-allowed'
                 : 'cursor-pointer',
@@ -93,24 +87,17 @@
           type="button"
           class="w-full flex items-center gap-2 px-3 py-2 text-xs border-t border-border-secondary transition-colors"
           :class="
-            loading
-              ? 'text-secondary cursor-not-allowed'
-              : 'text-red-500 hover:bg-bg-tertiary'
+            loading ? 'text-secondary cursor-not-allowed' : 'text-red-500 hover:bg-bg-tertiary'
           "
           :disabled="loading"
           @click="handleDeleteSession"
         >
           <Trash2 :size="13" />
-          {{ t("deleteSession", "Delete session") }}
+          {{ t('deleteSession', 'Delete session') }}
         </button>
       </div>
     </div>
 
-    <div class="mr-1 flex items-center gap-1">
-      <span class="h-2 w-2 rounded-full bg-[#33ABC6]" />
-      <span class="h-2 w-2 rounded-full bg-black" />
-      <span class="h-2 w-2 rounded-full border border-black/30 bg-white" />
-    </div>
     <div class="flex items-center gap-1 rounded-md border border-accent/10">
       <CustomButton
         :title="settingsTitle"
@@ -126,72 +113,65 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
-import { useI18n } from "vue-i18n";
-import {
-  Check,
-  ChevronDown,
-  MessageSquare,
-  Plus,
-  Settings,
-  Trash2,
-} from "lucide-vue-next";
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { Check, ChevronDown, MessageSquare, Plus, Settings, Trash2 } from 'lucide-vue-next'
 
-import CustomButton from "@/components/CustomButton.vue";
-import type { ChatSession } from "@/composables/useSessionManager";
-import { getSessionMessageCount } from "@/composables/useSessionManager";
+import CustomButton from '@/components/CustomButton.vue'
+import type { ChatSession } from '@/composables/useSessionManager'
+import { getSessionMessageCount } from '@/composables/useSessionManager'
 
-const { t } = useI18n();
+const { t } = useI18n()
 
 const props = defineProps<{
-  settingsTitle: string;
-  loading: boolean;
-  sessions: ChatSession[];
-  currentSessionId: string | null;
-}>();
+  settingsTitle: string
+  loading: boolean
+  sessions: ChatSession[]
+  currentSessionId: string | null
+}>()
 
 const emit = defineEmits<{
-  (e: "new-chat"): void;
-  (e: "settings"): void;
-  (e: "switch-session", sessionId: string): void;
-  (e: "delete-session"): void;
-}>();
+  (e: 'new-chat'): void
+  (e: 'settings'): void
+  (e: 'switch-session', sessionId: string): void
+  (e: 'delete-session'): void
+}>()
 
-const dropdownOpen = ref(false);
-const dropdownRef = ref<HTMLElement>();
+const dropdownOpen = ref(false)
+const dropdownRef = ref<HTMLElement>()
 
 const currentSessionName = computed(() => {
-  const session = props.sessions.find((s) => s.id === props.currentSessionId);
-  const name = session?.name ?? t("newChat");
-  return name.length > 18 ? `${name.slice(0, 16)}…` : name;
-});
+  const session = props.sessions.find(s => s.id === props.currentSessionId)
+  const name = session?.name ?? t('newChat')
+  return name.length > 30 ? `${name.slice(0, 28)}…` : name
+})
 
 function handleNewChat() {
-  dropdownOpen.value = false;
-  emit("new-chat");
+  dropdownOpen.value = false
+  emit('new-chat')
 }
 
 function handleSwitchSession(sessionId: string) {
-  dropdownOpen.value = false;
-  emit("switch-session", sessionId);
+  dropdownOpen.value = false
+  emit('switch-session', sessionId)
 }
 
 function handleDeleteSession() {
-  dropdownOpen.value = false;
-  emit("delete-session");
+  dropdownOpen.value = false
+  emit('delete-session')
 }
 
 function handleClickOutside(event: MouseEvent) {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
-    dropdownOpen.value = false;
+    dropdownOpen.value = false
   }
 }
 
 onMounted(() => {
-  document.addEventListener("mousedown", handleClickOutside);
-});
+  document.addEventListener('mousedown', handleClickOutside)
+})
 
 onBeforeUnmount(() => {
-  document.removeEventListener("mousedown", handleClickOutside);
-});
+  document.removeEventListener('mousedown', handleClickOutside)
+})
 </script>

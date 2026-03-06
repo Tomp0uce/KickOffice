@@ -44,6 +44,7 @@ function createPowerPointTools(definitions: Record<PowerPointToolName, PowerPoin
 
 export type PowerPointToolName =
   | 'getSelectedText'
+  | 'replaceSelectedText'
   | 'insertContent'
   | 'getSlideContent'
   | 'addSlide'
@@ -311,6 +312,23 @@ const powerpointToolDefinitions = createPowerPointTools({
       required: [],
     },
     executeCommon: async () => getPowerPointSelection(),
+  },
+
+  replaceSelectedText: {
+    name: 'replaceSelectedText',
+    category: 'write',
+    description: 'Replace the currently selected text in PowerPoint. This tool preserves block-level formatting and inline styles better than full shape replacement.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The new text to replace the selection with. Markdown formatting is supported.' },
+      },
+      required: ['text'],
+    },
+    executeCommon: async (args: Record<string, any>) => {
+      await insertIntoPowerPoint(args.text, true)
+      return 'Successfully replaced selected text.'
+    },
   },
 
   proposeShapeTextRevision: {
