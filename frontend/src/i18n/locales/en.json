@@ -286,7 +286,7 @@
   "pptPunchify": "Impact",
   "pptShrink": "Shrink",
   "pptVisual": "Visual",
-  "pptVisualPrefix": "Generate an image prompt for a slide about: ",
+  "pptVisualPrefix": "Generate a professional and clean image to illustrate this PowerPoint slide. Content: ",
   "emptySubtitlePowerPoint": "Select text in a slide and let me help you create impactful presentations",
   "includeSelectionLabelPowerPoint": "Include Selected Slide Text",
   "selectSlideTextPrompt": "Please select text inside a shape first",

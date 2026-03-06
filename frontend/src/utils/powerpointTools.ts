@@ -572,7 +572,12 @@ try {
         
         const textRange = shape.textFrame.textRange
         if (isPowerPointApiSupported('1.5')) {
-          textRange.insertHtml(renderOfficeCommonApiHtml(content), 'Replace')
+          try {
+            textRange.insertHtml(renderOfficeCommonApiHtml(content), 'Replace')
+          } catch (e) {
+            console.warn('insertHtml failed or not available, falling back to text modification', e)
+            textRange.text = stripRichFormattingSyntax(content)
+          }
         } else {
           textRange.text = stripRichFormattingSyntax(content)
         }

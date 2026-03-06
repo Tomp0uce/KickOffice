@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="items-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1"
-  >
+  <div class="items-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1">
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
         :settings-title="t('settings')"
@@ -62,9 +60,7 @@
         :input-placeholder="inputPlaceholder"
         :loading="loading"
         :backend-online="backendOnline"
-        :show-word-formatting="
-          !hostIsExcel && !hostIsPowerPoint && !hostIsOutlook
-        "
+        :show-word-formatting="!hostIsExcel && !hostIsPowerPoint && !hostIsOutlook"
         :use-word-formatting-label="t('useWordFormattingLabel')"
         :include-selection-label="
           t(
@@ -95,8 +91,8 @@
 </template>
 
 <script lang="ts" setup>
-import type { InsertType, ModelTier, ModelInfo } from "@/types";
-defineOptions({ name: "Home" });
+import type { InsertType, ModelTier, ModelInfo } from '@/types'
+defineOptions({ name: 'Home' })
 import {
   ref,
   computed,
@@ -107,8 +103,8 @@ import {
   onUnmounted,
   onActivated,
   onDeactivated,
-} from "vue";
-import { useStorage } from "@vueuse/core";
+} from 'vue'
+import { useStorage } from '@vueuse/core'
 import {
   BookOpen,
   Brush,
@@ -126,245 +122,227 @@ import {
   Sparkle,
   Wand2,
   Zap,
-} from "lucide-vue-next";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+} from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
-import { fetchModels, healthCheck } from "@/api/backend";
-import ChatHeader from "@/components/chat/ChatHeader.vue";
-import ChatInput from "@/components/chat/ChatInput.vue";
-import ChatMessageList from "@/components/chat/ChatMessageList.vue";
-import QuickActionsBar from "@/components/chat/QuickActionsBar.vue";
-import StatsBar from "@/components/chat/StatsBar.vue";
-import { useAgentLoop } from "@/composables/useAgentLoop";
-import { useImageActions } from "@/composables/useImageActions";
-import { useOfficeInsert } from "@/composables/useOfficeInsert";
-import { useSessionManager } from "@/composables/useSessionManager";
+import { fetchModels, healthCheck } from '@/api/backend'
+import ChatHeader from '@/components/chat/ChatHeader.vue'
+import ChatInput from '@/components/chat/ChatInput.vue'
+import ChatMessageList from '@/components/chat/ChatMessageList.vue'
+import QuickActionsBar from '@/components/chat/QuickActionsBar.vue'
+import StatsBar from '@/components/chat/StatsBar.vue'
+import { useAgentLoop } from '@/composables/useAgentLoop'
+import { useImageActions } from '@/composables/useImageActions'
+import { useOfficeInsert } from '@/composables/useOfficeInsert'
+import { useSessionManager } from '@/composables/useSessionManager'
 import type {
   DisplayMessage,
   ExcelQuickAction,
   PowerPointQuickAction,
   OutlookQuickAction,
   QuickAction,
-} from "@/types/chat";
-import { localStorageKey } from "@/utils/enum";
-import {
-  isPowerPoint,
-  isWord,
-  isExcel,
-  isOutlook,
-  forHost,
-} from "@/utils/hostDetection";
-import {
-  loadSavedPromptsFromStorage,
-  type SavedPrompt,
-} from "@/utils/savedPrompts";
+} from '@/types/chat'
+import { localStorageKey } from '@/utils/enum'
+import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection'
+import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
 
-const router = useRouter();
-const { t } = useI18n();
+const router = useRouter()
+const { t } = useI18n()
 
-const savedPrompts = ref<SavedPrompt[]>([]);
-const selectedPromptId = ref("");
-const customSystemPrompt = ref("");
-const draftFocusGlow = ref(false);
-const backendOnline = ref(false);
-const availableModels = ref<Record<string, ModelInfo>>({});
-const selectedModelTier = useStorage<ModelTier>(
-  localStorageKey.modelTier,
-  "standard",
-);
-const hostIsExcel = isExcel();
-const hostIsWord = isWord();
-const hostIsPowerPoint = isPowerPoint();
-const hostIsOutlook = isOutlook();
+const savedPrompts = ref<SavedPrompt[]>([])
+const selectedPromptId = ref('')
+const customSystemPrompt = ref('')
+const draftFocusGlow = ref(false)
+const backendOnline = ref(false)
+const availableModels = ref<Record<string, ModelInfo>>({})
+const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
+const hostIsExcel = isExcel()
+const hostIsWord = isWord()
+const hostIsPowerPoint = isPowerPoint()
+const hostIsOutlook = isOutlook()
 
 const currentHost = forHost({
-  outlook: "outlook",
-  powerpoint: "powerpoint",
-  excel: "excel",
-  word: "word",
-});
-const history = ref<DisplayMessage[]>([]);
+  outlook: 'outlook',
+  powerpoint: 'powerpoint',
+  excel: 'excel',
+  word: 'word',
+})
+const history = ref<DisplayMessage[]>([])
 
-const sessionManager = useSessionManager(currentHost, history);
-const userInput = ref("");
-const loading = ref(false);
-const imageLoading = ref(false);
-const abortController = ref<AbortController | null>(null);
-const backendCheckInterval = ref<number | null>(null);
-const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true);
-const useSelectedText = useStorage(localStorageKey.useSelectedText, true);
-const agentMaxIterationsRaw = useStorage(
-  localStorageKey.agentMaxIterations,
-  25,
-);
+const sessionManager = useSessionManager(currentHost, history)
+const userInput = ref('')
+const loading = ref(false)
+const imageLoading = ref(false)
+const abortController = ref<AbortController | null>(null)
+const backendCheckInterval = ref<number | null>(null)
+const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true)
+const useSelectedText = useStorage(localStorageKey.useSelectedText, true)
+const agentMaxIterationsRaw = useStorage(localStorageKey.agentMaxIterations, 25)
 const agentMaxIterations = computed(() => {
-  const val = Number(agentMaxIterationsRaw.value);
-  if (isNaN(val) || val < 1) return 1;
-  if (val > 100) return 100;
-  return Math.floor(val);
-});
-const userGender = useStorage(localStorageKey.userGender, "unspecified");
-const userFirstName = useStorage(localStorageKey.userFirstName, "");
-const userLastName = useStorage(localStorageKey.userLastName, "");
-const excelFormulaLanguage = useStorage<"en" | "fr">(
-  localStorageKey.excelFormulaLanguage,
-  "en",
-);
-const insertType = ref<InsertType>("replace");
+  const val = Number(agentMaxIterationsRaw.value)
+  if (isNaN(val) || val < 1) return 1
+  if (val > 100) return 100
+  return Math.floor(val)
+})
+const userGender = useStorage(localStorageKey.userGender, 'unspecified')
+const userFirstName = useStorage(localStorageKey.userFirstName, '')
+const userLastName = useStorage(localStorageKey.userLastName, '')
+const excelFormulaLanguage = useStorage<'en' | 'fr'>(localStorageKey.excelFormulaLanguage, 'en')
+const insertType = ref<InsertType>('replace')
 
-const chatInputRef = ref<InstanceType<typeof ChatInput>>();
-const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
+const chatInputRef = ref<InstanceType<typeof ChatInput>>()
+const messageListRef = ref<InstanceType<typeof ChatMessageList>>()
 
 const wordQuickActions = computed<QuickAction[]>(() => [
   {
-    key: "proofread",
-    label: t("proofread"),
+    key: 'proofread',
+    label: t('proofread'),
     icon: CheckCheck,
     executeWithAgent: true,
-    tooltipKey: "proofread_tooltip",
+    tooltipKey: 'proofread_tooltip',
   },
   {
-    key: "translate",
-    label: t("translate"),
+    key: 'translate',
+    label: t('translate'),
     icon: Globe,
-    tooltipKey: "translate_tooltip",
+    tooltipKey: 'translate_tooltip',
   },
   {
-    key: "polish",
-    label: t("polish"),
+    key: 'polish',
+    label: t('polish'),
     icon: Sparkle,
-    tooltipKey: "polish_tooltip",
+    tooltipKey: 'polish_tooltip',
   },
   {
-    key: "academic",
-    label: t("academic"),
+    key: 'academic',
+    label: t('academic'),
     icon: BookOpen,
-    tooltipKey: "academic_tooltip",
+    tooltipKey: 'academic_tooltip',
   },
   {
-    key: "summary",
-    label: t("summary"),
+    key: 'summary',
+    label: t('summary'),
     icon: FileCheck,
-    tooltipKey: "summary_tooltip",
+    tooltipKey: 'summary_tooltip',
   },
-]);
+])
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
-    key: "clean",
-    label: t("clean"),
+    key: 'clean',
+    label: t('clean'),
     icon: Eraser,
-    mode: "immediate",
+    mode: 'immediate',
     systemPrompt:
       "You are a data cleaning expert. Use 'setCellRange' to fix values/formulas and 'clearRange' to remove junk.",
-    tooltipKey: "excelClean_tooltip",
+    tooltipKey: 'excelClean_tooltip',
   },
   {
-    key: "beautify",
-    label: t("beautify"),
+    key: 'beautify',
+    label: t('beautify'),
     icon: Brush,
-    mode: "immediate",
+    mode: 'immediate',
     systemPrompt:
       "You are an Excel formatting expert. Use 'formatRange' for visual styles and 'setCellRange' for number formats or conditional formatting.",
-    tooltipKey: "excelBeautify_tooltip",
+    tooltipKey: 'excelBeautify_tooltip',
   },
   {
-    key: "formula",
-    label: t("excelFormula"),
+    key: 'formula',
+    label: t('excelFormula'),
     icon: FunctionSquare,
-    mode: "draft",
-    prefix: t("excelFormulaPrefix"),
-    tooltipKey: "excelFormula_tooltip",
+    mode: 'draft',
+    prefix: t('excelFormulaPrefix'),
+    tooltipKey: 'excelFormula_tooltip',
   },
   {
-    key: "transform",
-    label: t("transform"),
+    key: 'transform',
+    label: t('transform'),
     icon: Wand2,
-    mode: "draft",
-    prefix: t("excelTransformPrefix"),
-    tooltipKey: "excelTransform_tooltip",
+    mode: 'draft',
+    prefix: t('excelTransformPrefix'),
+    tooltipKey: 'excelTransform_tooltip',
   },
   {
-    key: "highlight",
-    label: t("highlight"),
+    key: 'highlight',
+    label: t('highlight'),
     icon: Eye,
-    mode: "draft",
-    prefix: t("excelHighlightPrefix"),
-    tooltipKey: "excelHighlight_tooltip",
+    mode: 'draft',
+    prefix: t('excelHighlightPrefix'),
+    tooltipKey: 'excelHighlight_tooltip',
   },
-]);
+])
 const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
   {
-    key: "proofread",
-    label: t("outlookProofread"),
+    key: 'proofread',
+    label: t('outlookProofread'),
     icon: CheckCheck,
-    tooltipKey: "outlookProofread_tooltip",
+    tooltipKey: 'outlookProofread_tooltip',
   },
   {
-    key: "translate",
-    label: t("translate"),
+    key: 'translate',
+    label: t('translate'),
     icon: Globe,
-    tooltipKey: "translate_tooltip",
+    tooltipKey: 'translate_tooltip',
   },
   {
-    key: "concise",
-    label: t("outlookConcise"),
+    key: 'concise',
+    label: t('outlookConcise'),
     icon: Scissors,
-    tooltipKey: "outlookConcise_tooltip",
+    tooltipKey: 'outlookConcise_tooltip',
   },
   {
-    key: "extract",
-    label: t("outlookExtract"),
+    key: 'extract',
+    label: t('outlookExtract'),
     icon: ListTodo,
-    tooltipKey: "outlookExtract_tooltip",
+    tooltipKey: 'outlookExtract_tooltip',
   },
   {
-    key: "reply",
-    label: t("outlookReply"),
+    key: 'reply',
+    label: t('outlookReply'),
     icon: Mail,
-    mode: "smart-reply",
-    prefix: t("outlookReplyPrePrompt"),
-    tooltipKey: "outlookReply_tooltip",
+    mode: 'smart-reply',
+    prefix: t('outlookReplyPrePrompt'),
+    tooltipKey: 'outlookReply_tooltip',
   },
-]);
+])
 const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
   {
-    key: "proofread",
-    label: t("proofread"),
+    key: 'proofread',
+    label: t('proofread'),
     icon: CheckCheck,
-    mode: "immediate",
+    mode: 'immediate',
     executeWithAgent: true,
-    tooltipKey: "proofread_tooltip",
+    tooltipKey: 'proofread_tooltip',
   },
   {
-    key: "translate",
-    label: t("translate"),
+    key: 'translate',
+    label: t('translate'),
     icon: Globe,
-    mode: "immediate",
-    tooltipKey: "translate_tooltip",
+    mode: 'immediate',
+    tooltipKey: 'translate_tooltip',
   },
   {
-    key: "speakerNotes",
-    label: t("pptSpeakerNotes"),
+    key: 'speakerNotes',
+    label: t('pptSpeakerNotes'),
     icon: MessageSquare,
-    mode: "immediate",
-    tooltipKey: "pptSpeakerNotes_tooltip",
+    mode: 'immediate',
+    tooltipKey: 'pptSpeakerNotes_tooltip',
   },
   {
-    key: "punchify",
-    label: t("pptPunchify"),
+    key: 'punchify',
+    label: t('pptPunchify'),
     icon: Zap,
-    mode: "immediate",
-    tooltipKey: "pptPunchify_tooltip",
+    mode: 'immediate',
+    tooltipKey: 'pptPunchify_tooltip',
   },
   {
-    key: "visual",
-    label: t("pptVisual"),
+    key: 'visual',
+    label: t('pptVisual'),
     icon: Image,
-    mode: "immediate",
-    tooltipKey: "pptVisual_tooltip",
+    mode: 'immediate',
+    tooltipKey: 'pptVisual_tooltip',
   },
-]);
+])
 
 const quickActions = computed(() =>
   forHost({
@@ -373,80 +351,70 @@ const quickActions = computed(() =>
     excel: excelQuickActions.value,
     word: wordQuickActions.value,
   }),
-);
-const selectedModelInfo = computed(
-  () => availableModels.value[selectedModelTier.value],
-);
+)
+const selectedModelInfo = computed(() => availableModels.value[selectedModelTier.value])
 const firstChatModelTier = computed<ModelTier>(
   () =>
     (Object.entries(availableModels.value).find(
-      ([, model]) => model.type !== "image",
-    )?.[0] as ModelTier) || "standard",
-);
+      ([, model]) => model.type !== 'image',
+    )?.[0] as ModelTier) || 'standard',
+)
 const inputPlaceholder = computed(() =>
-  selectedModelInfo.value?.type === "image"
-    ? t("describeImage")
-    : t("directTheAgent"),
-);
+  selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'),
+)
 
 function adjustTextareaHeight() {
-  const candidate = chatInputRef.value?.textareaEl;
+  const candidate = chatInputRef.value?.textareaEl
   const textarea =
-    candidate && "style" in candidate
-      ? (candidate as HTMLTextAreaElement)
-      : candidate?.value;
+    candidate && 'style' in candidate ? (candidate as HTMLTextAreaElement) : candidate?.value
 
   if (textarea && textarea.style) {
-    textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+    textarea.style.height = 'auto'
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
   }
 }
 
 watch(userInput, () => {
-  adjustTextareaHeight();
-});
+  adjustTextareaHeight()
+})
 
-type ScrollMode = "bottom" | "message-top" | "auto";
+type ScrollMode = 'bottom' | 'message-top' | 'auto'
 
 /**
  * Scroll the chat container
  * @param mode - 'bottom': scroll to very bottom, 'message-top': scroll to top of last message, 'auto': smart behavior
  */
-async function scrollToBottom(mode: ScrollMode = "auto") {
-  await nextTick();
-  const rawContainer = messageListRef.value?.containerEl;
-  const container = ((rawContainer as any)?.value || rawContainer) as
-    | HTMLElement
-    | undefined;
-  if (!container) return;
+async function scrollToBottom(mode: ScrollMode = 'auto') {
+  await nextTick()
+  const rawContainer = messageListRef.value?.containerEl
+  const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
+  if (!container) return
 
-  const messageElements = container.querySelectorAll("[data-message]");
-  const lastMessage = messageElements[messageElements.length - 1] as
-    | HTMLElement
-    | undefined;
+  const messageElements = container.querySelectorAll('[data-message]')
+  const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined
 
   if (!lastMessage) {
-    container.scrollTop = container.scrollHeight;
-    return;
+    container.scrollTop = container.scrollHeight
+    return
   }
 
-  const msgTop = lastMessage.offsetTop;
-  const padding = 12;
+  const msgTop = lastMessage.offsetTop
+  const padding = 12
 
-  if (mode === "bottom") {
+  if (mode === 'bottom') {
     // Always scroll to the very bottom
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  } else if (mode === "message-top") {
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+  } else if (mode === 'message-top') {
     // Scroll so the top of the last message is visible at the top of the container
-    container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
+    container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
   } else {
     // Auto mode: smart behavior based on message height
     // If the message is taller than the container, keep its start visible
     // Otherwise, scroll to bottom as content grows
     if (lastMessage.offsetHeight > container.clientHeight) {
-      container.scrollTo({ top: msgTop - padding, behavior: "smooth" });
+      container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
     } else {
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
     }
   }
 }
@@ -455,20 +423,18 @@ async function scrollToBottom(mode: ScrollMode = "auto") {
  * Scroll to show the top of the last message (for receiving new assistant messages)
  */
 async function scrollToMessageTop() {
-  await scrollToBottom("message-top");
+  await scrollToBottom('message-top')
 }
 
 /**
  * Scroll to very bottom (for user sending messages and on startup)
  */
 async function scrollToVeryBottom() {
-  await scrollToBottom("bottom");
+  await scrollToBottom('bottom')
 }
 
-const imageActions = useImageActions(t);
-const historyWithSegments = computed(() =>
-  imageActions.historyWithSegments(history),
-);
+const imageActions = useImageActions(t)
+const historyWithSegments = computed(() => imageActions.historyWithSegments(history))
 
 const officeInsert = useOfficeInsert({
   hostIsOutlook,
@@ -483,173 +449,163 @@ const officeInsert = useOfficeInsert({
   copyImageToClipboard: imageActions.copyImageToClipboard,
   insertImageToWord: imageActions.insertImageToWord,
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
-});
+})
 
-const {
-  sendMessage,
-  applyQuickAction,
-  currentAction,
-  sessionStats,
-  resetSessionStats,
-} = useAgentLoop({
-  t,
-  refs: {
-    history,
-    userInput,
-    loading,
-    imageLoading,
-    backendOnline,
-    abortController,
-    inputTextarea: computed(() => chatInputRef.value?.textareaEl),
-    draftFocusGlow,
-  },
-  models: {
-    availableModels,
-    selectedModelTier,
-    selectedModelInfo,
-    firstChatModelTier,
-  },
-  host: {
-    isOutlook: hostIsOutlook,
-    isPowerPoint: hostIsPowerPoint,
-    isExcel: hostIsExcel,
-    isWord: hostIsWord,
-  },
-  settings: {
-    customSystemPrompt,
-    agentMaxIterations,
-    useSelectedText,
-    excelFormulaLanguage,
-    userGender,
-    userFirstName,
-    userLastName,
-  },
-  actions: {
-    quickActions,
-    outlookQuickActions,
-    excelQuickActions,
-    powerPointQuickActions,
-  },
-  helpers: {
-    createDisplayMessage: imageActions.createDisplayMessage,
-    adjustTextareaHeight,
-    scrollToBottom,
-    scrollToMessageTop,
-    scrollToVeryBottom,
-  },
-});
+const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } =
+  useAgentLoop({
+    t,
+    refs: {
+      history,
+      userInput,
+      loading,
+      imageLoading,
+      backendOnline,
+      abortController,
+      inputTextarea: computed(() => chatInputRef.value?.textareaEl),
+      draftFocusGlow,
+    },
+    models: {
+      availableModels,
+      selectedModelTier,
+      selectedModelInfo,
+      firstChatModelTier,
+    },
+    host: {
+      isOutlook: hostIsOutlook,
+      isPowerPoint: hostIsPowerPoint,
+      isExcel: hostIsExcel,
+      isWord: hostIsWord,
+    },
+    settings: {
+      customSystemPrompt,
+      agentMaxIterations,
+      useSelectedText,
+      excelFormulaLanguage,
+      userGender,
+      userFirstName,
+      userLastName,
+    },
+    actions: {
+      quickActions,
+      outlookQuickActions,
+      excelQuickActions,
+      powerPointQuickActions,
+    },
+    helpers: {
+      createDisplayMessage: imageActions.createDisplayMessage,
+      adjustTextareaHeight,
+      scrollToBottom,
+      scrollToMessageTop,
+      scrollToVeryBottom,
+    },
+  })
 
 function stopGeneration() {
-  abortController.value?.abort();
-  abortController.value = null;
-  loading.value = false;
+  abortController.value?.abort()
+  abortController.value = null
+  loading.value = false
 }
 
 function goToSettings() {
-  router.push("/settings");
+  router.push('/settings')
 }
 
 async function startNewChat() {
   if (history.value.length > 0) {
-    if (!window.confirm(t("newChatConfirm"))) return;
+    if (!window.confirm(t('newChatConfirm'))) return
   }
-  if (loading.value) stopGeneration();
-  await sessionManager.newSession();
-  resetSessionStats();
-  userInput.value = "";
-  customSystemPrompt.value = "";
-  selectedPromptId.value = "";
-  await nextTick();
-  chatInputRef.value?.textareaEl?.value?.focus();
-  adjustTextareaHeight();
+  if (loading.value) stopGeneration()
+  await sessionManager.newSession()
+  resetSessionStats()
+  userInput.value = ''
+  customSystemPrompt.value = ''
+  selectedPromptId.value = ''
+  await nextTick()
+  chatInputRef.value?.textareaEl?.value?.focus()
+  adjustTextareaHeight()
 }
 
 async function handleSwitchSession(sessionId: string) {
-  if (loading.value) return;
-  await sessionManager.switchSession(sessionId);
-  resetSessionStats();
-  await nextTick();
-  scrollToVeryBottom();
+  if (loading.value) return
+  await sessionManager.switchSession(sessionId)
+  resetSessionStats()
+  await nextTick()
+  scrollToVeryBottom()
 }
 
 async function handleDeleteSession() {
-  if (loading.value) return;
-  await sessionManager.deleteCurrentSession();
-  await nextTick();
-  scrollToVeryBottom();
+  if (loading.value) return
+  await sessionManager.deleteCurrentSession()
+  await nextTick()
+  scrollToVeryBottom()
 }
 
 function loadSavedPrompts() {
-  savedPrompts.value = loadSavedPromptsFromStorage([]);
+  savedPrompts.value = loadSavedPromptsFromStorage([])
 }
 
 function loadSelectedPrompt() {
-  const prompt = savedPrompts.value.find(
-    (p) => p.id === selectedPromptId.value,
-  );
+  const prompt = savedPrompts.value.find(p => p.id === selectedPromptId.value)
   if (!prompt) {
-    customSystemPrompt.value = "";
-    return;
+    customSystemPrompt.value = ''
+    return
   }
-  customSystemPrompt.value = prompt.systemPrompt;
-  userInput.value = prompt.userPrompt;
-  adjustTextareaHeight();
-  chatInputRef.value?.textareaEl?.value?.focus();
+  customSystemPrompt.value = prompt.systemPrompt
+  userInput.value = prompt.userPrompt
+  adjustTextareaHeight()
+  chatInputRef.value?.textareaEl?.value?.focus()
 }
 
 async function checkBackend() {
-  if (document.visibilityState === "hidden") return;
-  backendOnline.value = await healthCheck();
-  if (!backendOnline.value) return;
+  if (document.visibilityState === 'hidden') return
+  backendOnline.value = await healthCheck()
+  if (!backendOnline.value) return
   try {
-    availableModels.value = await fetchModels();
+    availableModels.value = await fetchModels()
     if (!availableModels.value[selectedModelTier.value]) {
-      const [firstTier] = Object.keys(availableModels.value);
-      if (firstTier) selectedModelTier.value = firstTier as ModelTier;
+      const [firstTier] = Object.keys(availableModels.value)
+      if (firstTier) selectedModelTier.value = firstTier as ModelTier
     }
   } catch {
-    console.error("Failed to fetch models");
+    console.error('Failed to fetch models')
   }
 }
 
-const { insertMessageToDocument, copyMessageToClipboard } = officeInsert;
+const { insertMessageToDocument, copyMessageToClipboard } = officeInsert
 
 // Persist session after each agent turn completes
 watch(loading, async (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
-    await sessionManager.persistCurrentSession();
+    await sessionManager.persistCurrentSession()
   }
-});
+})
 
 onBeforeMount(async () => {
-  insertType.value =
-    (localStorage.getItem(localStorageKey.insertType) as InsertType) ||
-    "replace";
-  loadSavedPrompts();
-  checkBackend();
-  backendCheckInterval.value = window.setInterval(checkBackend, 30000);
-  await sessionManager.init();
-});
+  insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace'
+  loadSavedPrompts()
+  checkBackend()
+  backendCheckInterval.value = window.setInterval(checkBackend, 30000)
+  await sessionManager.init()
+})
 
 onActivated(() => {
-  loadSavedPrompts();
-});
+  loadSavedPrompts()
+})
 
 onDeactivated(() => {
-  if (loading.value) stopGeneration();
-});
+  if (loading.value) stopGeneration()
+})
 
 onMounted(() => {
   // Scroll to bottom of history on initial load
   if (history.value.length > 0) {
     nextTick(() => {
-      scrollToVeryBottom();
-    });
+      scrollToVeryBottom()
+    })
   }
-});
+})
 
 onUnmounted(() => {
-  if (backendCheckInterval.value !== null)
-    window.clearInterval(backendCheckInterval.value);
-});
+  if (backendCheckInterval.value !== null) window.clearInterval(backendCheckInterval.value)
+})
 </script>

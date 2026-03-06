@@ -217,8 +217,27 @@ const outlookToolDefinitions = createOutlookTools({
         const body = mailbox.item.body
         
         if (mode === 'Replace') {
-          body.setAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
-            resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'))
+          // Safety guard to prevent deleting thread history
+          body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
+            if (getResult.status === getOfficeAsyncStatus()?.Succeeded) {
+              const existing = getResult.value || ''
+              // Common Outlook web/desktop thread markers
+              if (
+                existing.includes('<div id="divRplyFwdMsg">') ||
+                existing.includes('<hr tabindex="-1"') ||
+                existing.includes('<hr ')
+              ) {
+                console.warn('Thread history detected. Overriding "Replace" to "Insert" to protect email history.')
+                body.setSelectedDataAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
+                  resolve(resolveAsyncResult(res, () => 'Replaced content at cursor (protected history).'))
+                })
+                return
+              }
+            }
+            // Safe to replace if no history markers found
+            body.setAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
+              resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'))
+            })
           })
         } else if (mode === 'Append') {
           body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
