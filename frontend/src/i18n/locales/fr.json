@@ -292,7 +292,7 @@
   "pptPunchify": "Impact",
   "pptShrink": "Raccourcir",
   "pptVisual": "Visuel",
-  "pptVisualPrefix": "Génère un prompt d'image pour une diapo sur : ",
+  "pptVisualPrefix": "Génère une image professionnelle et épurée pour illustrer cette diapositive PowerPoint. Contenu : ",
   "emptySubtitlePowerPoint": "Sélectionnez du texte dans une diapositive et laissez-moi vous aider à créer des présentations percutantes",
   "includeSelectionLabelPowerPoint": "Inclure le texte de la diapo",
   "selectSlideTextPrompt": "Veuillez d'abord sélectionner du texte dans une forme",

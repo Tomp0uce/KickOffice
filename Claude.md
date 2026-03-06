@@ -9,15 +9,16 @@ This document provides operational guidance for AI coding agents working in this
 
 ### Companion documents
 
-| File                                   | Purpose                                                                                                     |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Code audit — issues by severity (CRITICAL/HIGH/MEDIUM/LOW) with status tracking |
-| [UX_REVIEW.md](./UX_REVIEW.md)         | User experience issues — open items by priority |
-| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)   | Tool set audit — current tools per host + proposed additions |
-| [AGENT_MODE_ANALYSIS.md](./AGENT_MODE_ANALYSIS.md) | Agent execution mode analysis — streaming vs sync performance comparison |
-| [INTEGRATION_PLAN.md](./INTEGRATION_PLAN.md) | Technical integration roadmap and implementation strategy |
-| [REPORT-openexcel-kickoffice-comparison.md](./REPORT-openexcel-kickoffice-comparison.md) | OpenExcel vs KickOffice feature comparison — chat UX, conversation management, tool status, stats bar |
-| [PRD.md](./PRD.md) | Product Requirements Document — Single source of truth for product features, user personas, acceptance criteria, and business logic. **Read this before implementing new features.** |
+| File                                                                                     | Purpose                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md)                                                   | Code audit — issues by severity (CRITICAL/HIGH/MEDIUM/LOW) with status tracking                                                                                                      |
+| [UX_REVIEW.md](./UX_REVIEW.md)                                                           | User experience issues — open items by priority                                                                                                                                      |
+| [SKILLS_AUDIT.md](./SKILLS_AUDIT.md)                                                     | Tool set audit — current tools per host + proposed additions                                                                                                                         |
+| [AGENT_MODE_ANALYSIS.md](./AGENT_MODE_ANALYSIS.md)                                       | Agent execution mode analysis — streaming vs sync performance comparison                                                                                                             |
+| [INTEGRATION_PLAN.md](./INTEGRATION_PLAN.md)                                             | Technical integration roadmap and implementation strategy                                                                                                                            |
+| [REPORT-openexcel-kickoffice-comparison.md](./REPORT-openexcel-kickoffice-comparison.md) | OpenExcel vs KickOffice feature comparison — chat UX, conversation management, tool status, stats bar                                                                                |
+| [PRD.md](./PRD.md)                                                                       | Product Requirements Document — Single source of truth for product features, user personas, acceptance criteria, and business logic. **Read this before implementing new features.** |
+
 ## 2) Product and Architecture Snapshot
 
 KickOffice is a Microsoft Office add-in with:
@@ -30,6 +31,7 @@ KickOffice is a Microsoft Office add-in with:
 ### Docker & Deployment Constraints
 
 **CRITICAL Hardware Compatibility Requirement**:
+
 - **MUST use `node:22-slim`** (Debian-based, glibc) for all Node.js containers
 - **MUST use `nginx:stable`** (Debian-based) for frontend serving
 - **DO NOT use Alpine Linux images** (`node:*-alpine`, `nginx:alpine`) — incompatible with older Intel Celeron processors (Synology DS416play) due to musl libc + AVX instruction issues
@@ -150,6 +152,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **Total**: 129 tools across all hosts
 
 **Agent Stability Features** (implemented):
+
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
 - **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
 - **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps office-word-diff library with cascading fallback strategies)
@@ -212,6 +215,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 **ALWAYS consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) before making architectural changes.**
 
 This document is the single source of truth for:
+
 - Issue inventory (CRITICAL/HIGH/MEDIUM/LOW severity)
 - Fix status tracking (✅ FIXED / open)
 - Architectural gaps and technical debt
@@ -261,3 +265,14 @@ When the user asks to create a Pull Request, **always follow this exact sequence
 1. **Restricted Scope:** You must STRICTLY remain within the current working directory (kickoffice).
 2. **No Outside Access:** You are strictly forbidden from reading, listing, or modifying files outside of this directory (for example, absolutely no reading of `~/.claude/settings.json` or any other file in `~/`).
 3. **Focus:** Ignore your own system configuration settings when you review code. Focus solely on the source code and files present in this repository.
+
+## 15) Vibe Coding Rules (Error Prevention)
+
+To prevent common errors during vibe coding and automated command execution, **STRICTLY ADHERE** to the following rules:
+
+1. **PowerShell Command Chaining:**
+   - **NEVER** use `&&` to chain commands in PowerShell. It is not a valid statement separator.
+   - **ALWAYS** use `;` to chain commands (e.g., `npm run build ; npm run check`).
+2. **NPM Scripts:**
+   - **DO NOT** run `npm run check` or `npm run type-check` or `npm run typecheck` unless you have explicitly verified that the script exists in `package.json`.
+   - If you need to verify types and no script is available, run `npx tsc --noEmit` directly.

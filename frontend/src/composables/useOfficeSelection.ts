@@ -101,6 +101,10 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText()
         if (selected) return selected
+        // BUGFIX: Never fall back to the entire body for proofread
+        if (selectionOptions.actionKey === 'outlookProofread') {
+          return ''
+        }
       }
       
       // Fall back to the full email body when no text is selected
@@ -144,6 +148,10 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selectedHtml = await getOutlookSelectedHtml()
         if (selectedHtml) return selectedHtml
+        // BUGFIX: Never fall back to the entire body for proofread
+        if (selectionOptions.actionKey === 'outlookProofread') {
+          return ''
+        }
       }
       
       // Fall back to the full email body HTML for all quick actions
