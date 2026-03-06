@@ -253,6 +253,13 @@ chatRouter.post('/sync', async (req, res) => {
       }, 'POST /api/chat/sync')
     }
 
+    if (!firstChoice.message.content && (!firstChoice.message.tool_calls || firstChoice.message.tool_calls.length === 0)) {
+      systemLog('ERROR', 'LLM API returned empty content without tool calls', { choice: firstChoice })
+      return logAndRespond(res, 502, {
+        error: 'The AI service returned an empty response.',
+      }, 'POST /api/chat/sync')
+    }
+
     verboseLog(` /api/chat/sync upstream response`, {
       id: data?.id,
       model: data?.model,

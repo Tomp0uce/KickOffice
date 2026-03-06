@@ -196,7 +196,9 @@ const outlookToolDefinitions = createOutlookTools({
     },
     executeOutlook: async (mailbox, args: Record<string, any>) => {
       const { content, mode = 'Append', diffTracking = false, originalText = '' } = args
-      if (!mailbox?.item?.body) return 'Cannot write email body: compose mode is not available.'
+      if (!mailbox?.item?.body || typeof mailbox.item.body.setAsync !== 'function') {
+        return 'Cannot write email body: compose mode is not available.'
+      }
 
       // Check if we have preserved rich content (images) to reassemble
       const richContext = getLastRichContext()
@@ -282,7 +284,7 @@ const outlookToolDefinitions = createOutlookTools({
     },
     executeOutlook: async (mailbox, args: Record<string, any>) => {
       const { subject } = args as Record<string, any>
-      if (!mailbox?.item?.subject?.setAsync) {
+      if (!mailbox?.item?.subject || typeof mailbox.item.subject.setAsync !== 'function') {
         return 'Cannot set email subject: compose mode is not available.'
       }
 

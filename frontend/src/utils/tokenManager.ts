@@ -1,22 +1,43 @@
 import type { ChatRequestMessage } from '@/api/backend'
 
-export const MAX_CONTEXT_CHARS = 100_000
+import { message as messageUtil } from '@/utils/message'
+import { i18n } from '@/i18n'
+
+export const MAX_CONTEXT_CHARS = 1_000_000 // Increased from 100k to 1M to handle massive GPT-5.1 contexts
 
 const TRUNCATION_MARKER = '\n\n[... Truncated]'
+let hasWarnedTruncation = false
 
-function truncateToBudget(content: string, budget: number): string {
+function truncateToBudget(content: any, budget: number): any {
+  if (typeof content !== 'string') return content // L4 fix: Implicit coercion protection for vision arrays
   if (budget <= 0) return ''
-  if (content.length <= budget) return content
+  if (content.length <= budget) {
+    hasWarnedTruncation = false // Reset per full fit
+    return content
+  }
+
+  if (!hasWarnedTruncation) {
+    messageUtil.warning((i18n.global.t as any)('errorTruncated') ?? 'Message was truncated due to context limits')
+    hasWarnedTruncation = true
+  }
+
   if (budget <= TRUNCATION_MARKER.length) {
+    console.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
     return TRUNCATION_MARKER.slice(0, budget)
   }
 
   const headLength = budget - TRUNCATION_MARKER.length
+  console.warn(`[tokenManager] Message truncated by ${content.length - headLength} chars`)
   return `${content.slice(0, headLength)}${TRUNCATION_MARKER}`
 }
 
 function getMessageContentLength(message: ChatRequestMessage): number {
-  let length = message.content.length
+  let length = 0
+  if (typeof message.content === 'string') {
+    length = message.content.length
+  } else {
+    length = JSON.stringify(message.content).length
+  }
   if ('tool_calls' in message && message.tool_calls) {
     length += JSON.stringify(message.tool_calls).length
   }

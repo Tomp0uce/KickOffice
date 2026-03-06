@@ -19,6 +19,7 @@ export { getSessionMessageCount }
 export function useSessionManager(hostType: string, history: Ref<DisplayMessage[]>) {
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
+  const isSwitching = ref(false)
 
   const currentSession = (): ChatSession | undefined =>
     sessions.value.find(s => s.id === currentSessionId.value)
@@ -58,17 +59,23 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
   }
 
   async function switchSession(sessionId: string) {
+    if (isSwitching.value) return
     if (sessionId === currentSessionId.value) return
-    // Save current session
-    if (currentSessionId.value) {
-      await saveSession(currentSessionId.value, history.value)
+    isSwitching.value = true
+    try {
+      // Save current session
+      if (currentSessionId.value) {
+        await saveSession(currentSessionId.value, history.value)
+      }
+      // Reload sessions to get latest names
+      await loadSessions()
+      const target = sessions.value.find(s => s.id === sessionId)
+      if (!target) return
+      currentSessionId.value = sessionId
+      history.value = target.messages ?? []
+    } finally {
+      isSwitching.value = false
     }
-    // Reload sessions to get latest names
-    await loadSessions()
-    const target = sessions.value.find(s => s.id === sessionId)
-    if (!target) return
-    currentSessionId.value = sessionId
-    history.value = target.messages ?? []
   }
 
   async function persistCurrentSession() {

@@ -1,10 +1,23 @@
 import { isChatGptModel, isGpt5Model, MAX_TOOLS, models } from '../config/models.js'
 
-/** @param {unknown} value @returns {boolean} */
 function isPlainObject(value) {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const proto = Object.getPrototypeOf(value)
   return proto === Object.prototype || proto === null
+}
+
+function getObjectDepth(obj, currentDepth = 1, maxDepth = 20) {
+  if (currentDepth > maxDepth) return currentDepth
+  if (!isPlainObject(obj) && !Array.isArray(obj)) return currentDepth
+  
+  let maxChildDepth = currentDepth
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const depth = getObjectDepth(obj[key], currentDepth + 1, maxDepth)
+      if (depth > maxChildDepth) maxChildDepth = depth
+    }
+  }
+  return maxChildDepth
 }
 
 /**
@@ -54,6 +67,9 @@ function validateTools(tools) {
     }
     if (!isPlainObject(parameters)) {
       return { error: 'tool.function.parameters must be a JSON schema object' }
+    }
+    if (getObjectDepth(parameters) > 20) {
+      return { error: 'tool.function.parameters schema exceeds maximum allowed depth' }
     }
     if (strict !== undefined && typeof strict !== 'boolean') {
       return { error: 'tool.function.strict must be a boolean' }

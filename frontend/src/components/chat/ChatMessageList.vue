@@ -47,62 +47,62 @@
           <div
             class="group max-w-[95%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
           >
-          <template
-            v-for="(segment, idx) in item.segments"
-            :key="`${item.key}-segment-${idx}`"
-          >
-            <MarkdownRenderer
-              v-if="segment.type === 'text'"
-              :content="segment.text"
-            />
-            <!-- Enhanced thinking block with brain icon + streaming dots -->
-            <div
-              v-else
-              class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary overflow-hidden"
+            <template
+              v-for="(segment, idx) in item.segments"
+              :key="`${item.key}-segment-${idx}`"
             >
-              <button
-                type="button"
-                class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-accent hover:bg-bg-tertiary transition-colors"
-                @click="toggleThought(item.key, idx)"
+              <MarkdownRenderer
+                v-if="segment.type === 'text'"
+                :content="segment.text"
+              />
+              <!-- Enhanced thinking block with brain icon + streaming dots -->
+              <div
+                v-else
+                class="mb-1 rounded-sm border border-border-secondary bg-bg-secondary overflow-hidden"
               >
-                <component
-                  :is="
-                    isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight
-                  "
-                  :size="10"
-                />
-                <Brain :size="10" />
-                <span>{{ thoughtProcessLabel }}</span>
-                <!-- Streaming dots: show when loading and this is last segment -->
-                <span
-                  v-if="
-                    loading &&
-                    idx === item.segments.length - 1 &&
-                    item.key ===
-                      historyWithSegments[historyWithSegments.length - 1]?.key
-                  "
-                  class="animate-pulse ml-1"
-                  >...</span
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-accent hover:bg-bg-tertiary transition-colors"
+                  @click="toggleThought(item.key, idx)"
                 >
-              </button>
-              <pre
-                v-if="isThoughtOpen(item.key, idx)"
-                class="m-0 px-2 py-1.5 text-xs wrap-break-word whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
-                >{{ segment.text.trim() }}</pre
-              >
-            </div>
-          </template>
-          <ToolCallBlock
-            v-for="tc in item.message.toolCalls"
-            :key="tc.id"
-            :tool-call="tc"
-          />
-          <img
-            v-if="item.message.imageSrc"
-            :src="item.message.imageSrc"
-            class="mt-2 max-w-full rounded-md"
-            alt="Generated image"
-          />
+                  <component
+                    :is="
+                      isThoughtOpen(item.key, idx) ? ChevronDown : ChevronRight
+                    "
+                    :size="10"
+                  />
+                  <Brain :size="10" />
+                  <span>{{ thoughtProcessLabel }}</span>
+                  <!-- Streaming dots: show when loading and this is last segment -->
+                  <span
+                    v-if="
+                      loading &&
+                      idx === item.segments.length - 1 &&
+                      item.key ===
+                        historyWithSegments[historyWithSegments.length - 1]?.key
+                    "
+                    class="animate-pulse ml-1"
+                    >...</span
+                  >
+                </button>
+                <pre
+                  v-if="isThoughtOpen(item.key, idx)"
+                  class="m-0 px-2 py-1.5 text-xs wrap-break-word whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
+                  >{{ segment.text.trim() }}</pre
+                >
+              </div>
+            </template>
+            <ToolCallBlock
+              v-for="tc in item.message.toolCalls"
+              :key="tc.id"
+              :tool-call="tc"
+            />
+            <img
+              v-if="item.message.imageSrc"
+              :src="item.message.imageSrc"
+              class="mt-2 max-w-full rounded-md"
+              alt="Generated image"
+            />
           </div>
           <div
             v-if="item.message.timestamp"
@@ -141,17 +141,6 @@
           />
         </div>
       </div>
-    </div>
-    <div
-      v-if="currentAction || (loading && !currentAction)"
-      class="mt-auto flex items-center gap-2 px-2 pb-1 text-xs text-secondary"
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    >
-      <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
-      <span v-if="currentAction">{{ currentAction }}</span>
-      <span v-else class="animate-pulse">▊</span>
     </div>
   </div>
 </template>
@@ -232,8 +221,8 @@ const liveAnnouncement = ref("");
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
   return `${hours}:${minutes}`;
 }
 

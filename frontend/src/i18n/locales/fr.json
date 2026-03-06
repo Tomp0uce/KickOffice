@@ -92,11 +92,12 @@
   "excelTool_setRowHeight_desc": "Définir la hauteur d'une ligne.",
   "excelTool_sortRange": "Trier la plage",
   "excelTool_sortRange_desc": "Trier les données sélectionnées par colonne.",
-  "failedToProcessAction": "Échec du traitement de l'action",
+
   "failedToResponse": "Échec de la réponse",
   "general": "Général",
   "generationStop": "Génération arrêtée",
   "agentAnalyzing": "⏳ Analyse de la demande...",
+  "agentWaitingForLLM": "⏳ En attente de l'IA (génération de la réponse)...",
   "agentStoppedByUser": "🛑 Processus arrêté par l'utilisateur.",
   "agentMaxIterationsReached": "Nombre maximum d'itérations atteint. L'agent a accompli autant que possible dans la limite configurée.",
   "requestInProgress": "Une requête est déjà en cours. Veuillez patienter ou arrêter la requête actuelle.",
@@ -144,7 +145,7 @@
   "polish": "Réécrire",
   "prompts": "Prompts",
   "recursionLimitExceeded": "L'agent a dépassé le nombre maximum d'itérations.",
-  "responseTruncated": "La réponse a été tronquée par la limite de tokens. Essayez d'augmenter la limite ou de reformuler la demande.",
+
   "replaceSelectedText": "Remplacer",
   "reset": "Réinitialiser",
   "save": "Enregistrer",
