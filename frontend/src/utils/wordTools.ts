@@ -17,6 +17,7 @@ export type WordToolName =
   | 'insertContent'
   | 'formatText'
   | 'searchAndReplace'
+  | 'searchAndFormat'
   | 'addComment'
   | 'getComments'
   | 'getSpecificParagraph'
@@ -379,6 +380,115 @@ const wordToolDefinitions = createWordTools({
         await context.sync()
         return `Replaced ${count} occurrence(s) of "${searchText}" with "${replaceText}"`
       },
+  },
+
+  searchAndFormat: {
+    name: 'searchAndFormat',
+    category: 'format',
+    description:
+      'Search for text in the document and apply formatting (color, bold, italic, highlight, etc.) to each occurrence WITHOUT changing the text content. PREFERRED for requests like "color verbs in green", "highlight errors", "bold all names". Multiple calls expected — one per word/phrase to format.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        searchText: {
+          type: 'string',
+          description: 'The text to search for',
+        },
+        matchCase: {
+          type: 'boolean',
+          description: 'Whether to match case (default: false)',
+        },
+        matchWholeWord: {
+          type: 'boolean',
+          description: 'Whether to match whole word only (default: false)',
+        },
+        bold: {
+          type: 'boolean',
+          description: 'Apply bold formatting',
+        },
+        italic: {
+          type: 'boolean',
+          description: 'Apply italic formatting',
+        },
+        underline: {
+          type: 'boolean',
+          description: 'Apply underline formatting',
+        },
+        strikethrough: {
+          type: 'boolean',
+          description: 'Apply strikethrough formatting',
+        },
+        fontColor: {
+          type: 'string',
+          description: 'Font color as hex (e.g., "#228B22" for green, "#CC0000" for red)',
+        },
+        highlightColor: {
+          type: 'string',
+          description: 'Highlight color: Yellow, Green, Cyan, Pink, Blue, Red, DarkBlue, Teal, Lime, Purple, Orange, etc.',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in points',
+        },
+        fontName: {
+          type: 'string',
+          description: 'Font family name (e.g., "Calibri", "Arial")',
+        },
+      },
+      required: ['searchText'],
+    },
+    executeWord: async (context, args: Record<string, any>) => {
+      const {
+        searchText,
+        matchCase = false,
+        matchWholeWord = false,
+        bold,
+        italic,
+        underline,
+        strikethrough,
+        fontColor,
+        highlightColor,
+        fontSize,
+        fontName,
+      } = args
+
+      if (typeof searchText === 'string' && searchText.length > 255) {
+        throw new Error('Error: searchText cannot exceed 255 characters.')
+      }
+
+      const body = context.document.body
+      const searchResults = body.search(searchText, { matchCase, matchWholeWord })
+      searchResults.load('items')
+      await context.sync()
+
+      const count = searchResults.items.length
+      if (count === 0) {
+        return `No occurrences of "${searchText}" found in the document.`
+      }
+
+      for (const item of searchResults.items) {
+        if (bold !== undefined) item.font.bold = bold
+        if (italic !== undefined) item.font.italic = italic
+        if (underline !== undefined) item.font.underline = underline ? 'Single' : 'None'
+        if (strikethrough !== undefined) item.font.strikeThrough = strikethrough
+        if (fontColor !== undefined) item.font.color = fontColor
+        if (highlightColor !== undefined) item.font.highlightColor = highlightColor
+        if (fontSize !== undefined) item.font.size = fontSize
+        if (fontName !== undefined) item.font.name = fontName
+      }
+      await context.sync()
+
+      const formats: string[] = []
+      if (fontColor !== undefined) formats.push(`color: ${fontColor}`)
+      if (highlightColor !== undefined) formats.push(`highlight: ${highlightColor}`)
+      if (bold !== undefined) formats.push(bold ? 'bold' : 'not bold')
+      if (italic !== undefined) formats.push(italic ? 'italic' : 'not italic')
+      if (underline !== undefined) formats.push(underline ? 'underlined' : 'not underlined')
+      if (fontSize !== undefined) formats.push(`size: ${fontSize}pt`)
+      if (fontName !== undefined) formats.push(`font: ${fontName}`)
+
+      return `Applied formatting (${formats.join(', ')}) to ${count} occurrence(s) of "${searchText}".`
+    },
   },
 
   getDocumentProperties: {

@@ -443,24 +443,26 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
 
   proofread: {
     system: (language: string) =>
-      `You are a meticulous proofreader. Your sole focus is correcting grammar and spelling without altering the style or tone of the text in ${language}.
-      You must preserve original structure and formatting by using the smallest possible localized edits.`,
-    user: (text: string, language: string) =>
-      `Task: Correct only the grammar and spelling in the following text without changing the style or tone.
-      Focus:
-      - Fix all spelling and punctuation errors.
-      - Correct subject-verb agreement and tense inconsistencies.
-      - Ensure proper sentence structure.
-      - Do NOT change vocabulary, tone, or style.
-      - Apply a minimum-edit strategy: edit only the smallest necessary unit (character, punctuation mark, or minimal token fragment).
-      - Never replace an entire sentence or paragraph when a local correction is enough.
-      - Example: if only a trailing letter must change, modify only that letter/ending.
-      Constraints:
-      1. If the text is already perfect, respond exactly with: "No corrections needed."
-      2. Otherwise, provide ONLY the corrected text with minimal localized edits and without explaining the changes.
-      3. Respond in ${language}.
+      `You are an expert email proofreader and light editor. Your task is to correct and mildly improve the current email compose reply — without rewriting it.
 
-      Text: ${text}`,
+KEY CONSTRAINTS:
+- You are working on the COMPOSE BODY of an email reply — only the text the user is currently drafting.
+- Do NOT touch any email history, forwarded messages, quoted blocks, or signatures (content preceded by lines like "---", "De:", "From:", "On ... wrote:").
+- Preserve the original tone, intent, and structure as much as possible.
+- Allowed corrections and improvements:
+  1. Fix grammar, spelling, and punctuation errors.
+  2. Improve sentence clarity minimally (simplify awkward phrasing, fix word order).
+  3. Lightly adjust style for naturalness — but stay very close to the original.
+  4. Keep formatting (bullets, line breaks, bold) intact.
+- Apply minimum-edit strategy: do NOT add new ideas, do NOT expand or shorten significantly.
+- OUTPUT ONLY the corrected/improved text — no explanations, no meta-commentary.`,
+    user: (text: string, language: string) =>
+      `Correct grammar/spelling and lightly improve the style of this email compose reply. Stay as close to the original as possible.
+
+EMAIL BODY:
+${text}
+
+OUTPUT: The corrected and lightly improved email body only.`,
   },
 
   extract: {

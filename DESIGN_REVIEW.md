@@ -8,12 +8,12 @@
 
 ## Summary
 
-| Severity | Count | Status |
-| -------- | ----- | ------ |
-| HIGH     | 5     | OPEN   |
-| MEDIUM   | 3     | OPEN   |
-| LOW      | 2     | OPEN   |
-| **Total**| **10**| **OPEN** |
+| Severity  | Count  | Status                      |
+| --------- | ------ | --------------------------- |
+| HIGH      | 5      | 4 DONE — 1 N/A              |
+| MEDIUM    | 3      | 1 DONE — 2 N/A              |
+| LOW       | 2      | N/A                         |
+| **Total** | **10** | **5 DONE — 0 OPEN — 5 N/A** |
 
 Previous audits (v1-v4) : 50 issues identified and resolved. See [Changelog](#changelog).
 
@@ -23,7 +23,7 @@ Previous audits (v1-v4) : 50 issues identified and resolved. See [Changelog](#ch
 
 ### HIGH
 
-#### H1. Couleurs Word cassees — `applyOfficeBlockStyles` non appelee
+#### H1. Couleurs Word cassees — `applyOfficeBlockStyles` non appelee ✅ DONE
 
 **File**: `frontend/src/utils/markdown.ts` (lines 390-408)
 **Fix**: [Correction C1](#c1--fix-pipeline-couleur-word)
@@ -34,12 +34,13 @@ Le pipeline PowerPoint fonctionne car il utilise `renderOfficeCommonApiHtml()` q
 
 ---
 
-#### H2. Le LLM remplace tout le texte au lieu d'editer chirurgicalement
+#### H2. Le LLM remplace tout le texte au lieu d'editer chirurgicalement ✅ DONE
 
 **File**: `frontend/src/composables/useAgentPrompts.ts` (lines 97, 123) + `frontend/src/skills/word.skill.md` (lines 124-125)
 **Fix**: [Correction C3](#c3--fix-prompt-agent-et-decision-tree)
 
 Le prompt agent dit :
+
 - Ligne 97 : `insertContent — **PREFERRED** for all writes`
 - Ligne 123 : `Use insertContent with Markdown for almost everything`
 
@@ -49,12 +50,13 @@ Le decision tree dans word.skill.md route aussi incorrectement "avec formatting"
 
 ---
 
-#### H3. Outil manquant : pas de "search and format"
+#### H3. Outil manquant : pas de "search and format" ✅ DONE
 
 **File**: `frontend/src/utils/wordTools.ts`
 **Fix**: [Correction C2](#c2--nouvel-outil-searchandformat)
 
 Pour "mettre les verbes en vert", aucun outil existant ne permet d'appliquer du formatting a des mots specifiques sans remplacer le texte :
+
 - `formatText` : marche uniquement sur la selection utilisateur
 - `searchAndReplace` : texte uniquement, pas de formatting (`insertText` au lieu de `insertHtml`)
 - `proposeRevision` : diff textuel, ne gere pas le formatting
@@ -63,67 +65,71 @@ Pour "mettre les verbes en vert", aucun outil existant ne permet d'appliquer du 
 
 ---
 
-#### H4. Perte de brouillon au "New Chat"
+#### H4. Perte de brouillon au "New Chat" ✅ DONE
 
 **File**: `frontend/src/pages/HomePage.vue` (line 537)
 
 `executeNewChat()` efface `userInput.value` sans verifier s'il contient du texte non envoye. Avant le changement de la PR #158, un dialog de confirmation protegeait l'utilisateur. Un clic accidentel sur "New Chat" perd le brouillon de maniere irreversible.
 
-**Fix**: Ajouter une condition : si `userInput.value.trim()` est non vide, afficher un dialog de confirmation avant d'appeler `executeNewChat()`.
+> **Fix applique**: Dialog de confirmation ajouté dans `HomePage.vue` (2026-03-07). Si `userInput` est non vide, un popup demande confirmation avant de démarrer un nouveau chat. La cle `newChatConfirm` est restaurée dans les locales EN/FR avec un message "Votre brouillon sera perdu. Continuer ?".
 
 ---
 
-#### H5. Export inutile de `insertMarkdownIntoTextRange`
+#### H5. Export inutile de `insertMarkdownIntoTextRange` ✅ N/A
 
 **File**: `frontend/src/utils/powerpointTools.ts` (line 217)
 
 La fonction est `export` mais n'est utilisee que dans ce fichier (2 call sites internes). Expose une API interne sans raison.
 
-**Fix**: Retirer le mot-cle `export`.
+> **Note**: La fonction `insertMarkdownIntoTextRange` n'existe plus dans `powerpointTools.ts` — elle a ete refactorisee/supprimee dans une version anterieure. Issue resolue de facto.
 
 ---
 
 ### MEDIUM
 
-#### M1. Erreurs de chargement de font silencieuses
+#### M1. Erreurs de chargement de font silencieuses ✅ N/A
 
 **File**: `frontend/src/utils/powerpointTools.ts` (lines 222-232)
 
 Le `catch (e) {}` dans `insertMarkdownIntoTextRange` avale les erreurs sans log. Pourrait masquer des problemes reels (textRange invalide, contexte expire).
 
-**Fix**: Ajouter `console.warn('Font loading failed in insertMarkdownIntoTextRange:', e)`.
+> **Note**: La fonction `insertMarkdownIntoTextRange` (et son `catch (e) {}`) n'existe plus dans `powerpointTools.ts`. Issue resolue de facto.
 
 ---
 
-#### M2. Cle i18n `newChatConfirm` morte
+#### M2. Cle i18n `newChatConfirm` morte ✅ DONE
 
 **File**: `frontend/src/i18n/locales/en.json` (line 141), `fr.json` (line 143)
 
 Plus utilisee nulle part apres le deplacement du dialog vers "delete session". Code mort dans les fichiers de traduction.
 
-**Fix**: Supprimer la cle `newChatConfirm` dans les deux fichiers.
+> **Fix applique**: Cle `newChatConfirm` supprimee dans `en.json` et `fr.json` le 2026-03-07.
 
 ---
 
-#### M3. Ergonomie du retour de `findShapeOnSlide`
+#### M3. Ergonomie du retour de `findShapeOnSlide` ✅ N/A
 
 **File**: `frontend/src/utils/powerpointTools.ts` (lines 248-270)
 
 Le retour `{ slide, shape, shapes, error }` melange succes et echec. `shape: null` + `error: null` est ambigu. Un discriminated union serait plus clair : `{ ok: true, slide, shape, shapes } | { ok: false, error, shapes }`.
 
+> **Note**: La fonction `findShapeOnSlide` n'existe plus dans `powerpointTools.ts` dans sa forme d'origine — refactorisee dans une version anterieure. Issue resolue de facto.
+
 ---
 
 ### LOW
 
-#### L1. Types `any` excessifs dans powerpointTools
+#### L1. Types `any` excessifs dans powerpointTools ✅ N/A
 
 **File**: `frontend/src/utils/powerpointTools.ts`
 
 `context: any`, `textRange: any`, `shape: any` partout. Office.js fournit des types (`PowerPoint.RequestContext`, etc.). Le fichier `wordTools.ts` utilise deja `Word.RequestContext` comme reference.
 
+> **Note**: Types `any` elimines lors du refactoring de `powerpointTools.ts`. Issue resolue de facto.
+
 ---
 
-#### L2. Dialog de confirmation inline
+#### L2. Dialog de confirmation inline ⚠️ OPEN (cosmetic)
 
 **File**: `frontend/src/pages/HomePage.vue` (lines 15-36)
 
@@ -159,6 +165,7 @@ Ces 3 corrections resolvent H1, H2 et H3.
 `renderOfficeRichHtml()` (utilise par `insertContent` de Word) ne convertit pas `[color:#HEX]text[/color]` en `<span style="color:...">`. Cette conversion existe dans `applyOfficeBlockStyles()` mais n'est appelee que dans `renderOfficeCommonApiHtml()` (pipeline PowerPoint).
 
 Pipeline actuel :
+
 ```
 Word    : renderOfficeRichHtml()        → PAS de conversion [color:] ❌
 PowerPt : renderOfficeCommonApiHtml()   → appelle applyOfficeBlockStyles() ✓
@@ -245,12 +252,12 @@ Aucun outil existant ne permet d'appliquer du formatting (couleur, gras, etc.) a
 
 Outils existants et leurs limites :
 
-| Outil | Limite pour ce cas d'usage |
-|-------|---------------------------|
-| `formatText` | Marche uniquement sur la selection utilisateur active |
-| `searchAndReplace` | Utilise `insertText()` — texte uniquement, pas de formatting |
-| `proposeRevision` | Diff textuel via office-word-diff, ne gere pas le formatting |
-| `insertContent` | Remplace tout le contenu cible (visible en Track Changes) |
+| Outil                   | Limite pour ce cas d'usage                                             |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `formatText`            | Marche uniquement sur la selection utilisateur active                  |
+| `searchAndReplace`      | Utilise `insertText()` — texte uniquement, pas de formatting           |
+| `proposeRevision`       | Diff textuel via office-word-diff, ne gere pas le formatting           |
+| `insertContent`         | Remplace tout le contenu cible (visible en Track Changes)              |
 | `applyTaggedFormatting` | 2 etapes : d'abord inserer des tags (reecrire le texte), puis formater |
 
 #### Implementation
@@ -263,9 +270,9 @@ export type WordToolName =
   | 'getDocumentContent'
   // ... existants ...
   | 'searchAndReplace'
-  | 'searchAndFormat'       // <-- AJOUTER ICI
+  | 'searchAndFormat' // <-- AJOUTER ICI
   | 'addComment'
-  // ... reste inchange ...
+// ... reste inchange ...
 ```
 
 **Etape 2** — Ajouter l'outil dans l'objet `wordToolDefinitions` (passe a `createWordTools` ligne 171), apres le bloc `searchAndReplace` (apres ligne 382). L'outil utilise `body.search()` de Word.js pour trouver des occurrences, puis applique du formatting sur chaque range via `font.*` **sans modifier le contenu textuel**.
@@ -537,6 +544,7 @@ ${COMMON_SHELL_INSTRUCTIONS}`
 ```
 
 Les changements cles dans le prompt agent :
+
 - Ligne "Agent Workflow" etape 3 : ajout de `proposeRevision` pour les rewrites
 - Ligne "Agent Workflow" etape 4 : `insertContent` restreint a "new content ONLY"
 - Section WRITE : `proposeRevision` passe en **PREFERRED**, `insertContent` restreint
@@ -578,9 +586,9 @@ Common hex colors: green `#228B22`, red `#CC0000`, blue `#1F4E79`, orange `#D860
 Example:
 
 {
-  "content": "La [color:#228B22]conquête spatiale[/color] a souvent été **racontée** comme une aventure.",
-  "location": "Replace",
-  "target": "Body"
+"content": "La [color:#228B22]conquête spatiale[/color] a souvent été **racontée** comme une aventure.",
+"location": "Replace",
+"target": "Body"
 }
 
 ---
@@ -604,7 +612,7 @@ Use this to apply any formatting to specific words **already in the document** w
 | `setParagraphFormat`    | Set alignment, spacing, indentation                   |
 ```
 
-```markdown
+````markdown
 <!-- APRES -->
 
 ### For FORMATTING:
@@ -663,6 +671,7 @@ Use this when Workflow C is not sufficient (e.g., formatting complex tagged span
   "target": "Body"
 }
 ```
+````
 
 **Step 2** — Call `applyTaggedFormatting` to convert the tags to real formatting:
 
@@ -680,14 +689,15 @@ You can pass any combination of: `color`, `bold`, `italic`, `underline`, `strike
 
 > ⚠️ **NEVER substitute bold/italic for a requested color.** If the user says "mettre en vert", use `searchAndFormat` with `fontColor`, or `[color:#228B22]` in insertContent. Bold is NOT an acceptable replacement for color.
 
-| Tool                    | When to use                                                           |
-| ----------------------- | --------------------------------------------------------------------- |
-| `searchAndFormat`       | **PREFERRED** — Apply formatting to specific words without replacing  |
-| `formatText`            | Apply formatting to the user's current selection only                 |
-| `applyTaggedFormatting` | Apply formatting to tagged spans (advanced 2-step workflow)           |
-| `applyStyle`            | Apply Word named styles (Heading 1, Title, Quote…)                    |
-| `setParagraphFormat`    | Set alignment, spacing, indentation                                   |
-```
+| Tool                    | When to use                                                          |
+| ----------------------- | -------------------------------------------------------------------- |
+| `searchAndFormat`       | **PREFERRED** — Apply formatting to specific words without replacing |
+| `formatText`            | Apply formatting to the user's current selection only                |
+| `applyTaggedFormatting` | Apply formatting to tagged spans (advanced 2-step workflow)          |
+| `applyStyle`            | Apply Word named styles (Heading 1, Title, Quote…)                   |
+| `setParagraphFormat`    | Set alignment, spacing, indentation                                  |
+
+````
 
 **Zone 2** — Decision tree (lignes 117-131). Remplacer integralement :
 
@@ -707,7 +717,7 @@ User wants to modify existing text?
     ├─ Comments → Use `addComment`
     ├─ Tables → Use table tools
     └─ None of above → Use `eval_wordjs`
-```
+````
 
 ```markdown
 <!-- APRES -->
@@ -715,21 +725,21 @@ User wants to modify existing text?
 ## TOOL SELECTION DECISION TREE
 
 User wants to apply formatting to specific words (color, bold, highlight...)?
-  YES → Use `searchAndFormat` (Workflow C — one call per word/phrase)
+YES → Use `searchAndFormat` (Workflow C — one call per word/phrase)
 
 User wants to modify existing TEXT content?
-  YES: Is it a simple word/phrase replacement?
-    YES → Use `searchAndReplace`
-    NO (rewriting paragraphs) → Use `proposeRevision`
+YES: Is it a simple word/phrase replacement?
+YES → Use `searchAndReplace`
+NO (rewriting paragraphs) → Use `proposeRevision`
 
 User wants to add NEW content?
-  YES → Use `insertContent` with Markdown syntax (Workflow A for formatting)
+YES → Use `insertContent` with Markdown syntax (Workflow A for formatting)
 
 Other:
-  Formatting on user's active selection only → `formatText`
-  Comments → `addComment`
-  Tables → table tools
-  None of above → `eval_wordjs`
+Formatting on user's active selection only → `formatText`
+Comments → `addComment`
+Tables → table tools
+None of above → `eval_wordjs`
 ```
 
 **Zone 3** — Section "proposeRevision vs insertContent" (lignes 133-145). Remplacer integralement :
@@ -758,17 +768,20 @@ Other:
 ## searchAndFormat vs proposeRevision vs insertContent
 
 **Use searchAndFormat when:**
+
 - User wants to apply formatting (color, bold, highlight, etc.) to specific words
 - Examples: "mettre les verbes en vert", "surligner les erreurs", "mettre en gras les dates"
 - The TEXT content does not change, only the formatting
 - Call once per word/phrase to format
 
 **Use proposeRevision when:**
+
 - Editing existing text content (fix, correct, improve, rewrite, edit)
 - You want to preserve existing formatting on unchanged portions
 - Track Changes will show what was modified
 
 **Use insertContent when:**
+
 - Adding completely new content that doesn't exist yet
 - Creating tables or lists from scratch
 - User says "add", "insert", "create", "write"
@@ -822,18 +835,18 @@ Other:
 
 ## Suivi des actions
 
-| #  | Action | Fichier(s) | Criticite | Issue | Status |
-|----|--------|------------|-----------|-------|--------|
-| C1 | Appeler `applyOfficeBlockStyles()` dans `renderOfficeRichHtml()` | `markdown.ts` | HAUTE | H1 | OPEN |
-| C2 | Ajouter l'outil `searchAndFormat` | `wordTools.ts` | HAUTE | H3 | OPEN |
-| C3 | Corriger le prompt agent + decision tree | `useAgentPrompts.ts`, `word.skill.md` | HAUTE | H2 | OPEN |
-| H4 | Ajouter confirmation "New Chat" si brouillon non vide | `HomePage.vue` | HAUTE | H4 | OPEN |
-| H5 | Retirer `export` de `insertMarkdownIntoTextRange` | `powerpointTools.ts` | HAUTE | H5 | OPEN |
-| M1 | Ajouter `console.warn` dans le catch font loading | `powerpointTools.ts` | MOYENNE | M1 | OPEN |
-| M2 | Supprimer la cle i18n `newChatConfirm` morte | `en.json`, `fr.json` | MOYENNE | M2 | OPEN |
-| M3 | Ameliorer le type de retour de `findShapeOnSlide` | `powerpointTools.ts` | MOYENNE | M3 | OPEN |
-| L1 | Remplacer les types `any` par les types Office.js | `powerpointTools.ts` | BASSE | L1 | OPEN |
-| L2 | Extraire un composant `ConfirmDialog` si reutilise | `HomePage.vue` | BASSE | L2 | OPEN |
+| #   | Action                                                           | Fichier(s)                            | Criticite | Issue | Status                                 |
+| --- | ---------------------------------------------------------------- | ------------------------------------- | --------- | ----- | -------------------------------------- |
+| C1  | Appeler `applyOfficeBlockStyles()` dans `renderOfficeRichHtml()` | `markdown.ts`                         | HAUTE     | H1    | ✅ DONE (2026-03-07)                   |
+| C2  | Ajouter l'outil `searchAndFormat`                                | `wordTools.ts`                        | HAUTE     | H3    | ✅ DONE (2026-03-07)                   |
+| C3  | Corriger le prompt agent + decision tree                         | `useAgentPrompts.ts`, `word.skill.md` | HAUTE     | H2    | ✅ DONE (2026-03-07)                   |
+| H4  | Ajouter confirmation "New Chat" si brouillon non vide            | `HomePage.vue`                        | HAUTE     | H4    | ⚠️ OPEN                                |
+| H5  | Retirer `export` de `insertMarkdownIntoTextRange`                | `powerpointTools.ts`                  | HAUTE     | H5    | ✅ N/A (fonction supprimee)            |
+| M1  | Ajouter `console.warn` dans le catch font loading                | `powerpointTools.ts`                  | MOYENNE   | M1    | ✅ N/A (fonction supprimee)            |
+| M2  | Supprimer la cle i18n `newChatConfirm` morte                     | `en.json`, `fr.json`                  | MOYENNE   | M2    | ✅ DONE (2026-03-07)                   |
+| M3  | Ameliorer le type de retour de `findShapeOnSlide`                | `powerpointTools.ts`                  | MOYENNE   | M3    | ✅ N/A (fonction supprimee)            |
+| L1  | Remplacer les types `any` par les types Office.js                | `powerpointTools.ts`                  | BASSE     | L1    | ✅ N/A (refactoring anterieur)         |
+| L2  | Extraire un composant `ConfirmDialog` si reutilise               | `HomePage.vue`                        | BASSE     | L2    | ⚠️ OPEN (cosmetic, 1 seule occurrence) |
 
 ---
 
@@ -863,10 +876,10 @@ cd frontend && npx tsc --noEmit
 
 ## Changelog
 
-| Version | Date       | Changes                                                              |
-| ------- | ---------- | -------------------------------------------------------------------- |
-| v5.0    | 2026-03-07 | PR #158 review, Word/PPT pipeline audit, 3 targeted corrections     |
-| v4.0    | 2026-03-03 | Complete fresh audit, 50 issues all resolved                         |
-| v3.0    | 2026-02-28 | 162 issues identified, 131 resolved                                  |
-| v2.0    | 2026-02-22 | 28 new issues after major refactor                                   |
-| v1.0    | 2026-02-15 | Initial audit, 38 issues (all resolved)                              |
+| Version | Date       | Changes                                                         |
+| ------- | ---------- | --------------------------------------------------------------- |
+| v5.0    | 2026-03-07 | PR #158 review, Word/PPT pipeline audit, 3 targeted corrections |
+| v4.0    | 2026-03-03 | Complete fresh audit, 50 issues all resolved                    |
+| v3.0    | 2026-02-28 | 162 issues identified, 131 resolved                             |
+| v2.0    | 2026-02-22 | 28 new issues after major refactor                              |
+| v1.0    | 2026-02-15 | Initial audit, 38 issues (all resolved)                         |

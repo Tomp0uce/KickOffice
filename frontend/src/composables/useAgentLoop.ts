@@ -1064,11 +1064,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     try {
       const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true, actionKey })
       if (!selectedText) {
-        if (hostIsOutlook && actionKey === 'outlookProofread') {
-          messageUtil.error('Veuillez sélectionner le texte à relire.')
-        } else {
-          messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
-        }
+        messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
         return
       }
 
