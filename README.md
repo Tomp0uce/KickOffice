@@ -84,10 +84,12 @@ All `eval_*` tools validate code before execution:
 - **Warnings**: Missing try/catch, excessive sync calls, incorrect array formats
 
 ### 3. Diffing Integration (Format Preservation)
-Word-level surgical editing via `office-word-diff` library:
-- **Word `proposeRevision`**: Applies only insertions/deletions, preserving formatting on unchanged text
-- **PowerPoint `proposeShapeTextRevision`**: Diff statistics with full replacement
-- **Cascading strategies**: Token → Sentence → Block fallback
+Word-level surgical editing via `office-word-diff` library (local package at `office-word-diff/`, Apache 2.0):
+- **Word `proposeRevision`**: Applies only insertions/deletions, preserving formatting (bold, italic, colors, fonts) on unchanged text. Backed by `wordDiffUtils.ts`.
+- **PowerPoint `proposeShapeTextRevision`**: Diff statistics with full replacement (Word Range API unavailable in PowerPoint)
+- **Cascading strategies**: Token Map → Sentence Diff → Block Replace fallback
+- **Track Changes**: `proposeRevision` wraps edits in Word's Track Changes by default so users can review/accept/reject
+- **Mandatory agent workflow**: agent must call `getSelectedTextWithFormatting` before `proposeRevision` (tool reads selection internally, but agent needs the original text to generate a meaningful revision). `eval_wordjs` with `insertText(..., 'Replace')` is explicitly forbidden as it destroys formatting.
 
 ---
 

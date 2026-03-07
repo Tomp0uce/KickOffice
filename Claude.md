@@ -155,7 +155,7 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
 - **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
-- **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps office-word-diff library with cascading fallback strategies)
+- **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps `office-word-diff` local library — Token Map → Sentence Diff → Block Replace cascade). `proposeRevision` is the only Word tool that preserves formatting on unchanged text; agent is instructed to always call `getSelectedTextWithFormatting` first, and is explicitly forbidden from using `eval_wordjs` with `insertText(..., 'Replace')` which destroys formatting. `office-word-diff` is Word-only (PowerPoint/Outlook lack the Range API and Track Changes).
 - **Sandbox Enhancement**: Host filtering in `sandbox.ts` prevents cross-namespace API access (e.g., Word API blocked in Excel context)
 
 ## 6) Backend Editing Guidelines
