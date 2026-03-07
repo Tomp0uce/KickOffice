@@ -7,6 +7,17 @@ import { validateOfficeCode } from './officeCodeValidator'
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
 
+/** Safely resolves a worksheet by name, falling back to active sheet. Throws a clear error if the sheet doesn't exist. */
+async function safeGetSheet(context: Excel.RequestContext, sheetName?: string): Promise<Excel.Worksheet> {
+  if (!sheetName) return context.workbook.worksheets.getActiveWorksheet()
+  const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName)
+  await context.sync()
+  if (sheet.isNullObject) {
+    throw new Error(`Worksheet "${sheetName}" not found. Use getWorksheetInfo to list available worksheets.`)
+  }
+  return sheet
+}
+
 type ExcelToolTemplate = Omit<ExcelToolDefinition, 'execute'> & {
   executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>
 }
@@ -217,9 +228,7 @@ const excelToolDefinitions = createExcelTools({
       const { address, sheetName, values, formulas, formatting, copyToRange } = args
       const formulaLocale = getExcelFormulaLanguage()
 
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       const range = sheet.getRange(address)
 
@@ -300,9 +309,7 @@ const excelToolDefinitions = createExcelTools({
     executeExcel: async (context, args: Record<string, any>) => {
       const { operation, dimension, reference, count = 1, sheetName } = args
 
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       if (operation === 'freeze' || operation === 'unfreeze') {
         if (operation === 'unfreeze') {
@@ -430,9 +437,7 @@ const excelToolDefinitions = createExcelTools({
       }
 
       // Resolve target sheet
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       if (operation === 'create') {
         if (objectType === 'chart') {
@@ -824,8 +829,8 @@ const excelToolDefinitions = createExcelTools({
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { name, address } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getItem(name)
+
+        const sheet = await safeGetSheet(context, name)
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
         range.load('address, values, rowCount, columnCount')
         await context.sync()
@@ -1007,9 +1012,7 @@ const excelToolDefinitions = createExcelTools({
       } = args as Record<string, any>
 
       
-        const sheet = sheetName
-          ? context.workbook.worksheets.getItem(sheetName)
-          : context.workbook.worksheets.getActiveWorksheet()
+        const sheet = await safeGetSheet(context, sheetName)
 
         if (action === 'protect') {
           sheet.protection.protect({
