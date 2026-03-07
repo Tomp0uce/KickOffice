@@ -8,8 +8,8 @@ if (!BACKEND_URL) {
 // Timeouts by model tier — reasoning models need more time (up to 6 min LLM + overhead)
 const BASE_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 180_000
 const TIMEOUT_BY_TIER: Record<string, number> = {
-  reasoning: 360_000,
-  standard: 180_000,
+  reasoning: 600_000,  // 10 min — GPT-5.2 up to 65k output tokens
+  standard: 300_000,   // 5 min — GPT-5.2 up to 32k output tokens
   fast: 120_000,
 }
 

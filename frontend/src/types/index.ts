@@ -9,6 +9,7 @@ export interface ModelInfo {
   id: string
   label: string
   type: 'chat' | 'image'
+  contextWindow?: number
 }
 
 export interface ToolInputSchema {

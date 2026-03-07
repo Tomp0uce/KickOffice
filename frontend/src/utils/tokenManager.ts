@@ -3,7 +3,8 @@ import type { ChatRequestMessage } from '@/api/backend'
 import { message as messageUtil } from '@/utils/message'
 import { i18n } from '@/i18n'
 
-export const MAX_CONTEXT_CHARS = 1_000_000 // Increased from 100k to 1M to handle massive GPT-5.1 contexts
+// GPT-5.2: 400k token context window × 3 chars/token ≈ 1.2M chars (conservative ratio)
+export const MAX_CONTEXT_CHARS = 1_200_000
 
 const TRUNCATION_MARKER = '\n\n[... Truncated]'
 let hasWarnedTruncation = false

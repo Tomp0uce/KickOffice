@@ -112,7 +112,7 @@ app.use((req, res, next) => {
   next()
 })
 
-app.use(express.json({ limit: '4mb' }))
+app.use(express.json({ limit: '32mb' }))
 
 // Reject POST/PUT/PATCH requests that don't declare application/json to avoid silent empty bodies
 app.use((req, res, next) => {

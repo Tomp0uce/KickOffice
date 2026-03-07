@@ -39,7 +39,8 @@ const models = {
   standard: {
     id: process.env.MODEL_STANDARD || 'gpt-5.1',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
-    maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '4096', 10),
+    maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '32000', 10),
+    contextWindow: parseInt(process.env.MODEL_STANDARD_CONTEXT_WINDOW || '400000', 10),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
     reasoningEffort: process.env.MODEL_STANDARD_REASONING_EFFORT || undefined,
     type: 'chat',
@@ -47,7 +48,8 @@ const models = {
   reasoning: {
     id: process.env.MODEL_REASONING || 'gpt-5.1',
     label: process.env.MODEL_REASONING_LABEL || 'Reasoning',
-    maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '8192', 10),
+    maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '65000', 10),
+    contextWindow: parseInt(process.env.MODEL_REASONING_CONTEXT_WINDOW || '400000', 10),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
     reasoningEffort: process.env.MODEL_REASONING_EFFORT || 'high',
     type: 'chat',
@@ -77,6 +79,7 @@ function getPublicModels() {
       id: config.id,
       label: config.label,
       type: config.type,
+      ...(config.contextWindow ? { contextWindow: config.contextWindow } : {}),
     }
   }
   return publicModels
