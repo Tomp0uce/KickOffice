@@ -1,4 +1,4 @@
-import type { PowerPointToolDefinition } from '@/types'
+import type { ToolDefinition } from '@/types'
 /**
  * PowerPoint interaction utilities.
  *
@@ -11,7 +11,7 @@ import { executeOfficeAction } from './officeAction'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
-import DiffMatchPatch from 'diff-match-patch'
+import { computeTextDiffStats, createOfficeTools } from './common'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -20,26 +20,9 @@ const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => PowerPoint.run(action) as Promise<T>)
 
 
-type PowerPointToolTemplate = Omit<PowerPointToolDefinition, 'execute'> & {
+type PowerPointToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executePowerPoint?: (context: any, args: Record<string, any>) => Promise<string>
   executeCommon?: (args: Record<string, any>) => Promise<string>
-}
-
-function createPowerPointTools(definitions: Record<PowerPointToolName, PowerPointToolTemplate>): Record<PowerPointToolName, PowerPointToolDefinition> {
-  return Object.fromEntries(
-    Object.entries(definitions).map(([name, definition]) => [
-      name,
-      {
-        ...definition,
-        execute: async (args: Record<string, any> = {}) => {
-          if (definition.executePowerPoint) {
-            return runPowerPoint(context => definition.executePowerPoint!(context, args))
-          }
-          return executeOfficeAction(() => definition.executeCommon!(args))
-        },
-      },
-    ]),
-  ) as unknown as Record<PowerPointToolName, PowerPointToolDefinition>
 }
 
 export type PowerPointToolName =
@@ -328,7 +311,7 @@ function ensurePowerPointRunAvailable() {
   }
 }
 
-const powerpointToolDefinitions = createPowerPointTools({
+const powerpointToolDefinitions = createOfficeTools<PowerPointToolName, PowerPointToolTemplate, ToolDefinition>({
   getSelectedText: {
     name: 'getSelectedText',
     category: 'read',
@@ -411,22 +394,10 @@ PARAMETERS:
 
         const originalText = textRange.text || ''
 
-        // 4. Compute diff
-        const dmp = new DiffMatchPatch()
-        const diffs = dmp.diff_main(originalText, revisedText)
-        dmp.diff_cleanupSemantic(diffs)
+        // 4. Compute diff stats
+        const { insertions, deletions, unchanged } = computeTextDiffStats(originalText, revisedText)
 
-        // 5. Calculate stats
-        let insertions = 0
-        let deletions = 0
-        let unchanged = 0
-        for (const [op, text] of diffs) {
-          if (op === 0) unchanged += text.length
-          else if (op === -1) deletions += text.length
-          else if (op === 1) insertions += text.length
-        }
-
-        // 6. Apply changes
+        // 5. Apply changes
         // PowerPoint API is limited - we do full replacement but report the diff
         textRange.text = revisedText
         await context.sync()
@@ -941,10 +912,15 @@ try {
       return overview.join('\n')
     },
   },
+}, (def) => async (args = {}) => {
+  if (def.executePowerPoint) return runPowerPoint(ctx => def.executePowerPoint!(ctx, args))
+  return executeOfficeAction(() => def.executeCommon!(args))
 })
 
-export function getPowerPointToolDefinitions(): PowerPointToolDefinition[] {
+export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(powerpointToolDefinitions)
 }
+
+export const getPowerPointToolDefinitions = getToolDefinitions
 
 export { powerpointToolDefinitions }

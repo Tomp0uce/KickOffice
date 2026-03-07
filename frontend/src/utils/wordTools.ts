@@ -1,13 +1,12 @@
-import type { WordToolDefinition } from '@/types'
+import type { ToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
-import DiffMatchPatch from 'diff-match-patch'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 import { applyRevisionToSelection, previewDiffStats, hasComplexContent } from './wordDiffUtils'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './markdown'
 
-import { generateVisualDiff } from './common'
+import { generateVisualDiff, createOfficeTools } from './common'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -153,23 +152,11 @@ async function applyHeadingBuiltinStyles(
   }
 }
 
-type WordToolTemplate = Omit<WordToolDefinition, 'execute'> & {
+type WordToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
 }
 
-function createWordTools(definitions: Record<WordToolName, WordToolTemplate>): Record<WordToolName, WordToolDefinition> {
-  return Object.fromEntries(
-    Object.entries(definitions).map(([name, definition]) => [
-      name,
-      {
-        ...definition,
-        execute: async (args: Record<string, any> = {}) => runWord(context => definition.executeWord(context, args)),
-      },
-    ]),
-  ) as unknown as Record<WordToolName, WordToolDefinition>
-}
-
-const wordToolDefinitions = createWordTools({
+const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, ToolDefinition>({
   getSelectedText: {
     name: 'getSelectedText',
     category: 'read',
@@ -1528,10 +1515,12 @@ try {
       }
     },
   },
-})
+}, (def) => async (args = {}) => runWord(ctx => def.executeWord(ctx, args)))
 
-export function getWordToolDefinitions(): WordToolDefinition[] {
+export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(wordToolDefinitions)
 }
+
+export const getWordToolDefinitions = getToolDefinitions
 
 export { wordToolDefinitions }

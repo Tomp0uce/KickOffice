@@ -94,7 +94,7 @@ function buildHostGlobals(
  * Create a safe error message from an execution error.
  * Strips sensitive information while keeping useful details.
  */
-export function sanitizeExecutionError(error: any): string {
+function sanitizeExecutionError(error: any): string {
   const message = error?.message || String(error)
 
   // Remove stack traces that might expose internal paths

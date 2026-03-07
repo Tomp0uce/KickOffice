@@ -28,6 +28,8 @@ CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
 - For emphasis, use **bold** (not CAPS or underlining)
 - For document structure, use Markdown headings (# ## ###)`
 
+const LANGUAGE_MATCH_INSTRUCTION = 'Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.'
+
 export const builtInPrompt = {
   translate: {
     system: (_language: string) =>
@@ -67,7 +69,7 @@ Text: ${text}`,
       - Improve sentence structure and eliminate redundancy.
       - Keep the tone natural and highly human.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the polished text without any commentary.
 
       Text: ${text}`,
@@ -84,7 +86,7 @@ Text: ${text}`,
       - Maintain a third-person perspective unless the context requires otherwise.
       - Optimize for clarity and conciseness as per peer-review expectations.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the revised text. No pre-amble or meta-talk.
 
       Text: ${text}`,
@@ -100,7 +102,7 @@ Text: ${text}`,
       - Focus solely on core decisions, facts, and conclusions.
       - Scale the length proportionally to the input text, but prioritize extreme brevity.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bulleted summary. No preamble.
 
       Text: ${text}`,
@@ -121,7 +123,7 @@ Text: ${text}`,
       2. For each error found, identify the specific text segment and use the \`addComment\` tool to explain the error and provide the correction (e.g., "Change 'était' to 'étaient'").
       3. If the text is already perfect, respond exactly with: "No grammatical issues found."
       4. Do NOT output a fully rewritten text block. Your ONLY output mechanism for corrections is the \`addComment\` tool.
-      5. Analyze the language of the provided text. You MUST write your comments in the exact SAME language as the original text, disregarding any other UI language preferences.
+      5. ${LANGUAGE_MATCH_INSTRUCTION.replace('respond', 'write your comments')}
 
       Text: ${text}`,
   },
@@ -139,7 +141,7 @@ export const excelBuiltInPrompt = {
       - Provide 3-5 actionable insights.
       Constraints:
       1. Do NOT attempt to calculate exact mathematical sums or averages unless they are explicitly obvious. Focus on relationships and meaning.
-      2. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      2. ${LANGUAGE_MATCH_INSTRUCTION}
       3. OUTPUT ONLY the analysis results, clearly structured.
 
       Data: ${text}`,
@@ -155,7 +157,7 @@ export const excelBuiltInPrompt = {
       - The best chart type (bar, line, pie, scatter, etc.) and why.
       - Any data preparation needed before charting.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the recommendation with brief justification.
 
       Data: ${text}`,
@@ -171,7 +173,7 @@ export const excelBuiltInPrompt = {
       - Explain briefly what each formula does.
       - If multiple approaches exist, suggest the most efficient one.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the formula suggestions with brief explanations.
 
       Context: ${text}`,
@@ -188,7 +190,7 @@ export const excelBuiltInPrompt = {
       - Header styling and cell alignment.
       - Color coding for readability.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the formatting recommendations.
 
       Data: ${text}`,
@@ -205,7 +207,7 @@ export const excelBuiltInPrompt = {
       - Any notable patterns or outliers.
       - A brief plain-language summary.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the explanation.
 
       Data: ${text}`,
@@ -231,7 +233,7 @@ export const excelBuiltInPrompt = {
       - Clearly state the main upward, downward, or cyclical trends.
       - Formally suggest 1-2 actions to put in place (e.g., using specific conditional formatting rules) to visually highlight these insights.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the trend analysis and the highlighting recommendations.
 
       Data: ${text}`,
@@ -250,7 +252,7 @@ export const powerPointBuiltInPrompt = {
       - Remove filler words and redundancies.
       - Keep only the essential information.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
 
       Text: ${text}`,
@@ -267,7 +269,7 @@ export const powerPointBuiltInPrompt = {
       - Keep the notes extremely short (under 100 words total).
       - Use short, punch-able sentences and visual cues.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the speaker notes. No meta-commentary.
 
       Slide content: ${text}`,
@@ -284,7 +286,7 @@ export const powerPointBuiltInPrompt = {
       - Focus on benefits/outcomes rather than just features.
       - Create a "hook" that grabs the audience's attention instantly.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the rewritten text. No explanations.
       3. Keep the meaning accurate but dramatically improved in style.
 
@@ -305,7 +307,7 @@ export const powerPointBuiltInPrompt = {
       Constraints:
       1. If the text is error-free, respond strictly with: "No corrections needed."
       2. Otherwise, provide ONLY the fully corrected text block, ready to replace the original.
-      3. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      3. ${LANGUAGE_MATCH_INSTRUCTION}
 
       Text: ${text}`,
   },
@@ -435,7 +437,7 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
       - Keep it direct, punchy, and highly concise.
       - Preserve all essential facts, dates, names, and action items.
       Constraints:
-      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the condensed text.
 
       Text: ${text}`,
@@ -476,7 +478,7 @@ OUTPUT: The corrected and lightly improved email body only.`,
       - The deadline (if mentioned).
       Constraints:
       1. DO NOT include a summary or key points. Focus 100% on actions.
-      2. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      2. ${LANGUAGE_MATCH_INSTRUCTION}
       3. OUTPUT ONLY the bulleted list of tasks.
 
       Email: ${text}`,

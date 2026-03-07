@@ -1,14 +1,11 @@
-import type { WordToolDefinition, OutlookToolDefinition } from '@/types'
-import DiffMatchPatch from 'diff-match-patch'
-
-import DOMPurify from 'dompurify'
+import type { ToolDefinition } from '@/types'
 
 import { executeOfficeAction } from './officeAction'
-import { renderOfficeRichHtml } from './markdown'
+import { renderOfficeRichHtml, sanitizeHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 
-import { generateVisualDiff } from './common'
+import { generateVisualDiff, createOfficeTools } from './common'
 import { getLastRichContext, setLastRichContext } from './richContextStore'
 import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver'
 
@@ -41,25 +38,8 @@ function getOfficeCoercionType(): any {
 const runOutlook = <T>(action: () => Promise<T>): Promise<T> =>
   executeOfficeAction(action)
 
-type OutlookToolTemplate = Omit<OutlookToolDefinition, 'execute'> & {
+type OutlookToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>
-}
-
-function createOutlookTools(definitions: Record<OutlookToolName, OutlookToolTemplate>): Record<OutlookToolName, OutlookToolDefinition> {
-  return Object.fromEntries(
-    Object.entries(definitions).map(([name, definition]) => [
-      name,
-      {
-        ...definition,
-        execute: async (args: Record<string, any> = {}) => runOutlook(async () => {
-          return Promise.race([
-            definition.executeOutlook(getMailbox(), args),
-            new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000))
-          ])
-        }),
-      },
-    ]),
-  ) as unknown as Record<OutlookToolName, OutlookToolDefinition>
 }
 
 function resolveAsyncResult(result: any, onSuccess: (value: any) => string): string {
@@ -112,7 +92,7 @@ function getRecipientField(field: unknown): RecipientField {
   return 'to'
 }
 
-const outlookToolDefinitions = createOutlookTools({
+const outlookToolDefinitions = createOfficeTools<OutlookToolName, OutlookToolTemplate, ToolDefinition>({
   getEmailBody: {
     name: 'getEmailBody',
     category: 'read',
@@ -247,7 +227,7 @@ const outlookToolDefinitions = createOutlookTools({
             }
             const existing = getResult.value || ''
             const separator = existing.trim() ? '<br/><br/>' : ''
-            const newBody = existing + separator + DOMPurify.sanitize(html)
+            const newBody = existing + separator + sanitizeHtml(html)
             body.setAsync(newBody, { coercionType: getOfficeCoercionType().Html }, (setResult: any) => {
               resolve(resolveAsyncResult(setResult, () => 'Successfully appended to email body.'))
             })
@@ -517,10 +497,15 @@ try {
       }
     },
   },
-})
+}, (def) => async (args = {}) => runOutlook(async () => Promise.race([
+  def.executeOutlook(getMailbox(), args),
+  new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000)),
+])))
 
-export function getOutlookToolDefinitions(): OutlookToolDefinition[] {
+export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(outlookToolDefinitions)
 }
+
+export const getOutlookToolDefinitions = getToolDefinitions
 
 export { outlookToolDefinitions }

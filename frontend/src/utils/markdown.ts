@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify'
+import type { Config as DOMPurifyConfig } from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import markdownItDeflist from 'markdown-it-deflist'
 import markdownItFootnote from 'markdown-it-footnote'
@@ -392,6 +393,11 @@ export function stripMarkdownListMarkers(content: string): string {
       return `${'\t'.repeat(indentLevel)}${itemText}`
     })
     .join('\n')
+}
+
+/** Shared DOMPurify wrapper — single import point for all Office HTML sanitization. */
+export function sanitizeHtml(html: string, options?: DOMPurifyConfig): string {
+  return DOMPurify.sanitize(html, options) as string
 }
 
 export function renderOfficeRichHtml(content: string): string {

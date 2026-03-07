@@ -19,4 +19,3 @@ export async function executeOfficeAction<T>(action: () => Promise<T>): Promise<
   }
 }
 
-export { OFFICE_ACTION_TIMEOUT_MS, OFFICE_BUSY_TIMEOUT_MESSAGE }
