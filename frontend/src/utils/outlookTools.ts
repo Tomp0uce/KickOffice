@@ -497,10 +497,21 @@ try {
       }
     },
   },
-}, (def) => async (args = {}) => runOutlook(async () => Promise.race([
-  def.executeOutlook(getMailbox(), args),
-  new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000)),
-])))
+}, (def) => async (args = {}) => {
+  try {
+    return await runOutlook(async () => Promise.race([
+      def.executeOutlook(getMailbox(), args),
+      new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000)),
+    ]))
+  } catch (error: any) {
+    return JSON.stringify({
+      error: true,
+      message: error.message || String(error),
+      tool: def.name,
+      suggestion: 'Fix the error parameters or context and try again.'
+    }, null, 2)
+  }
+})
 
 export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(outlookToolDefinitions)

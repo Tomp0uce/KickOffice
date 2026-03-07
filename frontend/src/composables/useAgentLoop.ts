@@ -1,5 +1,5 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
-import { nextTick, ref, type Ref } from 'vue'
+import { nextTick, ref, type Ref, type ComputedRef } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, categorizeError } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
@@ -23,6 +23,7 @@ import {
   getWordDocumentContext,
 } from '@/utils/officeDocumentContext'
 import { areCredentialsConfigured } from '@/utils/credentialStorage'
+import { logService } from '@/utils/logger'
 
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
 
@@ -135,7 +136,7 @@ interface AgentLoopSettings {
 }
 
 interface AgentLoopActions {
-  quickActions: Ref<QuickAction[]>
+  quickActions: ComputedRef<QuickAction[] | undefined>
   outlookQuickActions?: Ref<OutlookQuickAction[]>
   excelQuickActions: Ref<ExcelQuickAction[]>
   powerPointQuickActions: Ref<PowerPointQuickAction[]>
@@ -189,7 +190,7 @@ export async function executeAgentToolCall(
     // M3: Runtime object check instead of unchecked type assertion
     toolArgs = typeof parsed === 'object' && parsed !== null ? parsed : {}
   } catch (parseErr) {
-    console.error('[AgentLoop] Failed to parse tool call arguments', { toolName, arguments: toolCall.function.arguments, error: parseErr })
+    logService.error('[AgentLoop] Failed to parse tool call arguments', parseErr, { toolName, arguments: toolCall.function.arguments, traffic: 'user' })
     if (assistantMessage) {
       if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
       assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: {}, status: 'error', result: 'Malformed tool arguments — JSON parse failed' })
@@ -218,15 +219,17 @@ export async function executeAgentToolCall(
 
   currentActionRef.value = getActionLabelForCategory(toolDef.category)
   await scrollToBottomFn()
+  const executionStartTime = Date.now()
   try {
     result = await toolDef.execute(toolArgs)
     success = true
+    logService.info('[AgentLoop] tool execution succeeded', 'user', { toolName, duration: Date.now() - executionStartTime })
     if (assistantMessage?.toolCalls) {
       const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
       if (idx !== -1) assistantMessage.toolCalls[idx].status = 'complete'
     }
   } catch (err: unknown) {
-    console.error('[AgentLoop] tool execution failed', { toolName, toolArgs, error: err })
+    logService.error('[AgentLoop] tool execution failed', err, { toolName, toolArgs, traffic: 'user' })
     const errorMessage = err instanceof Error ? err.message : String(err)
     result = `Error in ${toolName}: ${errorMessage}`
     if (assistantMessage?.toolCalls) {
@@ -443,6 +446,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
       let truncatedByLength = false
+      logService.info('llm_request', 'llm', { model: modelTier, messageCount: contextSafeMessages.length })
       try {
         await chatStream({
           messages: contextSafeMessages,
@@ -475,17 +479,18 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           onUsage: accumulateUsage,
         })
         response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
+        logService.info('llm_response_complete', 'llm', { tokensUsed: sessionStats.value.totalTokens })
       } catch (err: unknown) {
         if ((err instanceof Error && err.name === 'AbortError') || abortController.value?.signal.aborted) {
           abortedByUser = true
           break
         }
-        console.error('[AgentLoop] chatStream failed', {
+        logService.error('[AgentLoop] chatStream failed', err, {
           host: hostIsOutlook ? 'outlook' : hostIsPowerPoint ? 'powerpoint' : hostIsExcel ? 'excel' : 'word',
           modelTier,
           iteration,
           messageCount: currentMessages.length,
-          error: err,
+          traffic: 'system'
         })
         const errInfo = categorizeError(err)
         if (errInfo.type === 'auth') {
@@ -983,12 +988,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       return messageUtil.warning(t('requestInProgress') || 'A request is already in progress. Please wait or stop the current request.')
     }
     const selectedQuickAction = hostIsExcel
-      ? excelQuickActions.value.find(a => a.key === actionKey)
+      ? excelQuickActions.value.find((a: ExcelQuickAction) => a.key === actionKey)
       : hostIsPowerPoint
-        ? powerPointQuickActions.value.find(a => a.key === actionKey)
-        : hostIsOutlook && outlookQuickActions
-          ? outlookQuickActions.value?.find(a => a.key === actionKey)
-          : quickActions.value.find(a => a.key === actionKey)
+        ? powerPointQuickActions.value.find((a: PowerPointQuickAction) => a.key === actionKey)
+        : hostIsOutlook && outlookQuickActions?.value
+          ? outlookQuickActions.value.find((a: OutlookQuickAction) => a.key === actionKey)
+          : quickActions.value?.find((a: QuickAction) => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
     const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined

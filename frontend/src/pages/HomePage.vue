@@ -60,7 +60,7 @@
 
       <QuickActionsBar
         v-model:selected-prompt-id="selectedPromptId"
-        :quick-actions="quickActions"
+        :quick-actions="quickActions ?? []"
         :loading="loading"
         :saved-prompts="savedPrompts"
         :select-prompt-title="t('selectPrompt')"
@@ -83,7 +83,7 @@
               powerpoint: 'emptySubtitlePowerPoint',
               excel: 'emptySubtitleExcel',
               word: 'emptySubtitle',
-            }),
+            }) || 'emptySubtitle',
           )
         "
         :backend-online-label="t('backendOnline')"
@@ -119,7 +119,7 @@
               powerpoint: 'includeSelectionLabelPowerPoint',
               excel: 'includeSelectionLabelExcel',
               word: 'includeSelectionLabel',
-            }),
+            }) || 'includeSelectionLabel',
           )
         "
         :task-type-label="t('taskTypeLabel')"
@@ -217,12 +217,13 @@ const hostIsWord = isWord()
 const hostIsPowerPoint = isPowerPoint()
 const hostIsOutlook = isOutlook()
 
-const currentHost = forHost({
-  outlook: 'outlook',
-  powerpoint: 'powerpoint',
-  excel: 'excel',
-  word: 'word',
-})
+const currentHost =
+  forHost({
+    outlook: 'outlook',
+    powerpoint: 'powerpoint',
+    excel: 'excel',
+    word: 'word',
+  }) || 'word'
 const history = ref<DisplayMessage[]>([])
 
 const sessionManager = useSessionManager(currentHost, history)
@@ -421,7 +422,9 @@ const inputPlaceholder = computed(() =>
 function adjustTextareaHeight() {
   const candidate = chatInputRef.value?.textareaEl
   const textarea =
-    candidate && 'style' in candidate ? (candidate as HTMLTextAreaElement) : candidate?.value
+    candidate && 'style' in candidate
+      ? (candidate as HTMLTextAreaElement)
+      : (candidate as unknown as HTMLTextAreaElement)
 
   if (textarea && textarea.style) {
     textarea.style.height = 'auto'
@@ -571,7 +574,9 @@ function handleRegenerate() {
 async function handleEditMessage(message: DisplayMessage) {
   userInput.value = message.content ?? ''
   await nextTick()
-  chatInputRef.value?.textareaEl?.focus()
+  // Vue template refs can sometimes be nested components or raw elements
+  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
+  el?.focus?.()
 }
 
 function goToSettings() {
@@ -599,7 +604,8 @@ async function doNewChat() {
   customSystemPrompt.value = ''
   selectedPromptId.value = ''
   await nextTick()
-  chatInputRef.value?.textareaEl?.value?.focus()
+  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
+  el?.focus?.()
   adjustTextareaHeight()
 }
 
@@ -636,7 +642,8 @@ function loadSelectedPrompt() {
   customSystemPrompt.value = prompt.systemPrompt
   userInput.value = prompt.userPrompt
   adjustTextareaHeight()
-  chatInputRef.value?.textareaEl?.value?.focus()
+  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
+  el?.focus?.()
 }
 
 async function checkBackend() {

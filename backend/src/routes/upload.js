@@ -6,7 +6,7 @@ import mammoth from 'mammoth'
 import * as xlsx from 'xlsx'
 import { ErrorCodes } from '../config/errorCodes.js'
 import { logAndRespond } from '../utils/http.js'
-import { systemLog } from '../utils/logger.js'
+import logger from '../utils/logger.js'
 
 const uploadRouter = Router()
 
@@ -39,10 +39,10 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
       mimeType = typeInfo.mime
     }
   } catch (err) {
-    systemLog('WARN', 'Could not determine file type from buffer', err)
+    req.logger.warn('Could not determine file type from buffer', { error: err })
   }
   
-  systemLog('INFO', `POST /api/upload started parsing file: ${filename}`, {
+  req.logger.info(`POST /api/upload started parsing file: ${filename}`, {
     size: file.size,
     mimeType
   })
@@ -59,7 +59,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
         if (!data || !data.text) throw new Error('Empty or unreadable PDF')
         extractedText = data.text
       } catch (pdfErr) {
-        systemLog('ERROR', 'PDF extraction failed', pdfErr)
+        req.logger.error('PDF extraction failed', { error: pdfErr })
         return logAndRespond(res, 400, { code: ErrorCodes.PDF_EXTRACTION_FAILED, error: 'Failed to extract text from PDF. The file may be corrupted or encrypted.' }, 'POST /api/upload')
       }
     } 
@@ -72,7 +72,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
         const result = await mammoth.extractRawText({ buffer: file.buffer })
         extractedText = result.value
       } catch (docxErr) {
-        systemLog('ERROR', 'DOCX extraction failed', docxErr)
+        req.logger.error('DOCX extraction failed', { error: docxErr })
         return logAndRespond(res, 400, { code: ErrorCodes.DOCX_EXTRACTION_FAILED, error: 'Failed to extract text from DOCX. The file may be corrupted.' }, 'POST /api/upload')
       }
     } 
@@ -112,7 +112,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     ) {
       const b64 = file.buffer.toString('base64')
       const imageBase64 = `data:${mimeType};base64,${b64}`
-      systemLog('INFO', `POST /api/upload completed image encoding`, { filename, bytes: file.size })
+      req.logger.info(`POST /api/upload completed image encoding`, { filename, bytes: file.size })
       return res.json({ filename, imageBase64 })
     }
     else {
@@ -136,10 +136,10 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
       extractedText: extractedText.trim()
     })
 
-    systemLog('INFO', `POST /api/upload completed file parsing`, { filename, charCount: extractedText.length })
+    req.logger.info(`POST /api/upload completed file parsing`, { filename, charCount: extractedText.length })
 
   } catch (error) {
-    systemLog('ERROR', `POST /api/upload error parsing file ${filename}`, error)
+    req.logger.error(`POST /api/upload error parsing file ${filename}`, { error })
     return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Failed to process file' }, 'POST /api/upload')
   }
 })

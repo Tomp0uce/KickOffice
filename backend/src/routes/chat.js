@@ -5,15 +5,13 @@ import { ErrorCodes } from '../config/errorCodes.js'
 import { validateChatRequest } from '../middleware/validate.js'
 import { chatCompletion, handleErrorResponse } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
-import { systemLog } from '../utils/logger.js'
+import logger from '../utils/logger.js'
 
 const chatRouter = Router()
-const VERBOSE_LOGGING_ENABLED = process.env.VERBOSE_LOGGING === 'true'
-const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-CHAT]') : () => {}
 
 chatRouter.post('/', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
-  verboseLog(` /api/chat incoming`, {
+  req.logger.debug(` /api/chat incoming`, {
     modelTier,
     messageCount: Array.isArray(messages) ? messages.length : 0,
     hasTemperature: temperature !== undefined,
@@ -38,7 +36,7 @@ chatRouter.post('/', async (req, res) => {
       tools: parsedTools.value,
     })
 
-    verboseLog(` /api/chat upstream payload`, {
+    req.logger.debug(` /api/chat upstream payload`, {
       model: body.model,
       stream: body.stream,
       messageCount: body.messages?.length || 0,
@@ -47,7 +45,8 @@ chatRouter.post('/', async (req, res) => {
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
     })
 
-    systemLog('INFO', `POST /api/chat upstream request initiated`, {
+    req.logger.info(`POST /api/chat upstream request initiated`, {
+      traffic: 'llm',
       url: '/v1/chat/completions',
       body,
     })
@@ -83,6 +82,8 @@ chatRouter.post('/', async (req, res) => {
       })
     })
 
+    let streamContent = ''
+
     try {
       while (true) {
         if (clientDisconnected) break
@@ -104,6 +105,7 @@ chatRouter.post('/', async (req, res) => {
         const { done, value } = readResult
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
+        streamContent += chunk
 
         // Check if client disconnected before writing
         if (clientDisconnected) break
@@ -137,10 +139,14 @@ chatRouter.post('/', async (req, res) => {
           // Ignore write errors if client disconnected
         }
       }
-      systemLog('INFO', 'POST /api/chat stream completed successfully')
+      req.logger.info('POST /api/chat stream completed successfully', {
+        traffic: 'llm',
+        responseLength: streamContent.length,
+        responseContent: streamContent
+      })
     } catch (streamError) {
       if (!clientDisconnected) {
-        systemLog('ERROR', 'POST /api/chat stream error', streamError)
+        req.logger.error('POST /api/chat stream error', { error: streamError, traffic: 'system' })
       }
     } finally {
       // Cancel reader if still active
@@ -156,7 +162,7 @@ chatRouter.post('/', async (req, res) => {
     }
   } catch (error) {
     if (res.headersSent) {
-      systemLog('ERROR', 'POST /api/chat proxy error during stream', error)
+      req.logger.error('POST /api/chat proxy error during stream', { error, traffic: 'system' })
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: 'Internal server error during stream processing' })}\n\n`)
         res.end()
@@ -164,17 +170,17 @@ chatRouter.post('/', async (req, res) => {
       return
     }
     if (error.name === 'AbortError') {
-      systemLog('ERROR', 'POST /api/chat LLM API request timeout')
+      req.logger.error('POST /api/chat LLM API request timeout', { traffic: 'system' })
       return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat')
     }
-    systemLog('ERROR', 'POST /api/chat Chat proxy error', error)
+    req.logger.error('POST /api/chat Chat proxy error', { error, traffic: 'system' })
     return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat')
   }
 })
 
 chatRouter.post('/sync', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
-  verboseLog(` /api/chat/sync incoming`, {
+  req.logger.debug(` /api/chat/sync incoming`, {
     modelTier,
     messageCount: Array.isArray(messages) ? messages.length : 0,
     toolCount: Array.isArray(tools) ? tools.length : 0,
@@ -200,7 +206,7 @@ chatRouter.post('/sync', async (req, res) => {
       tools: parsedTools.value,
     })
 
-    verboseLog(` /api/chat/sync upstream payload`, {
+    req.logger.debug(` /api/chat/sync upstream payload`, {
       model: body.model,
       stream: body.stream,
       messageCount: body.messages?.length || 0,
@@ -210,7 +216,8 @@ chatRouter.post('/sync', async (req, res) => {
       hasMaxTokens: Object.prototype.hasOwnProperty.call(body, 'max_tokens') || Object.prototype.hasOwnProperty.call(body, 'max_completion_tokens'),
     })
 
-    systemLog('INFO', `POST /api/chat/sync upstream request initiated`, {
+    req.logger.info(`POST /api/chat/sync upstream request initiated`, {
+      traffic: 'llm',
       url: '/v1/chat/completions',
       body,
     })
@@ -233,7 +240,7 @@ chatRouter.post('/sync', async (req, res) => {
 
     // Validate upstream response structure
     if (!data || typeof data !== 'object') {
-      systemLog('ERROR', 'LLM API returned invalid response format', { type: typeof data })
+      req.logger.error('LLM API returned invalid response format', { type: typeof data, traffic: 'system' })
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_INVALID_JSON,
         error: 'The AI service returned an invalid response format.',
@@ -241,7 +248,7 @@ chatRouter.post('/sync', async (req, res) => {
     }
 
     if (!Array.isArray(data.choices) || data.choices.length === 0) {
-      systemLog('ERROR', 'LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500) })
+      req.logger.error('LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500), traffic: 'system' })
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_NO_CHOICES,
         error: 'The AI service returned an empty response.',
@@ -250,7 +257,7 @@ chatRouter.post('/sync', async (req, res) => {
 
     const firstChoice = data.choices[0]
     if (!firstChoice.message || typeof firstChoice.message !== 'object') {
-      systemLog('ERROR', 'LLM API returned invalid choice structure', { choice: firstChoice })
+      req.logger.error('LLM API returned invalid choice structure', { choice: firstChoice, traffic: 'system' })
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_INVALID_JSON,
         error: 'The AI service returned an invalid response structure.',
@@ -258,14 +265,14 @@ chatRouter.post('/sync', async (req, res) => {
     }
 
     if (!firstChoice.message.content && (!firstChoice.message.tool_calls || firstChoice.message.tool_calls.length === 0)) {
-      systemLog('ERROR', 'LLM API returned empty content without tool calls', { choice: firstChoice })
+      req.logger.error('LLM API returned empty content without tool calls', { choice: firstChoice, traffic: 'system' })
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_EMPTY_RESPONSE,
         error: 'The AI service returned an empty response.',
       }, 'POST /api/chat/sync')
     }
 
-    verboseLog(` /api/chat/sync upstream response`, {
+    req.logger.debug(` /api/chat/sync upstream response`, {
       id: data?.id,
       model: data?.model,
       choiceCount: data?.choices?.length || 0,
@@ -275,14 +282,14 @@ chatRouter.post('/sync', async (req, res) => {
       toolCallCount: data?.choices?.[0]?.message?.tool_calls?.length || 0,
     })
     
-    systemLog('INFO', 'POST /api/chat/sync upstream response completed', data)
+    req.logger.info('POST /api/chat/sync upstream response completed', { traffic: 'llm', response: data })
     res.json(data)
   } catch (error) {
     if (error.name === 'AbortError') {
-      systemLog('ERROR', 'POST /api/chat/sync LLM API request timeout')
+      req.logger.error('POST /api/chat/sync LLM API request timeout', { traffic: 'system' })
       return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
-    systemLog('ERROR', 'POST /api/chat/sync Chat sync proxy error', error)
+    req.logger.error('POST /api/chat/sync Chat sync proxy error', { error, traffic: 'system' })
     return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })

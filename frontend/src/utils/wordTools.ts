@@ -1515,7 +1515,18 @@ try {
       }
     },
   },
-}, (def) => async (args = {}) => runWord(ctx => def.executeWord(ctx, args)))
+}, (def) => async (args = {}) => {
+  try {
+    return await runWord(ctx => def.executeWord(ctx, args))
+  } catch (error: any) {
+    return JSON.stringify({
+      error: true,
+      message: error.message || String(error),
+      tool: def.name,
+      suggestion: 'Fix the error parameters or context and try again.'
+    }, null, 2)
+  }
+})
 
 export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(wordToolDefinitions)
