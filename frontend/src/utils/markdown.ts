@@ -33,8 +33,15 @@ turndownService.addRule('color', {
     } else {
       color = (node as HTMLElement).getAttribute('color') || '';
     }
-    // Only wrap if it's an actual hex or named color and content is not empty
-    if (color && content.trim()) {
+    
+    // Ignore default/black colors to avoid wrapping all standard text
+    const isBlack = color.replace(/\s+/g, '').toLowerCase() === 'rgb(0,0,0)' || 
+                    color.toLowerCase() === '#000000' || 
+                    color.toLowerCase() === 'black' || 
+                    color.toLowerCase() === 'windowtext';
+                    
+    // Only wrap if it's an actual hex or named color (and not black/default), and content is not empty
+    if (color && !isBlack && content.trim()) {
       return `[color:${color}]${content}[/color]`;
     }
     return content;
