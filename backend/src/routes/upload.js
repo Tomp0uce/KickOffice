@@ -4,6 +4,7 @@ import { fileTypeFromBuffer } from 'file-type'
 import { PDFParse } from 'pdf-parse'
 import mammoth from 'mammoth'
 import * as xlsx from 'xlsx'
+import { ErrorCodes } from '../config/errorCodes.js'
 import { logAndRespond } from '../utils/http.js'
 import { systemLog } from '../utils/logger.js'
 
@@ -25,7 +26,7 @@ const upload = multer({
 
 uploadRouter.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) {
-    return logAndRespond(res, 400, { error: 'No file uploaded' }, 'POST /api/upload')
+    return logAndRespond(res, 400, { code: ErrorCodes.NO_FILE_UPLOADED, error: 'No file uploaded' }, 'POST /api/upload')
   }
 
   const file = req.file
@@ -59,16 +60,21 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
         extractedText = data.text
       } catch (pdfErr) {
         systemLog('ERROR', 'PDF extraction failed', pdfErr)
-        return logAndRespond(res, 400, { error: 'Failed to extract text from PDF. The file may be corrupted or encrypted.' }, 'POST /api/upload')
+        return logAndRespond(res, 400, { code: ErrorCodes.PDF_EXTRACTION_FAILED, error: 'Failed to extract text from PDF. The file may be corrupted or encrypted.' }, 'POST /api/upload')
       }
     } 
     // DOCX Extraction
     else if (
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       filename.toLowerCase().endsWith('.docx')
     ) {
-      const result = await mammoth.extractRawText({ buffer: file.buffer })
-      extractedText = result.value
+      try {
+        const result = await mammoth.extractRawText({ buffer: file.buffer })
+        extractedText = result.value
+      } catch (docxErr) {
+        systemLog('ERROR', 'DOCX extraction failed', docxErr)
+        return logAndRespond(res, 400, { code: ErrorCodes.DOCX_EXTRACTION_FAILED, error: 'Failed to extract text from DOCX. The file may be corrupted.' }, 'POST /api/upload')
+      }
     } 
     // XLSX / CSV Extraction
     else if (
@@ -110,13 +116,14 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
       return res.json({ filename, imageBase64 })
     }
     else {
-      return logAndRespond(res, 400, { 
-        error: `Unsupported file type: ${mimeType}. Please upload a PDF, DOCX, XLSX, CSV, Image (PNG/JPG/WEBP/GIF), or Text file.` 
+      return logAndRespond(res, 400, {
+        code: ErrorCodes.UNSUPPORTED_FILE_TYPE,
+        error: `Unsupported file type: ${mimeType}. Please upload a PDF, DOCX, XLSX, CSV, Image (PNG/JPG/WEBP/GIF), or Text file.`
       }, 'POST /api/upload')
     }
 
     if (!extractedText || !extractedText.trim()) {
-      return logAndRespond(res, 400, { error: 'No text could be extracted from the file. Make sure the file contains readable text.' }, 'POST /api/upload')
+      return logAndRespond(res, 400, { code: ErrorCodes.FILE_EMPTY, error: 'No text could be extracted from the file. Make sure the file contains readable text.' }, 'POST /api/upload')
     }
 
     // Limit text size to prevent enormous context windows (approx context token limit defense)
@@ -133,7 +140,7 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
 
   } catch (error) {
     systemLog('ERROR', `POST /api/upload error parsing file ${filename}`, error)
-    return logAndRespond(res, 500, { error: 'Failed to process file' }, 'POST /api/upload')
+    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Failed to process file' }, 'POST /api/upload')
   }
 })
 
