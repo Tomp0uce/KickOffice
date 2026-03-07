@@ -31,7 +31,10 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
 
   const userProfilePromptBlock = () => {
     // Sanitize user input to prevent prompt injection
-    const sanitize = (str: string) => str.replace(/[<-]/g, '')
+    const sanitize = (str: string) =>
+      str
+        .replace(/[\r\n\t]/g, ' ')              // strip newlines (injection vectors)
+        .replace(/[<>{}[\]`|#*_~\\]/g, '')      // strip markdown/HTML special chars
     const firstName = sanitize(userFirstName.value).trim()
     const lastName = sanitize(userLastName.value).trim()
     const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName')

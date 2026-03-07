@@ -722,10 +722,14 @@ const excelToolDefinitions = createExcelTools({
   sortRange: {
     name: 'sortRange',
     category: 'write',
-    description: 'Sort the selected data range by a specific column.',
+    description: 'Sort a data range by a specific column. Pass an explicit address (e.g. "A1:D50") to sort a known range, or omit it to sort the current selection.',
     inputSchema: {
       type: 'object',
       properties: {
+        address: {
+          type: 'string',
+          description: 'Optional range address to sort (e.g. "A1:D50", "Sheet2!B2:E100"). If omitted, the current user selection is used.',
+        },
         columnIndex: {
           type: 'number',
           description: 'Zero-based column index to sort by (default: 0)',
@@ -742,9 +746,11 @@ const excelToolDefinitions = createExcelTools({
       required: [],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { columnIndex = 0, ascending = true, hasHeaders = true } = args as Record<string, any>
-      
-        const range = context.workbook.getSelectedRange()
+      const { address, columnIndex = 0, ascending = true, hasHeaders = true } = args as Record<string, any>
+
+        const range = address
+          ? context.workbook.worksheets.getActiveWorksheet().getRange(address)
+          : context.workbook.getSelectedRange()
         range.load('values, rowCount, columnCount')
         await context.sync()
 
@@ -1341,7 +1347,7 @@ const excelToolDefinitions = createExcelTools({
   findData: {
     name: 'findData',
     category: 'read',
-    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match.',
+    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Returns up to 1000 results; when truncated, totalMatches indicates how many were found in total.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1354,15 +1360,25 @@ const excelToolDefinitions = createExcelTools({
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args as Record<string, any>
+      const MAX_RESULTS = 1000
+
+      let pattern: RegExp | null = null
+      if (useRegex) {
+        try {
+          pattern = new RegExp(searchTerm, matchCase ? '' : 'i')
+        } catch {
+          return JSON.stringify({ error: `Invalid regex pattern: "${searchTerm}". Please provide a valid regular expression.` })
+        }
+      }
+
       const sheets = context.workbook.worksheets
       sheets.load('items')
       await context.sync()
 
-      const pattern = useRegex ? new RegExp(searchTerm, matchCase ? '' : 'i') : null
       const matches: any[] = []
+      let totalMatches = 0
 
       for (const sheet of sheets.items) {
-        if (matches.length > 200) break // limit
         sheet.load('name')
         const usedRange = sheet.getUsedRangeOrNullObject()
         usedRange.load('values,address,rowCount,columnCount')
@@ -1380,7 +1396,6 @@ const excelToolDefinitions = createExcelTools({
         }
 
         for (let r = 0; r < usedRange.rowCount; r++) {
-         if (matches.length > 200) break
           for (let c = 0; c < usedRange.columnCount; c++) {
             const val = usedRange.values[r][c]
             const target = String(val ?? '')
@@ -1393,12 +1408,17 @@ const excelToolDefinitions = createExcelTools({
               isMatch = matchEntireCell ? compVal === compTerm : compVal.includes(compTerm)
             }
             if (isMatch) {
-              matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
+              totalMatches++
+              if (matches.length < MAX_RESULTS) {
+                matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
+              }
             }
           }
         }
       }
-      return JSON.stringify(matches, null, 2)
+
+      const truncated = totalMatches > MAX_RESULTS
+      return JSON.stringify(truncated ? { matches, totalMatches, truncated: true } : matches, null, 2)
     },
   },
 
@@ -1406,19 +1426,19 @@ const excelToolDefinitions = createExcelTools({
   getAllObjects: {
     name: 'getAllObjects',
     category: 'read',
-    description: 'List all charts and pivot tables. By default scans the entire workbook (all sheets). Pass allSheets: false to limit to the active sheet only.',
+    description: 'List all charts and pivot tables. By default scans the active sheet only. Pass allSheets: true to scan all sheets in the workbook (may be slow on large workbooks).',
     inputSchema: {
       type: 'object',
       properties: {
         allSheets: {
           type: 'boolean',
-          description: 'When true (default), list objects from ALL sheets. When false, list only the active sheet.',
+          description: 'When true, list objects from ALL sheets. When false (default), list only the active sheet.',
         },
       },
       required: [],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const allSheets = args.allSheets !== false // default true
+      const allSheets = args.allSheets === true // default false
 
       if (!allSheets) {
         const sheet = context.workbook.worksheets.getActiveWorksheet()
