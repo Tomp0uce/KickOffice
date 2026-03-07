@@ -101,13 +101,10 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText()
         if (selected) return selected
-        // BUGFIX: Never fall back to the entire body for proofread
-        if (selectionOptions.actionKey === 'outlookProofread') {
-          return ''
-        }
+        // For proofread: fall through to full body (compose body only, no history)
       }
       
-      // Fall back to the full email body when no text is selected
+      // Fall back to the full email compose body (Outlook API only returns the reply being drafted)
       return getOutlookMailBody()
     }
     if (hostIsPowerPoint) return getPowerPointSelection()
@@ -148,13 +145,10 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selectedHtml = await getOutlookSelectedHtml()
         if (selectedHtml) return selectedHtml
-        // BUGFIX: Never fall back to the entire body for proofread
-        if (selectionOptions.actionKey === 'outlookProofread') {
-          return ''
-        }
+        // For proofread: fall through to full compose body HTML (no history)
       }
       
-      // Fall back to the full email body HTML for all quick actions
+      // Fall back to the full email compose body HTML
       const html = await getOutlookMailBodyAsHtml()
       return html || getOutlookMailBody()
     }

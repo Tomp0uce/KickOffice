@@ -35,6 +35,29 @@
         </div>
       </div>
 
+      <div
+        v-if="showNewChatConfirm"
+        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
+      >
+        <p class="text-[13px] font-medium leading-tight text-main">
+          {{ t('newChatConfirm') }}
+        </p>
+        <div class="mt-1 flex justify-end gap-2">
+          <button
+            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
+            @click="showNewChatConfirm = false"
+          >
+            {{ t('cancel') }}
+          </button>
+          <button
+            class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary/90"
+            @click="confirmNewChat"
+          >
+            {{ t('confirm') }}
+          </button>
+        </div>
+      </div>
+
       <QuickActionsBar
         v-model:selected-prompt-id="selectedPromptId"
         :quick-actions="quickActions"
@@ -182,6 +205,7 @@ const customSystemPrompt = ref('')
 const draftFocusGlow = ref(false)
 const backendOnline = ref(false)
 const showDeleteConfirm = ref(false)
+const showNewChatConfirm = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
 const hostIsExcel = isExcel()
@@ -538,6 +562,19 @@ function goToSettings() {
 }
 
 async function executeNewChat() {
+  if (userInput.value.trim()) {
+    showNewChatConfirm.value = true
+    return
+  }
+  await doNewChat()
+}
+
+async function confirmNewChat() {
+  showNewChatConfirm.value = false
+  await doNewChat()
+}
+
+async function doNewChat() {
   if (loading.value) stopGeneration()
   await sessionManager.newSession()
   resetSessionStats()

@@ -404,7 +404,8 @@ export function renderOfficeRichHtml(content: string): string {
   })
 
   const withFootnotes = processFootnotes(sanitized)  // R19
-  return splitBrInListItems(withFootnotes)  // R4
+  const withListFix = splitBrInListItems(withFootnotes)  // R4
+  return applyOfficeBlockStyles(withListFix)  // C1: apply [color:] and block styles for all Office pipelines
 }
 
 /**
@@ -412,10 +413,9 @@ export function renderOfficeRichHtml(content: string): string {
  * Common API hosts can be stricter, so we keep semantic tags but normalize block styles.
  */
 export function renderOfficeCommonApiHtml(content: string): string {
+  // applyOfficeBlockStyles is already called inside renderOfficeRichHtml (idempotent)
   const richHtml = renderOfficeRichHtml(content)
-  const styledHtml = applyOfficeBlockStyles(richHtml)
-
-  return styledHtml.trim() || content
+  return richHtml.trim() || content
 }
 
 export function stripRichFormattingSyntax(content: string, stripListMarkers = false): string {

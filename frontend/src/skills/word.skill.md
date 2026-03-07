@@ -17,27 +17,49 @@
 
 ### For WRITING/EDITING content:
 
-| Tool                 | When to use                                                    |
-| -------------------- | -------------------------------------------------------------- |
-| `proposeRevision`    | **PREFERRED** for editing existing text. Preserves formatting! |
-| `searchAndReplace`   | Fix specific words/phrases throughout document                 |
-| `insertContent`      | Add new content (Markdown + inline color/style syntax)         |
-| `insertHyperlink`    | Add clickable links                                            |
-| `addComment`         | Add review comments                                            |
-| `insertHeaderFooter` | Add headers/footers                                            |
-| `insertFootnote`     | Add footnotes                                                  |
+| Tool                 | When to use                                                              |
+| -------------------- | ------------------------------------------------------------------------ |
+| `proposeRevision`    | **PREFERRED** for editing existing text. Preserves formatting! Uses diff |
+| `searchAndReplace`   | Fix specific words/phrases throughout document                           |
+| `insertContent`      | Add NEW content only (Markdown + inline color/style syntax)              |
+| `insertHyperlink`    | Add clickable links                                                      |
+| `addComment`         | Add review comments                                                      |
+| `insertHeaderFooter` | Add headers/footers                                                      |
+| `insertFootnote`     | Add footnotes                                                            |
 
 ### For FORMATTING:
 
 **CRITICAL RULE**: The `formatText` tool ONLY works when text is already selected by the user. If you just inserted text via `insertContent`, it is NOT selected — you CANNOT color/bold it with `formatText` after the fact.
 
-To apply any formatting (color, bold, italic, underline, highlight, font size…) to newly inserted or existing text, use one of these two workflows:
+To apply formatting to specific words or to newly inserted text, use one of these three workflows (in priority order):
 
 ---
 
-#### WORKFLOW A — Inline syntax in `insertContent` (PREFERRED for full rewrites with formatting)
+#### WORKFLOW C — `searchAndFormat` (PREFERRED for formatting specific words)
 
-Embed formatting directly into the `content` string:
+The simplest way to format specific words. Does NOT modify text content, no Track Changes impact.
+
+Example: "mettre les verbes en vert"
+
+1. Read the document with `getDocumentContent` or `getSelectedTextWithFormatting`
+2. Identify the target words (verbs, names, errors, etc.)
+3. Call `searchAndFormat` for each word:
+
+```json
+{ "searchText": "mange", "fontColor": "#228B22" }
+```
+
+```json
+{ "searchText": "court", "fontColor": "#228B22" }
+```
+
+Result: only those words are colored, nothing else changes.
+
+---
+
+#### WORKFLOW A — Inline syntax in `insertContent` (for full rewrites with formatting)
+
+Use ONLY when writing NEW content. Embed formatting directly into the `content` string:
 
 | Effect        | Syntax                             | Example                                         |
 | ------------- | ---------------------------------- | ----------------------------------------------- |
@@ -50,23 +72,13 @@ Embed formatting directly into the `content` string:
 
 Common hex colors: green `#228B22`, red `#CC0000`, blue `#1F4E79`, orange `#D86000`, purple `#7030A0`
 
-Example:
-
-```json
-{
-  "content": "La [color:#228B22]conquête spatiale[/color] a souvent été **racontée** comme une aventure.",
-  "location": "Replace",
-  "target": "Body"
-}
-```
-
 ---
 
-#### WORKFLOW B — `applyTaggedFormatting` (PREFERRED when not rewriting the whole text)
+#### WORKFLOW B — `applyTaggedFormatting` (advanced 2-step workflow)
 
-Use this to apply any formatting to specific words **already in the document** without replacing everything.
+Use this when Workflow C is not sufficient (e.g., formatting complex tagged spans with mixed styles).
 
-**Step 1** — Insert the document with `<yourTag>` around words to format:
+**Step 1** — Insert content with `<yourTag>` around words to format:
 
 ```json
 {
@@ -90,14 +102,15 @@ You can pass any combination of: `color`, `bold`, `italic`, `underline`, `strike
 
 ---
 
-> ⚠️ **NEVER substitute bold/italic for a requested color.** If the user says "mettre en vert", use `[color:#228B22]` or `applyTaggedFormatting` with `color`. Bold is NOT an acceptable replacement for color.
+> ⚠️ **NEVER substitute bold/italic for a requested color.** If the user says "mettre en vert", use `searchAndFormat` with `fontColor`, or `[color:#228B22]` in insertContent. Bold is NOT an acceptable replacement for color.
 
-| Tool                    | When to use                                           |
-| ----------------------- | ----------------------------------------------------- |
-| `formatText`            | Apply formatting to the user's current selection only |
-| `applyTaggedFormatting` | Apply formatting to tagged spans across the document  |
-| `applyStyle`            | Apply Word named styles (Heading 1, Title, Quote…)    |
-| `setParagraphFormat`    | Set alignment, spacing, indentation                   |
+| Tool                    | When to use                                                          |
+| ----------------------- | -------------------------------------------------------------------- |
+| `searchAndFormat`       | **PREFERRED** — Apply formatting to specific words without replacing |
+| `formatText`            | Apply formatting to the user's current selection only                |
+| `applyTaggedFormatting` | Apply formatting to tagged spans (advanced 2-step workflow)          |
+| `applyStyle`            | Apply Word named styles (Heading 1, Title, Quote…)                   |
+| `setParagraphFormat`    | Set alignment, spacing, indentation                                  |
 
 ### For TABLES:
 
@@ -117,32 +130,45 @@ You can pass any combination of: `color`, `bold`, `italic`, `underline`, `strike
 ## TOOL SELECTION DECISION TREE
 
 ```
-User wants to modify existing text?
-├─ YES: Is it a simple word/phrase replacement?
-│   ├─ YES → Use `searchAndReplace`
-│   └─ NO (rewriting paragraphs) → Use `proposeRevision`
-└─ NO: Adding new content or rewriting WITH formatting?
-    ├─ YES, with color/bold/etc → Use `insertContent` with [color:] / **bold** inline syntax
-    ├─ YES, apply formatting to existing doc → Use `applyTaggedFormatting` (Workflow B)
-    ├─ Formatting on user's active selection only → Use `formatText`
-    ├─ Comments → Use `addComment`
-    ├─ Tables → Use table tools
-    └─ None of above → Use `eval_wordjs`
+User wants to apply formatting to specific words (color, bold, highlight...)?
+  YES → Use `searchAndFormat` (Workflow C — one call per word/phrase)
+
+User wants to modify existing TEXT content?
+  YES: Is it a simple word/phrase replacement?
+    YES → Use `searchAndReplace`
+    NO (rewriting paragraphs) → Use `proposeRevision`
+
+User wants to add NEW content?
+  YES → Use `insertContent` with Markdown syntax (Workflow A for formatting)
+
+Other:
+  Formatting on user's active selection only → `formatText`
+  Comments → `addComment`
+  Tables → table tools
+  None of above → `eval_wordjs`
 ```
 
-## proposeRevision vs insertContent
+## searchAndFormat vs proposeRevision vs insertContent
+
+**Use searchAndFormat when:**
+
+- User wants to apply formatting (color, bold, highlight, etc.) to specific words
+- Examples: "mettre les verbes en vert", "surligner les erreurs", "mettre en gras les dates"
+- The TEXT content does not change, only the formatting
+- Call once per word/phrase to format
 
 **Use proposeRevision when:**
 
-- Editing existing text (fix, correct, improve, rewrite, edit)
+- Editing existing text content (fix, correct, improve, rewrite, edit)
 - You want to preserve existing formatting on unchanged portions
+- Track Changes will show what was modified
 
 **Use insertContent when:**
 
-- Adding completely new content
+- Adding completely new content that doesn't exist yet
 - Creating tables or lists from scratch
 - User says "add", "insert", "create", "write"
-- User wants a rewrite **with color/formatting** (use inline syntax)
+- NEVER use to modify existing text (causes full replacement visible in Track Changes)
 
 ## WORD-SPECIFIC API PATTERNS
 
