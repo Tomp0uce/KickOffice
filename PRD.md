@@ -6,6 +6,7 @@
 
 **Target Audience:**
 All employees within the organization, specifically tailored to handle the diverse needs of:
+
 - Engineers (Hardware, Software, Firmware, Mechanical)
 - Project Managers
 - Accounting & Finance
@@ -27,12 +28,14 @@ All employees within the organization, specifically tailored to handle the diver
 ### 3.1 Chat Interface
 
 #### Visual Components
+
 - **Chat header**: KickOffice logo, subtitle, status indicator (3 dots)
 - **Input area**: Auto-expanding text field with implicit character counting
 - **Message list**: Messages displayed with timestamps (HH:MM format), clear user/assistant separation
 - **Stats bar**: Input/output tokens (with K/M formatting), context window percentage, active model name, shell activity indicator
 
 #### Session Management
+
 - **Multiple sessions**: Users can maintain several independent conversations
 - **Session switching**: Dropdown listing all sessions with message count
 - **New chat**: Button to start a fresh conversation
@@ -42,12 +45,14 @@ All employees within the organization, specifically tailored to handle the diver
 - **Per-host isolation**: Each Office app (Word, Excel, PowerPoint, Outlook) has its own sessions
 
 #### Model Selection
+
 - **Tier selector**: Dropdown to choose between model tiers (Standard, Reasoning, Image)
 - **Active model display**: Visual indication of current model in stats bar
 - **Placeholder adaptation**: Input placeholder changes based on selected model type (e.g., "Describe Image" for image tier)
 - **Persistence**: Model selection saved in localStorage
 
 #### File Attachments
+
 - **File upload**: Up to 3 files per message
 - **Supported formats**: PDF, DOCX, XLSX, XLS, CSV, TXT, MD, PNG, JPEG, JPG, WEBP, GIF
 - **Size limit**: 10 MB per file
@@ -58,12 +63,14 @@ All employees within the organization, specifically tailored to handle the diver
 - **Error messages**: Specific notifications for oversized files, unsupported formats, or max files reached
 
 #### Context Options
+
 - **Include selection**: Checkbox to automatically include selected text from document
 - **Word formatting**: Checkbox (Word only) to enable rich formatting in responses
 
 ### 3.2 Quick Actions
 
 Contextual buttons at the top of the interface for one-click actions:
+
 - **Tooltips**: Each button shows a description on hover
 - **Disabled state**: Buttons grayed out during loading
 - **Saved prompts dropdown**: Quick access to custom prompts
@@ -72,10 +79,12 @@ Contextual buttons at the top of the interface for one-click actions:
 ### 3.3 Message Display
 
 #### User Messages
+
 - Plain text display with timestamp
 - Indication of attached files
 
 #### Assistant Messages
+
 - **Markdown rendering**: Full support (bold, italic, lists, code blocks, tables)
 - **Thinking blocks**: Collapsible `<think>` sections showing AI reasoning process with brain icon
 - **Tool calls**: Expandable blocks showing tool name, arguments (JSON), status, and results
@@ -84,6 +93,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - **DOMPurify sanitization**: XSS prevention on all rendered content
 
 #### Tool Call Visualization
+
 - **Running status**: Animated spinner (Loader2 icon)
 - **Success status**: Green checkmark
 - **Error status**: Red X with error message in red text
@@ -91,6 +101,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Expandable/collapsible**: Click to show/hide details
 
 #### Message Actions
+
 - **Replace selection**: Insert message content replacing current selection
 - **Append to selection**: Add content at the end of selection
 - **Copy to clipboard**: Copy text with fallback for Office WebView environments
@@ -143,12 +154,14 @@ Contextual buttons at the top of the interface for one-click actions:
 ### 4.1 Credential Management
 
 #### Configuration
+
 - **LiteLLM API key**: Masked input field (password type)
 - **User email**: Input field for identification
 - **Status indicator**: Colored badge (green = configured, yellow = missing)
 - **Portal link**: Redirect to key generation portal (getkey.ai.kickmaker.net)
 
 #### Credential Persistence
+
 - **Remember me**: "Remember credentials" checkbox
 - **Encrypted storage**: AES-GCM 256-bit encryption for saved credentials
 - **Encryption key**: Random unique key generated per installation
@@ -158,6 +171,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Corrupted data recovery**: Graceful handling of decryption failures
 
 #### Logout
+
 - Manual credential deletion in settings
 - Associated encryption keys cleared
 
@@ -173,14 +187,14 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 4.3 Authentication Error Handling
 
-| Error Type | Displayed Message |
-|------------|-------------------|
+| Error Type          | Displayed Message                                         |
+| ------------------- | --------------------------------------------------------- |
 | Missing credentials | "Please configure your credentials in Settings > Account" |
-| 401 error | "Authentication required" |
-| Timeout | "Request timed out. The model took too long..." |
-| Network error | "Connection error. Check your network..." |
-| Rate limit | "Too many requests — rate limit reached. Please wait..." |
-| Server error | "Internal server error..." |
+| 401 error           | "Authentication required"                                 |
+| Timeout             | "Request timed out. The model took too long..."           |
+| Network error       | "Connection error. Check your network..."                 |
+| Rate limit          | "Too many requests — rate limit reached. Please wait..."  |
+| Server error        | "Internal server error..."                                |
 
 ### 4.4 Security Features
 
@@ -195,6 +209,7 @@ Contextual buttons at the top of the interface for one-click actions:
 ## 5. Settings Page
 
 ### 5.1 Account Tab
+
 - API key field (masked with show/hide toggle)
 - Email field
 - Remember credentials checkbox with description
@@ -202,6 +217,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - Link to configuration portal
 
 ### 5.2 General Tab
+
 - **Interface language**: FR/EN selector with persistence
 - **Dark mode**: On/off toggle with theme persistence
 - **User profile**:
@@ -213,6 +229,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Available models list** (read-only display)
 
 ### 5.3 Custom Prompts Tab
+
 - List of all saved prompts
 - New prompt add button
 - Inline editing (system prompt + user prompt)
@@ -220,12 +237,14 @@ Contextual buttons at the top of the interface for one-click actions:
 - Prompt preview with truncated display
 
 ### 5.4 Built-in Prompts Tab
+
 - Default prompts per application (Translate, Polish, Academic, Summarize, Proofread...)
 - Ability to edit each built-in prompt
 - Reset to default button
 - System and user prompt preview
 
 ### 5.5 Tools Tab
+
 - Complete tool list with checkboxes (67 tools total)
 - Enable/disable per tool
 - Description for each tool
@@ -238,53 +257,53 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 6.1 Document Reading Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| getSelectedText | Get currently selected text as plain text | none |
-| getDocumentContent | Get full document body as plain text | none |
-| getDocumentHtml | Get full document as HTML with formatting | none |
-| getDocumentProperties | Get paragraph count, word count, character count | none |
-| getSelectedTextWithFormatting | Get selection as Markdown with formatting preserved | none |
-| getSpecificParagraph | Read one paragraph by index | index (0-based) |
-| findText | Search document and return match count | searchText, matchCase, matchWholeWord |
-| getComments | List all comments in document | none |
+| Tool                          | Description                                         | Parameters                            |
+| ----------------------------- | --------------------------------------------------- | ------------------------------------- |
+| getSelectedText               | Get currently selected text as plain text           | none                                  |
+| getDocumentContent            | Get full document body as plain text                | none                                  |
+| getDocumentHtml               | Get full document as HTML with formatting           | none                                  |
+| getDocumentProperties         | Get paragraph count, word count, character count    | none                                  |
+| getSelectedTextWithFormatting | Get selection as Markdown with formatting preserved | none                                  |
+| getSpecificParagraph          | Read one paragraph by index                         | index (0-based)                       |
+| findText                      | Search document and return match count              | searchText, matchCase, matchWholeWord |
+| getComments                   | List all comments in document                       | none                                  |
 
 ### 6.2 Content Insertion Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| insertContent | **PREFERRED** - Add content with Markdown support | content, location (Start/End/Before/After/Replace), target (Selection/Body), preserveFormatting |
-| searchAndReplace | **PREFERRED for corrections** - Find and replace text | searchText, replaceText, matchCase, matchWholeWord |
-| proposeRevision | **PREFERRED for editing** - Diff-based revision with Track Changes | originalText, revisedText |
-| insertHyperlink | Insert clickable link | address, textToDisplay |
-| insertFootnote | Add footnote at selection | text |
-| insertHeaderFooter | Add headers/footers | headerText, footerText, location (Primary/FirstPage/EvenPages) |
-| insertSectionBreak | Insert section break | breakType |
-| addComment | Add review comment bubble | text, location |
+| Tool               | Description                                                        | Key Parameters                                                                                  |
+| ------------------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| insertContent      | **PREFERRED** - Add content with Markdown support                  | content, location (Start/End/Before/After/Replace), target (Selection/Body), preserveFormatting |
+| searchAndReplace   | **PREFERRED for corrections** - Find and replace text              | searchText, replaceText, matchCase, matchWholeWord                                              |
+| proposeRevision    | **PREFERRED for editing** - Diff-based revision with Track Changes | originalText, revisedText                                                                       |
+| insertHyperlink    | Insert clickable link                                              | address, textToDisplay                                                                          |
+| insertFootnote     | Add footnote at selection                                          | text                                                                                            |
+| insertHeaderFooter | Add headers/footers                                                | headerText, footerText, location (Primary/FirstPage/EvenPages)                                  |
+| insertSectionBreak | Insert section break                                               | breakType                                                                                       |
+| addComment         | Add review comment bubble                                          | text, location                                                                                  |
 
 ### 6.3 Text Formatting Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| formatText | Apply character formatting | bold, italic, underline, fontSize, fontColor (hex), highlightColor |
-| applyStyle | Apply Word built-in styles | styleName (Normal, Heading 1-9, Title, Subtitle, Quote, etc.) |
-| setParagraphFormat | Set paragraph formatting | alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent |
+| Tool                  | Description                            | Key Parameters                                                                                              |
+| --------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| formatText            | Apply character formatting             | bold, italic, underline, fontSize, fontColor (hex), highlightColor                                          |
+| applyStyle            | Apply Word built-in styles             | styleName (Normal, Heading 1-9, Title, Subtitle, Quote, etc.)                                               |
+| setParagraphFormat    | Set paragraph formatting               | alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent                                |
 | applyTaggedFormatting | Convert inline tags to real formatting | tagName, fontName, fontSize, color, bold, italic, underline, strikethrough, allCaps, subscript, superscript |
 
 ### 6.4 Table Management Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| modifyTableCell | Replace cell content | row, column, text, tableIndex |
-| addTableRow | Add rows to table | tableIndex, location (Before/After), count, values |
-| addTableColumn | Add columns to table | tableIndex, location (Before/After), count, values |
-| deleteTableRowColumn | Delete rows/columns | tableIndex, rowIndex, columnIndex, deleteWhat |
-| formatTableCell | Style table cells | tableIndex, row, column, fillColor, fontName, fontSize, fontColor, bold, italic |
+| Tool                 | Description          | Key Parameters                                                                  |
+| -------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| modifyTableCell      | Replace cell content | row, column, text, tableIndex                                                   |
+| addTableRow          | Add rows to table    | tableIndex, location (Before/After), count, values                              |
+| addTableColumn       | Add columns to table | tableIndex, location (Before/After), count, values                              |
+| deleteTableRowColumn | Delete rows/columns  | tableIndex, rowIndex, columnIndex, deleteWhat                                   |
+| formatTableCell      | Style table cells    | tableIndex, row, column, fillColor, fontName, fontSize, fontColor, bold, italic |
 
 ### 6.5 Document Structure Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
+| Tool         | Description     | Key Parameters                                                                                                 |
+| ------------ | --------------- | -------------------------------------------------------------------------------------------------------------- |
 | setPageSetup | Set page layout | marginTop, marginBottom, marginLeft, marginRight, orientation (Portrait/Landscape), pageSize (Letter/A4/Legal) |
 
 ### 6.6 Track Changes (CRITICAL REQUIREMENT)
@@ -303,13 +322,13 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 6.8 Word Quick Actions
 
-| Action | Description |
-|--------|-------------|
+| Action    | Description                                        |
+| --------- | -------------------------------------------------- |
 | Proofread | Grammar and spelling correction with Track Changes |
-| Translate | FR↔EN translation of selection |
-| Polish | Style and clarity improvement |
-| Academic | Formalization for academic writing |
-| Summarize | Concise summary generation |
+| Translate | FR↔EN translation of selection                     |
+| Polish    | Style and clarity improvement                      |
+| Academic  | Formalization for academic writing                 |
+| Summarize | Concise summary generation                         |
 
 ### 6.9 Custom Code Execution (eval_wordjs)
 
@@ -324,48 +343,49 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 7.1 Data Reading Tools
 
-| Tool | Description | Returns |
-|------|-------------|---------|
+| Tool             | Description                                  | Returns                                                     |
+| ---------------- | -------------------------------------------- | ----------------------------------------------------------- |
 | getSelectedCells | Get values, address, dimensions of selection | JSON with address, rowCount, columnCount, values (2D array) |
-| getWorksheetData | Get all data from used range | values, address, rowCount, columnCount |
-| getWorksheetInfo | Get workbook structure | activeName, position, usedRange, totalSheets, sheetNames |
-| getDataFromSheet | Read from any sheet by name | data from specified sheet |
-| getNamedRanges | List all named ranges | names and formulas |
-| findData | Search values workbook-wide | matches with locations |
-| getAllObjects | List charts and pivot tables | object details |
+| getWorksheetData | Get all data from used range                 | values, address, rowCount, columnCount                      |
+| getWorksheetInfo | Get workbook structure                       | activeName, position, usedRange, totalSheets, sheetNames    |
+| getDataFromSheet | Read from any sheet by name                  | data from specified sheet                                   |
+| getNamedRanges   | List all named ranges                        | names and formulas                                          |
+| findData         | Search values workbook-wide                  | matches with locations                                      |
+| getAllObjects    | List charts and pivot tables                 | object details                                              |
 
 ### 7.2 Writing and Editing Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| setCellRange | **PREFERRED** - Write values, formulas, or formatting | address, sheetName, values (2D array), formulas (2D array), formatting, copyToRange |
-| clearRange | Clear contents or formatting | address, clearContents, clearFormatting |
-| modifyStructure | Insert/delete rows/columns, freeze panes | sheetName, operation, rowIndex, columnIndex |
-| addWorksheet | Create new worksheet | sheetName |
-| createTable | Convert range to structured table | address, hasHeaders, tableName, style |
-| sortRange | Sort data by column | columnIndex, ascending, hasHeaders |
+| Tool            | Description                                           | Key Parameters                                                                      |
+| --------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| setCellRange    | **PREFERRED** - Write values, formulas, or formatting | address, sheetName, values (2D array), formulas (2D array), formatting, copyToRange |
+| clearRange      | Clear contents or formatting                          | address, clearContents, clearFormatting                                             |
+| modifyStructure | Insert/delete rows/columns, freeze panes              | sheetName, operation, rowIndex, columnIndex                                         |
+| addWorksheet    | Create new worksheet                                  | sheetName                                                                           |
+| createTable     | Convert range to structured table                     | address, hasHeaders, tableName, style                                               |
+| sortRange       | Sort data by column                                   | columnIndex, ascending, hasHeaders                                                  |
 
 ### 7.3 Formatting Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| formatRange | Apply comprehensive formatting | address, fillColor, fontColor, bold, italic, fontSize, fontName, borders, alignment, wrapText, borderStyle/Color/Weight per edge |
-| applyConditionalFormatting | Add conditional format rules | address, rule type, conditions, format |
+| Tool                       | Description                    | Key Parameters                                                                                                                   |
+| -------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| formatRange                | Apply comprehensive formatting | address, fillColor, fontColor, bold, italic, fontSize, fontName, borders, alignment, wrapText, borderStyle/Color/Weight per edge |
+| applyConditionalFormatting | Add conditional format rules   | address, rule type, conditions, format                                                                                           |
 
 ### 7.4 Conditional Formatting Types
 
-| Type | Description |
-|------|-------------|
-| Cell value | Comparison (equal, not equal, greater, less, between...) |
-| Text match | Contains, starts with, ends with |
-| Custom formula | Formatting based on formula |
-| Color scale | Color gradient min→max |
-| Data bars | Proportional visual bars |
-| Icon sets | Icons based on thresholds (traffic lights, arrows, symbols) |
+| Type           | Description                                                 |
+| -------------- | ----------------------------------------------------------- |
+| Cell value     | Comparison (equal, not equal, greater, less, between...)    |
+| Text match     | Contains, starts with, ends with                            |
+| Custom formula | Formatting based on formula                                 |
+| Color scale    | Color gradient min→max                                      |
+| Data bars      | Proportional visual bars                                    |
+| Icon sets      | Icons based on thresholds (traffic lights, arrows, symbols) |
 
 ### 7.5 Chart Management
 
 **Supported Chart Types:**
+
 - Column (Clustered, Stacked)
 - Line (simple, with markers)
 - Pie
@@ -375,6 +395,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - XY Scatter
 
 **Features via manageObject tool:**
+
 - Create from data range with anchor positioning
 - Set title and dimensions
 - Update type, source, or title
@@ -395,13 +416,13 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 7.8 Excel Quick Actions
 
-| Action | Mode | Description |
-|--------|------|-------------|
-| Clean | Immediate | Detect and fix data quality issues |
-| Beautify | Immediate | Apply professional formatting |
-| Formula | Draft | Generate Excel formulas as needed |
-| Transform | Draft | Restructure data (transpose, pivot...) |
-| Highlight | Draft | Apply visual emphasis |
+| Action            | Mode        | Description                                                                                                                                                                                                              |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Smart Ingestion   | Immediate   | Le bouton magique d'importation. Convertit intelligemment les données brutes collées (CSV) en un vrai tableau Excel, en corrigeant silencieusement les problèmes de locales (points vs virgules).                        |
+| Auto-Graph        | Draft       | Le partenaire d'analyse visuelle. Propose des graphiques pour mettre en valeur les données, génère de nouvelles colonnes si identifiées visuellement, et génère le graphique dans la slide (PPT) avec légendes et titre. |
+| Explain Formula   | Immediate   | Le décodeur. Vulgarise et explique en langage naturel la logique derrière n'importe quelle cellule contenant une formule complexe.                                                                                       |
+| Formula Generator | Interactive | L'assistant création. Guide l'utilisateur dans l'écriture du prompt avec un prompt system adapté au lieu d'un système step-by-step bloquant.                                                                             |
+| Data Trend        | Draft       | Analyse les données pour en déduire des tendances et suggère des actions à faire avec pour mieux mettre en avant certaines tendances.                                                                                    |
 
 ### 7.9 Formula Localization
 
@@ -423,21 +444,21 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 8.1 Presentation Reading Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| getSelectedText | Get currently selected text | none |
-| getSlideContent | Get all text from a specific slide | slideNumber (1-based) |
-| getShapes | Get all shapes with properties | slideNumber (1-based) |
-| getAllSlidesOverview | Get text overview of entire presentation | none |
+| Tool                 | Description                              | Parameters            |
+| -------------------- | ---------------------------------------- | --------------------- |
+| getSelectedText      | Get currently selected text              | none                  |
+| getSlideContent      | Get all text from a specific slide       | slideNumber (1-based) |
+| getShapes            | Get all shapes with properties           | slideNumber (1-based) |
+| getAllSlidesOverview | Get text overview of entire presentation | none                  |
 
 ### 8.2 Content Insertion Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| insertContent | **PREFERRED** - Add/replace content with Markdown | content, slideNumber, shapeIdOrName |
-| proposeShapeTextRevision | Modify shape text with diff tracking | slideNumber, shapeIdOrName, revisedText |
-| addSlide | Add new slide | layout (Blank, Title, TitleAndContent...) |
-| deleteSlide | Delete slide by number | slideNumber (1-based) |
+| Tool                     | Description                                       | Key Parameters                            |
+| ------------------------ | ------------------------------------------------- | ----------------------------------------- |
+| insertContent            | **PREFERRED** - Add/replace content with Markdown | content, slideNumber, shapeIdOrName       |
+| proposeShapeTextRevision | Modify shape text with diff tracking              | slideNumber, shapeIdOrName, revisedText   |
+| addSlide                 | Add new slide                                     | layout (Blank, Title, TitleAndContent...) |
+| deleteSlide              | Delete slide by number                            | slideNumber (1-based)                     |
 
 ### 8.3 Modification History (PowerPoint-specific)
 
@@ -448,13 +469,13 @@ PowerPoint has NO native Track Changes. Two workarounds:
 
 ### 8.4 PowerPoint Quick Actions
 
-| Action | Mode | Description |
-|--------|------|-------------|
-| Proofread | Immediate | Grammar/spelling correction |
-| Translate | Immediate | FR↔EN translation |
-| Notes | Immediate | Generate speaker notes (<100 words) |
-| Impact | Immediate | Steve Jobs-style rewrite (punch, hook) |
-| Visual | Immediate | Generate detailed AI image prompts |
+| Action    | Mode      | Description                            |
+| --------- | --------- | -------------------------------------- |
+| Proofread | Immediate | Grammar/spelling correction            |
+| Translate | Immediate | FR↔EN translation                      |
+| Notes     | Immediate | Generate speaker notes (<100 words)    |
+| Impact    | Immediate | Steve Jobs-style rewrite (punch, hook) |
+| Visual    | Immediate | Generate detailed AI image prompts     |
 
 ### 8.5 Slide Style Rules
 
@@ -478,28 +499,28 @@ PowerPoint has NO native Track Changes. Two workarounds:
 
 ### 9.1 Email Reading Tools
 
-| Tool | Description | Returns |
-|------|-------------|---------|
-| getEmailBody | Get full email body (read or compose mode) | Text with automatic image preservation |
-| getEmailSubject | Get email subject | Subject line |
-| getEmailRecipients | Get To, Cc, Bcc recipients | JSON with arrays |
-| getEmailSender | Get sender info | JSON with displayName, emailAddress |
+| Tool               | Description                                | Returns                                |
+| ------------------ | ------------------------------------------ | -------------------------------------- |
+| getEmailBody       | Get full email body (read or compose mode) | Text with automatic image preservation |
+| getEmailSubject    | Get email subject                          | Subject line                           |
+| getEmailRecipients | Get To, Cc, Bcc recipients                 | JSON with arrays                       |
+| getEmailSender     | Get sender info                            | JSON with displayName, emailAddress    |
 
 ### 9.2 Email Writing Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| writeEmailBody | **PREFERRED** - Modify email body | content, mode (Append/Insert/Replace), diffTracking |
-| setEmailSubject | Set email subject | subject |
-| addRecipient | Add recipients | field (to/cc/bcc), recipients (comma-separated) |
+| Tool            | Description                       | Key Parameters                                      |
+| --------------- | --------------------------------- | --------------------------------------------------- |
+| writeEmailBody  | **PREFERRED** - Modify email body | content, mode (Append/Insert/Replace), diffTracking |
+| setEmailSubject | Set email subject                 | subject                                             |
+| addRecipient    | Add recipients                    | field (to/cc/bcc), recipients (comma-separated)     |
 
 ### 9.3 Email Body Writing Modes
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| **Append (DEFAULT)** | Adds at end, preserves history | Replies, forwards - ALWAYS use this |
-| **Insert** | Inserts at cursor with optional diff | Specific text replacement in draft |
-| **Replace** | Replaces entire body | Brand new emails ONLY |
+| Mode                 | Description                          | Use Case                            |
+| -------------------- | ------------------------------------ | ----------------------------------- |
+| **Append (DEFAULT)** | Adds at end, preserves history       | Replies, forwards - ALWAYS use this |
+| **Insert**           | Inserts at cursor with optional diff | Specific text replacement in draft  |
+| **Replace**          | Replaces entire body                 | Brand new emails ONLY               |
 
 ### 9.4 Email History Protection (CRITICAL)
 
@@ -512,17 +533,18 @@ PowerPoint has NO native Track Changes. Two workarounds:
 
 ### 9.5 Outlook Quick Actions
 
-| Action | Mode | Description |
-|--------|------|-------------|
-| **Proofread** | Immediate | Grammar and spelling correction |
-| **Translate & Formalize** | Immediate | FR↔EN translation with professional formalization |
-| **Concise** | Immediate | Condense for maximum readability, bullet points if multiple ideas |
-| **Extract Tasks** | Immediate | Identify actions, follow-ups, next steps with owners and deadlines |
-| **Smart Reply** | Smart-reply | Assisted drafting with contextual analysis |
+| Action                    | Mode        | Description                                                        |
+| ------------------------- | ----------- | ------------------------------------------------------------------ |
+| **Proofread**             | Immediate   | Grammar and spelling correction                                    |
+| **Translate & Formalize** | Immediate   | FR↔EN translation with professional formalization                  |
+| **Concise**               | Immediate   | Condense for maximum readability, bullet points if multiple ideas  |
+| **Extract Tasks**         | Immediate   | Identify actions, follow-ups, next steps with owners and deadlines |
+| **Smart Reply**           | Smart-reply | Assisted drafting with contextual analysis                         |
 
 ### 9.6 Smart Reply Mode
 
 #### Automatic Analysis
+
 - Detect original email language (replies in same language)
 - Determine formality level (Formal/Semi-formal/Casual)
 - Analyze appropriate length based on original
@@ -530,6 +552,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 - Infer sender relationship from communication style
 
 #### Smart Generation
+
 - Precise tone and formality matching
 - Appropriate greetings/sign-offs
 - Proportional length calibration
@@ -555,6 +578,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 ### 10.1 Theme and Appearance
 
 #### Dark/Light Mode
+
 - Toggle in settings with persistence
 - Complete color palette for each mode
 - CSS custom properties for all components
@@ -562,27 +586,28 @@ PowerPoint has NO native Track Changes. Two workarounds:
 
 #### Color Palette
 
-| Element | Light Mode | Dark Mode |
-|---------|-----------|-----------|
-| Primary text | #1d1d1f | #f5f5f7 |
-| Secondary text | #6e6e73 | #a1a1a6 |
-| Primary background | #ffffff | #000000 |
-| Secondary background | #f5f5f7 | #1c1c1e |
-| Accent | #33abc6 | #33abc6 |
-| Success | #34c759 | #34c759 |
-| Warning | #f1930f | #f1930f |
-| Danger | #ff3b30 | #ff3b30 |
+| Element              | Light Mode | Dark Mode |
+| -------------------- | ---------- | --------- |
+| Primary text         | #1d1d1f    | #f5f5f7   |
+| Secondary text       | #6e6e73    | #a1a1a6   |
+| Primary background   | #ffffff    | #000000   |
+| Secondary background | #f5f5f7    | #1c1c1e   |
+| Accent               | #33abc6    | #33abc6   |
+| Success              | #34c759    | #34c759   |
+| Warning              | #f1930f    | #f1930f   |
+| Danger               | #ff3b30    | #ff3b30   |
 
 ### 10.2 Toast Notifications
 
-| Type | Color | Icon | Usage |
-|------|-------|------|-------|
-| Success | Green | CheckCircle | Operation succeeded |
-| Error | Red | AlertCircle | Operation failed |
-| Info | Blue | Info | Neutral information |
+| Type    | Color        | Icon          | Usage                               |
+| ------- | ------------ | ------------- | ----------------------------------- |
+| Success | Green        | CheckCircle   | Operation succeeded                 |
+| Error   | Red          | AlertCircle   | Operation failed                    |
+| Info    | Blue         | Info          | Neutral information                 |
 | Warning | Yellow/Amber | AlertTriangle | Warning (context limit, truncation) |
 
 **Features:**
+
 - Auto-close with animated progress bar
 - Slide animation from right
 - Configurable duration (default 3000ms)
@@ -592,10 +617,12 @@ PowerPoint has NO native Track Changes. Two workarounds:
 ### 10.3 Localization
 
 #### Supported Languages
+
 - **French** (default)
 - **English**
 
 #### Translated Elements (400+ keys)
+
 - Navigation and buttons
 - Error messages
 - Tool descriptions (100+ per application)
@@ -606,6 +633,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 ### 10.4 Accessibility
 
 #### ARIA Support
+
 - `aria-live="polite"` on message list and status indicators
 - `role="log"` on chat container
 - `role="status"` on activity indicators
@@ -615,6 +643,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 - SR-only announcement div for screen readers
 
 #### Keyboard Navigation
+
 - **Tab**: Navigate between elements
 - **Enter**: Send message (in textarea)
 - **Shift+Enter**: New line in message
@@ -622,6 +651,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 - Visible focus ring with accent color
 
 #### Motion Preferences
+
 - All animations disabled if `prefers-reduced-motion: reduce`
 
 ### 10.5 Responsive Design
@@ -659,6 +689,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 ### 11.3 Automatic Truncation Behavior
 
 When context limit is reached:
+
 1. System does NOT block the action
 2. Automatically truncates payload (oldest messages first for email threads, or document content)
 3. Immediately displays **Warning Toast**: "Context limit reached. Only the current selection / first X pages were sent to the AI."
@@ -689,12 +720,12 @@ When context limit is reached:
 
 ### 12.2 Modification History by Application
 
-| Application | Method |
-|-------------|--------|
-| **Word** | Native Track Changes feature - AI modifications visible in Review pane |
-| **Excel** | AI inserts comments on modified cells: "Modified by AI. Old value: [X]" |
+| Application    | Method                                                                             |
+| -------------- | ---------------------------------------------------------------------------------- |
+| **Word**       | Native Track Changes feature - AI modifications visible in Review pane             |
+| **Excel**      | AI inserts comments on modified cells: "Modified by AI. Old value: [X]"            |
 | **PowerPoint** | AI logs changes in Speaker Notes, or duplicates slides for before/after comparison |
-| **Outlook** | Email history preserved via Append mode; no special tracking needed |
+| **Outlook**    | Email history preserved via Append mode; no special tracking needed                |
 
 ---
 
@@ -702,38 +733,39 @@ When context limit is reached:
 
 ### 13.1 Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/chat` | POST | Streaming chat completion (SSE) |
-| `/api/chat/sync` | POST | Synchronous chat completion |
-| `/api/image` | POST | Image generation |
-| `/api/upload` | POST | File upload and processing |
-| `/api/models` | GET | Get available models |
-| `/health` | GET | Health check with timestamp and version |
+| Endpoint         | Method | Description                             |
+| ---------------- | ------ | --------------------------------------- |
+| `/api/chat`      | POST   | Streaming chat completion (SSE)         |
+| `/api/chat/sync` | POST   | Synchronous chat completion             |
+| `/api/image`     | POST   | Image generation                        |
+| `/api/upload`    | POST   | File upload and processing              |
+| `/api/models`    | GET    | Get available models                    |
+| `/health`        | GET    | Health check with timestamp and version |
 
 ### 13.2 Rate Limiting
 
-| Endpoint | Window | Default Max |
-|----------|--------|-------------|
-| `/api/chat` | 60s | 20 requests |
-| `/api/image` | 60s | 5 requests |
-| `/api/upload` | 60s | 10 requests |
-| `/health`, `/models` | 60s | 120 requests |
+| Endpoint             | Window | Default Max  |
+| -------------------- | ------ | ------------ |
+| `/api/chat`          | 60s    | 20 requests  |
+| `/api/image`         | 60s    | 5 requests   |
+| `/api/upload`        | 60s    | 10 requests  |
+| `/health`, `/models` | 60s    | 120 requests |
 
 ### 13.3 Timeouts
 
-| Operation | Duration |
-|-----------|----------|
-| Standard chat models | 2 minutes |
-| Reasoning models | 5 minutes |
-| Image generation | 3 minutes |
-| Per-read operation | 30 seconds |
-| Outlook API calls | 3 seconds |
+| Operation               | Duration   |
+| ----------------------- | ---------- |
+| Standard chat models    | 2 minutes  |
+| Reasoning models        | 5 minutes  |
+| Image generation        | 3 minutes  |
+| Per-read operation      | 30 seconds |
+| Outlook API calls       | 3 seconds  |
 | Overall request timeout | 10 minutes |
 
 ### 13.4 File Processing
 
 **Supported formats with extraction:**
+
 - PDF → text extraction via pdf-parse
 - DOCX → text extraction via mammoth
 - XLSX/XLS/CSV → all sheets to CSV format via xlsx
@@ -741,6 +773,7 @@ When context limit is reached:
 - Images (PNG, JPG, WEBP, GIF) → base64 encoding with data-URI
 
 **Limits:**
+
 - 10 MB per file
 - 100K characters after extraction (truncated with notification)
 - MIME type detection (not just declared type)
@@ -768,11 +801,11 @@ When context limit is reached:
 
 ### 14.1 Model Tiers
 
-| Tier | Default Model | Max Tokens | Temperature | Special |
-|------|--------------|------------|-------------|---------|
-| Standard | gpt-5.1 | 4,096 | 0.7 | General purpose |
-| Reasoning | gpt-5.1 | 8,192 | 1.0 | reasoning_effort parameter |
-| Image | gpt-image-1 | N/A | N/A | Image generation |
+| Tier      | Default Model | Max Tokens | Temperature | Special                    |
+| --------- | ------------- | ---------- | ----------- | -------------------------- |
+| Standard  | gpt-5.1       | 4,096      | 0.7         | General purpose            |
+| Reasoning | gpt-5.1       | 8,192      | 1.0         | reasoning_effort parameter |
+| Image     | gpt-image-1   | N/A        | N/A         | Image generation           |
 
 ### 14.2 Model Detection
 
@@ -792,33 +825,33 @@ When context limit is reached:
 
 ### 15.1 Supported Platforms
 
-| Platform | Supported |
-|----------|-----------|
-| Office 365 Desktop (Windows) | Yes |
-| Office 365 Online (Web) | Yes |
-| Office Mobile (iOS/Android) | No |
-| Older Office versions | No |
+| Platform                     | Supported |
+| ---------------------------- | --------- |
+| Office 365 Desktop (Windows) | Yes       |
+| Office 365 Online (Web)      | Yes       |
+| Office Mobile (iOS/Android)  | No        |
+| Older Office versions        | No        |
 
 ### 15.2 Out of Scope
 
-| Feature | Status |
-|---------|--------|
-| VBA/Macros interaction | Not planned for now |
-| Password-protected documents | Not planned for now |
-| Template creation/modification | No |
-| Co-authoring support | No |
-| Third-party add-in compatibility | Not managed |
-| OneDrive/SharePoint special handling | Treated as regular documents |
-| New LLM models | No additions planned |
-| New Office apps (Teams, OneNote, Visio) | No |
-| Extended agent mode (web search, databases) | Not planned for now |
-| Credential expiration/refresh | No |
-| Audit trail | No |
-| Sensitive data masking | No |
-| Session sharing | No |
-| Team-shared prompts | No |
-| Email attachment analysis | Not planned for now |
-| Calendar integration | Removed from scope |
+| Feature                                     | Status                       |
+| ------------------------------------------- | ---------------------------- |
+| VBA/Macros interaction                      | Not planned for now          |
+| Password-protected documents                | Not planned for now          |
+| Template creation/modification              | No                           |
+| Co-authoring support                        | No                           |
+| Third-party add-in compatibility            | Not managed                  |
+| OneDrive/SharePoint special handling        | Treated as regular documents |
+| New LLM models                              | No additions planned         |
+| New Office apps (Teams, OneNote, Visio)     | No                           |
+| Extended agent mode (web search, databases) | Not planned for now          |
+| Credential expiration/refresh               | No                           |
+| Audit trail                                 | No                           |
+| Sensitive data masking                      | No                           |
+| Session sharing                             | No                           |
+| Team-shared prompts                         | No                           |
+| Email attachment analysis                   | Not planned for now          |
+| Calendar integration                        | Removed from scope           |
 
 ---
 
@@ -826,29 +859,30 @@ When context limit is reached:
 
 ### 16.1 Tool Count by Application
 
-| Application | Read | Write | Format | Eval | Total |
-|-------------|------|-------|--------|------|-------|
-| Word | 8 | 13 | 5 | 1 | 27 |
-| Excel | 7 | 10 | 1 | 1 | 18 (with chart tool) |
-| PowerPoint | 4 | 5 | 0 | 1 | 9 |
-| Outlook | 4 | 4 | 0 | 1 | 8 |
-| General | 3 | 3 | 0 | 0 | 6 |
-| **Total** | **26** | **35** | **6** | **4** | **67** |
+| Application | Read   | Write  | Format | Eval  | Total                |
+| ----------- | ------ | ------ | ------ | ----- | -------------------- |
+| Word        | 8      | 13     | 5      | 1     | 27                   |
+| Excel       | 7      | 10     | 1      | 1     | 18 (with chart tool) |
+| PowerPoint  | 4      | 5      | 0      | 1     | 9                    |
+| Outlook     | 4      | 4      | 0      | 1     | 8                    |
+| General     | 3      | 3      | 0      | 0     | 6                    |
+| **Total**   | **26** | **35** | **6**  | **4** | **67**               |
 
 ### 16.2 General Tools (All Apps)
 
-| Tool | Category | Description |
-|------|----------|-------------|
-| getCurrentDate | read | Get current date/time in various formats |
-| calculateMath | write | Evaluate mathematical expressions safely |
-| executeBash | write | Execute bash commands in sandboxed VFS |
-| vfsWriteFile | write | Write files to virtual filesystem |
-| vfsReadFile | read | Read files from virtual filesystem |
-| vfsListFiles | read | List files in VFS uploads directory |
+| Tool           | Category | Description                              |
+| -------------- | -------- | ---------------------------------------- |
+| getCurrentDate | read     | Get current date/time in various formats |
+| calculateMath  | write    | Evaluate mathematical expressions safely |
+| executeBash    | write    | Execute bash commands in sandboxed VFS   |
+| vfsWriteFile   | write    | Write files to virtual filesystem        |
+| vfsReadFile    | read     | Read files from virtual filesystem       |
+| vfsListFiles   | read     | List files in VFS uploads directory      |
 
 ### 16.3 Tool Decision Trees
 
 **Word Content Modification:**
+
 ```
 Simple word/phrase replacement → searchAndReplace
 Rewriting sentences/paragraphs → proposeRevision (preserves formatting)
@@ -856,6 +890,7 @@ Adding new content → insertContent
 ```
 
 **Excel Data Operations:**
+
 ```
 Write data → setCellRange (ALWAYS preferred)
 Format data → formatRange
@@ -865,6 +900,7 @@ Advanced → eval_officejs
 ```
 
 **PowerPoint Workflow:**
+
 ```
 1. getAllSlidesOverview (understand structure)
 2. getShapes(slideNumber) (discover shape IDs)
@@ -872,6 +908,7 @@ Advanced → eval_officejs
 ```
 
 **Outlook Email:**
+
 ```
 Reply/Forward → ALWAYS mode "Append"
 New email → Can use mode "Replace"
