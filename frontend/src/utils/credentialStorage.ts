@@ -1,171 +1,19 @@
 /**
- * Credential storage utility with Web Crypto API encryption
- * Uses sessionStorage by default for better security.
- * Can use localStorage if "remember credentials" is explicitly enabled.
+ * Credential storage utility.
+ * Storage layer: selects between localStorage (encrypted) and sessionStorage (plaintext).
+ * Encryption layer: delegated to credentialCrypto.ts.
  */
 
-import { isCryptoAvailable, logCryptoStatus } from './cryptoPolyfill'
+import { logCryptoStatus } from './cryptoPolyfill'
+import { encryptValue, decryptValue, clearEncryptionKeys } from './credentialCrypto'
 
 const STORAGE_PREFIX = 'ko_cred_'
-const ENCRYPTION_KEY_NAME = 'ko_encryption_key'
 
 // Log crypto availability on module load
 logCryptoStatus()
 
 /**
- * Get or create an encryption key using Web Crypto API
- * Stores key in localStorage if rememberCredentials is enabled, otherwise sessionStorage
- * BUGFIX: Check both storages to avoid losing the key during migration
- * BUGFIX: Return null if crypto.subtle is not available (fallback to plaintext)
- */
-async function getEncryptionKey(): Promise<CryptoKey | null> {
-  // Check if Web Crypto API is available
-  if (!isCryptoAvailable()) {
-    return null
-  }
-
-  const remember = getRememberCredentials()
-  const primaryStorage = remember ? localStorage : sessionStorage
-  const fallbackStorage = remember ? sessionStorage : localStorage
-
-  // Try primary storage first
-  let keyData = primaryStorage.getItem(ENCRYPTION_KEY_NAME)
-
-  // BUGFIX: If not found in primary, check fallback storage (migration case)
-  if (!keyData) {
-    keyData = fallbackStorage.getItem(ENCRYPTION_KEY_NAME)
-    // If found in fallback, migrate it to primary
-    if (keyData) {
-      primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
-      console.info('[CredentialStorage] Migrated encryption key to', remember ? 'localStorage' : 'sessionStorage')
-    }
-  }
-
-  if (!keyData) {
-    // Generate a new random key
-    const key = await crypto.subtle.generateKey(
-      { name: 'AES-GCM', length: 256 },
-      true, // extractable
-      ['encrypt', 'decrypt']
-    )
-
-    // Export and store the key
-    const exported = await crypto.subtle.exportKey('jwk', key)
-    keyData = JSON.stringify(exported)
-    primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
-    return key
-  }
-
-  // Import existing key
-  const keyJwk = JSON.parse(keyData)
-  return crypto.subtle.importKey(
-    'jwk',
-    keyJwk,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  )
-}
-
-/**
- * Encrypt a string using Web Crypto API
- * Falls back to plaintext if crypto is not available
- */
-async function encryptValue(plaintext: string): Promise<string> {
-  if (!plaintext) return ''
-
-  try {
-    const key = await getEncryptionKey()
-
-    // If crypto is not available, return plaintext
-    if (!key) {
-      console.warn('[CredentialStorage] Crypto not available, storing plaintext')
-      return plaintext
-    }
-
-    const iv = crypto.getRandomValues(new Uint8Array(12)) // 12 bytes for AES-GCM
-    const encoded = new TextEncoder().encode(plaintext)
-
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      encoded
-    )
-
-    // Combine IV and ciphertext
-    const combined = new Uint8Array(iv.length + ciphertext.byteLength)
-    combined.set(iv, 0)
-    combined.set(new Uint8Array(ciphertext), iv.length)
-
-    // Convert to base64
-    return btoa(String.fromCharCode(...combined))
-  } catch (error) {
-    console.error('[CredentialStorage] Encryption failed:', error)
-    // Fallback to plaintext if encryption fails
-    return plaintext
-  }
-}
-
-/**
- * Decrypt a string using Web Crypto API
- * If crypto is not available, assumes plaintext and returns as-is
- */
-async function decryptValue(encrypted: string, key?: string): Promise<string> {
-  if (!encrypted) return ''
-
-  try {
-    const cryptoKey = await getEncryptionKey()
-
-    // If crypto is not available, assume plaintext
-    if (!cryptoKey) {
-      console.warn('[CredentialStorage] Crypto not available, treating as plaintext')
-      // Check if it looks like base64 (encrypted data) - if so, we have a problem
-      try {
-        atob(encrypted)
-        // If we get here, it's base64 but we can't decrypt it
-        console.error('[CredentialStorage] Found encrypted data but crypto is not available')
-        if (key) {
-          console.warn(`[CredentialStorage] Clearing unusable encrypted data for key: ${key}`)
-          localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
-          sessionStorage.removeItem(`${STORAGE_PREFIX}${key}`)
-        }
-        return ''
-      } catch {
-        // Not base64, so it's plaintext - return as-is
-        return encrypted
-      }
-    }
-
-    // Decode from base64
-    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0))
-
-    // Extract IV and ciphertext
-    const iv = combined.slice(0, 12)
-    const ciphertext = combined.slice(12)
-
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      cryptoKey,
-      ciphertext
-    )
-
-    return new TextDecoder().decode(decrypted)
-  } catch (error) {
-    console.error('[CredentialStorage] Decryption failed:', error)
-    // Clear corrupted data when decryption fails
-    if (key) {
-      console.warn(`[CredentialStorage] Clearing corrupted data for key: ${key}`)
-      localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
-      sessionStorage.removeItem(`${STORAGE_PREFIX}${key}`)
-      sessionStorage.removeItem(key) // Also try unprefixed key
-    }
-    // Return empty string if decryption fails
-    return ''
-  }
-}
-
-/**
- * Safe localStorage setter with quota handling
+ * Safe localStorage setter with quota handling.
  */
 function safeSetItem(key: string, value: string): void {
   try {
@@ -180,23 +28,21 @@ function safeSetItem(key: string, value: string): void {
 }
 
 /**
- * Get credential from the appropriate storage (with decryption for localStorage)
- * BUGFIX: Check both storages as fallback to avoid losing credentials during migration
+ * Get credential from the appropriate storage (with decryption for localStorage).
+ * Checks both storages as fallback to survive migrations.
  */
 async function getCredential(key: string, remember: boolean): Promise<string> {
   if (remember) {
-    // Try encrypted localStorage first
     const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
     if (encrypted) {
-      const decrypted = await decryptValue(encrypted, key)
+      const decrypted = await decryptValue(encrypted, true, key)
       if (decrypted) return decrypted
     }
 
-    // BUGFIX: Fallback to sessionStorage (migration case)
+    // Fallback: migrate from sessionStorage
     const sessionValue = sessionStorage.getItem(key)
     if (sessionValue) {
-      console.info(`[CredentialStorage] Found credential "${key}" in sessionStorage, migrating to localStorage`)
-      // Migrate to encrypted localStorage
+      console.info(`[CredentialStorage] Migrating "${key}" from sessionStorage to localStorage`)
       await setCredential(key, sessionValue, true)
       return sessionValue
     }
@@ -204,17 +50,16 @@ async function getCredential(key: string, remember: boolean): Promise<string> {
     return ''
   }
 
-  // Using sessionStorage
+  // sessionStorage path
   const sessionValue = sessionStorage.getItem(key)
   if (sessionValue) return sessionValue
 
-  // BUGFIX: Fallback to encrypted localStorage (migration case)
+  // Fallback: migrate from encrypted localStorage
   const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
   if (encrypted) {
-    const decrypted = await decryptValue(encrypted, key)
+    const decrypted = await decryptValue(encrypted, false, key)
     if (decrypted) {
-      console.info(`[CredentialStorage] Found credential "${key}" in localStorage, migrating to sessionStorage`)
-      // Migrate to sessionStorage
+      console.info(`[CredentialStorage] Migrating "${key}" from localStorage to sessionStorage`)
       sessionStorage.setItem(key, decrypted)
       return decrypted
     }
@@ -224,90 +69,64 @@ async function getCredential(key: string, remember: boolean): Promise<string> {
 }
 
 /**
- * Set credential in the appropriate storage (with encryption for localStorage)
+ * Set credential in the appropriate storage (encrypted localStorage or plaintext sessionStorage).
  */
 async function setCredential(key: string, value: string, remember: boolean): Promise<void> {
   if (remember) {
     if (value) {
-      const encrypted = await encryptValue(value)
+      const encrypted = await encryptValue(value, true)
       safeSetItem(`${STORAGE_PREFIX}${key}`, encrypted)
     } else {
       localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
     }
-    // Clear from sessionStorage if exists
     sessionStorage.removeItem(key)
   } else {
     if (value) {
-      // sessionStorage doesn't need encryption (session-only)
       sessionStorage.setItem(key, value)
     } else {
       sessionStorage.removeItem(key)
     }
-    // Clear from localStorage if exists
     localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
   }
 }
 
 /**
- * Check if "remember credentials" is enabled
- * Defaults to true for Office Add-ins since sessionStorage is not persistent across sessions
+ * Check if "remember credentials" is enabled.
+ * Defaults to true for Office Add-ins (sessionStorage is wiped on restart).
  */
 export function getRememberCredentials(): boolean {
   const value = localStorage.getItem('rememberCredentials')
-  // Default to true if not explicitly set (first launch)
-  // Office Add-ins MUST use localStorage because sessionStorage is wiped on restart
-  if (value === null) {
-    return true
-  }
-  return value === 'true'
+  return value === null ? true : value === 'true'
 }
 
 /**
- * Set "remember credentials" preference and migrate data accordingly
+ * Set "remember credentials" preference and migrate data accordingly.
  */
 export async function setRememberCredentials(value: boolean): Promise<void> {
   const wasRemembering = getRememberCredentials()
   safeSetItem('rememberCredentials', value ? 'true' : 'false')
 
   if (value && !wasRemembering) {
-    // Migrate from sessionStorage to localStorage (with encryption)
+    // Migrate from sessionStorage to encrypted localStorage
     const key = sessionStorage.getItem('litellmUserKey')
     const email = sessionStorage.getItem('litellmUserEmail')
-    const encryptionKey = sessionStorage.getItem(ENCRYPTION_KEY_NAME)
 
     if (key) {
-      const encrypted = await encryptValue(key)
-      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, encrypted)
+      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, await encryptValue(key, true))
       sessionStorage.removeItem('litellmUserKey')
     }
     if (email) {
-      const encrypted = await encryptValue(email)
-      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, encrypted)
+      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, await encryptValue(email, true))
       sessionStorage.removeItem('litellmUserEmail')
     }
-    // Migrate encryption key to localStorage
-    if (encryptionKey) {
-      safeSetItem(ENCRYPTION_KEY_NAME, encryptionKey)
-      sessionStorage.removeItem(ENCRYPTION_KEY_NAME)
-    }
   } else if (!value && wasRemembering) {
-    // Migrate from localStorage to sessionStorage (with decryption)
+    // Migrate from encrypted localStorage to sessionStorage
     const key = await getCredential('litellmUserKey', true)
     const email = await getCredential('litellmUserEmail', true)
-    const encryptionKey = localStorage.getItem(ENCRYPTION_KEY_NAME)
 
-    if (key) {
-      sessionStorage.setItem('litellmUserKey', key)
-    }
-    if (email) {
-      sessionStorage.setItem('litellmUserEmail', email)
-    }
-    // Migrate encryption key to sessionStorage
-    if (encryptionKey) {
-      sessionStorage.setItem(ENCRYPTION_KEY_NAME, encryptionKey)
-      localStorage.removeItem(ENCRYPTION_KEY_NAME)
-    }
-    // Clear credentials from localStorage
+    if (key) sessionStorage.setItem('litellmUserKey', key)
+    if (email) sessionStorage.setItem('litellmUserEmail', email)
+
     localStorage.removeItem(`${STORAGE_PREFIX}litellmUserKey`)
     localStorage.removeItem(`${STORAGE_PREFIX}litellmUserEmail`)
   }
@@ -330,63 +149,52 @@ export async function setUserEmail(value: string): Promise<void> {
 }
 
 export function clearCredentials(): void {
-  // Clear from both storages
   sessionStorage.removeItem('litellmUserKey')
   sessionStorage.removeItem('litellmUserEmail')
   localStorage.removeItem(`${STORAGE_PREFIX}litellmUserKey`)
   localStorage.removeItem(`${STORAGE_PREFIX}litellmUserEmail`)
-  // Clear encryption key from both storages
-  sessionStorage.removeItem(ENCRYPTION_KEY_NAME)
-  localStorage.removeItem(ENCRYPTION_KEY_NAME)
+  clearEncryptionKeys()
 }
 
 /**
- * Migrate credentials from old plaintext format (for backward compatibility)
+ * Migrate credentials from old plaintext format (backward compatibility).
  */
 export async function migrateFromPlaintext(): Promise<void> {
   const remember = getRememberCredentials()
-  if (remember) {
-    // Check if we have plaintext credentials that should be encrypted
-    const key = localStorage.getItem(`${STORAGE_PREFIX}litellmUserKey`)
-    const email = localStorage.getItem(`${STORAGE_PREFIX}litellmUserEmail`)
+  if (!remember) return
 
-    // Check if they look like plaintext (not base64 encrypted)
-    const isPlaintext = (value: string | null) => {
-      if (!value) return false
-      try {
-        // If it's valid base64 and long enough to be encrypted, assume it's encrypted
-        atob(value)
-        return value.length < 20 // Encrypted values should be longer
-      } catch {
-        return true // Not base64, so plaintext
-      }
+  const isPlaintext = (value: string | null): boolean => {
+    if (!value) return false
+    try {
+      atob(value)
+      return value.length < 20
+    } catch {
+      return true
     }
+  }
 
-    if (key && isPlaintext(key)) {
-      const encrypted = await encryptValue(key)
-      safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, encrypted)
-    }
-    if (email && isPlaintext(email)) {
-      const encrypted = await encryptValue(email)
-      safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, encrypted)
-    }
+  const key = localStorage.getItem(`${STORAGE_PREFIX}litellmUserKey`)
+  const email = localStorage.getItem(`${STORAGE_PREFIX}litellmUserEmail`)
+
+  if (key && isPlaintext(key)) {
+    safeSetItem(`${STORAGE_PREFIX}litellmUserKey`, await encryptValue(key, true))
+  }
+  if (email && isPlaintext(email)) {
+    safeSetItem(`${STORAGE_PREFIX}litellmUserEmail`, await encryptValue(email, true))
   }
 }
 
 /**
- * Check if credentials are configured
- * Used to validate before making API requests
+ * Check if credentials are configured.
  */
 export async function areCredentialsConfigured(): Promise<boolean> {
   try {
     const key = await getUserKey()
     const email = await getUserEmail()
     const hasCredentials = key.length > 0 && email.length > 0
-
     if (!hasCredentials) {
       console.warn('[CredentialStorage] Credentials not configured - key or email missing')
     }
-
     return hasCredentials
   } catch (error) {
     console.error('[CredentialStorage] Error checking credentials:', error)
