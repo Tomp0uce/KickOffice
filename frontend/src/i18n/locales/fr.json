@@ -408,5 +408,10 @@
   "errorNetwork": "Erreur de connexion au serveur. Vérifiez votre connexion réseau et réessayez.",
   "errorRateLimit": "Trop de requêtes — limite atteinte. Attendez quelques secondes et réessayez.",
   "errorServer": "Erreur interne du serveur. Consultez les logs du backend ou réessayez plus tard.",
-  "errorTruncated": "⚠️ La réponse a été tronquée : le nombre de tokens maximum a été atteint. Simplifiez votre demande ou augmentez la limite."
+  "errorTruncated": "⚠️ La réponse a été tronquée : le nombre de tokens maximum a été atteint. Simplifiez votre demande ou augmentez la limite.",
+  "modelTier.standard": "Qualité",
+  "modelTier.reasoning": "Réflexion profonde",
+  "modelTier.image": "Image",
+  "regenerate": "Régénérer",
+  "editMessage": "Modifier le message"
 }

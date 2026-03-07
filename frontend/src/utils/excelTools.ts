@@ -41,6 +41,9 @@ export type ExcelToolName =
   | 'findData'
   | 'getAllObjects'
   | 'manageObject'
+  | 'protectWorksheet'
+  | 'setNamedRange'
+  | 'getConditionalFormattingRules'
   | 'eval_officejs'
 
 
@@ -1075,9 +1078,9 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name', 'rangeAddress'],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { name, rangeAddress } = args as Record<string, any>
-      
+
         context.workbook.names.add(name, rangeAddress)
         await context.sync()
         return `Successfully set named range "${name}" = ${rangeAddress}`
@@ -1302,9 +1305,9 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { address } = args as Record<string, any>
-      
+
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
         targetRange.load('address,isNullObject')
@@ -1322,7 +1325,7 @@ const excelToolDefinitions = createExcelTools({
           {
             address: targetRange.address,
             totalRules: conditionalFormats.items.length,
-            rules: conditionalFormats.items.map(rule => ({
+            rules: conditionalFormats.items.map((rule: any) => ({
               type: rule.type,
               priority: rule.priority,
               stopIfTrue: rule.stopIfTrue,
