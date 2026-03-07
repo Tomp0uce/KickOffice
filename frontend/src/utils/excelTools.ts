@@ -7,6 +7,17 @@ import { validateOfficeCode } from './officeCodeValidator'
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
 
+/** Safely resolves a worksheet by name, falling back to active sheet. Throws a clear error if the sheet doesn't exist. */
+async function safeGetSheet(context: Excel.RequestContext, sheetName?: string): Promise<Excel.Worksheet> {
+  if (!sheetName) return context.workbook.worksheets.getActiveWorksheet()
+  const sheet = context.workbook.worksheets.getItemOrNullObject(sheetName)
+  await context.sync()
+  if (sheet.isNullObject) {
+    throw new Error(`Worksheet "${sheetName}" not found. Use getWorksheetInfo to list available worksheets.`)
+  }
+  return sheet
+}
+
 type ExcelToolTemplate = Omit<ExcelToolDefinition, 'execute'> & {
   executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>
 }
@@ -41,6 +52,9 @@ export type ExcelToolName =
   | 'findData'
   | 'getAllObjects'
   | 'manageObject'
+  | 'protectWorksheet'
+  | 'setNamedRange'
+  | 'getConditionalFormattingRules'
   | 'eval_officejs'
 
 
@@ -217,9 +231,7 @@ const excelToolDefinitions = createExcelTools({
       const { address, sheetName, values, formulas, formatting, copyToRange } = args
       const formulaLocale = getExcelFormulaLanguage()
 
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       const range = sheet.getRange(address)
 
@@ -300,9 +312,7 @@ const excelToolDefinitions = createExcelTools({
     executeExcel: async (context, args: Record<string, any>) => {
       const { operation, dimension, reference, count = 1, sheetName } = args
 
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       if (operation === 'freeze' || operation === 'unfreeze') {
         if (operation === 'unfreeze') {
@@ -430,9 +440,7 @@ const excelToolDefinitions = createExcelTools({
       }
 
       // Resolve target sheet
-      const sheet = sheetName
-        ? context.workbook.worksheets.getItem(sheetName)
-        : context.workbook.worksheets.getActiveWorksheet()
+      const sheet = await safeGetSheet(context, sheetName)
 
       if (operation === 'create') {
         if (objectType === 'chart') {
@@ -717,10 +725,14 @@ const excelToolDefinitions = createExcelTools({
   sortRange: {
     name: 'sortRange',
     category: 'write',
-    description: 'Sort the selected data range by a specific column.',
+    description: 'Sort a data range by a specific column. Pass an explicit address (e.g. "A1:D50") to sort a known range, or omit it to sort the current selection.',
     inputSchema: {
       type: 'object',
       properties: {
+        address: {
+          type: 'string',
+          description: 'Optional range address to sort (e.g. "A1:D50", "Sheet2!B2:E100"). If omitted, the current user selection is used.',
+        },
         columnIndex: {
           type: 'number',
           description: 'Zero-based column index to sort by (default: 0)',
@@ -737,9 +749,11 @@ const excelToolDefinitions = createExcelTools({
       required: [],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { columnIndex = 0, ascending = true, hasHeaders = true } = args as Record<string, any>
-      
-        const range = context.workbook.getSelectedRange()
+      const { address, columnIndex = 0, ascending = true, hasHeaders = true } = args as Record<string, any>
+
+        const range = address
+          ? context.workbook.worksheets.getActiveWorksheet().getRange(address)
+          : context.workbook.getSelectedRange()
         range.load('values, rowCount, columnCount')
         await context.sync()
 
@@ -824,8 +838,8 @@ const excelToolDefinitions = createExcelTools({
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { name, address } = args as Record<string, any>
-      
-        const sheet = context.workbook.worksheets.getItem(name)
+
+        const sheet = await safeGetSheet(context, name)
         const range = address ? sheet.getRange(address) : sheet.getUsedRange()
         range.load('address, values, rowCount, columnCount')
         await context.sync()
@@ -1007,9 +1021,7 @@ const excelToolDefinitions = createExcelTools({
       } = args as Record<string, any>
 
       
-        const sheet = sheetName
-          ? context.workbook.worksheets.getItem(sheetName)
-          : context.workbook.worksheets.getActiveWorksheet()
+        const sheet = await safeGetSheet(context, sheetName)
 
         if (action === 'protect') {
           sheet.protection.protect({
@@ -1075,7 +1087,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name', 'rangeAddress'],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { name, rangeAddress } = args as Record<string, any>
       
         context.workbook.names.add(name, rangeAddress)
@@ -1302,9 +1314,9 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { address } = args as Record<string, any>
-      
+
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
         targetRange.load('address,isNullObject')
@@ -1322,7 +1334,7 @@ const excelToolDefinitions = createExcelTools({
           {
             address: targetRange.address,
             totalRules: conditionalFormats.items.length,
-            rules: conditionalFormats.items.map(rule => ({
+            rules: conditionalFormats.items.map((rule: any) => ({
               type: rule.type,
               priority: rule.priority,
               stopIfTrue: rule.stopIfTrue,
@@ -1338,7 +1350,7 @@ const excelToolDefinitions = createExcelTools({
   findData: {
     name: 'findData',
     category: 'read',
-    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match.',
+    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Returns up to 2000 results; when truncated, totalMatches indicates how many were found in total.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1351,15 +1363,25 @@ const excelToolDefinitions = createExcelTools({
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args as Record<string, any>
+      const MAX_RESULTS = 2000
+
+      let pattern: RegExp | null = null
+      if (useRegex) {
+        try {
+          pattern = new RegExp(searchTerm, matchCase ? '' : 'i')
+        } catch {
+          return JSON.stringify({ error: `Invalid regex pattern: "${searchTerm}". Please provide a valid regular expression.` })
+        }
+      }
+
       const sheets = context.workbook.worksheets
       sheets.load('items')
       await context.sync()
 
-      const pattern = useRegex ? new RegExp(searchTerm, matchCase ? '' : 'i') : null
       const matches: any[] = []
+      let totalMatches = 0
 
       for (const sheet of sheets.items) {
-        if (matches.length > 200) break // limit
         sheet.load('name')
         const usedRange = sheet.getUsedRangeOrNullObject()
         usedRange.load('values,address,rowCount,columnCount')
@@ -1377,7 +1399,6 @@ const excelToolDefinitions = createExcelTools({
         }
 
         for (let r = 0; r < usedRange.rowCount; r++) {
-         if (matches.length > 200) break
           for (let c = 0; c < usedRange.columnCount; c++) {
             const val = usedRange.values[r][c]
             const target = String(val ?? '')
@@ -1390,12 +1411,17 @@ const excelToolDefinitions = createExcelTools({
               isMatch = matchEntireCell ? compVal === compTerm : compVal.includes(compTerm)
             }
             if (isMatch) {
-              matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
+              totalMatches++
+              if (matches.length < MAX_RESULTS) {
+                matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
+              }
             }
           }
         }
       }
-      return JSON.stringify(matches, null, 2)
+
+      const truncated = totalMatches > MAX_RESULTS
+      return JSON.stringify(truncated ? { matches, totalMatches, truncated: true } : matches, null, 2)
     },
   },
 
@@ -1403,19 +1429,19 @@ const excelToolDefinitions = createExcelTools({
   getAllObjects: {
     name: 'getAllObjects',
     category: 'read',
-    description: 'List all charts and pivot tables. By default scans the entire workbook (all sheets). Pass allSheets: false to limit to the active sheet only.',
+    description: 'List all charts and pivot tables. By default scans the active sheet only. Pass allSheets: true to scan all sheets in the workbook (may be slow on large workbooks).',
     inputSchema: {
       type: 'object',
       properties: {
         allSheets: {
           type: 'boolean',
-          description: 'When true (default), list objects from ALL sheets. When false, list only the active sheet.',
+          description: 'When true, list objects from ALL sheets. When false (default), list only the active sheet.',
         },
       },
       required: [],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const allSheets = args.allSheets !== false // default true
+      const allSheets = args.allSheets === true // default false
 
       if (!allSheets) {
         const sheet = context.workbook.worksheets.getActiveWorksheet()

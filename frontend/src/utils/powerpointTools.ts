@@ -52,6 +52,9 @@ export type PowerPointToolName =
   | 'getShapes'
   | 'getAllSlidesOverview'
   | 'proposeShapeTextRevision'
+  | 'getSpeakerNotes'
+  | 'setSpeakerNotes'
+  | 'insertImageOnSlide'
   | 'eval_powerpointjs'
 
 /**
@@ -306,10 +309,12 @@ async function hasNativeBullets(context: any, textRange: any): Promise<boolean> 
     paragraphs.load('items')
     await context.sync()
     if (paragraphs.items.length > 0) {
-      const firstPara = paragraphs.items[0]
-      firstPara.load('bulletFormat/visible')
+      for (const para of paragraphs.items) {
+        para.load('bulletFormat/visible')
+      }
       await context.sync()
-      return firstPara.bulletFormat?.visible === true
+      // Return true if ANY paragraph has native bullets
+      return paragraphs.items.some((p: any) => p.bulletFormat?.visible === true)
     }
   } catch {
     // API not available or paragraphs inaccessible — assume no native bullets
@@ -356,13 +361,11 @@ const powerpointToolDefinitions = createPowerPointTools({
   proposeShapeTextRevision: {
     name: 'proposeShapeTextRevision',
     category: 'write',
-    description: `Modify text in a specific shape while attempting to preserve formatting on unchanged portions.
+    description: `Replace text in a specific shape. WARNING: this performs a FULL TEXT REPLACEMENT — all existing formatting (bold, italic, font, color) will be lost.
 
-IMPORTANT: PowerPoint has limited diff support compared to Word. This tool:
-1. Reads the current shape text
-2. Computes word-level diff
-3. Applies changes character-by-character when possible
-4. Falls back to full replacement if diff fails
+The tool reports a word-level diff (insertions/deletions/unchanged stats) for informational purposes, but the actual operation is a complete overwrite of the shape text.
+
+Use this when the content change is more important than preserving formatting. For formatting-sensitive edits, use eval_powerpointjs to modify individual text runs.
 
 PARAMETERS:
 - slideNumber: 1-based slide number (as shown in PowerPoint UI)
@@ -450,6 +453,115 @@ PARAMETERS:
     },
   },
 
+  getSpeakerNotes: {
+    name: 'getSpeakerNotes',
+    category: 'read',
+    description: 'Get the speaker notes text for a specific slide (1-based index). Requires PowerPointApi 1.5+.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+      },
+      required: ['slideNumber'],
+    },
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      ensurePowerPointRunAvailable()
+      if (!isPowerPointApiSupported('1.5')) {
+        return 'Error: getSpeakerNotes requires PowerPointApi 1.5 or later, which is not supported in this Office version.'
+      }
+      const slideNumber = Number(args.slideNumber)
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
+      const slide = slides.getItemAt(index)
+      const notesPage = slide.notesSlide
+      notesPage.load('notesTextFrame/textRange/text')
+      await context.sync()
+      const text = notesPage.notesTextFrame.textRange.text ?? ''
+      return text.trim() || '(no speaker notes)'
+    },
+  },
+
+  setSpeakerNotes: {
+    name: 'setSpeakerNotes',
+    category: 'write',
+    description: 'Set (replace) the speaker notes for a specific slide (1-based index). Requires PowerPointApi 1.5+.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        notes: { type: 'string', description: 'The new speaker notes text (plain text).' },
+      },
+      required: ['slideNumber', 'notes'],
+    },
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      ensurePowerPointRunAvailable()
+      if (!isPowerPointApiSupported('1.5')) {
+        return 'Error: setSpeakerNotes requires PowerPointApi 1.5 or later, which is not supported in this Office version.'
+      }
+      const slideNumber = Number(args.slideNumber)
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
+      const slide = slides.getItemAt(index)
+      const notesPage = slide.notesSlide
+      notesPage.load('notesTextFrame/textRange')
+      await context.sync()
+      notesPage.notesTextFrame.textRange.text = String(args.notes ?? '')
+      await context.sync()
+      return `Successfully updated speaker notes for slide ${slideNumber}.`
+    },
+  },
+
+  insertImageOnSlide: {
+    name: 'insertImageOnSlide',
+    category: 'write',
+    description: 'Insert an image onto a specific slide from a base64-encoded string (without the data URI prefix). Requires PowerPointApi 1.4+. Position and size are in points (1 inch = 72 points). Default: centered at 400×300pt.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        base64Image: { type: 'string', description: 'Base64-encoded image string WITHOUT the data URI prefix (e.g. just the raw base64 characters, no "data:image/png;base64,").' },
+        left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
+        top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
+        width: { type: 'number', description: 'Width in points. Default: 400.' },
+        height: { type: 'number', description: 'Height in points. Default: 300.' },
+      },
+      required: ['slideNumber', 'base64Image'],
+    },
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      ensurePowerPointRunAvailable()
+      if (!isPowerPointApiSupported('1.4')) {
+        return 'Error: insertImageOnSlide requires PowerPointApi 1.4 or later, which is not supported in this Office version.'
+      }
+      const slideNumber = Number(args.slideNumber)
+      if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+      const index = Math.trunc(slideNumber) - 1
+      if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
+
+      // Strip data URI prefix if accidentally included
+      const base64 = String(args.base64Image).replace(/^data:[^;]+;base64,/, '')
+
+      const slide = slides.getItemAt(index)
+      const shape = slide.shapes.addImage(base64)
+      shape.left = typeof args.left === 'number' ? args.left : 100
+      shape.top = typeof args.top === 'number' ? args.top : 100
+      shape.width = typeof args.width === 'number' ? args.width : 400
+      shape.height = typeof args.height === 'number' ? args.height : 300
+      await context.sync()
+      return `Successfully inserted image on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
+    },
+  },
+
   eval_powerpointjs: {
     name: 'eval_powerpointjs',
     category: 'write',
@@ -457,7 +569,7 @@ PARAMETERS:
 
 **USE THIS TOOL ONLY WHEN:**
 - No dedicated tool exists for your operation
-- Operations like: speaker notes, images, animations, advanced shape manipulations
+- Operations like: animations, transitions, advanced shape manipulations not covered by other tools
 
 **REQUIRED CODE STRUCTURE:**
 \`\`\`javascript
@@ -591,6 +703,8 @@ try {
           } catch (e) {
             console.warn('insertMarkdownIntoTextRange failed, falling back to text modification', e)
             textRange.text = stripRichFormattingSyntax(content)
+            await context.sync()
+            return `Content set on shape '${shapeIdOrName}' on slide ${slideNumber} (plain text fallback — markdown formatting was not applied because the rich text API failed).`
           }
         } else {
           textRange.text = stripRichFormattingSyntax(content)
@@ -820,7 +934,7 @@ try {
         }).filter(Boolean)
 
         let slideText = lines.join(' | ')
-        if (slideText.length > 100) slideText = slideText.substring(0, 100) + '...'
+        if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...'
 
         overview.push(`Slide ${i + 1} (Layout: ${slide?.layout || 'unknown'}): ${slideText || '<No Text>'}`)
       }

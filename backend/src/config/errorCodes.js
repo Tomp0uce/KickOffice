@@ -1,0 +1,38 @@
+/**
+ * Centralized error code registry.
+ * Backend always returns { code, error } — frontend maps code → i18n key.
+ */
+
+const ErrorCodes = Object.freeze({
+  // Validation (400)
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  NO_FILE_UPLOADED: 'NO_FILE_UPLOADED',
+  UNSUPPORTED_FILE_TYPE: 'UNSUPPORTED_FILE_TYPE',
+  FILE_EMPTY: 'FILE_EMPTY',
+
+  // Extraction (400)
+  PDF_EXTRACTION_FAILED: 'PDF_EXTRACTION_FAILED',
+  DOCX_EXTRACTION_FAILED: 'DOCX_EXTRACTION_FAILED',
+
+  // Auth (401/403)
+  AUTH_REQUIRED: 'AUTH_REQUIRED',
+
+  // Rate limit (429)
+  RATE_LIMITED: 'RATE_LIMITED',
+
+  // LLM upstream (502)
+  LLM_UPSTREAM_ERROR: 'LLM_UPSTREAM_ERROR',
+  LLM_EMPTY_RESPONSE: 'LLM_EMPTY_RESPONSE',
+  LLM_INVALID_JSON: 'LLM_INVALID_JSON',
+  LLM_NO_CHOICES: 'LLM_NO_CHOICES',
+  LLM_CONTENT_FILTERED: 'LLM_CONTENT_FILTERED',
+
+  // Timeout (504)
+  LLM_TIMEOUT: 'LLM_TIMEOUT',
+  IMAGE_TIMEOUT: 'IMAGE_TIMEOUT',
+
+  // Server (500)
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+})
+
+export { ErrorCodes }

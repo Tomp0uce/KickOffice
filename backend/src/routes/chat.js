@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { buildChatBody } from '../config/models.js'
+import { ErrorCodes } from '../config/errorCodes.js'
 import { validateChatRequest } from '../middleware/validate.js'
 import { chatCompletion, handleErrorResponse } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
@@ -21,7 +22,7 @@ chatRouter.post('/', async (req, res) => {
 
   const validation = validateChatRequest(req.body)
   if (validation.error) {
-    return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat')
+    return logAndRespond(res, 400, { code: ErrorCodes.VALIDATION_ERROR, error: validation.error }, 'POST /api/chat')
   }
 
   const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
@@ -60,6 +61,7 @@ chatRouter.post('/', async (req, res) => {
     if (!response.ok) {
       await handleErrorResponse(response, '/api/chat')
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_UPSTREAM_ERROR,
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat')
     }
@@ -139,7 +141,6 @@ chatRouter.post('/', async (req, res) => {
     } catch (streamError) {
       if (!clientDisconnected) {
         systemLog('ERROR', 'POST /api/chat stream error', streamError)
-        systemLog('ERROR', 'Stream error:', streamError)
       }
     } finally {
       // Cancel reader if still active
@@ -164,11 +165,10 @@ chatRouter.post('/', async (req, res) => {
     }
     if (error.name === 'AbortError') {
       systemLog('ERROR', 'POST /api/chat LLM API request timeout')
-      return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat')
+      return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat')
     }
     systemLog('ERROR', 'POST /api/chat Chat proxy error', error)
-    systemLog('ERROR', 'Chat proxy error:', error)
-    return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat')
+    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat')
   }
 })
 
@@ -184,7 +184,7 @@ chatRouter.post('/sync', async (req, res) => {
 
   const validation = validateChatRequest(req.body)
   if (validation.error) {
-    return logAndRespond(res, 400, { error: validation.error }, 'POST /api/chat/sync')
+    return logAndRespond(res, 400, { code: ErrorCodes.VALIDATION_ERROR, error: validation.error }, 'POST /api/chat/sync')
   }
 
   const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
@@ -224,6 +224,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (!response.ok) {
       await handleErrorResponse(response, '/api/chat/sync')
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_UPSTREAM_ERROR,
         error: 'The AI service returned an error. Please try again later.',
       }, 'POST /api/chat/sync')
     }
@@ -234,6 +235,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (!data || typeof data !== 'object') {
       systemLog('ERROR', 'LLM API returned invalid response format', { type: typeof data })
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_INVALID_JSON,
         error: 'The AI service returned an invalid response format.',
       }, 'POST /api/chat/sync')
     }
@@ -241,6 +243,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (!Array.isArray(data.choices) || data.choices.length === 0) {
       systemLog('ERROR', 'LLM API returned no choices', { data: JSON.stringify(data).slice(0, 500) })
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_NO_CHOICES,
         error: 'The AI service returned an empty response.',
       }, 'POST /api/chat/sync')
     }
@@ -249,6 +252,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (!firstChoice.message || typeof firstChoice.message !== 'object') {
       systemLog('ERROR', 'LLM API returned invalid choice structure', { choice: firstChoice })
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_INVALID_JSON,
         error: 'The AI service returned an invalid response structure.',
       }, 'POST /api/chat/sync')
     }
@@ -256,6 +260,7 @@ chatRouter.post('/sync', async (req, res) => {
     if (!firstChoice.message.content && (!firstChoice.message.tool_calls || firstChoice.message.tool_calls.length === 0)) {
       systemLog('ERROR', 'LLM API returned empty content without tool calls', { choice: firstChoice })
       return logAndRespond(res, 502, {
+        code: ErrorCodes.LLM_EMPTY_RESPONSE,
         error: 'The AI service returned an empty response.',
       }, 'POST /api/chat/sync')
     }
@@ -275,11 +280,10 @@ chatRouter.post('/sync', async (req, res) => {
   } catch (error) {
     if (error.name === 'AbortError') {
       systemLog('ERROR', 'POST /api/chat/sync LLM API request timeout')
-      return logAndRespond(res, 504, { error: 'LLM API request timeout' }, 'POST /api/chat/sync')
+      return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat/sync')
     }
     systemLog('ERROR', 'POST /api/chat/sync Chat sync proxy error', error)
-    systemLog('ERROR', 'Chat sync proxy error', { modelTier, error })
-    return logAndRespond(res, 500, { error: 'Internal server error' }, 'POST /api/chat/sync')
+    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat/sync')
   }
 })
 

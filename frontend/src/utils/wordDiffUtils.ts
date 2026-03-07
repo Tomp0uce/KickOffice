@@ -76,7 +76,7 @@ export async function applyRevisionToSelection(
   const differ = new OfficeWordDiff({
     enableTracking: enableTrackChanges,
     logLevel: 'info',
-    onLog: (msg, level) => {
+    onLog: (msg: string, level: string) => {
       if (level === 'error') console.error('[WordDiff]', msg)
       else if (level === 'warn') console.warn('[WordDiff]', msg)
     },
