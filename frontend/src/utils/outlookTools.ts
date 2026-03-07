@@ -54,7 +54,7 @@ function createOutlookTools(definitions: Record<OutlookToolName, OutlookToolTemp
         execute: async (args: Record<string, any> = {}) => runOutlook(async () => {
           return Promise.race([
             definition.executeOutlook(getMailbox(), args),
-            new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 3 seconds.'), 3000))
+            new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000))
           ])
         }),
       },
