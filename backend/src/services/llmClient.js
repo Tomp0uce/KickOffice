@@ -29,6 +29,38 @@ function getImageTimeoutMs() {
 }
 
 /**
+ * Retries a fetch factory function with exponential backoff on transient errors.
+ * Retries on 429 (rate-limit) and 5xx responses, or on network-level failures.
+ * @param {() => Promise<Response>} fetchFn - Factory returning a fetch Promise
+ * @param {number} [maxAttempts=3] - Maximum number of attempts
+ * @returns {Promise<Response>}
+ */
+async function withRetry(fetchFn, maxAttempts = 3) {
+  let lastError
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetchFn()
+      // Retry on rate-limit or server-side transient errors
+      if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 8000) // 1s, 2s, 4s … capped at 8s
+        console.warn(`[llmClient] HTTP ${response.status} on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      return response
+    } catch (err) {
+      lastError = err
+      if (attempt < maxAttempts) {
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 8000)
+        console.warn(`[llmClient] Network error on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`, err.message)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+  throw lastError
+}
+
+/**
  * Strips header injection characters (\r, \n, non-printable) from a header value.
  */
 function sanitizeHeaderValue(value) {
@@ -58,7 +90,7 @@ function buildHeaders(userCredentials) {
  */
 export async function chatCompletion({ body, userCredentials, modelTier }) {
   const timeoutMs = getChatTimeoutMs(modelTier)
-  return fetchWithTimeout(
+  return withRetry(() => fetchWithTimeout(
     `${LLM_API_BASE_URL}/chat/completions`,
     {
       method: 'POST',
@@ -66,7 +98,7 @@ export async function chatCompletion({ body, userCredentials, modelTier }) {
       body: JSON.stringify(body),
     },
     timeoutMs
-  )
+  ))
 }
 
 /**
@@ -78,7 +110,7 @@ export async function chatCompletion({ body, userCredentials, modelTier }) {
  */
 export async function imageGeneration({ body, userCredentials }) {
   const timeoutMs = getImageTimeoutMs()
-  return fetchWithTimeout(
+  return withRetry(() => fetchWithTimeout(
     `${LLM_API_BASE_URL}/images/generations`,
     {
       method: 'POST',
@@ -86,7 +118,7 @@ export async function imageGeneration({ body, userCredentials }) {
       body: JSON.stringify(body),
     },
     timeoutMs
-  )
+  ))
 }
 
 /**

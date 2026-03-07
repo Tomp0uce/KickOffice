@@ -1,12 +1,14 @@
 # DESIGN_REVIEW.md — Code Audit v6
 
 **Date**: 2026-03-07
+
 **Version**: 6.1
 **Scope**: Full project design review — Fonctionnalites, Code Quality, Architecture, UX/UI
 
 ---
 
 ## Etat de sante global
+
 
 Le projet KickOffice est **solide architecturalement** avec une bonne separation frontend/backend, un sandbox SES pour l'execution de code, et une gestion correcte d'Office.onReady.
 
@@ -57,6 +59,7 @@ Le projet KickOffice est **solide architecturalement** avec une bonne separation
 
 ### BLOQUANT/CRITIQUE
 
+
 - **C-C1** — Upload route try/catch mammoth + code d'erreur structure ✅ DONE (PR #167)
 
 ### MAJEUR/IMPORTANT
@@ -68,6 +71,7 @@ Le projet KickOffice est **solide architecturalement** avec une bonne separation
   - `constant.ts` ; interpole dans toutes les quick actions
 
 - **C-M3** — Double logging dans `chat.js` ✅ DONE (PR #167)
+
 
 - **C-M4** — DRY : `sanitizeHtml()` centralise ✅ DONE (PR #170)
   - Export dans `markdown.ts` ; `DOMPurify` importe en un seul endroit
@@ -95,10 +99,12 @@ Le projet KickOffice est **solide architecturalement** avec une bonne separation
 - **A-M1** — Gestion d'etat sans documentation ✅ DONE (PR #171)
   - `docs/STATE_MANAGEMENT.md` : 5 couches documentees avec diagrammes et regles
 
+
 - **A-M2** — Credentials storage trop complexe ✅ DONE (PR #171)
   - Chiffrement extrait dans `credentialCrypto.ts` ; `credentialStorage.ts` = routage uniquement
 
 ### MINEUR/AMELIORATION
+
 
 - **A-L1** — Backend sans abstraction retry ✅ DONE (PR #171)
   - `withRetry(fetchFn, maxAttempts=3)` dans `llmClient.js` : backoff 1s/2s/4s sur 429 et 5xx
@@ -108,7 +114,9 @@ Le projet KickOffice est **solide architecturalement** avec une bonne separation
 
 - **A-L3** — MAX_MESSAGES 200 → 1000 ✅ DONE (PR #171)
 
----
+
+**Fix**: Aligner a 5-10 secondes.
+
 
 ## AXE 4 — REVUE UX ET UI
 

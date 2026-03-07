@@ -53,6 +53,10 @@ export function sandboxedEval(
     __options__: true,
   })
 
+  // Audit trail: log host and truncated code for debugging
+  const preview = code.length > 200 ? `${code.slice(0, 200)}…` : code
+  console.info(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`)
+
   // Wrap in async IIFE and execute
   return compartment.evaluate(`(async () => { ${code} })()`)
 }
@@ -94,7 +98,7 @@ function buildHostGlobals(
  * Create a safe error message from an execution error.
  * Strips sensitive information while keeping useful details.
  */
-export function sanitizeExecutionError(error: any): string {
+function sanitizeExecutionError(error: any): string {
   const message = error?.message || String(error)
 
   // Remove stack traces that might expose internal paths

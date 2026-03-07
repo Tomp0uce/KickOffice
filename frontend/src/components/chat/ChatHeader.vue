@@ -33,7 +33,7 @@
       <!-- Dropdown panel -->
       <div
         v-if="dropdownOpen"
-        class="absolute top-full left-0 mt-1 w-56 bg-surface border border-border-secondary rounded shadow-lg z-50 overflow-hidden"
+        class="absolute top-full left-0 mt-1 w-56 max-w-[calc(100vw-1rem)] bg-surface border border-border-secondary rounded shadow-lg z-50 overflow-hidden"
         style="font-size: 11px"
       >
         <!-- New Chat -->

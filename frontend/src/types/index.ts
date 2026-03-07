@@ -24,6 +24,7 @@ export interface ToolProperty {
   description?: string
   enum?: string[]
   items?: ToolProperty
+  properties?: Record<string, ToolProperty>
   default?: any
 }
 
@@ -37,9 +38,5 @@ export interface ToolDefinition {
   execute: (args: Record<string, any>) => Promise<string>
 }
 
-export type WordToolDefinition = ToolDefinition
-export type ExcelToolDefinition = ToolDefinition
-export type PowerPointToolDefinition = ToolDefinition
-export type OutlookToolDefinition = ToolDefinition
 
 export type OfficeHostType = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook' | 'Unknown'

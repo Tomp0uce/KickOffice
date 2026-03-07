@@ -92,8 +92,12 @@
         :append-to-selection="t('appendToSelection')"
         :copy-to-clipboard="t('copyToClipboard')"
         :thought-process-label="t('thoughtProcess')"
+        :regenerate-label="t('regenerate')"
+        :edit-message-label="t('editMessage')"
         @insert-message="insertMessageToDocument"
         @copy-message="copyMessageToClipboard"
+        @regenerate="handleRegenerate"
+        @edit-message="handleEditMessage"
       />
 
       <ChatInput
@@ -555,6 +559,19 @@ function stopGeneration() {
   abortController.value?.abort()
   abortController.value = null
   loading.value = false
+}
+
+function handleRegenerate() {
+  if (loading.value) return
+  const lastUserMsg = [...history.value].reverse().find(m => m.role === 'user')
+  if (!lastUserMsg?.content) return
+  sendMessage(lastUserMsg.content, [])
+}
+
+async function handleEditMessage(message: DisplayMessage) {
+  userInput.value = message.content ?? ''
+  await nextTick()
+  chatInputRef.value?.textareaEl?.focus()
 }
 
 function goToSettings() {

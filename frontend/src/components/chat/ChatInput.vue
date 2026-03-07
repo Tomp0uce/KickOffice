@@ -26,7 +26,7 @@
             :key="tier"
             :value="tier"
           >
-            {{ info.label }}
+            {{ $te(`modelTier.${tier}`) ? $t(`modelTier.${tier}`) : info.label }}
           </option>
         </select>
       </div>
@@ -113,7 +113,7 @@
         <Send :size="18" />
       </button>
     </div>
-    <div class="flex justify-center gap-3 px-1">
+    <div class="flex flex-wrap justify-center gap-x-3 gap-y-1 px-1">
       <label
         v-if="showWordFormatting"
         :for="wordFormattingCheckboxId"

@@ -122,7 +122,7 @@ function validateImagePayload(payload = {}) {
   return { value: { prompt, size, quality, n } }
 }
 
-const MAX_MESSAGES = 200
+const MAX_MESSAGES = 1000
 const VALID_ROLES = new Set(['system', 'user', 'assistant', 'tool'])
 
 /**
