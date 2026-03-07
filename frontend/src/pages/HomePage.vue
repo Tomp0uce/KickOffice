@@ -6,7 +6,7 @@
         :loading="loading"
         :sessions="sessionManager.sessions.value"
         :current-session-id="sessionManager.currentSessionId.value"
-        @new-chat="startNewChat"
+        @new-chat="executeNewChat"
         @settings="goToSettings"
         @switch-session="handleSwitchSession"
         @delete-session="handleDeleteSession"
@@ -537,10 +537,6 @@ function goToSettings() {
   router.push('/settings')
 }
 
-async function startNewChat() {
-  await executeNewChat()
-}
-
 async function executeNewChat() {
   if (loading.value) stopGeneration()
   await sessionManager.newSession()
@@ -561,7 +557,7 @@ async function handleSwitchSession(sessionId: string) {
   scrollToVeryBottom()
 }
 
-async function handleDeleteSession() {
+function handleDeleteSession() {
   if (loading.value) return
   showDeleteConfirm.value = true
 }

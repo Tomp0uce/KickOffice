@@ -245,6 +245,30 @@ export async function insertMarkdownIntoTextRange(context: any, textRange: any, 
   textRange.insertHtml(html, 'Replace')
 }
 
+async function findShapeOnSlide(context: any, slideNumber: number, shapeIdOrName: string | number) {
+  const slides = context.presentation.slides
+  slides.load('items')
+  await context.sync()
+
+  const idx = Math.trunc(Number(slideNumber)) - 1
+  if (idx < 0 || idx >= slides.items.length) {
+    return { slide: null, shape: null, shapes: [], error: `Invalid slide number ${slideNumber}` }
+  }
+
+  const slide = slides.items[idx]
+  const shapes = slide.shapes
+  shapes.load('items,items/id,items/name')
+  await context.sync()
+
+  for (const s of shapes.items) {
+    if (s.id === shapeIdOrName || s.name === shapeIdOrName) {
+      return { slide, shape: s, shapes: shapes.items, error: null }
+    }
+  }
+
+  return { slide, shape: null, shapes: shapes.items, error: `Shape '${shapeIdOrName}' not found on slide ${slideNumber}` }
+}
+
 function fallbackToText(text: string, resolve: any, reject: any) {
   // Pass true to strip list markers so it plays nice with shapes that are already natively bulleted.
   const fallbackText = stripRichFormattingSyntax(text, true)
@@ -366,42 +390,17 @@ PARAMETERS:
       const { slideNumber, shapeIdOrName, revisedText } = args
 
       try {
-        // 1. Get slide (convert 1-based to 0-based index)
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-
-        if (slideNumber < 1 || slideNumber > slides.items.length) {
-          return JSON.stringify({
-            success: false,
-            error: `Invalid slide number. Presentation has ${slides.items.length} slides.`,
-          }, null, 2)
-        }
-
-        const slide = slides.items[slideNumber - 1]
-
-        // 2. Get shape
-        const shapes = slide.shapes
-        shapes.load('items,items/id,items/name')
-        await context.sync()
-
-        let targetShape: any = null
-        for (const shape of shapes.items) {
-          if (shape.id === shapeIdOrName || shape.name === shapeIdOrName) {
-            targetShape = shape
-            break
-          }
-        }
+        const { shape: targetShape, shapes, error } = await findShapeOnSlide(context, slideNumber, shapeIdOrName)
 
         if (!targetShape) {
           return JSON.stringify({
             success: false,
-            error: `Shape "${shapeIdOrName}" not found on slide ${slideNumber}`,
-            availableShapes: shapes.items.map((s: any) => ({ id: s.id, name: s.name })),
+            error: error || `Shape "${shapeIdOrName}" not found on slide ${slideNumber}`,
+            availableShapes: shapes.map((s: any) => ({ id: s.id, name: s.name })),
           }, null, 2)
         }
 
-        // 3. Get current text
+        // Get current text
         const textFrame = targetShape.textFrame
         const textRange = textFrame.textRange
         textRange.load('text')
@@ -576,34 +575,14 @@ try {
       
       if (shapeIdOrName) {
         if (!slideNumber) throw new Error('Error: slideNumber is required when shapeIdOrName is provided.')
-        
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
 
-        const idx = Math.trunc(Number(slideNumber)) - 1
-        if (idx < 0 || idx >= slides.items.length) {
-          throw new Error(`Error: Invalid slide number ${slideNumber}`)
-        }
-
-        const slide = slides.items[idx]
-        const shapes = slide.shapes
-        shapes.load('items,items/id,items/name')
-        await context.sync()
-
-        let shape: any = null
-        for (const s of shapes.items) {
-          if (s.id === shapeIdOrName || s.name === shapeIdOrName) {
-            shape = s
-            break
-          }
-        }
+        const { shape, shapes, error } = await findShapeOnSlide(context, slideNumber, shapeIdOrName)
 
         if (!shape) {
-          const availableShapes = shapes.items.map((s: any) => `'${s.name}' (id: ${s.id})`).join(', ')
-          throw new Error(`Error: Shape '${shapeIdOrName}' not found on slide ${slideNumber}. Available shapes are: ${availableShapes}`)
+          const availableShapes = shapes.map((s: any) => `'${s.name}' (id: ${s.id})`).join(', ')
+          throw new Error(`Error: ${error}. Available shapes are: ${availableShapes}`)
         }
-        
+
         const textRange = shape.textFrame.textRange
         if (isPowerPointApiSupported('1.5')) {
           try {
