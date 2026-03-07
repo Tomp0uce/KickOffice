@@ -41,6 +41,26 @@ export interface CategorizedError {
   i18nKey: string
 }
 
+/** Maps backend error codes to i18n keys. Falls back to message inspection if no code present. */
+const ERROR_CODE_MAP: Record<string, CategorizedError> = {
+  VALIDATION_ERROR: { type: 'unknown', i18nKey: 'failedToResponse' },
+  AUTH_REQUIRED: { type: 'auth', i18nKey: 'credentialsRequired' },
+  RATE_LIMITED: { type: 'rate_limit', i18nKey: 'errorRateLimit' },
+  LLM_UPSTREAM_ERROR: { type: 'server', i18nKey: 'errorServer' },
+  LLM_EMPTY_RESPONSE: { type: 'server', i18nKey: 'errorServer' },
+  LLM_INVALID_JSON: { type: 'server', i18nKey: 'errorServer' },
+  LLM_NO_CHOICES: { type: 'server', i18nKey: 'errorServer' },
+  LLM_CONTENT_FILTERED: { type: 'server', i18nKey: 'errorServer' },
+  LLM_TIMEOUT: { type: 'timeout', i18nKey: 'errorTimeout' },
+  IMAGE_TIMEOUT: { type: 'timeout', i18nKey: 'errorTimeout' },
+  INTERNAL_ERROR: { type: 'server', i18nKey: 'errorServer' },
+  PDF_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
+  DOCX_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
+  NO_FILE_UPLOADED: { type: 'unknown', i18nKey: 'failedToResponse' },
+  UNSUPPORTED_FILE_TYPE: { type: 'unknown', i18nKey: 'failedToResponse' },
+  FILE_EMPTY: { type: 'unknown', i18nKey: 'failedToResponse' },
+}
+
 export function categorizeError(error: unknown): CategorizedError {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return { type: 'unknown', i18nKey: 'generationStop' }
@@ -49,9 +69,16 @@ export function categorizeError(error: unknown): CategorizedError {
     return { type: 'timeout', i18nKey: 'errorTimeout' }
   }
   if (error instanceof TypeError) {
-    // Fetch TypeError typically means network unreachable
     return { type: 'network', i18nKey: 'errorNetwork' }
   }
+
+  // Try structured error code first (from backend ErrorCodes registry)
+  if (error instanceof Error && 'code' in error) {
+    const mapped = ERROR_CODE_MAP[(error as any).code]
+    if (mapped) return mapped
+  }
+
+  // Fallback: inspect error message string
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase()
   if (msg.includes('401') || msg.includes('403') || msg.includes('credentials') || msg.includes('x-user-key') || msg.includes('x-user-email')) {
     return { type: 'auth', i18nKey: 'credentialsRequired' }

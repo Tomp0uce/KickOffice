@@ -356,13 +356,11 @@ const powerpointToolDefinitions = createPowerPointTools({
   proposeShapeTextRevision: {
     name: 'proposeShapeTextRevision',
     category: 'write',
-    description: `Modify text in a specific shape while attempting to preserve formatting on unchanged portions.
+    description: `Replace text in a specific shape. WARNING: this performs a FULL TEXT REPLACEMENT — all existing formatting (bold, italic, font, color) will be lost.
 
-IMPORTANT: PowerPoint has limited diff support compared to Word. This tool:
-1. Reads the current shape text
-2. Computes word-level diff
-3. Applies changes character-by-character when possible
-4. Falls back to full replacement if diff fails
+The tool reports a word-level diff (insertions/deletions/unchanged stats) for informational purposes, but the actual operation is a complete overwrite of the shape text.
+
+Use this when the content change is more important than preserving formatting. For formatting-sensitive edits, use eval_powerpointjs to modify individual text runs.
 
 PARAMETERS:
 - slideNumber: 1-based slide number (as shown in PowerPoint UI)
