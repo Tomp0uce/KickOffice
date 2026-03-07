@@ -934,7 +934,7 @@ try {
         }).filter(Boolean)
 
         let slideText = lines.join(' | ')
-        if (slideText.length > 500) slideText = slideText.substring(0, 500) + '...'
+        if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...'
 
         overview.push(`Slide ${i + 1} (Layout: ${slide?.layout || 'unknown'}): ${slideText || '<No Text>'}`)
       }

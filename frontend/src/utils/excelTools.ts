@@ -52,6 +52,9 @@ export type ExcelToolName =
   | 'findData'
   | 'getAllObjects'
   | 'manageObject'
+  | 'protectWorksheet'
+  | 'setNamedRange'
+  | 'getConditionalFormattingRules'
   | 'eval_officejs'
 
 
@@ -1084,7 +1087,7 @@ const excelToolDefinitions = createExcelTools({
       },
       required: ['name', 'rangeAddress'],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { name, rangeAddress } = args as Record<string, any>
       
         context.workbook.names.add(name, rangeAddress)
@@ -1311,9 +1314,9 @@ const excelToolDefinitions = createExcelTools({
       },
       required: [],
     },
-    executeExcel: async (context, args: Record<string, any>) => {
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
       const { address } = args as Record<string, any>
-      
+
         const sheet = context.workbook.worksheets.getActiveWorksheet()
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject()
         targetRange.load('address,isNullObject')
@@ -1331,7 +1334,7 @@ const excelToolDefinitions = createExcelTools({
           {
             address: targetRange.address,
             totalRules: conditionalFormats.items.length,
-            rules: conditionalFormats.items.map(rule => ({
+            rules: conditionalFormats.items.map((rule: any) => ({
               type: rule.type,
               priority: rule.priority,
               stopIfTrue: rule.stopIfTrue,
@@ -1347,7 +1350,7 @@ const excelToolDefinitions = createExcelTools({
   findData: {
     name: 'findData',
     category: 'read',
-    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Returns up to 1000 results; when truncated, totalMatches indicates how many were found in total.',
+    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Returns up to 2000 results; when truncated, totalMatches indicates how many were found in total.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1360,7 +1363,7 @@ const excelToolDefinitions = createExcelTools({
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args as Record<string, any>
-      const MAX_RESULTS = 1000
+      const MAX_RESULTS = 2000
 
       let pattern: RegExp | null = null
       if (useRegex) {
