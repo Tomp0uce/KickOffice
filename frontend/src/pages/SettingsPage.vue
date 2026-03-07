@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="relative flex h-full w-full items-center justify-center bg-bg-secondary"
-  >
+  <div class="relative flex h-full w-full items-center justify-center bg-bg-secondary">
     <div
       class="relative z-1 flex h-full w-full flex-col items-center justify-start gap-2 rounded-xl border-none p-2"
     >
@@ -20,7 +18,7 @@
         </div>
         <div class="flex-1">
           <h2 class="text-sm font-semibold text-main">
-            {{ t("settings") }}
+            {{ t('settings') }}
           </h2>
         </div>
       </div>
@@ -47,9 +45,7 @@
 
       <!-- Main Content -->
       <div class="w-full flex-1 overflow-hidden">
-        <div
-          class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md"
-        >
+        <div class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md">
           <!-- Account Settings (LiteLLM credentials) -->
           <div
             v-if="currentTab === 'account'"
@@ -74,15 +70,13 @@
             </SettingCard>
 
             <SettingCard>
-              <label
-                class="flex cursor-pointer items-center justify-between gap-2"
-              >
+              <label class="flex cursor-pointer items-center justify-between gap-2">
                 <div class="flex flex-col">
                   <span class="text-sm font-semibold text-main">{{
-                    t("rememberCredentialsLabel")
+                    t('rememberCredentialsLabel')
                   }}</span>
                   <span class="text-xs text-secondary">{{
-                    t("rememberCredentialsDescription")
+                    t('rememberCredentialsDescription')
                   }}</span>
                 </div>
                 <input
@@ -97,7 +91,7 @@
             <SettingCard>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-semibold text-secondary">{{
-                  t("litellmCredentialsMissing")
+                  t('litellmCredentialsMissing')
                 }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
@@ -109,14 +103,12 @@
                 >
                   <div
                     class="h-2 w-2 rounded-full"
-                    :class="
-                      litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'
-                    "
+                    :class="litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'"
                   />
                   {{
                     litellmConfigured
-                      ? t("litellmCredentialsConfigured")
-                      : t("litellmCredentialsMissing")
+                      ? t('litellmCredentialsConfigured')
+                      : t('litellmCredentialsMissing')
                   }}
                 </div>
               </div>
@@ -124,9 +116,7 @@
 
             <SettingCard>
               <div class="flex flex-col gap-1">
-                <span class="text-xs text-secondary">{{
-                  t("litellmCredentialsInfo")
-                }}</span>
+                <span class="text-xs text-secondary">{{ t('litellmCredentialsInfo') }}</span>
                 <a
                   href="https://getkey.ai.kickmaker.net/"
                   target="_blank"
@@ -143,10 +133,10 @@
                 <span class="text-2xl">⚠️</span>
                 <div class="flex flex-col gap-1">
                   <span class="text-sm font-semibold text-yellow-800">
-                    {{ t("cryptoNotAvailableTitle") }}
+                    {{ t('cryptoNotAvailableTitle') }}
                   </span>
                   <span class="text-xs text-yellow-700">
-                    {{ t("cryptoNotAvailableMessage") }}
+                    {{ t('cryptoNotAvailableMessage') }}
                   </span>
                 </div>
               </div>
@@ -163,34 +153,24 @@
               <SingleSelect
                 v-model="localLanguage"
                 :tight="false"
-                :key-list="localLanguageOptions.map((item) => item.value)"
+                :key-list="localLanguageOptions.map(item => item.value)"
                 :title="t('localLanguageLabel')"
                 :fronticon="false"
                 :placeholder="
-                  localLanguageOptions.find((o) => o.value === localLanguage)
-                    ?.label || localLanguage
+                  localLanguageOptions.find(o => o.value === localLanguage)?.label || localLanguage
                 "
               >
                 <template #item="{ item }">
-                  {{
-                    localLanguageOptions.find((o) => o.value === item)?.label ||
-                    item
-                  }}
+                  {{ localLanguageOptions.find(o => o.value === item)?.label || item }}
                 </template>
               </SingleSelect>
             </SettingCard>
 
             <SettingCard>
-              <label
-                class="flex cursor-pointer items-center justify-between gap-2"
-              >
+              <label class="flex cursor-pointer items-center justify-between gap-2">
                 <div class="flex flex-col">
-                  <span class="text-sm font-semibold text-main">{{
-                    t("darkModeLabel")
-                  }}</span>
-                  <span class="text-xs text-secondary">{{
-                    t("darkModeDescription")
-                  }}</span>
+                  <span class="text-sm font-semibold text-main">{{ t('darkModeLabel') }}</span>
+                  <span class="text-xs text-secondary">{{ t('darkModeDescription') }}</span>
                 </div>
                 <input
                   v-model="darkMode"
@@ -205,22 +185,16 @@
               <SingleSelect
                 v-model="excelFormulaLanguage"
                 :tight="false"
-                :key-list="
-                  excelFormulaLanguageOptions.map((item) => item.value)
-                "
+                :key-list="excelFormulaLanguageOptions.map(item => item.value)"
                 :title="t('excelFormulaLanguageLabel')"
                 :fronticon="false"
                 :placeholder="
-                  excelFormulaLanguageOptions.find(
-                    (o) => o.value === excelFormulaLanguage,
-                  )?.label || excelFormulaLanguage
+                  excelFormulaLanguageOptions.find(o => o.value === excelFormulaLanguage)?.label ||
+                  excelFormulaLanguage
                 "
               >
                 <template #item="{ item }">
-                  {{
-                    excelFormulaLanguageOptions.find((o) => o.value === item)
-                      ?.label || item
-                  }}
+                  {{ excelFormulaLanguageOptions.find(o => o.value === item)?.label || item }}
                 </template>
               </SingleSelect>
             </SettingCard>
@@ -244,18 +218,16 @@
               <SingleSelect
                 v-model="userGender"
                 :tight="false"
-                :key-list="genderOptions.map((item) => item.value)"
+                :key-list="genderOptions.map(item => item.value)"
                 :title="t('userGenderLabel')"
                 :fronticon="false"
                 :placeholder="
-                  genderOptions.find((o) => o.value === userGender)?.label ||
+                  genderOptions.find(o => o.value === userGender)?.label ||
                   t('userGenderUnspecified')
                 "
               >
                 <template #item="{ item }">
-                  {{
-                    genderOptions.find((o) => o.value === item)?.label || item
-                  }}
+                  {{ genderOptions.find(o => o.value === item)?.label || item }}
                 </template>
               </SingleSelect>
             </SettingCard>
@@ -272,35 +244,39 @@
             <!-- Backend status -->
             <SettingCard>
               <div class="flex items-center justify-between">
-                <span class="text-sm font-semibold text-secondary">{{
-                  t("backendStatus")
-                }}</span>
+                <span class="text-sm font-semibold text-secondary">{{ t('backendStatus') }}</span>
                 <div
                   class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-                  :class="
-                    backendOnline
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  "
+                  :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
                 >
                   <div
                     class="h-2 w-2 rounded-full"
                     :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
                   />
-                  {{ backendOnline ? t("backendOnline") : t("backendOffline") }}
+                  {{ backendOnline ? t('backendOnline') : t('backendOffline') }}
                 </div>
               </div>
             </SettingCard>
 
             <SettingCard>
               <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-semibold text-secondary">{{
-                  t("appVersion")
+                <span class="text-sm font-semibold text-secondary">{{ t('appVersion') }}</span>
+                <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{
+                  appVersion
                 }}</span>
-                <span
-                  class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary"
-                  >{{ appVersion }}</span
-                >
+              </div>
+            </SettingCard>
+
+            <SettingCard>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-semibold text-secondary">{{
+                  t('reportBugOrFeedback') || 'Report a Bug / Feedback'
+                }}</span>
+                <CustomButton
+                  type="secondary"
+                  :text="t('feedbackButtonText') || 'Send Feedback'"
+                  @click="showFeedbackDialog = true"
+                />
               </div>
             </SettingCard>
 
@@ -308,25 +284,21 @@
             <SettingCard v-if="Object.keys(availableModels).length > 0">
               <div class="flex flex-col gap-2">
                 <span class="text-sm font-semibold text-secondary">{{
-                  t("configuredModels")
+                  t('configuredModels')
                 }}</span>
                 <div
                   v-for="(info, tier) in availableModels"
                   :key="tier"
                   class="card-base flex items-center justify-between"
                 >
-                  <span class="text-xs font-medium text-main">{{
-                    info.label
-                  }}</span>
+                  <span class="text-xs font-medium text-main">{{ info.label }}</span>
                   <div class="flex items-center gap-1.5">
-                    <span
-                      class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary"
-                      >{{ info.id }}</span
-                    >
-                    <span
-                      class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent"
-                      >{{ tier }}</span
-                    >
+                    <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{
+                      info.id
+                    }}</span>
+                    <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{
+                      tier
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -344,7 +316,7 @@
             >
               <div class="flex items-center justify-between">
                 <h3 class="text-center text-sm font-semibold text-main">
-                  {{ t("savedPrompts") }}
+                  {{ t('savedPrompts') }}
                 </h3>
                 <CustomButton
                   :icon="Plus"
@@ -370,9 +342,7 @@
                       @blur="savePromptEdit"
                       @keyup.enter="savePromptEdit"
                     />
-                    <span v-else class="text-sm font-semibold text-main">{{
-                      prompt.name
-                    }}</span>
+                    <span v-else class="text-sm font-semibold text-main">{{ prompt.name }}</span>
                   </div>
                   <div class="flex shrink-0 gap-1">
                     <CustomButton
@@ -401,10 +371,9 @@
                   v-if="editingPromptId === prompt.id"
                   class="mt-3 border-t border-t-border pt-3"
                 >
-                  <label
-                    class="mb-1 block text-xs font-semibold text-secondary"
-                    >{{ t("systemPrompt") }}</label
-                  >
+                  <label class="mb-1 block text-xs font-semibold text-secondary">{{
+                    t('systemPrompt')
+                  }}</label>
                   <textarea
                     v-model="editingPrompt.systemPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
@@ -412,10 +381,9 @@
                     :placeholder="t('systemPromptPlaceholder')"
                   />
 
-                  <label
-                    class="mb-1 block text-xs font-semibold text-secondary"
-                    >{{ t("userPrompt") }}</label
-                  >
+                  <label class="mb-1 block text-xs font-semibold text-secondary">{{
+                    t('userPrompt')
+                  }}</label>
                   <textarea
                     v-model="editingPrompt.userPrompt"
                     class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm leading-normal text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none"
@@ -440,11 +408,9 @@
                 </div>
 
                 <div v-else class="mt-2">
-                  <p
-                    class="overflow-hidden text-xs font-semibold text-ellipsis text-secondary"
-                  >
+                  <p class="overflow-hidden text-xs font-semibold text-ellipsis text-secondary">
                     {{ prompt.systemPrompt.substring(0, 100)
-                    }}{{ prompt.systemPrompt.length > 100 ? "..." : "" }}
+                    }}{{ prompt.systemPrompt.length > 100 ? '...' : '' }}
                   </p>
                 </div>
               </div>
@@ -460,22 +426,16 @@
             <div
               class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
             >
-              <div
-                class="rounded-md border border-border-secondary p-1 shadow-sm"
-              >
+              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
                 <h3 class="text-center text-sm font-semibold text-accent/70">
-                  {{ t("builtinPrompts") }}
+                  {{ t('builtinPrompts') }}
                 </h3>
               </div>
-              <div
-                class="rounded-md border border-border-secondary p-1 shadow-sm"
-              >
-                <p
-                  class="text-xs leading-normal font-medium wrap-break-word text-secondary"
-                >
+              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
+                <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
                   {{
-                    t("builtinPromptsDescription", {
-                      text: "[TEXT]",
+                    t('builtinPromptsDescription', {
+                      text: '[TEXT]',
                     })
                   }}
                 </p>
@@ -489,20 +449,15 @@
                 <div class="flex flex-row items-start justify-between">
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold text-secondary">{{
-                      t(
-                        hostIsExcel
-                          ? `excel${key.charAt(0).toUpperCase() + key.slice(1)}`
-                          : key,
-                      ) || key
+                      t(hostIsExcel ? `excel${key.charAt(0).toUpperCase() + key.slice(1)}` : key) ||
+                      key
                     }}</span>
                   </div>
                   <div class="flex gap-1">
                     <CustomButton
                       :icon="editingBuiltinPromptKey === key ? Save : Edit2"
                       text=""
-                      :title="
-                        editingBuiltinPromptKey === key ? t('save') : t('edit')
-                      "
+                      :title="editingBuiltinPromptKey === key ? t('save') : t('edit')"
                       class="border-none bg-surface! p-1.5!"
                       type="secondary"
                       :icon-size="14"
@@ -522,19 +477,17 @@
                 </div>
 
                 <div v-if="editingBuiltinPromptKey === key">
-                  <label
-                    class="mt-2 block text-xs font-semibold text-secondary"
-                    >{{ t("systemPrompt") }}</label
-                  >
+                  <label class="mt-2 block text-xs font-semibold text-secondary">{{
+                    t('systemPrompt')
+                  }}</label>
                   <textarea
                     v-model="editingBuiltinPrompt.system"
                     class="min-h-20 w-full rounded-md border border-border bg-bg-secondary p-2 text-xs text-main focus:border-accent focus:outline-none"
                     rows="3"
                   />
-                  <label
-                    class="mt-2 block text-xs font-semibold text-secondary"
-                    >{{ t("userPrompt") }}</label
-                  >
+                  <label class="mt-2 block text-xs font-semibold text-secondary">{{
+                    t('userPrompt')
+                  }}</label>
                   <textarea
                     v-model="editingBuiltinPrompt.user"
                     class="min-h-20 w-full rounded-md border border-border bg-bg-secondary p-2 text-xs text-main focus:border-accent focus:outline-none"
@@ -543,20 +496,14 @@
                 </div>
 
                 <div v-else class="mt-2">
-                  <p class="mb-2 text-xs font-semibold text-secondary">
-                    {{ t("systemPrompt") }}:
-                  </p>
-                  <p
-                    class="text-xs leading-normal wrap-break-word text-secondary"
-                  >
+                  <p class="mb-2 text-xs font-semibold text-secondary">{{ t('systemPrompt') }}:</p>
+                  <p class="text-xs leading-normal wrap-break-word text-secondary">
                     {{ getSystemPromptPreview(promptConfig.system) }}
                   </p>
                   <p class="mt-2 mb-2 text-xs font-semibold text-secondary">
-                    {{ t("userPrompt") }}:
+                    {{ t('userPrompt') }}:
                   </p>
-                  <p
-                    class="text-xs leading-normal wrap-break-word text-secondary"
-                  >
+                  <p class="text-xs leading-normal wrap-break-word text-secondary">
                     {{ getUserPromptPreview(promptConfig.user) }}
                   </p>
                 </div>
@@ -573,19 +520,13 @@
             <div
               class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
             >
-              <div
-                class="rounded-md border border-border-secondary p-1 shadow-sm"
-              >
+              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
                 <h3 class="text-center text-sm font-semibold text-accent/70">
-                  {{ t("tools") }}
+                  {{ t('tools') }}
                 </h3>
               </div>
-              <div
-                class="rounded-md border border-border-secondary p-1 shadow-sm"
-              >
-                <p
-                  class="text-xs leading-normal font-medium wrap-break-word text-secondary"
-                >
+              <div class="rounded-md border border-border-secondary p-1 shadow-sm">
+                <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
                   {{ t(toolDescriptionKey) }}
                 </p>
               </div>
@@ -603,10 +544,7 @@
                     @change="toggleTool(tool.name)"
                   />
                   <div class="flex flex-col" @click="toggleTool(tool.name)">
-                    <label
-                      :for="'tool-' + tool.name"
-                      class="text-xs font-semibold text-secondary"
-                    >
+                    <label :for="'tool-' + tool.name" class="text-xs font-semibold text-secondary">
                       {{ t(`${toolTranslationPrefix}_${tool.name}`) }}
                     </label>
                     <span class="text-xs text-secondary/90">
@@ -620,12 +558,13 @@
         </div>
       </div>
     </div>
+    <FeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from "@/types";
-import { useStorage } from "@vueuse/core";
+import type { ModelInfo } from '@/types'
+import { useStorage } from '@vueuse/core'
 import {
   ArrowLeft,
   Edit2,
@@ -638,23 +577,24 @@ import {
   Settings,
   Trash2,
   Wrench,
-} from "lucide-vue-next";
-import { computed, onBeforeMount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+} from 'lucide-vue-next'
+import { computed, onBeforeMount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 
-import { fetchModels, healthCheck } from "@/api/backend";
-import CustomButton from "@/components/CustomButton.vue";
-import CustomInput from "@/components/CustomInput.vue";
-import SettingCard from "@/components/SettingCard.vue";
-import SingleSelect from "@/components/SingleSelect.vue";
+import { fetchModels, healthCheck } from '@/api/backend'
+import CustomButton from '@/components/CustomButton.vue'
+import CustomInput from '@/components/CustomInput.vue'
+import SettingCard from '@/components/SettingCard.vue'
+import SingleSelect from '@/components/SingleSelect.vue'
+import FeedbackDialog from '@/components/settings/FeedbackDialog.vue'
 import {
   builtInPrompt,
   excelBuiltInPrompt,
   outlookBuiltInPrompt,
   powerPointBuiltInPrompt,
-} from "@/utils/constant";
-import { optionLists } from "@/utils/common";
+} from '@/utils/constant'
+import { optionLists } from '@/utils/common'
 import {
   getUserKey,
   setUserKey,
@@ -663,110 +603,93 @@ import {
   getRememberCredentials,
   setRememberCredentials as setRememberCredentialsPersist,
   migrateFromPlaintext,
-} from "@/utils/credentialStorage";
-import { localStorageKey } from "@/utils/enum";
-import { getExcelToolDefinitions } from "@/utils/excelTools";
-import { getGeneralToolDefinitions } from "@/utils/generalTools";
-import {
-  isExcel,
-  isOutlook,
-  isPowerPoint,
-  isWord,
-  forHost,
-} from "@/utils/hostDetection";
-import {
-  loadSavedPromptsFromStorage,
-  type SavedPrompt,
-} from "@/utils/savedPrompts";
-import { getOutlookToolDefinitions } from "@/utils/outlookTools";
-import { getPowerPointToolDefinitions } from "@/utils/powerpointTools";
-import { getWordToolDefinitions } from "@/utils/wordTools";
-import {
-  getEnabledToolNamesFromStorage,
-  persistEnabledTools,
-} from "@/utils/toolStorage";
-import { i18n } from "@/i18n";
-import { isCryptoAvailable } from "@/utils/cryptoPolyfill";
+} from '@/utils/credentialStorage'
+import { localStorageKey } from '@/utils/enum'
+import { getExcelToolDefinitions } from '@/utils/excelTools'
+import { getGeneralToolDefinitions } from '@/utils/generalTools'
+import { isExcel, isOutlook, isPowerPoint, isWord, forHost } from '@/utils/hostDetection'
+import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import { getOutlookToolDefinitions } from '@/utils/outlookTools'
+import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
+import { getWordToolDefinitions } from '@/utils/wordTools'
+import { getEnabledToolNamesFromStorage, persistEnabledTools } from '@/utils/toolStorage'
+import { i18n } from '@/i18n'
+import { isCryptoAvailable } from '@/utils/cryptoPolyfill'
 
-const { t } = useI18n();
-const router = useRouter();
-const appVersion = __APP_VERSION__;
+const { t } = useI18n()
+const router = useRouter()
+const appVersion = __APP_VERSION__
 
-const currentTab = ref("account");
+const currentTab = ref('account')
+const showFeedbackDialog = ref(false)
 
 // Settings
-const localLanguage = useStorage(localStorageKey.localLanguage, "fr");
-const darkMode = useStorage(localStorageKey.darkMode, false);
+const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
+const darkMode = useStorage(localStorageKey.darkMode, false)
 
 // Credential storage with secure persistence
-const litellmUserKey = ref("");
-const litellmUserEmail = ref("");
-const rememberCredentials = ref(getRememberCredentials());
-const cryptoAvailable = ref(isCryptoAvailable());
+const litellmUserKey = ref('')
+const litellmUserEmail = ref('')
+const rememberCredentials = ref(getRememberCredentials())
+const cryptoAvailable = ref(isCryptoAvailable())
 
 // Watch for credential changes and persist them
-watch(litellmUserKey, async (value) => {
-  await setUserKey(value);
-});
+watch(litellmUserKey, async value => {
+  await setUserKey(value)
+})
 
-watch(litellmUserEmail, async (value) => {
-  await setUserEmail(value);
-});
+watch(litellmUserEmail, async value => {
+  await setUserEmail(value)
+})
 
-watch(rememberCredentials, async (value) => {
-  await setRememberCredentialsPersist(value);
+watch(rememberCredentials, async value => {
+  await setRememberCredentialsPersist(value)
   // Reload credentials after migration
-  litellmUserKey.value = await getUserKey();
-  litellmUserEmail.value = await getUserEmail();
-});
+  litellmUserKey.value = await getUserKey()
+  litellmUserEmail.value = await getUserEmail()
+})
 
-const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
-const AGENT_MAX_ITERATIONS_MIN = 1;
-const AGENT_MAX_ITERATIONS_MAX = 100;
+const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
+const AGENT_MAX_ITERATIONS_MIN = 1
+const AGENT_MAX_ITERATIONS_MAX = 100
 
 function sanitizeAgentMaxIterations(value: unknown): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 25;
-  const normalized = Math.trunc(parsed);
-  return Math.min(
-    AGENT_MAX_ITERATIONS_MAX,
-    Math.max(AGENT_MAX_ITERATIONS_MIN, normalized),
-  );
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 25
+  const normalized = Math.trunc(parsed)
+  return Math.min(AGENT_MAX_ITERATIONS_MAX, Math.max(AGENT_MAX_ITERATIONS_MIN, normalized))
 }
-const userGender = useStorage(localStorageKey.userGender, "unspecified");
-const userFirstName = useStorage(localStorageKey.userFirstName, "");
-const userLastName = useStorage(localStorageKey.userLastName, "");
-const excelFormulaLanguage = useStorage(
-  localStorageKey.excelFormulaLanguage,
-  "en",
-);
+const userGender = useStorage(localStorageKey.userGender, 'unspecified')
+const userFirstName = useStorage(localStorageKey.userFirstName, '')
+const userLastName = useStorage(localStorageKey.userLastName, '')
+const excelFormulaLanguage = useStorage(localStorageKey.excelFormulaLanguage, 'en')
 
-const localLanguageOptions = optionLists.localLanguageList;
+const localLanguageOptions = optionLists.localLanguageList
 
 const excelFormulaLanguageOptions = [
-  { label: t("excelFormulaLanguageEnglish"), value: "en" },
-  { label: t("excelFormulaLanguageFrench"), value: "fr" },
-];
+  { label: t('excelFormulaLanguageEnglish'), value: 'en' },
+  { label: t('excelFormulaLanguageFrench'), value: 'fr' },
+]
 const genderOptions = [
-  { label: t("userGenderUnspecified"), value: "unspecified" },
-  { label: t("userGenderFemale"), value: "female" },
-  { label: t("userGenderMale"), value: "male" },
-  { label: t("userGenderNonBinary"), value: "nonbinary" },
-];
+  { label: t('userGenderUnspecified'), value: 'unspecified' },
+  { label: t('userGenderFemale'), value: 'female' },
+  { label: t('userGenderMale'), value: 'male' },
+  { label: t('userGenderNonBinary'), value: 'nonbinary' },
+]
 
 // LiteLLM credentials status
 const litellmConfigured = computed(() => {
-  return litellmUserKey.value.length > 0 && litellmUserEmail.value.length > 0;
-});
+  return litellmUserKey.value.length > 0 && litellmUserEmail.value.length > 0
+})
 
 // Backend
-const backendOnline = ref(false);
-const availableModels = ref<Record<string, ModelInfo>>({});
+const backendOnline = ref(false)
+const availableModels = ref<Record<string, ModelInfo>>({})
 
 // Host detection
-const hostIsExcel = isExcel();
-const hostIsPowerPoint = isPowerPoint();
-const hostIsOutlook = isOutlook();
+const hostIsExcel = isExcel()
+const hostIsPowerPoint = isPowerPoint()
+const hostIsOutlook = isOutlook()
 
 // Tools - switch based on host
 const appToolsList =
@@ -775,203 +698,166 @@ const appToolsList =
     excel: getExcelToolDefinitions(),
     powerpoint: getPowerPointToolDefinitions(),
     word: getWordToolDefinitions(),
-  }) || [];
-const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList];
-const enabledTools = ref<Set<string>>(new Set());
+  }) || []
+const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
+const enabledTools = ref<Set<string>>(new Set())
 
 const toolDescriptionKey = forHost({
-  outlook: "outlookToolsDescription",
-  excel: "excelToolsDescription",
-  powerpoint: "powerpointToolsDescription",
-  word: "wordToolsDescription",
-}) as string;
+  outlook: 'outlookToolsDescription',
+  excel: 'excelToolsDescription',
+  powerpoint: 'powerpointToolsDescription',
+  word: 'wordToolsDescription',
+}) as string
 
 const toolTranslationPrefix = forHost({
-  outlook: "outlookTool",
-  excel: "excelTool",
-  powerpoint: "powerpointTool",
-  word: "wordTool",
-}) as string;
+  outlook: 'outlookTool',
+  excel: 'excelTool',
+  powerpoint: 'powerpointTool',
+  word: 'wordTool',
+}) as string
 
 // Prompt management
-const savedPrompts = ref<SavedPrompt[]>([]);
-const editingPromptId = ref<string>("");
+const savedPrompts = ref<SavedPrompt[]>([])
+const editingPromptId = ref<string>('')
 const editingPrompt = ref<SavedPrompt>({
-  id: "",
-  name: "",
-  systemPrompt: "",
-  userPrompt: "",
-});
+  id: '',
+  name: '',
+  systemPrompt: '',
+  userPrompt: '',
+})
 
 // Built-in prompts - switch between host apps
-type WordBuiltinPromptKey =
-  | "translate"
-  | "polish"
-  | "academic"
-  | "summary"
-  | "proofread";
-type ExcelBuiltinPromptKey =
-  | "analyze"
-  | "chart"
-  | "formula"
-  | "format"
-  | "explain";
-type PowerPointBuiltinPromptKey =
-  | "bullets"
-  | "speakerNotes"
-  | "punchify"
-  | "proofread"
-  | "visual";
-type OutlookBuiltinPromptKey =
-  | "reply"
-  | "translate_formalize"
-  | "concise"
-  | "proofread"
-  | "extract";
+type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'proofread'
+type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
+type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'proofread' | 'visual'
+type OutlookBuiltinPromptKey = 'reply' | 'translate_formalize' | 'concise' | 'proofread' | 'extract'
 type BuiltinPromptKey =
   | WordBuiltinPromptKey
   | ExcelBuiltinPromptKey
   | PowerPointBuiltinPromptKey
-  | OutlookBuiltinPromptKey;
+  | OutlookBuiltinPromptKey
 
 interface BuiltinPromptConfig {
-  system: (language: string) => string;
-  user: (text: string, language: string) => string;
+  system: (language: string) => string
+  user: (text: string, language: string) => string
 }
 
-const wordBuiltInPromptsData: Record<
-  WordBuiltinPromptKey,
-  BuiltinPromptConfig
-> = {
+const wordBuiltInPromptsData: Record<WordBuiltinPromptKey, BuiltinPromptConfig> = {
   translate: { ...builtInPrompt.translate },
   polish: { ...builtInPrompt.polish },
   academic: { ...builtInPrompt.academic },
   summary: { ...builtInPrompt.summary },
   proofread: { ...builtInPrompt.proofread },
-};
+}
 
-const excelBuiltInPromptsData: Record<
-  ExcelBuiltinPromptKey,
-  BuiltinPromptConfig
-> = {
+const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig> = {
   analyze: { ...excelBuiltInPrompt.analyze },
   chart: { ...excelBuiltInPrompt.chart },
   formula: { ...excelBuiltInPrompt.formula },
   format: { ...excelBuiltInPrompt.format },
   explain: { ...excelBuiltInPrompt.explain },
-};
+}
 
-const powerPointBuiltInPromptsData: Record<
-  PowerPointBuiltinPromptKey,
-  BuiltinPromptConfig
-> = {
+const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPromptConfig> = {
   bullets: { ...powerPointBuiltInPrompt.bullets },
   speakerNotes: { ...powerPointBuiltInPrompt.speakerNotes },
   punchify: { ...powerPointBuiltInPrompt.punchify },
   proofread: { ...powerPointBuiltInPrompt.proofread },
   visual: { ...powerPointBuiltInPrompt.visual },
-};
+}
 
-const outlookBuiltInPromptsData: Record<
-  OutlookBuiltinPromptKey,
-  BuiltinPromptConfig
-> = {
+const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptConfig> = {
   reply: { ...outlookBuiltInPrompt.reply },
   translate_formalize: { ...outlookBuiltInPrompt.translate_formalize },
   concise: { ...outlookBuiltInPrompt.concise },
   proofread: { ...outlookBuiltInPrompt.proofread },
   extract: { ...outlookBuiltInPrompt.extract },
-};
+}
 
 const selectedBuiltInPromptsData = forHost({
   outlook: { ...outlookBuiltInPromptsData },
   excel: { ...excelBuiltInPromptsData },
   powerpoint: { ...powerPointBuiltInPromptsData },
   word: { ...wordBuiltInPromptsData },
-}) as Record<string, BuiltinPromptConfig>;
+}) as Record<string, BuiltinPromptConfig>
 
 const selectedOriginalBuiltInPrompts = forHost({
   outlook: { ...outlookBuiltInPrompt },
   excel: { ...excelBuiltInPrompt },
   powerpoint: { ...powerPointBuiltInPrompt },
   word: { ...builtInPrompt },
-}) as Record<string, BuiltinPromptConfig>;
+}) as Record<string, BuiltinPromptConfig>
 
-const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(
-  selectedBuiltInPromptsData,
-);
+const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(selectedBuiltInPromptsData)
 
-const editingBuiltinPromptKey = ref<BuiltinPromptKey | "">("");
+const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('')
 const editingBuiltinPrompt = ref<{ system: string; user: string }>({
-  system: "",
-  user: "",
-});
-const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> =
-  selectedOriginalBuiltInPrompts;
+  system: '',
+  user: '',
+})
+const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = selectedOriginalBuiltInPrompts
 const builtInPromptsStorageKey = forHost({
-  default: "ki_Settings_BuiltInPrompts_v5",
-  powerpoint: "ki_Settings_BuiltInPrompts_ppt_v5",
-  outlook: "ki_Settings_BuiltInPrompts_outlook_v5",
-  word: "ki_Settings_BuiltInPrompts_word_v5",
-  excel: "ki_Settings_BuiltInPrompts_excel_v5",
-}) as string;
+  default: 'ki_Settings_BuiltInPrompts_v5',
+  powerpoint: 'ki_Settings_BuiltInPrompts_ppt_v5',
+  outlook: 'ki_Settings_BuiltInPrompts_outlook_v5',
+  word: 'ki_Settings_BuiltInPrompts_word_v5',
+  excel: 'ki_Settings_BuiltInPrompts_excel_v5',
+}) as string
 
 const tabs = [
-  { id: "account", label: "account", defaultLabel: "Account", icon: KeyRound },
-  { id: "general", label: "general", defaultLabel: "General", icon: Globe },
+  { id: 'account', label: 'account', defaultLabel: 'Account', icon: KeyRound },
+  { id: 'general', label: 'general', defaultLabel: 'General', icon: Globe },
   {
-    id: "prompts",
-    label: "prompts",
-    defaultLabel: "Prompts",
+    id: 'prompts',
+    label: 'prompts',
+    defaultLabel: 'Prompts',
     icon: MessageSquare,
   },
   {
-    id: "builtinPrompts",
-    label: "builtinPrompts",
-    defaultLabel: "Built-in Prompts",
+    id: 'builtinPrompts',
+    label: 'builtinPrompts',
+    defaultLabel: 'Built-in Prompts',
     icon: Settings,
   },
-  { id: "tools", label: "tools", defaultLabel: "Tools", icon: Wrench },
-];
+  { id: 'tools', label: 'tools', defaultLabel: 'Tools', icon: Wrench },
+]
 
 // Watchers
-watch(localLanguage, (val) => {
-  i18n.global.locale.value = val as "en" | "fr";
-});
+watch(localLanguage, val => {
+  i18n.global.locale.value = val as 'en' | 'fr'
+})
 
 watch(
   agentMaxIterations,
-  (value) => {
-    const sanitized = sanitizeAgentMaxIterations(value);
+  value => {
+    const sanitized = sanitizeAgentMaxIterations(value)
     if (sanitized !== value) {
-      agentMaxIterations.value = sanitized;
+      agentMaxIterations.value = sanitized
     }
   },
   { immediate: true },
-);
+)
 
 // Prompt management
 function loadPrompts() {
   const defaultPrompts: SavedPrompt[] = [
-    { id: "default", name: "Default", systemPrompt: "", userPrompt: "" },
-  ];
-  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts);
+    { id: 'default', name: 'Default', systemPrompt: '', userPrompt: '' },
+  ]
+  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts)
   if (savedPrompts.value.length === 0) {
-    savedPrompts.value = defaultPrompts;
+    savedPrompts.value = defaultPrompts
   }
-  savePromptsToStorage();
+  savePromptsToStorage()
 }
 
 function savePromptsToStorage() {
   try {
-    localStorage.setItem("savedPrompts", JSON.stringify(savedPrompts.value));
+    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts.value))
   } catch (e) {
-    if (e instanceof DOMException && e.name === "QuotaExceededError") {
-      console.warn(
-        "[SettingsPage] localStorage quota exceeded — saved prompts not persisted",
-      );
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[SettingsPage] localStorage quota exceeded — saved prompts not persisted')
     } else {
-      throw e;
+      throw e
     }
   }
 }
@@ -980,88 +866,79 @@ function addNewPrompt() {
   const newPrompt: SavedPrompt = {
     id: `prompt_${Date.now()}`,
     name: `Prompt ${savedPrompts.value.length + 1}`,
-    systemPrompt: "",
-    userPrompt: "",
-  };
-  savedPrompts.value.push(newPrompt);
-  savePromptsToStorage();
-  startEditPrompt(newPrompt);
+    systemPrompt: '',
+    userPrompt: '',
+  }
+  savedPrompts.value.push(newPrompt)
+  savePromptsToStorage()
+  startEditPrompt(newPrompt)
 }
 
 function startEditPrompt(prompt: SavedPrompt) {
-  editingPromptId.value = prompt.id;
-  editingPrompt.value = { ...prompt };
+  editingPromptId.value = prompt.id
+  editingPrompt.value = { ...prompt }
 }
 
 function savePromptEdit() {
-  const index = savedPrompts.value.findIndex(
-    (p) => p.id === editingPromptId.value,
-  );
+  const index = savedPrompts.value.findIndex(p => p.id === editingPromptId.value)
   if (index !== -1) {
-    savedPrompts.value[index] = { ...editingPrompt.value };
-    savePromptsToStorage();
+    savedPrompts.value[index] = { ...editingPrompt.value }
+    savePromptsToStorage()
   }
-  editingPromptId.value = "";
+  editingPromptId.value = ''
 }
 
 function cancelEdit() {
-  editingPromptId.value = "";
-  editingPrompt.value = { id: "", name: "", systemPrompt: "", userPrompt: "" };
+  editingPromptId.value = ''
+  editingPrompt.value = { id: '', name: '', systemPrompt: '', userPrompt: '' }
 }
 
 function deletePrompt(id: string) {
-  if (savedPrompts.value.length <= 1) return;
-  const index = savedPrompts.value.findIndex((p) => p.id === id);
+  if (savedPrompts.value.length <= 1) return
+  const index = savedPrompts.value.findIndex(p => p.id === id)
   if (index !== -1) {
-    savedPrompts.value.splice(index, 1);
-    savePromptsToStorage();
+    savedPrompts.value.splice(index, 1)
+    savePromptsToStorage()
   }
 }
 
 // Built-in prompts
 function loadBuiltInPrompts() {
-  const stored = localStorage.getItem(builtInPromptsStorageKey);
+  const stored = localStorage.getItem(builtInPromptsStorageKey)
   if (stored) {
     try {
-      const customPrompts = JSON.parse(stored);
-      Object.keys(customPrompts).forEach((key) => {
+      const customPrompts = JSON.parse(stored)
+      Object.keys(customPrompts).forEach(key => {
         if (builtInPromptsData.value[key]) {
           builtInPromptsData.value[key] = {
             system: (language: string) =>
               customPrompts[key].system.replace(/\[LANGUAGE\]/g, language),
             user: (text: string, language: string) =>
-              customPrompts[key].user
-                .replace(/\[TEXT\]/g, text)
-                .replace(/\[LANGUAGE\]/g, language),
-          };
+              customPrompts[key].user.replace(/\[TEXT\]/g, text).replace(/\[LANGUAGE\]/g, language),
+          }
         }
-      });
+      })
     } catch (error) {
-      console.error("Error loading custom built-in prompts:", error);
+      console.error('Error loading custom built-in prompts:', error)
     }
   }
 }
 
 function saveBuiltInPrompts() {
-  const customPrompts: Record<string, { system: string; user: string }> = {};
-  Object.keys(builtInPromptsData.value).forEach((key) => {
+  const customPrompts: Record<string, { system: string; user: string }> = {}
+  Object.keys(builtInPromptsData.value).forEach(key => {
     customPrompts[key] = {
-      system: builtInPromptsData.value[key].system("[LANGUAGE]"),
-      user: builtInPromptsData.value[key].user("[TEXT]", "[LANGUAGE]"),
-    };
-  });
+      system: builtInPromptsData.value[key].system('[LANGUAGE]'),
+      user: builtInPromptsData.value[key].user('[TEXT]', '[LANGUAGE]'),
+    }
+  })
   try {
-    localStorage.setItem(
-      builtInPromptsStorageKey,
-      JSON.stringify(customPrompts),
-    );
+    localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts))
   } catch (e) {
-    if (e instanceof DOMException && e.name === "QuotaExceededError") {
-      console.warn(
-        "[SettingsPage] localStorage quota exceeded — built-in prompts not persisted",
-      );
+    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+      console.warn('[SettingsPage] localStorage quota exceeded — built-in prompts not persisted')
     } else {
-      throw e;
+      throw e
     }
   }
 }
@@ -1075,100 +952,94 @@ function toggleEditBuiltinPrompt(key: string) {
         editingBuiltinPrompt.value.user
           .replace(/\[TEXT\]/g, text)
           .replace(/\[LANGUAGE\]/g, language),
-    };
-    saveBuiltInPrompts();
-    editingBuiltinPromptKey.value = "";
+    }
+    saveBuiltInPrompts()
+    editingBuiltinPromptKey.value = ''
   } else {
-    editingBuiltinPromptKey.value = key as BuiltinPromptKey;
+    editingBuiltinPromptKey.value = key as BuiltinPromptKey
     editingBuiltinPrompt.value = {
-      system: builtInPromptsData.value[key].system("[LANGUAGE]"),
-      user: builtInPromptsData.value[key].user("[TEXT]", "[LANGUAGE]"),
-    };
+      system: builtInPromptsData.value[key].system('[LANGUAGE]'),
+      user: builtInPromptsData.value[key].user('[TEXT]', '[LANGUAGE]'),
+    }
   }
 }
 
 function isBuiltinPromptModified(key: string): boolean {
-  if (!originalBuiltInPrompts[key]) return false;
+  if (!originalBuiltInPrompts[key]) return false
   const current = {
-    system: builtInPromptsData.value[key].system("English"),
-    user: builtInPromptsData.value[key].user("sample text", "English"),
-  };
+    system: builtInPromptsData.value[key].system('English'),
+    user: builtInPromptsData.value[key].user('sample text', 'English'),
+  }
   const original = {
-    system: originalBuiltInPrompts[key].system("English"),
-    user: originalBuiltInPrompts[key].user("sample text", "English"),
-  };
-  return current.system !== original.system || current.user !== original.user;
+    system: originalBuiltInPrompts[key].system('English'),
+    user: originalBuiltInPrompts[key].user('sample text', 'English'),
+  }
+  return current.system !== original.system || current.user !== original.user
 }
 
 function resetBuiltinPrompt(key: string) {
-  if (!originalBuiltInPrompts[key]) return;
-  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] };
-  saveBuiltInPrompts();
+  if (!originalBuiltInPrompts[key]) return
+  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] }
+  saveBuiltInPrompts()
   if (editingBuiltinPromptKey.value === key) {
-    editingBuiltinPromptKey.value = "";
+    editingBuiltinPromptKey.value = ''
   }
 }
 
-function getSystemPromptPreview(
-  systemFunc: (language: string) => string,
-): string {
-  const full = systemFunc("English");
-  return full.length > 100 ? full.substring(0, 100) + "..." : full;
+function getSystemPromptPreview(systemFunc: (language: string) => string): string {
+  const full = systemFunc('English')
+  return full.length > 100 ? full.substring(0, 100) + '...' : full
 }
 
-function getUserPromptPreview(
-  userFunc: (text: string, language: string) => string,
-): string {
-  const full = userFunc("[selected text]", "English");
-  return full.length > 100 ? full.substring(0, 100) + "..." : full;
+function getUserPromptPreview(userFunc: (text: string, language: string) => string): string {
+  const full = userFunc('[selected text]', 'English')
+  return full.length > 100 ? full.substring(0, 100) + '...' : full
 }
 
 // Tools
 function loadToolPreferences() {
-  enabledTools.value = getEnabledToolNamesFromStorage(
-    allToolsList.map((t) => t.name),
-  );
+  enabledTools.value = getEnabledToolNamesFromStorage(allToolsList.map(t => t.name))
 }
 
 function toggleTool(toolName: string) {
   if (enabledTools.value.has(toolName)) {
-    enabledTools.value.delete(toolName);
+    enabledTools.value.delete(toolName)
   } else {
-    enabledTools.value.add(toolName);
+    enabledTools.value.add(toolName)
   }
   persistEnabledTools(
-    allToolsList.map((t) => t.name),
+    allToolsList.map(t => t.name),
     enabledTools.value,
-  );
+  )
 }
 
 async function checkBackend() {
-  backendOnline.value = await healthCheck();
+  backendOnline.value = await healthCheck()
   if (backendOnline.value) {
     try {
-      availableModels.value = await fetchModels();
+      availableModels.value = await fetchModels()
     } catch {
-      console.error("Failed to fetch models");
+      console.error('Failed to fetch models')
     }
   }
 }
 
 function backToHome() {
-  router.push("/");
+  router.push('/')
 }
 
 onBeforeMount(() => {
-  loadPrompts();
-  loadBuiltInPrompts();
-  loadToolPreferences();
-  checkBackend();
-});
+  loadPrompts()
+  loadBuiltInPrompts()
+  loadToolPreferences()
+  checkBackend()
+})
 
 onMounted(async () => {
   // Migrate old plaintext credentials if needed
-  await migrateFromPlaintext();
+  await migrateFromPlaintext()
   // Load credentials (will be decrypted if needed)
-  litellmUserKey.value = await getUserKey();
-  litellmUserEmail.value = await getUserEmail();
-});
+  litellmUserKey.value = await getUserKey()
+  litellmUserEmail.value = await getUserEmail()
+})
 </script>

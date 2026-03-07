@@ -8,6 +8,25 @@ import router from './router'
 import { localStorageKey } from './utils/enum'
 import { detectOfficeHost, markOfficeReady } from './utils/hostDetection'
 import { setRememberCredentials, getRememberCredentials } from './utils/credentialStorage'
+import { logService } from './utils/logger'
+
+// Monkey patch console.error and console.warn
+console.error = (...args) => {
+  const msg = typeof args[0] === 'string' ? args[0] : 'Console Error'
+  const err = args.find(a => a instanceof Error)
+  logService.error(msg, err, args)
+}
+console.warn = (...args) => {
+  const msg = typeof args[0] === 'string' ? args[0] : 'Console Warn'
+  logService.warn(msg, args)
+}
+
+window.onerror = (message, source, lineno, colno, error) => {
+  logService.error(`Global Error: ${message}`, error)
+}
+window.onunhandledrejection = (event) => {
+  logService.error('Unhandled Promise Rejection', event.reason)
+}
 
 window.Office.onReady(async () => {
   markOfficeReady()
@@ -46,7 +65,7 @@ window.Office.onReady(async () => {
   }, { immediate: true })
 
   app.config.errorHandler = (err, instance, info) => {
-    console.error('Vue Global Error:', err, instance, info)
+    logService.error(`Vue Global Error: ${info}`, err)
   }
 
   app.use(i18n)

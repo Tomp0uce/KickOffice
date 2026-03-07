@@ -4,7 +4,7 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import crypto from 'crypto'
-import morgan from 'morgan'
+import logger from './utils/logger.js'
 
 import { models } from './config/models.js'
 import {
@@ -23,6 +23,7 @@ import { healthRouter } from './routes/health.js'
 import { imageRouter } from './routes/image.js'
 import { modelsRouter } from './routes/models.js'
 import { uploadRouter } from './routes/upload.js'
+import { feedbackRouter } from './routes/feedback.js'
 import { logAndRespond } from './utils/http.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -76,7 +77,7 @@ if (PUBLIC_FRONTEND_URL) {
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email', 'x-csrf-token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email', 'x-csrf-token', 'X-Office-Host', 'X-Session-Id'],
   credentials: true,
 }))
 
@@ -106,13 +107,45 @@ app.use((req, res, next) => {
 })
 
 
-// Add request ID
+// Add request ID and context logger
 app.use((req, res, next) => {
   res.locals.reqId = crypto.randomUUID()
+  res.locals.userId = req.headers['x-user-email'] || 'anonymous'
+  res.locals.host = req.headers['x-office-host'] || 'unknown'
+  
+  req.logger = logger.child({
+    reqId: res.locals.reqId,
+    userId: res.locals.userId,
+    host: res.locals.host
+  })
   next()
 })
 
 app.use(express.json({ limit: '32mb' }))
+
+// HTTP Request Logger
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    const isHealth = req.path.startsWith('/api/health')
+    const traffic = isHealth ? 'auto' : 
+                   (req.path.startsWith('/api/chat') || req.path.startsWith('/api/image')) ? 'llm' : 'user'
+    
+    // Fall back to main logger if req.logger isn't available
+    const reqLogger = req.logger || logger
+    const logLevel = isHealth ? 'debug' : 'http'
+    
+    reqLogger.log(logLevel, `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`, {
+      traffic,
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration
+    })
+  })
+  next()
+})
 
 // Reject POST/PUT/PATCH requests that don't declare application/json to avoid silent empty bodies
 app.use((req, res, next) => {
@@ -166,13 +199,14 @@ app.use((req, res, next) => {
   next()
 })
 
-app.use(morgan(':method :url :status :res[content-length] - :response-time ms'))
+
 
 app.use(infoLimiter, healthRouter)
 app.use(infoLimiter, modelsRouter)
 app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRouter)
 app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
 app.use('/api/upload', ensureUserCredentials, uploadLimiter, uploadRouter)
+app.use('/api/feedback', ensureUserCredentials, feedbackRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)
@@ -182,28 +216,35 @@ app.use((err, req, res, next) => {
   if (res.headersSent) {
     return next(err)
   }
-  console.error('Unhandled error:', err)
+  logger.error(`Unhandled error: ${err.message}`, {
+    error: {
+      name: err.name,
+      message: err.message,
+      stack: err.stack
+    },
+    traffic: 'system'
+  })
   return logAndRespond(res, 500, { error: 'Internal server error' }, 'SERVER')
 })
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`KickOffice backend running on port ${PORT}`)
-  console.log('Models configured:')
+  logger.info(`KickOffice backend running on port ${PORT}`, { traffic: 'system' })
+  logger.info('Models configured:', { traffic: 'system' })
   for (const [tier, config] of Object.entries(models)) {
-    console.log(`  ${tier}: ${config.id} (${config.label})`)
+    logger.info(`  ${tier}: ${config.id} (${config.label})`, { traffic: 'system' })
   }
 })
 
 // Graceful shutdown: stop accepting new connections and wait for in-flight requests
 function shutdown(signal) {
-  console.log(`${signal} received — shutting down gracefully`)
+  logger.info(`${signal} received — shutting down gracefully`, { traffic: 'system' })
   server.close(() => {
-    console.log('All connections closed. Exiting.')
+    logger.info('All connections closed. Exiting.', { traffic: 'system' })
     process.exit(0)
   })
   // Force exit after 30s if connections don't drain
   setTimeout(() => {
-    console.error('Graceful shutdown timeout — forcing exit')
+    logger.error('Graceful shutdown timeout — forcing exit', { traffic: 'system' })
     process.exit(1)
   }, 30_000).unref()
 }

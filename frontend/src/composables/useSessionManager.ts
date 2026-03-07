@@ -12,6 +12,7 @@ import {
   deleteSession,
   getSessionMessageCount,
 } from '@/composables/useSessionDB'
+import { logService } from '@/utils/logger'
 
 export type { ChatSession }
 export { getSessionMessageCount }
@@ -34,10 +35,12 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
       const session = await createSession(hostType)
       sessions.value = [session]
       currentSessionId.value = session.id
+      logService.setCurrentSessionId(session.id)
       history.value = []
     } else {
       const latest = sessions.value[0]
       currentSessionId.value = latest.id
+      logService.setCurrentSessionId(latest.id)
       history.value = latest.messages ?? []
     }
   }
@@ -55,6 +58,7 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
     const session = await createSession(hostType)
     await loadSessions()
     currentSessionId.value = session.id
+    logService.setCurrentSessionId(session.id)
     history.value = []
   }
 
@@ -72,6 +76,7 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
       const target = sessions.value.find(s => s.id === sessionId)
       if (!target) return
       currentSessionId.value = sessionId
+      logService.setCurrentSessionId(sessionId)
       history.value = target.messages ?? []
     } finally {
       isSwitching.value = false
@@ -92,14 +97,17 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
     const others = sessions.value.filter(s => s.id !== idToDelete)
     if (others.length > 0) {
       currentSessionId.value = others[0].id
+      logService.setCurrentSessionId(others[0].id)
       history.value = others[0].messages ?? []
     } else {
       // Create a new one if none remain
       const fresh = await createSession(hostType)
       currentSessionId.value = fresh.id
+      logService.setCurrentSessionId(fresh.id)
       history.value = []
     }
     await deleteSession(idToDelete)
+    logService.clearSessionLogs(idToDelete)
     await loadSessions()
   }
 

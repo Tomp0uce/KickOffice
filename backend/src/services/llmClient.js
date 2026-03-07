@@ -5,6 +5,7 @@
 
 import { LLM_API_BASE_URL, LLM_API_KEY } from '../config/models.js'
 import { fetchWithTimeout, sanitizeErrorText } from '../utils/http.js'
+import logger from '../utils/logger.js'
 
 // Centralized timeout configuration (in milliseconds)
 const TIMEOUTS = {
@@ -43,7 +44,7 @@ async function withRetry(fetchFn, maxAttempts = 3) {
       // Retry on rate-limit or server-side transient errors
       if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
         const delay = Math.min(1000 * 2 ** (attempt - 1), 8000) // 1s, 2s, 4s … capped at 8s
-        console.warn(`[llmClient] HTTP ${response.status} on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`)
+        logger.warn(`[llmClient] HTTP ${response.status} on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`, { traffic: 'system' })
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
@@ -52,7 +53,7 @@ async function withRetry(fetchFn, maxAttempts = 3) {
       lastError = err
       if (attempt < maxAttempts) {
         const delay = Math.min(1000 * 2 ** (attempt - 1), 8000)
-        console.warn(`[llmClient] Network error on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`, err.message)
+        logger.warn(`[llmClient] Network error on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`, { error: err, traffic: 'system' })
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
@@ -130,8 +131,9 @@ export async function imageGeneration({ body, userCredentials }) {
 export async function handleErrorResponse(response, context) {
   const errorText = await response.text()
   const sanitized = sanitizeErrorText(errorText)
-  console.error(`LLM API error on ${context}`, {
+  logger.error(`LLM API error on ${context}`, {
     status: response.status,
     errorText: sanitized,
+    traffic: 'system'
   })
 }

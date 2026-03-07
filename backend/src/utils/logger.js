@@ -1,63 +1,80 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { createStream } from 'rotating-file-stream'
+import winston from 'winston'
+import DailyRotateFile from 'winston-daily-rotate-file'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Ensure logs directory exists at the root of the backend folder
 const LOGS_DIR = path.join(__dirname, '../../logs')
 if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true })
 }
 
-// Create a rotating write stream
-const accessLogStream = createStream('kickoffice.log', {
-  size: '10M', // rotate every 10 MegaBytes written
-  interval: '1d', // rotate daily
-  compress: 'gzip', // compress rotated files
-  path: LOGS_DIR,
-  maxFiles: 30 // Keep up to 30 rotated log files
+const isProduction = process.env.NODE_ENV === 'production'
+
+const consoleFormat = winston.format.combine(
+  winston.format.colorize(),
+  winston.format.timestamp(),
+  winston.format.printf(({ timestamp, level, message, traffic, source, host, sessionId, userId, reqId, ...meta }) => {
+    let msg = `[${timestamp}] [${level}] `
+    const ctx = []
+    if (traffic) ctx.push(`traffic:${traffic}`)
+    if (host) ctx.push(`host:${host}`)
+    if (userId) ctx.push(`user:${userId}`)
+    if (reqId) ctx.push(`reqId:${reqId}`)
+    
+    if (ctx.length) msg += `(${ctx.join('|')}) `
+    msg += message
+    
+    // Avoid double logging of error stacks if present in meta
+    if (meta.error && meta.error.stack) {
+       msg += `\n${meta.error.stack}`
+       delete meta.error
+    }
+    
+    const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : ''
+    return msg + (metaStr ? ` ${metaStr}` : '')
+  })
+)
+
+const fileFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.json()
+)
+
+const logger = winston.createLogger({
+  level: isProduction ? 'info' : 'debug',
+  levels: {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    debug: 4
+  },
+  format: fileFormat,
+  defaultMeta: { source: 'backend' },
+  transports: [
+    new DailyRotateFile({
+      dirname: LOGS_DIR,
+      filename: 'kickoffice-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '10m',
+      maxFiles: '7d'
+    })
+  ]
 })
 
-function redactData(data) {
-  // Disabled redaction to allow full debugging of prompts and responses
-  return data
+if (!isProduction) {
+  logger.add(new winston.transports.Console({
+    format: consoleFormat
+  }))
+} else {
+  logger.add(new winston.transports.Console({
+    format: fileFormat
+  }))
 }
 
-/**
- * Custom file logger to capture detailed payloads and responses.
- * @param {string} level - Log level (e.g. INFO, ERROR, DEBUG)
- * @param {string} message - Descriptive message
- * @param {any} [data] - Optional JSON payload to stringify
- */
-export function systemLog(level, message, data = null) {
-  const timestamp = new Date().toISOString()
-  
-  let dataStr = ''
-  if (data !== null) {
-    try {
-      if (data instanceof Error) {
-        dataStr = '\n' + (data.stack || data.message || String(data))
-      } else {
-        const safeData = redactData(data);
-        dataStr = '\n' + JSON.stringify(safeData, null, 2)
-      }
-    } catch (err) {
-      dataStr = '\n[Unserializable Data]'
-    }
-  }
-
-  const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}${dataStr}\n`
-  
-  // Output to console (using process.stdout/stderr to bypass console interceptors if any)
-  if (level.toUpperCase() === 'ERROR') {
-    process.stderr.write(logEntry)
-  } else {
-    process.stdout.write(logEntry)
-  }
-
-  // Append to log rotating file stream
-  accessLogStream.write(logEntry)
-}
+export default logger

@@ -913,8 +913,17 @@ try {
     },
   },
 }, (def) => async (args = {}) => {
-  if (def.executePowerPoint) return runPowerPoint(ctx => def.executePowerPoint!(ctx, args))
-  return executeOfficeAction(() => def.executeCommon!(args))
+  try {
+    if (def.executePowerPoint) return await runPowerPoint(ctx => def.executePowerPoint!(ctx, args))
+    return await executeOfficeAction(() => def.executeCommon!(args))
+  } catch (error: any) {
+    return JSON.stringify({
+      error: true,
+      message: error.message || String(error),
+      tool: def.name,
+      suggestion: 'Fix the error parameters or context and try again.'
+    }, null, 2)
+  }
 })
 
 export function getToolDefinitions(): ToolDefinition[] {

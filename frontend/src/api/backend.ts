@@ -149,9 +149,11 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}, mod
         isRetryableError(error) &&
         (!isPost || attempt < maxPostRetries)
       if (!shouldRetry) {
+        logService.error(`Network request failed: ${url}`, error)
         throw error
       }
-
+      
+      logService.warn(`Network retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${url}`, error)
       await wait(RETRY_DELAYS_MS[attempt])
       attempt += 1
     } finally {
@@ -162,6 +164,7 @@ async function fetchWithTimeoutAndRetry(url: string, init: RequestInit = {}, mod
 
 
 import { getUserKey, getUserEmail } from '@/utils/credentialStorage'
+import { logService } from '@/utils/logger'
 
 function getCsrfToken(): string {
   const match = document.cookie.match(/(?:^| )csrf_token=([^;]+)/)
@@ -169,12 +172,16 @@ function getCsrfToken(): string {
   return ''
 }
 
-async function getUserCredentialHeaders(): Promise<Record<string, string>> {
+async function getGlobalHeaders(): Promise<Record<string, string>> {
   const userKey = await getUserKey()
   const userEmail = await getUserEmail()
+  const ctx = await logService.getContext()
+  
   const headers: Record<string, string> = {}
   if (userKey) headers['X-User-Key'] = userKey
   if (userEmail) headers['X-User-Email'] = userEmail
+  if (ctx.host) headers['X-Office-Host'] = ctx.host
+  if (ctx.sessionId) headers['X-Session-Id'] = ctx.sessionId
 
   const csrf = getCsrfToken()
   if (csrf) headers['x-csrf-token'] = csrf
@@ -184,7 +191,7 @@ async function getUserCredentialHeaders(): Promise<Record<string, string>> {
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`, {
-    headers: { ...(await getUserCredentialHeaders()) }
+    headers: { ...(await getGlobalHeaders()) }
   })
   if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`)
   return res.json()
@@ -193,7 +200,7 @@ export async function fetchModels(): Promise<Record<string, ModelInfo>> {
 export async function healthCheck(): Promise<boolean> {
   try {
     const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/health`, {
-      headers: { ...(await getUserCredentialHeaders()) }
+      headers: { ...(await getGlobalHeaders()) }
     })
     return res.ok
   } catch {
@@ -244,13 +251,14 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await getUserCredentialHeaders()) },
+    headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
     body: JSON.stringify({ messages, modelTier, tools, stream_options: { include_usage: true } }),
     signal: abortSignal,
   }, modelTier)
 
   if (!res.ok) {
     const err = await res.text()
+    logService.error('Chat API error', undefined, { status: res.status, error: err })
     throw new Error(`Chat API error ${res.status}: ${err}`)
   }
 
@@ -339,12 +347,13 @@ export interface ImageGenerateOptions {
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await getUserCredentialHeaders()) },
+    headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
     body: JSON.stringify(options),
   })
 
   if (!res.ok) {
     const err = await res.text()
+    logService.error('Image API error', undefined, { status: res.status, error: err })
     throw new Error(`Image API error ${res.status}: ${err}`)
   }
 
@@ -368,13 +377,32 @@ export async function uploadFile(file: File): Promise<{ filename: string; extrac
 
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/upload`, {
     method: 'POST',
-    headers: { ...(await getUserCredentialHeaders()) },
+    headers: { ...(await getGlobalHeaders()) },
     body: formData,
   })
 
   if (!res.ok) {
     const err = await res.text()
+    logService.error('File upload error', undefined, { status: res.status, error: err })
     throw new Error(`File upload error ${res.status}: ${err}`)
+  }
+
+  return res.json()
+}
+
+export async function submitFeedback(sessionId: string, payload: { category: string; comment: string; logs: unknown[] }): Promise<{ success: boolean }> {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/feedback/${sessionId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await getGlobalHeaders()),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Feedback submission failed: ${res.status} ${errText}`)
   }
 
   return res.json()

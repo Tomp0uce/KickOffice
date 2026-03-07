@@ -1,18 +1,18 @@
 # Plan d'Architecture — Système de Logging & Feedback
 
-> **Statut :** En attente de validation — Ne pas implémenter avant validation du plan complet.
+> **Statut :** Plan entièrement validé et implémenté avec succès (Toutes les 5 phases terminées).
 
 ---
 
 ## État des lieux
 
-| Aspect | Actuel | Problème |
-|--------|--------|----------|
-| **Backend logging** | Custom `systemLog()` + `rotating-file-stream` (30 fichiers, 10MB) + `console.*` éparpillés | Pas de niveaux structurés, pas de contexte (user/host/tab), `/health` pollue, prompts/réponses LLM non loggés |
-| **Frontend logging** | `console.*` direct dans 65 fichiers, pas d'abstraction | Aucun buffer récupérable, pas de contexte enrichi, erreurs perdues |
-| **Error handling tools** | `officeAction.ts` (timeout 10s) + try/catch ad hoc dans `useAgentLoop.ts` | Inconsistant, certains tools sans try/catch, erreurs pas remontées au logger |
-| **Sessions/Tabs** | UUID IndexedDB via `useSessionDB`/`useSessionManager` | Pas de lien logs ↔ session, pas de purge logs à la suppression |
-| **Settings UI** | 5 onglets dans `SettingsPage.vue` (1175 lignes) | Pas de mécanisme de feedback |
+| Aspect                   | Actuel                                                                                     | Problème                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **Backend logging**      | Custom `systemLog()` + `rotating-file-stream` (30 fichiers, 10MB) + `console.*` éparpillés | Pas de niveaux structurés, pas de contexte (user/host/tab), `/health` pollue, prompts/réponses LLM non loggés |
+| **Frontend logging**     | `console.*` direct dans 65 fichiers, pas d'abstraction                                     | Aucun buffer récupérable, pas de contexte enrichi, erreurs perdues                                            |
+| **Error handling tools** | `officeAction.ts` (timeout 10s) + try/catch ad hoc dans `useAgentLoop.ts`                  | Inconsistant, certains tools sans try/catch, erreurs pas remontées au logger                                  |
+| **Sessions/Tabs**        | UUID IndexedDB via `useSessionDB`/`useSessionManager`                                      | Pas de lien logs ↔ session, pas de purge logs à la suppression                                                |
+| **Settings UI**          | 5 onglets dans `SettingsPage.vue` (1175 lignes)                                            | Pas de mécanisme de feedback                                                                                  |
 
 ---
 
@@ -21,14 +21,14 @@
 ```typescript
 // Entrée de log (front & back)
 interface LogEntry {
-  timestamp: string        // ISO 8601
+  timestamp: string // ISO 8601
   level: 'error' | 'warn' | 'info' | 'debug'
   source: 'frontend' | 'backend'
-  traffic: 'user' | 'llm' | 'auto' | 'system'  // Séparation du trafic
-  sessionId?: string       // UUID du tab/chat
-  userId?: string          // Email utilisateur
-  host?: string            // 'Word' | 'Excel' | 'PowerPoint' | 'Outlook'
-  reqId?: string           // UUID de requête (backend)
+  traffic: 'user' | 'llm' | 'auto' | 'system' // Séparation du trafic
+  sessionId?: string // UUID du tab/chat
+  userId?: string // Email utilisateur
+  host?: string // 'Word' | 'Excel' | 'PowerPoint' | 'Outlook'
+  reqId?: string // UUID de requête (backend)
   message: string
   data?: Record<string, unknown>
   error?: {
@@ -40,14 +40,14 @@ interface LogEntry {
 
 // Rapport de feedback (Phase 5)
 interface FeedbackReport {
-  id: string               // UUID
+  id: string // UUID
   timestamp: string
   sessionId: string
   userId: string
   host: string
-  userMessage: string       // Texte libre de l'utilisateur
-  chatHistory: DisplayMessage[]  // Historique du chat courant
-  frontendLogs: LogEntry[]  // Dump du ring buffer
+  userMessage: string // Texte libre de l'utilisateur
+  chatHistory: DisplayMessage[] // Historique du chat courant
+  frontendLogs: LogEntry[] // Dump du ring buffer
   appVersion: string
 }
 ```
@@ -56,10 +56,10 @@ interface FeedbackReport {
 
 ## Dépendances à ajouter/supprimer
 
-| Côté | Ajouter | Supprimer |
-|------|---------|-----------|
-| **Backend** | `winston`, `winston-daily-rotate-file` | `morgan`, `rotating-file-stream` |
-| **Frontend** | (rien) | (rien) |
+| Côté         | Ajouter                                | Supprimer                        |
+| ------------ | -------------------------------------- | -------------------------------- |
+| **Backend**  | `winston`, `winston-daily-rotate-file` | `morgan`, `rotating-file-stream` |
+| **Frontend** | (rien)                                 | (rien)                           |
 
 ---
 
@@ -79,6 +79,7 @@ Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
 ### Backend : Winston + `winston-daily-rotate-file`
 
 Pourquoi Winston plutôt que Pino :
+
 - **Pretty-print natif** en dev (coloré, lisible) vs JSON strict en prod
 - Écosystème de transports riche (`winston-daily-rotate-file` = rotation + suppression automatique)
 - API `logger.info()`, `logger.warn()`, `logger.error()` standard et familière
@@ -87,6 +88,7 @@ Pourquoi Winston plutôt que Pino :
 ### Frontend : `LogService` maison (aucune lib externe)
 
 Raison : garder le bundle léger (Office Add-in). Singleton `LogService` qui :
+
 - Wrappe `console.*` (monkey-patch pour capturer les logs existants sans refactor massif)
 - Maintient un **ring buffer** de 500 entrées max par session — récupérable pour le feedback
 - Enrichit chaque entrée avec `{ host, sessionId, userEmail, timestamp, level }`
@@ -210,5 +212,25 @@ Raison : garder le bundle léger (Office Add-in). Singleton `LogService` qui :
    - Nettoyage des rapports de plus de 30 jours au démarrage du serveur
 
 4. **Purge à la suppression d'un onglet** dans `useSessionManager.ts` → `deleteCurrentSession()` :
-   - `logService.clearSessionLogs(sessionId)` — purge le ring buffer frontend
    - POST optionnel vers `/api/feedback/cleanup?sessionId=xxx` — backend supprime les rapports associés
+
+---
+
+## Résumé de l'Implémentation
+
+Toutes les 5 phases du plan ont été implémentées, testées et validées.
+
+**Réalisations principales :**
+
+- **Backend** : Intégration de `winston` et `winston-daily-rotate-file` pour un logging structuré et persistant avec rotation des logs. `morgan` et `rotating-file-stream` ont été complètement supprimés. Un middleware de contexte (`reqId`, `userId`, `host`) a été ajouté.
+- **Frontend** : Création d'un `LogService` via un buffer circulaire pour capturer tous les logs, avec monkey-patching transparent de `console.error` et `console.warn`.
+- **API & Core** : Interception des erreurs réseau, ajout des headers de traçabilité (`X-Office-Host`, `X-Session-Id`), et sécurisation (try/catch) de tous les factories de tools (Word, Excel, PPT, Outlook) pour renvoyer des erreurs JSON propres au LLM.
+- **Feedback UI** : Ajout d'une boîte de dialogue dans les paramètres permettant l'envoi de rapports de bugs/suggestions au backend, incluant automatiquement le dump du _ring buffer_ local.
+
+**Corrections apportées durant l'audit post-implémentation :**
+
+1. **CORS Backend** : Ajout de `X-Office-Host` et `X-Session-Id` dans les `allowedHeaders` pour éviter les échecs de requêtes preflight (OPTIONS).
+2. **API Feedback** : Correction du _path_ de la route (suppression du `/feedback` redondant) et réécriture du `FeedbackDialog.vue` pour utiliser une fonction encapsulée `submitFeedback` via l'URL complète du backend.
+3. **Typescript** : Correction d'une erreur asynchrone dans `FeedbackDialog.vue` liée à `logService.getContext()`, ainsi que **résolution complète de 9 erreurs TS pré-existantes** dans `HomePage.vue` (typage de `quickActions`, références d'éléments du DOM) et d'un effet de bord dans `useAgentLoop.ts`.
+
+> Le build (`vue-tsc`) est désormais 100% sans erreurs.
