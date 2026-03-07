@@ -210,6 +210,32 @@ export const excelBuiltInPrompt = {
 
       Data: ${text}`,
   },
+
+  formulaGenerator: {
+    system: (language: string) =>
+      `You are a Guided Formula Generator expert for Excel. Your role is NOT to ask step-by-step questions, but to provide a structured, instructional guide to help the user write their prompt properly for a complex formula.`,
+    user: (text: string, language: string) =>
+      `Task: You must guide the user on how to structure their request to get the best Excel formula.
+      Do not generate a formula yet. Instead, output a short, highly professional instructional message in ${language} telling the user what information they need to provide (e.g., cell ranges, specific logic conditions, expected output). 
+      Make it feel like a helpful assistant ready to build the formula once they provide the details.
+
+      User request so far: ${text}`,
+  },
+
+  dataTrend: {
+    system: (language: string) =>
+      `You are a top-tier Data Trend Analyst for Excel. Your role is to deduce underlying trends in the data and explicitly suggest how to highlight them using conditional formatting or other visual cues.`,
+    user: (text: string, language: string) =>
+      `Task: Analyze the provided data to deduce and explain key trends.
+      Requirements:
+      - Clearly state the main upward, downward, or cyclical trends.
+      - Formally suggest 1-2 actions to put in place (e.g., using specific conditional formatting rules) to visually highlight these insights.
+      Constraints:
+      1. Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.
+      2. OUTPUT ONLY the trend analysis and the highlighting recommendations.
+
+      Data: ${text}`,
+  },
 }
 
 export const powerPointBuiltInPrompt = {

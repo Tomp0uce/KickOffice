@@ -143,7 +143,10 @@ import {
   MessageSquare,
   Scissors,
   Sparkle,
+  Table,
+  TrendingUp,
   Wand2,
+  LineChart,
   Zap,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -253,46 +256,46 @@ const wordQuickActions = computed<QuickAction[]>(() => [
 ])
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
-    key: 'clean',
-    label: t('clean'),
-    icon: Eraser,
+    key: 'ingest',
+    label: t('excelIngest', 'Smart Ingestion'),
+    icon: Table,
     mode: 'immediate',
     systemPrompt:
-      "You are a data cleaning expert. Use 'setCellRange' to fix values/formulas and 'clearRange' to remove junk.",
-    tooltipKey: 'excelClean_tooltip',
+      "You are a data cleaning expert. Silently correct locales (like replacing wrong decimal dots or commas) using 'setCellRange' to modify cells, then FORCE conversion of the raw pasted data into a formatted Excel table using 'createTable'.",
+    tooltipKey: 'excelIngest_tooltip',
   },
   {
-    key: 'beautify',
-    label: t('beautify'),
-    icon: Brush,
-    mode: 'immediate',
-    systemPrompt:
-      "You are an Excel formatting expert. Use 'formatRange' for visual styles and 'setCellRange' for number formats or conditional formatting.",
-    tooltipKey: 'excelBeautify_tooltip',
+    key: 'autograph',
+    label: t('excelAutoGraph', 'Auto-Graph'),
+    icon: LineChart,
+    mode: 'draft',
+    prefix:
+      "You are a data visualization expert. Analyze the data. Generate new columns if necessary (and visually highlight them with 'formatRange'). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
+    tooltipKey: 'excelAutoGraph_tooltip',
   },
   {
-    key: 'formula',
-    label: t('excelFormula'),
+    key: 'explain',
+    label: t('excelExplain', 'Explain Formula'),
+    icon: BookOpen,
+    mode: 'draft',
+    prefix: t('excelExplainPrefix', 'Explain this formula'),
+    tooltipKey: 'excelExplain_tooltip',
+  },
+  {
+    key: 'formulaGenerator',
+    label: t('excelFormulaGenerator', 'Formula Generator'),
     icon: FunctionSquare,
     mode: 'draft',
-    prefix: t('excelFormulaPrefix'),
-    tooltipKey: 'excelFormula_tooltip',
+    prefix: t('excelFormulaGeneratorPrefix', 'Help me build a formula'),
+    tooltipKey: 'excelFormulaGenerator_tooltip',
   },
   {
-    key: 'transform',
-    label: t('transform'),
-    icon: Wand2,
+    key: 'dataTrend',
+    label: t('excelDataTrend', 'Data Trend'),
+    icon: TrendingUp,
     mode: 'draft',
-    prefix: t('excelTransformPrefix'),
-    tooltipKey: 'excelTransform_tooltip',
-  },
-  {
-    key: 'highlight',
-    label: t('highlight'),
-    icon: Eye,
-    mode: 'draft',
-    prefix: t('excelHighlightPrefix'),
-    tooltipKey: 'excelHighlight_tooltip',
+    prefix: t('excelDataTrendPrefix', 'Analyze trends'),
+    tooltipKey: 'excelDataTrend_tooltip',
   },
 ])
 const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
