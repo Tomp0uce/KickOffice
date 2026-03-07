@@ -1,5 +1,6 @@
-import type { ToolProperty, ExcelToolDefinition } from '@/types'
+import type { ToolProperty, ToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
+import { createOfficeTools } from './common'
 import { localStorageKey } from './enum'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
@@ -18,20 +19,8 @@ async function safeGetSheet(context: Excel.RequestContext, sheetName?: string): 
   return sheet
 }
 
-type ExcelToolTemplate = Omit<ExcelToolDefinition, 'execute'> & {
+type ExcelToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>
-}
-
-function createExcelTools(definitions: Record<ExcelToolName, ExcelToolTemplate>): Record<ExcelToolName, ExcelToolDefinition> {
-  return Object.fromEntries(
-    Object.entries(definitions).map(([name, definition]) => [
-      name,
-      {
-        ...definition,
-        execute: async (args: Record<string, any> = {}) => runExcel(context => definition.executeExcel(context, args)),
-      },
-    ]),
-  ) as unknown as Record<ExcelToolName, ExcelToolDefinition>
 }
 
 export type ExcelToolName =
@@ -63,25 +52,8 @@ function getExcelFormulaLanguage(): 'en' | 'fr' {
   return configured === 'fr' ? 'fr' : 'en'
 }
 
-function colToInt(col: string): number {
-  let num = 0
-  for (let i = 0; i < col.length; i++) {
-    num = num * 26 + (col.charCodeAt(i) - 64)
-  }
-  return num
-}
 
-function intToCol(num: number): string {
-  let col = ''
-  while (num > 0) {
-    const mod = (num - 1) % 26
-    col = String.fromCharCode(65 + mod) + col
-    num = Math.floor((num - mod) / 26)
-  }
-  return col
-}
-
-const excelToolDefinitions = createExcelTools({
+const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate, ToolDefinition>({
   getSelectedCells: {
     name: 'getSelectedCells',
     category: 'read',
@@ -1586,10 +1558,12 @@ try {
       }
     },
   },
-})
+}, (def) => async (args = {}) => runExcel(ctx => def.executeExcel(ctx, args)))
 
-export function getExcelToolDefinitions(): ExcelToolDefinition[] {
+export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(excelToolDefinitions)
 }
+
+export const getExcelToolDefinitions = getToolDefinitions
 
 export { excelToolDefinitions }

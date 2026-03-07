@@ -1,5 +1,5 @@
-import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import { sanitizeHtml } from './markdown'
 
 const markdownParser = new MarkdownIt({
   breaks: true,
@@ -42,7 +42,7 @@ export function renderSanitizedMarkdown(content: string): string {
   const rawMarkdown = content?.trim() ?? ''
   const unsafeHtml = markdownParser.render(rawMarkdown)
 
-  return DOMPurify.sanitize(unsafeHtml, {
+  return sanitizeHtml(unsafeHtml, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
