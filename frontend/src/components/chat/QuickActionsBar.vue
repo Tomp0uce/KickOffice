@@ -1,5 +1,5 @@
 <template>
-  <div class="flex w-full items-center justify-center gap-2 rounded-md">
+  <div class="flex w-full flex-wrap items-center justify-center gap-2 rounded-md">
     <CustomButton
       v-for="action in quickActions"
       :key="action.key"

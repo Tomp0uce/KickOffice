@@ -96,7 +96,11 @@
             {{ formatTime(item.message.timestamp) }}
           </div>
         </div>
-        <div v-if="item.message.role === 'assistant'" class="flex gap-1">
+        <!-- Assistant action buttons: hidden until hover (U-L1) -->
+        <div
+          v-if="item.message.role === 'assistant'"
+          class="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+        >
           <CustomButton
             :title="replaceSelectedText"
             text=""
@@ -123,6 +127,32 @@
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
             @click="$emit('copy-message', item.message)"
+          />
+          <!-- Regenerate: only on the last assistant message (U-L2) -->
+          <CustomButton
+            v-if="item.key === lastAssistantKey && !loading"
+            :title="regenerateLabel"
+            text=""
+            :icon="RotateCcw"
+            type="secondary"
+            class="bg-surface! p-1.5! text-secondary!"
+            :icon-size="12"
+            @click="$emit('regenerate')"
+          />
+        </div>
+        <!-- User message edit button: hidden until hover (U-L2) -->
+        <div
+          v-if="item.message.role === 'user'"
+          class="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
+        >
+          <CustomButton
+            :title="editMessageLabel"
+            text=""
+            :icon="Pencil"
+            type="secondary"
+            class="bg-surface! p-1.5! text-secondary!"
+            :icon-size="12"
+            @click="$emit('edit-message', item.message)"
           />
         </div>
       </div>
@@ -159,7 +189,9 @@ import {
   ChevronRight,
   Copy,
   FileText,
+  Pencil,
   Plus,
+  RotateCcw,
   Sparkles,
   Terminal,
 } from 'lucide-vue-next'
@@ -188,14 +220,23 @@ const props = defineProps<{
   appendToSelection: string
   copyToClipboard: string
   thoughtProcessLabel: string
+  regenerateLabel: string
+  editMessageLabel: string
 }>()
 
 defineEmits<{
   (e: 'insert-message', message: DisplayMessage, type: 'replace' | 'append'): void
   (e: 'copy-message', message: DisplayMessage): void
+  (e: 'regenerate'): void
+  (e: 'edit-message', message: DisplayMessage): void
 }>()
 
 const containerEl = ref<HTMLElement>()
+
+const lastAssistantKey = computed(() => {
+  const items = props.historyWithSegments.filter(item => item.message.role === 'assistant')
+  return items[items.length - 1]?.key ?? null
+})
 
 const expandedThoughts = ref<Record<string, boolean>>({})
 
