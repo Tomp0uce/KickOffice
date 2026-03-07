@@ -38,7 +38,7 @@ function validateTemperature(value) {
 function validateMaxTokens(value) {
   if (value === undefined) return { value: undefined }
   if (!Number.isInteger(value)) return { error: 'maxTokens must be an integer' }
-  if (value < 1 || value > 32768) return { error: 'maxTokens must be between 1 and 32768' }
+  if (value < 1 || value > 128000) return { error: 'maxTokens must be between 1 and 128000' }
   return { value }
 }
 

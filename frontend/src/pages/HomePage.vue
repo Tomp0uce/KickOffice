@@ -129,7 +129,7 @@
         :session-stats="sessionStats"
         :model-name="selectedModelInfo?.id ?? selectedModelTier"
         :current-action="currentAction"
-        :context-window-tokens="MAX_CONTEXT_CHARS"
+        :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
         :loading="loading"
       />
     </div>

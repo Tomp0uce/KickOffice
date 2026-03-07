@@ -3,12 +3,19 @@ import type { ChatRequestMessage } from '@/api/backend'
 import { message as messageUtil } from '@/utils/message'
 import { i18n } from '@/i18n'
 
-export const MAX_CONTEXT_CHARS = 1_000_000 // Increased from 100k to 1M to handle massive GPT-5.1 contexts
+// GPT-5.2: 400k token context window × 3 chars/token ≈ 1.2M chars (conservative ratio)
+export const MAX_CONTEXT_CHARS = 1_200_000
 
-const TRUNCATION_MARKER = '\n\n[... Truncated]'
+const TRUNCATION_MARKER_HEAD = '\n\n[... Truncated]'
+const TRUNCATION_MARKER_TAIL = '[Truncated ...]\n\n'
 let hasWarnedTruncation = false
 
-function truncateToBudget(content: any, budget: number): any {
+/**
+ * Truncates content to fit within a character budget.
+ * @param direction 'head' keeps the beginning (cuts tail) — best for documents, mails, code.
+ *                  'tail' keeps the end (cuts beginning) — best for tool results, logs.
+ */
+function truncateToBudget(content: any, budget: number, direction: 'head' | 'tail' = 'head'): any {
   if (typeof content !== 'string') return content // L4 fix: Implicit coercion protection for vision arrays
   if (budget <= 0) return ''
   if (content.length <= budget) {
@@ -21,14 +28,20 @@ function truncateToBudget(content: any, budget: number): any {
     hasWarnedTruncation = true
   }
 
-  if (budget <= TRUNCATION_MARKER.length) {
+  const marker = direction === 'head' ? TRUNCATION_MARKER_HEAD : TRUNCATION_MARKER_TAIL
+
+  if (budget <= marker.length) {
     console.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
-    return TRUNCATION_MARKER.slice(0, budget)
+    return marker.slice(0, budget)
   }
 
-  const headLength = budget - TRUNCATION_MARKER.length
-  console.warn(`[tokenManager] Message truncated by ${content.length - headLength} chars`)
-  return `${content.slice(0, headLength)}${TRUNCATION_MARKER}`
+  const kept = budget - marker.length
+  console.warn(`[tokenManager] Message truncated (${direction}) by ${content.length - kept} chars`)
+
+  if (direction === 'tail') {
+    return `${marker}${content.slice(-kept)}`
+  }
+  return `${content.slice(0, kept)}${marker}`
 }
 
 function getMessageContentLength(message: ChatRequestMessage): number {
@@ -67,7 +80,9 @@ export function prepareMessagesForContext(allMessages: ChatRequestMessage[], sys
     }
 
     if (message.role === 'tool' || forceInclude) {
-      const truncatedContent = truncateToBudget(message.content, remainingBudget)
+      // Tool results: keep the end (conclusion/result). User/assistant: keep the beginning (structure/intent).
+      const dir = message.role === 'tool' ? 'tail' : 'head'
+      const truncatedContent = truncateToBudget(message.content, remainingBudget, dir)
       if (!truncatedContent && !forceInclude) return
 
       selectedMessages.push({ index, message: { ...message, content: truncatedContent } })

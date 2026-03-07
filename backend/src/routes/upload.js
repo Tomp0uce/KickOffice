@@ -11,7 +11,7 @@ const uploadRouter = Router()
 
 const UPLOAD_MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB max file size
 const UPLOAD_MAX_FIELD_SIZE = 1024 // 1KB per non-file field
-const TEXT_MAX_CHARS = 100000 // approx 25-30k tokens context limit
+const TEXT_MAX_CHARS = 600000 // approx 200k tokens — proportional to GPT-5.2 400k context window
 
 // Configure multer to store files in memory
 const upload = multer({
