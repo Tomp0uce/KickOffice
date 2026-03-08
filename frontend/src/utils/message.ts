@@ -43,16 +43,16 @@ function showMessage(options: MessageOptions) {
 }
 
 export const message = {
-  error: (msg: string, duration = 3000) => {
+  error: (msg: string, duration = 6000) => {
     showMessage({ message: msg, type: 'error', duration })
   },
-  success: (msg: string, duration = 3000) => {
+  success: (msg: string, duration = 6000) => {
     showMessage({ message: msg, type: 'success', duration })
   },
-  info: (msg: string, duration = 3000) => {
+  info: (msg: string, duration = 6000) => {
     showMessage({ message: msg, type: 'info', duration })
   },
-  warning: (msg: string, duration = 3000) => {
+  warning: (msg: string, duration = 6000) => {
     showMessage({ message: msg, type: 'warning', duration })
   },
 }

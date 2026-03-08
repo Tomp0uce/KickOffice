@@ -100,10 +100,13 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
         
         const slide = slides.getItemAt(index)
         const notesPage = slide.notesSlide
-        // Attempt to load. If it fails, the notes slide might not be initialized.
+        // notesSlide can be undefined on Office Online or older PowerPoint builds
+        if (!notesPage) {
+          throw new Error('NOTES_SLIDE_UNAVAILABLE')
+        }
         notesPage.load('notesTextFrame/textRange')
         await context.sync()
-        
+
         notesPage.notesTextFrame.textRange.text = notes
         await context.sync()
       })
@@ -111,7 +114,21 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
     return true
   } catch (err) {
     console.error('[PowerPointTools] Failed to set speaker notes:', err)
-    messageUtil.error(`Impossible d'insérer les notes: ${err instanceof Error ? err.message : 'Erreur API'}`)
+    const isUnavailable =
+      err instanceof Error &&
+      (err.message === 'NOTES_SLIDE_UNAVAILABLE' ||
+        err.message.includes('undefined') ||
+        err.message.includes('load'))
+    if (isUnavailable) {
+      messageUtil.error(
+        "Impossible d'insérer les notes automatiquement. Cliquez dans la zone de notes de la diapositive, puis utilisez le bouton « Remplacer » sur la réponse générée.",
+        9000
+      )
+    } else {
+      messageUtil.error(
+        `Impossible d'insérer les notes: ${err instanceof Error ? err.message : 'Erreur API'}`
+      )
+    }
     return false
   }
 }

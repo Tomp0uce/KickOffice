@@ -8,6 +8,7 @@ import type { LogEntry } from '@/utils/logger'
 import { snapshotVfs, restoreVfs } from '@/utils/vfs'
 import { randomUUID } from '@/utils/cryptoPolyfill'
 import { message as messageUtil } from '@/utils/message'
+import { i18n } from '@/i18n'
 
 export interface VfsFile {
   path: string
@@ -182,7 +183,7 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
     await idbPut(store, { ...session, messages: plainMessages, vfsFiles, name: newName, updatedAt: Date.now() })
   } catch (putErr) {
     console.error('[SessionDB] Failed to save session:', putErr)
-    messageUtil.error('Failed to save chat data. Browser local storage might be full.')
+    messageUtil.error((i18n.global.t as any)('failedToSaveChatData'))
   }
 }
 

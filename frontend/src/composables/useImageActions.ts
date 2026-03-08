@@ -73,7 +73,7 @@ export function useImageActions(t: (key: string) => string) {
       }
     } catch (err) {
       console.error('Invalid imageSrc URL:', err)
-      messageUtil.error('Invalid image URL')
+      messageUtil.error(t('invalidImageUrl'))
       return
     }
 
