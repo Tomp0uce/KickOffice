@@ -430,5 +430,7 @@
   "modelTier.reasoning": "Deep Thinking",
   "modelTier.image": "Image",
   "regenerate": "Regenerate",
-  "editMessage": "Edit message"
+  "editMessage": "Edit message",
+  "invalidImageUrl": "Invalid image URL",
+  "failedToSaveChatData": "Failed to save chat data. Browser storage might be full."
 }

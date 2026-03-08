@@ -436,5 +436,7 @@
   "modelTier.reasoning": "Réflexion profonde",
   "modelTier.image": "Image",
   "regenerate": "Régénérer",
-  "editMessage": "Modifier le message"
+  "editMessage": "Modifier le message",
+  "invalidImageUrl": "URL d'image invalide",
+  "failedToSaveChatData": "Impossible de sauvegarder la conversation. Le stockage du navigateur est peut-être plein."
 }
