@@ -25,81 +25,11 @@ import {
 import { areCredentialsConfigured } from '@/utils/credentialStorage'
 import { logService } from '@/utils/logger'
 
-import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction, ToolCallPart } from '@/types/chat'
+import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
 
-
-/**
- * Safe JSON stringify with depth and circular reference checks
- * Prevents DoS attacks via deeply nested objects
- */
-function safeStringify(obj: unknown, maxDepth = 10): string {
-  const seen = new WeakSet()
-
-  function stringify(value: unknown, depth: number): string {
-    // Check depth limit
-    if (depth > maxDepth) {
-      return '"[Max depth exceeded]"'
-    }
-
-    // Handle primitives
-    if (value === null) return 'null'
-    if (value === undefined) return 'undefined'
-    if (typeof value === 'string') return JSON.stringify(value)
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-
-    // Handle arrays
-    if (Array.isArray(value)) {
-      if (seen.has(value)) return '"[Circular]"'
-      seen.add(value)
-
-      const items = value.map(item => stringify(item, depth + 1))
-      return `[${items.join(',')}]`
-    }
-
-    // Handle objects
-    if (typeof value === 'object') {
-      if (seen.has(value)) return '"[Circular]"'
-      seen.add(value)
-
-      const entries = Object.entries(value).map(([k, v]) => {
-        return `${JSON.stringify(k)}:${stringify(v, depth + 1)}`
-      })
-      return `{${entries.join(',')}}`
-    }
-
-    // Fallback for functions, symbols, etc.
-    return '"[Unsupported type]"'
-  }
-
-  return stringify(obj, 0)
-}
-
-interface ToolCallFunction {
-  name: string
-  arguments: string
-}
-
-interface ToolCall {
-  id: string
-  type: 'function'
-  function: ToolCallFunction
-}
-
-interface AssistantMessage {
-  role: 'assistant'
-  content: string
-  tool_calls: ToolCall[]
-}
-
-interface StreamResponseChoice {
-  message: AssistantMessage
-  finish_reason?: string | null
-}
-
-interface StreamResponse {
-  choices: StreamResponseChoice[]
-}
-
+import { useAgentStream } from './useAgentStream'
+import { executeAgentToolCall } from './useToolExecutor'
+import { useLoopDetection } from './useLoopDetection'
 interface AgentLoopRefs {
   history: Ref<DisplayMessage[]>
   userInput: Ref<string>
@@ -108,7 +38,7 @@ interface AgentLoopRefs {
   backendOnline: Ref<boolean>
   abortController: Ref<AbortController | null>
   inputTextarea: Ref<HTMLTextAreaElement | undefined>
-  draftFocusGlow: Ref<boolean>
+  isDraftFocusGlowing: Ref<boolean>
 }
 
 interface AgentLoopModels {
@@ -160,109 +90,13 @@ interface UseAgentLoopOptions {
   helpers: AgentLoopHelpers
 }
 
-/**
- * Check if an error is a 401 credential error from LiteLLM
- */
-function isCredentialError(error: unknown): boolean {
-  if (!error) return false
-  const errObj = error as Record<string, any>
-  const message = (errObj.message || String(error)).toString()
-  return (
-    message.includes('401') ||
-    message.includes('LiteLLM user credentials') ||
-    message.includes('X-User-Key') ||
-    message.includes('X-User-Email')
-  )
-}
-
-export async function executeAgentToolCall(
-  toolCall: any,
-  enabledToolDefs: any[],
-  assistantMessage: DisplayMessage | undefined,
-  currentActionRef: Ref<string>,
-  getActionLabelForCategory: (cat?: ToolCategory) => string,
-  scrollToBottomFn: () => Promise<void>
-) {
-  const toolName = toolCall.function.name
-  let toolArgs: Record<string, any> = {}
-  try {
-    const parsed = JSON.parse(toolCall.function.arguments)
-    // M3: Runtime object check instead of unchecked type assertion
-    toolArgs = typeof parsed === 'object' && parsed !== null ? parsed : {}
-  } catch (parseErr) {
-    logService.error('[AgentLoop] Failed to parse tool call arguments', parseErr, { toolName, arguments: toolCall.function.arguments, traffic: 'user' })
-    if (assistantMessage) {
-      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-      assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: {}, status: 'error', result: 'Malformed tool arguments — JSON parse failed' })
-    }
-    return { tool_call_id: toolCall.id, content: `Error in ${toolName}: malformed tool arguments — JSON parse failed`, success: false }
-  }
-
-  const toolDef = enabledToolDefs.find(tool => tool.name === toolName)
-  if (!toolDef) {
-    if (assistantMessage) {
-      if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-      assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'error', result: `Tool ${toolName} not found` })
-    }
-    return { tool_call_id: toolCall.id, content: `Error: Tool ${toolName} not found`, success: false }
-  }
-
-  // Use safe stringify to prevent DoS via deeply nested objects
-  const signature = `${toolName}${safeStringify(toolArgs)}`
-  let result = ''
-  let success = false
-
-  if (assistantMessage) {
-    if (!assistantMessage.toolCalls) assistantMessage.toolCalls = []
-    assistantMessage.toolCalls.push({ id: toolCall.id, name: toolName, args: toolArgs, status: 'running' })
-  }
-
-  currentActionRef.value = getActionLabelForCategory(toolDef.category)
-  await scrollToBottomFn()
-  const executionStartTime = Date.now()
-  try {
-    result = await toolDef.execute(toolArgs)
-    success = true
-    logService.info('[AgentLoop] tool execution succeeded', 'user', { toolName, duration: Date.now() - executionStartTime })
-    if (assistantMessage?.toolCalls) {
-      const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
-      if (idx !== -1) assistantMessage.toolCalls[idx].status = 'complete'
-    }
-  } catch (err: unknown) {
-    logService.error('[AgentLoop] tool execution failed', err, { toolName, toolArgs, traffic: 'user' })
-    const errorMessage = err instanceof Error ? err.message : String(err)
-    result = `Error in ${toolName}: ${errorMessage}`
-    if (assistantMessage?.toolCalls) {
-      const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
-      if (idx !== -1) {
-         assistantMessage.toolCalls[idx].status = 'error'
-         assistantMessage.toolCalls[idx].result = errorMessage
-      }
-    }
-  }
-  currentActionRef.value = ''
-
-  let safeContent = ''
-  if (result === null || result === undefined) {
-    safeContent = ''
-  } else if (typeof result === 'object') {
-    safeContent = JSON.stringify(result)
-  } else {
-    safeContent = String(result)
-  }
-
-  if (assistantMessage?.toolCalls) {
-    const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
-    if (idx !== -1 && success) {
-      assistantMessage.toolCalls[idx].result = safeContent
-    }
-  }
-
-  return { tool_call_id: toolCall.id, content: safeContent, success, signature }
-}
 
 export function useAgentLoop(options: UseAgentLoopOptions) {
   const { t, refs, models, host, settings, actions, helpers } = options
+
+  const { executeStream } = useAgentStream()
+  const { addSignatureAndCheckLoop, clearSignatures } = useLoopDetection(5, 2)
+
 
   // Destructure refs
   const {
@@ -273,7 +107,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     backendOnline,
     abortController,
     inputTextarea,
-    draftFocusGlow,
+    isDraftFocusGlowing,
   } = refs
 
   // Destructure models
@@ -411,10 +245,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const startTime = Date.now()
     const timeoutMs = maxIter * 60 * 1000 // up to 1 minute per iteration allowed
     let currentMessages: ChatRequestMessage[] = [...messages]
-    // Sliding window of last N signatures to detect repetitive loops (P6)
-    const LOOP_WINDOW_SIZE = 5
-    const LOOP_REPEAT_THRESHOLD = 2
-    const recentSignatures: string[] = []
+    // Sliding window loop detection (P6) uses useLoopDetection composable
+    clearSignatures()
     let toolsWereExecuted = false // Track if any tools were successfully executed
     currentAction.value = t('agentAnalyzing')
     history.value.push(createDisplayMessage('assistant', ''))
@@ -444,41 +276,25 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
       const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
-      let response: StreamResponse = { choices: [{ message: { role: 'assistant', content: '', tool_calls: [] } }] }
-      let truncatedByLength = false
       logService.info('llm_request', 'llm', { model: modelTier, messageCount: contextSafeMessages.length })
+
+      let response: any
+      let truncatedByLength = false
+
       try {
-        await chatStream({
+        const streamResult = await executeStream({
           messages: contextSafeMessages,
           modelTier,
           tools,
-          abortSignal: abortController.value?.signal,
-          onStream: (text) => {
-            // Clear action indicator only when actual content arrives
-            currentAction.value = ''
-            currentAssistantMessage.content = text
-            response.choices[0].message.content = text
-            scrollToBottom().catch(console.error)
-          },
-          onToolCallDelta: (toolCallDeltas) => {
-            // Clear action indicator only when tool calls arrive
-            currentAction.value = ''
-            for (const delta of toolCallDeltas) {
-              const idx = delta.index
-              if (!response.choices[0].message.tool_calls[idx]) {
-                response.choices[0].message.tool_calls[idx] = { id: delta.id, type: 'function', function: { name: delta.function.name || '', arguments: '' } }
-              }
-              if (delta.function?.arguments) {
-                response.choices[0].message.tool_calls[idx].function.arguments += delta.function.arguments
-              }
-            }
-          },
-          onFinishReason: (finishReason) => {
-            if (finishReason === 'length') truncatedByLength = true
-          },
-          onUsage: accumulateUsage,
+          abortSignal: abortController.value?.signal || undefined,
+          currentAction,
+          currentAssistantMessage,
+          scrollToBottom,
+          accumulateUsage
         })
-        response.choices[0].message.tool_calls = response.choices[0].message.tool_calls.filter(Boolean)
+        
+        response = streamResult.response
+        truncatedByLength = streamResult.truncatedByLength
         logService.info('llm_response_complete', 'llm', { tokensUsed: sessionStats.value.totalTokens })
       } catch (err: unknown) {
         if ((err instanceof Error && err.name === 'AbortError') || abortController.value?.signal.aborted) {
@@ -546,14 +362,9 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const sig = toolResult.signature
 
         // Sliding window loop detection (P6)
-        if (sig) {
-          recentSignatures.push(sig)
-          if (recentSignatures.length > LOOP_WINDOW_SIZE) recentSignatures.shift()
-          const sigCount = recentSignatures.filter(s => s === sig).length
-          if (sigCount >= LOOP_REPEAT_THRESHOLD) {
-            toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You have called this exact tool with the same arguments multiple times in a row. This is a loop. Stop repeating and try a different approach.' })
-            continue
-          }
+        if (sig && addSignatureAndCheckLoop(sig)) {
+          toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You have called this exact tool with the same arguments multiple times in a row. This is a loop. Stop repeating and try a different approach.' })
+          continue
         }
 
         if (toolResult.success) toolsWereExecuted = true
@@ -996,7 +807,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           : quickActions.value?.find((a: QuickAction) => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
-    const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
     const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
 
     if (actionKey === 'visual' && hostIsPowerPoint) {
@@ -1023,8 +833,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       pendingSmartReply.value = true
       userInput.value = selectedOutlookQuickAction.prefix || ''
       adjustTextareaHeight()
-      draftFocusGlow.value = true
-      setTimeout(() => { draftFocusGlow.value = false; }, 1500)
+      isDraftFocusGlowing.value = true
+      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
       await nextTick()
       const el = inputTextarea.value
       if (el) {
@@ -1037,8 +847,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || ''
       adjustTextareaHeight()
-      draftFocusGlow.value = true
-      setTimeout(() => { draftFocusGlow.value = false; }, 1500)
+      isDraftFocusGlowing.value = true
+      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
       await nextTick()
       const el = inputTextarea.value
       if (el) {
@@ -1051,8 +861,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (selectedExcelQuickAction?.mode === 'draft') {
       userInput.value = selectedExcelQuickAction.prefix || ''
       adjustTextareaHeight()
-      draftFocusGlow.value = true
-      setTimeout(() => { draftFocusGlow.value = false; }, 1000)
+      isDraftFocusGlowing.value = true
+      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1000)
       await nextTick()
       const el = inputTextarea.value
       if (el) {

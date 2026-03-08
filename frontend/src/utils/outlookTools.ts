@@ -36,7 +36,7 @@ function getOfficeCoercionType(): any {
 }
 
 const runOutlook = <T>(action: () => Promise<T>): Promise<T> =>
-  executeOfficeAction(action)
+  executeOfficeAction(action, 'outlook_action', 20_000)
 
 type OutlookToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>
@@ -501,7 +501,7 @@ try {
   try {
     return await runOutlook(async () => Promise.race([
       def.executeOutlook(getMailbox(), args),
-      new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 10 seconds.'), 10_000)),
+      new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 20 seconds.'), 20_000)),
     ]))
   } catch (error: any) {
     return JSON.stringify({

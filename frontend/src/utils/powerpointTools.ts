@@ -11,7 +11,7 @@ import { executeOfficeAction } from './officeAction'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
-import { computeTextDiffStats, createOfficeTools } from './common'
+import { computeTextDiffStats, createOfficeTools, normalizeLineEndings } from './common'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -156,7 +156,7 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
  * with the provided text.
  */
 export async function insertIntoPowerPoint(text: string, useHtml = true): Promise<void> {
-  const normalizedNewlines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const normalizedNewlines = normalizeLineEndings(text)
 
   // Try the Modern API first if available (requires PowerPointApi 1.5+)
   if (isPowerPointApiSupported('1.5') && useHtml) {
@@ -669,7 +669,7 @@ try {
         const textRange = shape.textFrame.textRange
         if (isPowerPointApiSupported('1.5')) {
           try {
-            const normalizedNewlines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+            const normalizedNewlines = normalizeLineEndings(content)
             await insertMarkdownIntoTextRange(context, textRange, normalizedNewlines)
           } catch (e) {
             console.warn('insertMarkdownIntoTextRange failed, falling back to text modification', e)

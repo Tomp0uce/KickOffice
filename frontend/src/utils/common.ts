@@ -1,5 +1,5 @@
 import DiffMatchPatch from 'diff-match-patch'
-import { languageMap } from './constant'
+
 
 // R17/CH5 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
 export function generateVisualDiff(originalText: unknown, newText: unknown): string {
@@ -62,4 +62,14 @@ export const optionLists = {
     { label: 'English', value: 'en' },
     { label: 'Fran\u00e7ais', value: 'fr' },
   ],
+}
+
+/**
+ * Normalizes line endings to \n (removes \r).
+ * This standardizes line endings from various inputs (like LLMs or copy/paste)
+ * across Word and PowerPoint.
+ */
+export function normalizeLineEndings(text: string): string {
+  if (!text) return ''
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 }

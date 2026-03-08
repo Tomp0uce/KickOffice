@@ -45,21 +45,7 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
     return `\n\nUser profile context for communications (especially emails):\n- First name: ${firstName || t('userProfileUnknownFirstName')}\n- Last name: ${lastName || t('userProfileUnknownLastName')}\n- Full name: ${fullName}\n- Gender: ${genderLabel}\nUse this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
   }
 
-  const COMMON_FORMATTING_INSTRUCTIONS = `
-## Output Formatting Rules
-When generating content that will be inserted into the document:
-- Use standard Markdown syntax exclusively. Do NOT use raw HTML tags.
-- **Bold**: Use \`**text**\` for emphasis
-- *Italic*: Use \`*text*\` for nuance
-- Bullet lists: Use "- " prefix. Each item on its own line.
-- Numbered lists: Use "1. ", "2. ", etc.
-- Nested sub-items: Indent with exactly 2 spaces before the marker:
-  - Level 1: "- Item"
-  - Level 2: "  - Sub-item"
-  - Level 3: "    - Sub-sub-item"
-- Headings: Use # for level 1, ## for level 2, ### for level 3.
-- NEVER mix bullet symbols. Use "-" consistently, never "*" or "+".
-- NEVER put an empty line between consecutive list items of the same level.`
+
 
   const COMMON_SHELL_INSTRUCTIONS = `
 # Sandboxed Shell & VFS (Virtual File System)

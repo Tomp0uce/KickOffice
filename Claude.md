@@ -42,10 +42,11 @@ See DESIGN_REVIEW.md §C0c for full context. This constraint is already enforced
 
 The frontend follows a composable-based architecture:
 
-- **Pages**: `HomePage.vue` (orchestration, history persistence per host), `SettingsPage.vue` (settings UI, feature toggles)
-- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`)
-- **Composables**: `useAgentLoop.ts` (agent execution loop with recursive context gathering and dynamic tool filtering), `useAgentPrompts.ts` (prompts array generation), `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard)
-- **Utils**: `tokenManager.ts` (context pruning and LLM token budget management), `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordFormatter.ts`, `constant.ts` (translation-aware built-in prompts), `hostDetection.ts`, `message.ts`, `common.ts`, `enum.ts`, `savedPrompts.ts`, `toolStorage.ts`, `officeOutlook.ts`, `officeAction.ts`, `markdown.ts`
+- **Pages**: `HomePage.vue` (now minimal orchestration, delegates logic to `useHomePage.ts`), `SettingsPage.vue` (decomposed into tab components)
+- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`) + Settings tabs (`AccountTab`, `GeneralTab`, etc.)
+- **Composables**: `useHomePage.ts` (orchestrates homepage state, session switching, scroll management), `useAgentLoop.ts` (modularized agent loop), `useAgentStream`, `useToolExecutor`, `useLoopDetection`, `useAgentPrompts.ts`, `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard), `useHealthCheck.ts`
+- **Constants**: `limits.ts` (centralized magic numbers: upload sizes, timeouts, buffer sizes, icon sizes)
+- **Utils**: `tokenManager.ts` (context pruning), `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordFormatter.ts`, `hostDetection.ts`, `message.ts`, `common.ts` (normalizeLineEndings), `enum.ts`, `officeCodeValidator.ts` (pre-execution safety), `markdown.ts` (deduplicated MarkdownIt config)
 
 ### Backend architecture (post-refactor)
 
@@ -134,13 +135,10 @@ Any contract change should update both backend and frontend in the same change s
 - Avoid silent failures in user-facing flows; surface understandable errors.
 - Preserve i18n behavior and existing translation keys when possible.
 - **All user-visible strings must use `t()` / i18n keys** — no hardcoded French or English strings in components or composables.
+- **Naming Conventions**: Booleans MUST be prefixed with `is` or `has` (e.g., `isLoading`, `isDraftFocusGlowing`, `hasSelection`).
+- **Constants Management**: Avoid "magic numbers". Use `frontend/src/constants/limits.ts` and `backend/src/config/limits.js` for all configuration values (timeouts, sizes, counts).
+- **Icon Sizing**: Use `ICON_SIZE_SM` (14), `ICON_SIZE_MD` (16), or `ICON_SIZE_LG` (20) from `limits.ts`.
 - For Office tool changes, ensure host-specific behavior remains correct (Word vs Excel vs PowerPoint vs Outlook).
-- Host capability gaps must be handled explicitly in UX (clear message instead of degraded/broken fallback behavior).
-- Image insertion: Word uses `insertInlinePictureFromBase64`, PowerPoint uses `slide.shapes.addImage`, Excel shows an info message (not supported). Never fall back to copying base64 text to clipboard.
-- When modifying the agent loop (`useAgentLoop.ts`), ensure:
-  - Abort signal is checked at loop start and passed to `chatSync`
-  - Empty model responses are detected and surfaced to the user
-  - Tool definitions are correctly gathered for the current host
 
 Current host/tool landscape (keep in mind for tool/agent changes):
 

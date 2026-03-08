@@ -60,9 +60,9 @@ Text: ${text}`,
   },
 
   polish: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a professional editor. Your goal is to improve sentence structure and flow while maintaining a natural, conversational tone. Do NOT use overly complex, pretentious, or robotic "AI" vocabulary.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Polish the following text for better readability and impact.
       Improvements:
       - Correct grammar, spelling, and punctuation.
@@ -76,9 +76,9 @@ Text: ${text}`,
   },
 
   academic: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a senior academic editor for high-impact journals. You specialize in formal, precise, and objective scholarly writing.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Rewrite the following text to meet professional academic standards.
       Requirements:
       - Use formal, objective language and avoid colloquialisms.
@@ -93,9 +93,9 @@ Text: ${text}`,
   },
 
   summary: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an expert document analyst. You excel at providing highly dense, bulleted summaries focused solely on core decisions, facts, and conclusions.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Summarize the following text.
       Structure:
       - Provide a highly dense, bulleted summary.
@@ -109,11 +109,11 @@ Text: ${text}`,
   },
 
   proofread: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a meticulous proofreader. Your primary focus is strictly correcting grammar, spelling, and typos.
       CRITICAL INSTRUCTION: You MUST NEVER make stylistic, vocabulary, or phrasing suggestions. Only fix objective errors.
       CRITICAL INSTRUCTION: You MUST NOT return replacement text directly. You MUST use the \`addComment\` tool to suggest corrections to the user.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Check and correct the grammar of the following text using the \`addComment\` tool.
       Focus:
       - Fix all spelling, punctuation, syntax, and agreement errors.
@@ -131,9 +131,9 @@ Text: ${text}`,
 
 export const excelBuiltInPrompt = {
   analyze: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an expert data analyst. You specialize in interpreting spreadsheet data, identifying patterns, and presenting structural insights.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Analyze the following Excel data and provide insights.
       Structure:
       - Identify column types (numeric, text, date).
@@ -148,9 +148,9 @@ export const excelBuiltInPrompt = {
   },
 
   chart: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a data visualization expert. You help users choose the best chart type and presentation for their data.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Based on the following data, recommend the best chart type and explain why.
       Consider:
       - The nature of the data (categorical, time series, comparison, distribution).
@@ -164,9 +164,9 @@ export const excelBuiltInPrompt = {
   },
 
   formula: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an Excel formula expert. You help users write efficient and correct Excel formulas for their specific needs.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Based on the following data and context, suggest the most appropriate Excel formula(s).
       Requirements:
       - Provide the exact formula(s) ready to use.
@@ -180,9 +180,9 @@ export const excelBuiltInPrompt = {
   },
 
   format: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a spreadsheet formatting specialist. You help users present their data professionally with appropriate formatting.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Suggest formatting improvements for the following data.
       Consider:
       - Number formats (currency, percentage, dates).
@@ -197,9 +197,9 @@ export const excelBuiltInPrompt = {
   },
 
   explain: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a data interpretation expert. You help users understand their spreadsheet data by providing clear explanations.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Explain the following spreadsheet data in simple terms.
       Include:
       - What the data represents.
@@ -214,7 +214,7 @@ export const excelBuiltInPrompt = {
   },
 
   formulaGenerator: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a Guided Formula Generator expert for Excel. Your role is NOT to ask step-by-step questions, but to provide a structured, instructional guide to help the user write their prompt properly for a complex formula.`,
     user: (text: string, language: string) =>
       `Task: You must guide the user on how to structure their request to get the best Excel formula.
@@ -225,9 +225,9 @@ export const excelBuiltInPrompt = {
   },
 
   dataTrend: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a top-tier Data Trend Analyst for Excel. Your role is to deduce underlying trends in the data and explicitly suggest how to highlight them using conditional formatting or other visual cues.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Analyze the provided data to deduce and explain key trends.
       Requirements:
       - Clearly state the main upward, downward, or cyclical trends.
@@ -242,9 +242,9 @@ export const excelBuiltInPrompt = {
 
 export const powerPointBuiltInPrompt = {
   bullets: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a PowerPoint presentation expert. Your task is to transform text into clear, concise bullet points suitable for presentation slides. Prioritize brevity, clarity, and visual hierarchy.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Convert the following text into a concise bullet-point list for a PowerPoint slide.
       Requirements:
       - Use short, punchy phrases (max 8-10 words per bullet).
@@ -259,9 +259,9 @@ export const powerPointBuiltInPrompt = {
   },
 
   speakerNotes: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an expert presenter. Your task is to write engaging, strictly-concise speaker notes that can be instantly read while glancing at a screen during a presentation.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Generate highly concise speaker notes based on the following slide content.
       Requirements:
       - Write in a natural, conversational tone.
@@ -276,9 +276,9 @@ export const powerPointBuiltInPrompt = {
   },
 
   punchify: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a world-class copywriter and presentation coach (like Steve Jobs). Your goal is to rewrite text to be incredibly persuasive, memorable, and visually striking.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Rewrite the following slide content to maximize impact.
       Techniques to use:
       - "Less is more": Cut fluff, use strong verbs.
@@ -294,10 +294,10 @@ export const powerPointBuiltInPrompt = {
   },
 
   proofread: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a meticulous proofreader for professional presentations. Your sole focus is correcting grammar, spelling, and typos without altering the slide structure.
       Because PowerPoint doesn't support comments via API, you MUST return the corrected text directly so it can replace the user's selection.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Correct the grammar and spelling of the following slide content.
       Critical Rules:
       - Fix typos, punctuation, and capitalization errors.
@@ -393,7 +393,7 @@ BEFORE drafting the reply, you MUST internally analyze the email thread and dete
 - The email body contains the original message thread which must be preserved
 - Your reply should be added BEFORE the existing thread (Outlook will handle positioning)
 - NEVER use mode: "Replace" as it would delete the entire conversation history`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `## Email thread to reply to:
 ${text}
 
@@ -405,13 +405,13 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
   },
 
   translate_formalize: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a bilingual communication specialist. Your task is to transform draft emails into highly polished, professional correspondence.
       If the source text is predominantly French, translate it into formal English.
       If the source text is predominantly English, translate it into formal French.
       If the text is mixed, translate it to the other language (French <-> English).
       Ensure the output is highly professional, formal, and suitable for business correspondence.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Translate and formalize this text for professional business use.
       Requirements:
       - Translate French to English, or English to French.
@@ -427,9 +427,9 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
   },
 
   concise: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are a concise writing expert. Your task is to condense texts for maximum readability and directness.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Condense this text for maximum readability.
       Requirements:
       - Eliminate all corporate fluff and redundant pleasantries.
@@ -444,7 +444,7 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
   },
 
   proofread: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an expert email proofreader and light editor. Your task is to correct and mildly improve the current email compose reply — without rewriting it.
 
 KEY CONSTRAINTS:
@@ -458,7 +458,7 @@ KEY CONSTRAINTS:
   4. Keep formatting (bullets, line breaks, bold) intact.
 - Apply minimum-edit strategy: do NOT add new ideas, do NOT expand or shorten significantly.
 - OUTPUT ONLY the corrected/improved text — no explanations, no meta-commentary.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Correct grammar/spelling and lightly improve the style of this email compose reply. Stay as close to the original as possible.
 
 EMAIL BODY:
@@ -468,9 +468,9 @@ OUTPUT: The corrected and lightly improved email body only.`,
   },
 
   extract: {
-    system: (language: string) =>
+    system: (_language: string) =>
       `You are an expert email analyst. Your sole task is to extract actionable tasks and required next steps from email threads.`,
-    user: (text: string, language: string) =>
+    user: (text: string, _language: string) =>
       `Task: Analyze this email and extract ONLY the required actions, tasks, and follow-ups.
       Provide a concise bulleted list detailing:
       - The exact task/action needed.

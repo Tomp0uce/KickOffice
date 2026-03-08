@@ -19,6 +19,8 @@
         class="flex flex-1 items-center gap-1 px-2 py-1 rounded text-xs text-secondary hover:bg-bg-tertiary transition-colors max-w-[200px]"
         :disabled="loading"
         :title="currentSessionName"
+        :aria-label="t('sessionOptions', 'Session Options')"
+        :aria-expanded="dropdownOpen"
         @click="dropdownOpen = !dropdownOpen"
       >
         <MessageSquare :size="11" class="shrink-0 text-accent" />
@@ -101,6 +103,7 @@
     <div class="flex items-center gap-1 rounded-md border border-accent/10">
       <CustomButton
         :title="settingsTitle"
+        :aria-label="settingsTitle"
         :icon="Settings"
         text=""
         type="secondary"

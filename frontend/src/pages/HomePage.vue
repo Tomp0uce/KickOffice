@@ -12,8 +12,40 @@
         @delete-session="handleDeleteSession"
       />
 
+      <!-- Persistent Offline Indicator -->
       <div
-        v-if="showDeleteConfirm"
+        v-if="!backendOnline"
+        class="flex items-center justify-center bg-red-500/10 py-1.5 px-3 rounded-md border border-red-500/20 shadow-xs mx-4 mt-2"
+      >
+        <span class="text-xs text-red-500 font-medium flex items-center gap-2">
+          <span class="relative flex h-2 w-2">
+            <span
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
+            ></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+          </span>
+          {{ t('backendOffline') }}
+        </span>
+      </div>
+
+      <!-- Auth Error Indicator (UX-M3) -->
+      <div
+        v-if="backendOnline && Object.keys(availableModels).length === 0 && !loading"
+        class="flex flex-col items-center justify-center bg-warning/10 py-2 px-3 rounded-md border border-warning/30 shadow-xs mx-4 mt-2 mb-2 animate-in fade-in"
+      >
+        <span class="text-xs text-warning-700 dark:text-warning font-medium text-center mb-1">
+          {{ t('authErrorBanner', 'Authentication required or invalid API key.') }}
+        </span>
+        <button
+          class="text-[11px] underline text-accent hover:text-accent-hover transition-colors"
+          @click="goToSettings"
+        >
+          {{ t('goToSettings', 'Go to Settings to configure') }}
+        </button>
+      </div>
+
+      <div
+        v-if="isDeleteConfirmVisible"
         class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
       >
         <p class="text-[13px] font-medium leading-tight text-main">
@@ -22,7 +54,7 @@
         <div class="mt-1 flex justify-end gap-2">
           <button
             class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="showDeleteConfirm = false"
+            @click="isDeleteConfirmVisible = false"
           >
             {{ t('cancel') }}
           </button>
@@ -36,7 +68,7 @@
       </div>
 
       <div
-        v-if="showNewChatConfirm"
+        v-if="isNewChatConfirmVisible"
         class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
       >
         <p class="text-[13px] font-medium leading-tight text-main">
@@ -45,7 +77,7 @@
         <div class="mt-1 flex justify-end gap-2">
           <button
             class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="showNewChatConfirm = false"
+            @click="isNewChatConfirmVisible = false"
           >
             {{ t('cancel') }}
           </button>
@@ -125,7 +157,7 @@
         :task-type-label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
-        :draft-focus-glow="draftFocusGlow"
+        :draft-focus-glow="isDraftFocusGlowing"
         @submit="sendMessage"
         @stop="stopGeneration"
       />
@@ -150,17 +182,13 @@ import {
   nextTick,
   onBeforeMount,
   onMounted,
-  onUnmounted,
   onActivated,
   onDeactivated,
 } from 'vue'
 import { useStorage } from '@vueuse/core'
 import {
   BookOpen,
-  Brush,
   CheckCheck,
-  Eraser,
-  Eye,
   FileCheck,
   FunctionSquare,
   Globe,
@@ -172,14 +200,12 @@ import {
   Sparkle,
   Table,
   TrendingUp,
-  Wand2,
   LineChart,
   Zap,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 
-import { fetchModels, healthCheck } from '@/api/backend'
+import { useHealthCheck } from '@/composables/useHealthCheck'
 import ChatHeader from '@/components/chat/ChatHeader.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
@@ -198,20 +224,22 @@ import type {
 } from '@/types/chat'
 import { localStorageKey } from '@/utils/enum'
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection'
-import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import { type SavedPrompt } from '@/utils/savedPrompts'
+import { useHomePage } from '@/composables/useHomePage'
 
-const router = useRouter()
 const { t } = useI18n()
 
 const savedPrompts = ref<SavedPrompt[]>([])
 const selectedPromptId = ref('')
 const customSystemPrompt = ref('')
-const draftFocusGlow = ref(false)
-const backendOnline = ref(false)
-const showDeleteConfirm = ref(false)
-const showNewChatConfirm = ref(false)
+const isDraftFocusGlowing = ref(false)
+const isDeleteConfirmVisible = ref(false)
+const isNewChatConfirmVisible = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
+
+const { backendOnline } = useHealthCheck(availableModels, selectedModelTier)
+
 const hostIsExcel = isExcel()
 const hostIsWord = isWord()
 const hostIsPowerPoint = isPowerPoint()
@@ -231,7 +259,6 @@ const userInput = ref('')
 const loading = ref(false)
 const imageLoading = ref(false)
 const abortController = ref<AbortController | null>(null)
-const backendCheckInterval = ref<number | null>(null)
 const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true)
 const useSelectedText = useStorage(localStorageKey.useSelectedText, true)
 const agentMaxIterationsRaw = useStorage(localStorageKey.agentMaxIterations, 25)
@@ -419,78 +446,6 @@ const inputPlaceholder = computed(() =>
   selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'),
 )
 
-function adjustTextareaHeight() {
-  const candidate = chatInputRef.value?.textareaEl
-  const textarea =
-    candidate && 'style' in candidate
-      ? (candidate as HTMLTextAreaElement)
-      : (candidate as unknown as HTMLTextAreaElement)
-
-  if (textarea && textarea.style) {
-    textarea.style.height = 'auto'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
-  }
-}
-
-watch(userInput, () => {
-  adjustTextareaHeight()
-})
-
-type ScrollMode = 'bottom' | 'message-top' | 'auto'
-
-/**
- * Scroll the chat container
- * @param mode - 'bottom': scroll to very bottom, 'message-top': scroll to top of last message, 'auto': smart behavior
- */
-async function scrollToBottom(mode: ScrollMode = 'auto') {
-  await nextTick()
-  const rawContainer = messageListRef.value?.containerEl
-  const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
-  if (!container) return
-
-  const messageElements = container.querySelectorAll('[data-message]')
-  const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined
-
-  if (!lastMessage) {
-    container.scrollTop = container.scrollHeight
-    return
-  }
-
-  const msgTop = lastMessage.offsetTop
-  const padding = 12
-
-  if (mode === 'bottom') {
-    // Always scroll to the very bottom
-    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-  } else if (mode === 'message-top') {
-    // Scroll so the top of the last message is visible at the top of the container
-    container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
-  } else {
-    // Auto mode: smart behavior based on message height
-    // If the message is taller than the container, keep its start visible
-    // Otherwise, scroll to bottom as content grows
-    if (lastMessage.offsetHeight > container.clientHeight) {
-      container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
-    } else {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
-    }
-  }
-}
-
-/**
- * Scroll to show the top of the last message (for receiving new assistant messages)
- */
-async function scrollToMessageTop() {
-  await scrollToBottom('message-top')
-}
-
-/**
- * Scroll to very bottom (for user sending messages and on startup)
- */
-async function scrollToVeryBottom() {
-  await scrollToBottom('bottom')
-}
-
 const imageActions = useImageActions(t)
 const historyWithSegments = computed(() => imageActions.historyWithSegments(history))
 
@@ -500,7 +455,6 @@ const officeInsert = useOfficeInsert({
   hostIsExcel,
   hostIsWord,
   useWordFormatting,
-  insertType,
   t,
   shouldTreatMessageAsImage: imageActions.shouldTreatMessageAsImage,
   getMessageActionPayload: imageActions.getMessageActionPayload,
@@ -508,6 +462,46 @@ const officeInsert = useOfficeInsert({
   insertImageToWord: imageActions.insertImageToWord,
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
 })
+
+function stopGeneration() {
+  abortController.value?.abort()
+  abortController.value = null
+  loading.value = false
+}
+
+const homePage = useHomePage({
+  chatInputRef,
+  messageListRef,
+  savedPrompts,
+  userInput,
+  customSystemPrompt,
+  selectedPromptId,
+  loading,
+  isDeleteConfirmVisible,
+  isNewChatConfirmVisible,
+  sessionManager,
+  resetSessionStats: () => resetSessionStats?.(),
+  stopGeneration,
+})
+
+watch(userInput, () => {
+  homePage.adjustTextareaHeight()
+})
+
+const {
+  adjustTextareaHeight,
+  scrollToBottom,
+  scrollToMessageTop,
+  scrollToVeryBottom,
+  goToSettings,
+  executeNewChat,
+  confirmNewChat,
+  handleSwitchSession,
+  handleDeleteSession,
+  confirmDeleteSession,
+  loadSavedPrompts,
+  loadSelectedPrompt,
+} = homePage
 
 const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } =
   useAgentLoop({
@@ -520,7 +514,7 @@ const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSession
       backendOnline,
       abortController,
       inputTextarea: computed(() => chatInputRef.value?.textareaEl),
-      draftFocusGlow,
+      isDraftFocusGlowing,
     },
     models: {
       availableModels,
@@ -558,107 +552,12 @@ const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSession
     },
   })
 
-function stopGeneration() {
-  abortController.value?.abort()
-  abortController.value = null
-  loading.value = false
-}
-
 function handleRegenerate() {
-  if (loading.value) return
-  const lastUserMsg = [...history.value].reverse().find(m => m.role === 'user')
-  if (!lastUserMsg?.content) return
-  sendMessage(lastUserMsg.content, [])
+  homePage.handleRegenerate(history, sendMessage)
 }
 
-async function handleEditMessage(message: DisplayMessage) {
-  userInput.value = message.content ?? ''
-  await nextTick()
-  // Vue template refs can sometimes be nested components or raw elements
-  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-  el?.focus?.()
-}
-
-function goToSettings() {
-  router.push('/settings')
-}
-
-async function executeNewChat() {
-  if (userInput.value.trim()) {
-    showNewChatConfirm.value = true
-    return
-  }
-  await doNewChat()
-}
-
-async function confirmNewChat() {
-  showNewChatConfirm.value = false
-  await doNewChat()
-}
-
-async function doNewChat() {
-  if (loading.value) stopGeneration()
-  await sessionManager.newSession()
-  resetSessionStats()
-  userInput.value = ''
-  customSystemPrompt.value = ''
-  selectedPromptId.value = ''
-  await nextTick()
-  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-  el?.focus?.()
-  adjustTextareaHeight()
-}
-
-async function handleSwitchSession(sessionId: string) {
-  if (loading.value) return
-  await sessionManager.switchSession(sessionId)
-  resetSessionStats()
-  await nextTick()
-  scrollToVeryBottom()
-}
-
-function handleDeleteSession() {
-  if (loading.value) return
-  showDeleteConfirm.value = true
-}
-
-async function confirmDeleteSession() {
-  showDeleteConfirm.value = false
-  await sessionManager.deleteCurrentSession()
-  await nextTick()
-  scrollToVeryBottom()
-}
-
-function loadSavedPrompts() {
-  savedPrompts.value = loadSavedPromptsFromStorage([])
-}
-
-function loadSelectedPrompt() {
-  const prompt = savedPrompts.value.find(p => p.id === selectedPromptId.value)
-  if (!prompt) {
-    customSystemPrompt.value = ''
-    return
-  }
-  customSystemPrompt.value = prompt.systemPrompt
-  userInput.value = prompt.userPrompt
-  adjustTextareaHeight()
-  const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-  el?.focus?.()
-}
-
-async function checkBackend() {
-  if (document.visibilityState === 'hidden') return
-  backendOnline.value = await healthCheck()
-  if (!backendOnline.value) return
-  try {
-    availableModels.value = await fetchModels()
-    if (!availableModels.value[selectedModelTier.value]) {
-      const [firstTier] = Object.keys(availableModels.value)
-      if (firstTier) selectedModelTier.value = firstTier as ModelTier
-    }
-  } catch {
-    console.error('Failed to fetch models')
-  }
+function handleEditMessage(message: DisplayMessage) {
+  homePage.handleEditMessage(message)
 }
 
 const { insertMessageToDocument, copyMessageToClipboard } = officeInsert
@@ -673,8 +572,6 @@ watch(loading, async (isLoading, wasLoading) => {
 onBeforeMount(async () => {
   insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace'
   loadSavedPrompts()
-  checkBackend()
-  backendCheckInterval.value = window.setInterval(checkBackend, 30000)
   await sessionManager.init()
 })
 
@@ -693,9 +590,5 @@ onMounted(() => {
       scrollToVeryBottom()
     })
   }
-})
-
-onUnmounted(() => {
-  if (backendCheckInterval.value !== null) window.clearInterval(backendCheckInterval.value)
 })
 </script>

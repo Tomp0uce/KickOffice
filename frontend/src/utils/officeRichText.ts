@@ -1,12 +1,6 @@
-import MarkdownIt from 'markdown-it'
-import { sanitizeHtml } from './markdown'
+import { sanitizeHtml, createBaseMarkdownParser } from './markdown'
 
-const markdownParser = new MarkdownIt({
-  breaks: true,
-  html: false,
-  linkify: true,
-  typographer: true,
-})
+const markdownParser = createBaseMarkdownParser(false)
 
 const defaultLinkRender = markdownParser.renderer.rules.link_open
   ?? ((tokens: any[], idx: number, options: any, _env: any, self: any) => self.renderToken(tokens, idx, options))

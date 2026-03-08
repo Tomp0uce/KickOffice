@@ -1,10 +1,13 @@
 import { detectOfficeHost } from './hostDetection'
 import { getUserEmail } from './credentialStorage'
 import { appendLogEntry } from '@/composables/useSessionDB'
+import { LOG_RING_BUFFER_SIZE } from '@/constants/limits'
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface LogEntry {
   timestamp: string
-  level: 'error' | 'warn' | 'info' | 'debug'
+  level: LogLevel
   source: 'frontend'
   traffic: 'user' | 'llm' | 'auto' | 'system'
   sessionId?: string
@@ -19,10 +22,18 @@ export interface LogEntry {
   }
 }
 
+const LOG_LEVEL_MAP: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+}
+
 class LogService {
   private buffer: Map<string, LogEntry[]> = new Map()
-  private readonly MAX_ENTRIES = 500
+  private readonly MAX_ENTRIES = LOG_RING_BUFFER_SIZE
   private _currentSessionId: string = 'default'
+  private _logLevel: LogLevel = import.meta.env.PROD ? 'warn' : 'debug'
 
   public readonly originalConsole = {
     log: console.log,
@@ -34,6 +45,10 @@ class LogService {
 
   setCurrentSessionId(id: string) {
     this._currentSessionId = id
+  }
+
+  setLogLevel(level: LogLevel) {
+    this._logLevel = level
   }
 
   async getContext() {
@@ -51,6 +66,10 @@ class LogService {
     data?: any,
     errorObj?: any
   ) {
+    if (LOG_LEVEL_MAP[level] < LOG_LEVEL_MAP[this._logLevel]) {
+      return
+    }
+
     const ctx = await this.getContext()
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),

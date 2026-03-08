@@ -7,7 +7,7 @@ import { i18n } from './i18n'
 import router from './router'
 import { localStorageKey } from './utils/enum'
 import { detectOfficeHost, markOfficeReady } from './utils/hostDetection'
-import { setRememberCredentials, getRememberCredentials } from './utils/credentialStorage'
+import { setRememberCredentials } from './utils/credentialStorage'
 import { logService } from './utils/logger'
 
 // Monkey patch console.error and console.warn
@@ -21,7 +21,7 @@ console.warn = (...args) => {
   logService.warn(msg, args)
 }
 
-window.onerror = (message, source, lineno, colno, error) => {
+window.onerror = (message, _source, _lineno, _colno, error) => {
   logService.error(`Global Error: ${message}`, error)
 }
 window.onunhandledrejection = (event) => {
@@ -64,7 +64,7 @@ window.Office.onReady(async () => {
     localStorage.setItem(localStorageKey.darkMode, String(value))
   }, { immediate: true })
 
-  app.config.errorHandler = (err, instance, info) => {
+  app.config.errorHandler = (err, _instance, info) => {
     logService.error(`Vue Global Error: ${info}`, err)
   }
 

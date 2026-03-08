@@ -46,21 +46,31 @@
       <!-- Main Content -->
       <div class="w-full flex-1 overflow-hidden">
         <div class="no-scrollbar h-full w-full overflow-auto rounded-md shadow-md">
-          <AccountTab v-if="currentTab === 'account'" ref="accountTabRef" />
+          <div v-if="resolvingConfig" class="flex flex-col gap-2 p-1">
+            <div
+              v-for="i in 3"
+              :key="i"
+              class="card-base h-16 w-full animate-pulse bg-surface/50"
+            ></div>
+          </div>
+          <template v-else>
+            <AccountTab v-if="currentTab === 'account'" ref="accountTabRef" />
 
-          <GeneralTab
-            v-if="currentTab === 'general'"
-            :backend-online="backendOnline"
-            :available-models="availableModels"
-            :app-version="appVersion"
-            @open-feedback="showFeedbackDialog = true"
-          />
+            <GeneralTab
+              v-if="currentTab === 'general'"
+              :backend-online="backendOnline"
+              :available-models="availableModels"
+              :app-version="appVersion"
+              :loading-models="loadingModels"
+              @open-feedback="showFeedbackDialog = true"
+            />
 
-          <PromptsTab v-if="currentTab === 'prompts'" />
+            <PromptsTab v-if="currentTab === 'prompts'" />
 
-          <BuiltinPromptsTab v-if="currentTab === 'builtinPrompts'" />
+            <BuiltinPromptsTab v-if="currentTab === 'builtinPrompts'" />
 
-          <ToolsTab v-if="currentTab === 'tools'" />
+            <ToolsTab v-if="currentTab === 'tools'" />
+          </template>
         </div>
       </div>
     </div>
@@ -95,6 +105,8 @@ const showFeedbackDialog = ref(false)
 // Backend state shared with GeneralTab
 const backendOnline = ref(false)
 const availableModels = ref<Record<string, ModelInfo>>({})
+const loadingModels = ref(true)
+const resolvingConfig = ref(true)
 
 // Ref to AccountTab to set credentials after migration
 const accountTabRef = ref<InstanceType<typeof AccountTab> | null>(null)
@@ -116,10 +128,15 @@ async function checkBackend() {
   backendOnline.value = await healthCheck()
   if (backendOnline.value) {
     try {
+      loadingModels.value = true
       availableModels.value = await fetchModels()
     } catch {
       console.error('Failed to fetch models')
+    } finally {
+      loadingModels.value = false
     }
+  } else {
+    loadingModels.value = false
   }
 }
 
@@ -132,11 +149,14 @@ onBeforeMount(() => {
 })
 
 onMounted(async () => {
+  // Simulate config resolution time for smooth UX
+  await new Promise(resolve => setTimeout(resolve, 600))
   // Migrate old plaintext credentials if needed
   await migrateFromPlaintext()
   // Load credentials and push them into AccountTab
   const key = await getUserKey()
   const email = await getUserEmail()
   accountTabRef.value?.setCredentials(key, email)
+  resolvingConfig.value = false
 })
 </script>

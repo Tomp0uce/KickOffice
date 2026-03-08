@@ -80,12 +80,16 @@ export function htmlToMarkdown(html: string): string {
   }
 }
 
-const officeMarkdownParser = new MarkdownIt({
-  breaks: true,
-  html: true,
-  linkify: true,
-  typographer: true,
-})
+export function createBaseMarkdownParser(html: boolean = true): MarkdownIt {
+  return new MarkdownIt({
+    breaks: true,
+    html: html,
+    linkify: true,
+    typographer: true,
+  })
+}
+
+const officeMarkdownParser = createBaseMarkdownParser()
   .use(markdownItTaskLists, { enabled: true })
   .use(markdownItDeflist)
   .use(markdownItFootnote)

@@ -21,8 +21,8 @@
         class="absolute top-1/2 right-3 flex -translate-y-1/2 items-center justify-center text-main"
         @click="type = type === 'password' ? 'text' : 'password'"
       >
-        <EyeIcon v-if="type === 'password'" class="text-accent" :size="16" />
-        <EyeClosedIcon v-else class="text-accent" :size="16" />
+        <EyeIcon v-if="type === 'password'" class="text-accent" :size="ICON_SIZE_MD" />
+        <EyeClosedIcon v-else class="text-accent" :size="ICON_SIZE_MD" />
       </button>
       <slot name="input-extra"></slot>
     </div>
@@ -30,40 +30,41 @@
 </template>
 
 <script setup lang="ts">
-import { EyeClosedIcon, EyeIcon } from "lucide-vue-next";
-import { ref } from "vue";
+import { EyeClosedIcon, EyeIcon } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { ICON_SIZE_MD } from '@/constants/limits'
 
 const [modelValue, modifiers] = defineModel<string | number>({
   set(value) {
-    let result = value;
-    if (modifiers.trim && typeof result === "string") {
-      result = result.trim();
+    let result = value
+    if (modifiers.trim && typeof result === 'string') {
+      result = result.trim()
     }
-    if (modifiers.number && typeof result === "string") {
-      const n = parseFloat(result);
-      result = isNaN(n) ? result : n;
+    if (modifiers.number && typeof result === 'string') {
+      const n = parseFloat(result)
+      result = isNaN(n) ? result : n
     }
-    return result;
+    return result
   },
-});
+})
 
 const {
   isPassword = false,
   title,
-  inputType = "text",
+  inputType = 'text',
   placeholder,
   required = false,
 } = defineProps<{
-  isPassword?: boolean;
-  title: string;
-  inputType?: string;
-  placeholder: string;
-  required?: boolean;
-}>();
+  isPassword?: boolean
+  title: string
+  inputType?: string
+  placeholder: string
+  required?: boolean
+}>()
 
 defineOptions({
   inheritAttrs: false,
-});
+})
 
-const type = ref(isPassword ? "password" : inputType);
+const type = ref(isPassword ? 'password' : inputType)
 </script>
