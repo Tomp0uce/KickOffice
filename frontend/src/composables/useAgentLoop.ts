@@ -1,7 +1,7 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
 import { nextTick, ref, type Ref, type ComputedRef } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, categorizeError } from '@/api/backend'
+import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, uploadFileToPlatform, categorizeError } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
@@ -97,7 +97,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const { addSignatureAndCheckLoop, clearSignatures } = useLoopDetection(5, 2)
 
   // Step 4: Persistent session memory for uploaded content (Point 2)
-  const sessionUploadedFiles = ref<{ filename: string; content: string }[]>([])
+  const sessionUploadedFiles = ref<{ filename: string; content: string; fileId?: string }[]>([])
   const sessionUploadedImages = ref<{ filename: string; dataUri: string; imageId?: string }[]>([])
 
 
@@ -521,7 +521,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     return localSelectedText
   }
 
-  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string; imageId?: string }>, injectedContext?: string) {
+  async function processChat(
+    userMessage: string,
+    visionImages?: Array<{ filename: string; dataUri: string; imageId?: string }>,
+    injectedContext?: string,
+    selectionContext?: string,
+    uploadedFiles?: Array<{ filename: string; content: string; fileId?: string }>,
+  ) {
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -569,9 +575,42 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       }
       if (injectedContext) {
+        // Legacy string-based injection (kept for any call sites that still pass it)
         const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
         if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
           messages[lastUserIdx].content += `\n\n<attached_files>\n${injectedContext}\n</attached_files>`
+        }
+      }
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+        if (lastUserIdx !== -1) {
+          const hasFileRefs = uploadedFiles.some(f => f.fileId)
+          if (hasFileRefs && typeof messages[lastUserIdx].content === 'string') {
+            // Convert to content array: text + file references + inline fallback for files without fileId
+            const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }]
+            for (const f of uploadedFiles) {
+              if (f.fileId) {
+                parts.push({ type: 'file', file: { file_id: f.fileId } })
+              } else {
+                parts.push({ type: 'text', text: `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]` })
+              }
+            }
+            messages[lastUserIdx].content = parts
+          } else if (typeof messages[lastUserIdx].content === 'string') {
+            // All inline fallback
+            const inlineText = uploadedFiles
+              .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
+              .join('')
+            messages[lastUserIdx].content += `\n\n<attached_files>${inlineText}\n</attached_files>`
+          }
+        }
+      }
+      if (selectionContext) {
+        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+        if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
+          const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
+          const sanitizedSelection = selectionContext.replace(new RegExp('</?document_content>', 'g'), '')
+          messages[lastUserIdx].content += `\n\nHere is the current context from the user's document (${selectionLabel}). IMPORTANT: First evaluate if this context is relevant to the user's query. If it is not relevant, ignore it completely and answer the query normally.\n\n<document_content>\n${sanitizedSelection}\n</document_content>`
         }
       }
     } catch (ctxErr) {
@@ -726,6 +765,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     // If it's pure selection image, we show the selection as the user message bubble
     const displayMessageText = isImageFromSelection ? selectedText : userMessage
     history.value.push(createDisplayMessage('user', displayMessageText))
+    const userMsgIdx = history.value.length - 1
     await scrollToVeryBottom() // Scroll to very bottom after user message
 
     try {
@@ -745,6 +785,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (files && files.length > 0) {
         currentAction.value = t('agentUploadingFiles') || 'Extraction des fichiers...'
         try {
+           const newTextFiles: Array<{ filename: string; content: string; fileId?: string }> = []
            for (const file of files) {
              const result = await uploadFile(file)
              if (result.imageBase64) {
@@ -756,11 +797,29 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                  powerpointImageRegistry.set(result.filename, result.imageBase64.replace(/^data:[^;]+;base64,/, ''))
                }
                // Show a preview thumbnail in the user message bubble
-               history.value[history.value.length - 1].imageSrc = result.imageBase64
+               history.value[userMsgIdx].imageSrc = result.imageBase64
              } else {
-               // Step 4: Store extracted text in persistent session memory (Fix Point 2)
-               sessionUploadedFiles.value.push({ filename: result.filename, content: result.extractedText })
+               // Store extracted text in persistent session memory
+               const entry: { filename: string; content: string; fileId?: string } = {
+                 filename: result.filename,
+                 content: result.extractedText,
+               }
+               // Tâche 4: Try to upload to LLM provider for file_id referencing (best-effort)
+               try {
+                 const platformResult = await uploadFileToPlatform(file)
+                 if (platformResult.fileId) {
+                   entry.fileId = platformResult.fileId
+                 }
+               } catch {
+                 // Provider doesn't support /v1/files or network error — fall back to inline content
+               }
+               sessionUploadedFiles.value.push(entry)
+               newTextFiles.push({ filename: result.filename, content: result.extractedText, fileId: entry.fileId })
              }
+           }
+           // Persist file info on the user message for session restore (Tâche 6)
+           if (newTextFiles.length > 0) {
+             history.value[userMsgIdx].attachedFiles = newTextFiles
            }
         } catch (uploadObjErr: unknown) {
            console.error('[AgentLoop] File upload failed', uploadObjErr)
@@ -768,33 +827,22 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       }
 
-      // Step 4: Reinject context of ALL session-uploaded files into every message (Fix Point 2)
-      let extractedFilesContext = ''
-      if (sessionUploadedFiles.value.length > 0) {
-         extractedFilesContext = sessionUploadedFiles.value
-           .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
-           .join('')
-      }
+      // Step 4: Pass session uploaded files to processChat (inline or file_id reference)
+      const uploadedFilesForChat = sessionUploadedFiles.value.length > 0 ? [...sessionUploadedFiles.value] : undefined
 
       // Only append context to standard text chats, not pure image generations
+      // selectedText is passed separately to processChat so it never pollutes the UI history
       if (isImageFromSelection) {
         if (hostIsPowerPoint) {
           fullMessage = t('pptVisualPrefix') + '\n' + selectedText
         } else {
           fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText)
         }
+        await processChat(fullMessage.trim(), undefined, undefined, undefined, uploadedFilesForChat)
       } else {
-        if (selectedText) {
-           const selectionLabel = hostIsOutlook ? 'Selected text' : hostIsPowerPoint ? 'Selected slide text' : hostIsExcel ? 'Selected cells' : 'Selected text'
-           const sanitizedText = '\\n<document_content>\\n' + selectedText.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
-           fullMessage += '\\n\\n[' + selectionLabel + ']: ' + sanitizedText
-        }
-       history.value[history.value.length - 1].content = fullMessage.trim()
+        // Pass selectedText as selectionContext: injected into LLM payload only, not shown in UI
+        await processChat(fullMessage.trim(), undefined, undefined, selectedText || undefined, uploadedFilesForChat)
       }
-
-      // Step 4: Call processChat. visionImages is now handled via sessionUploadedImages internal ref, 
-      // but we pass a flag or just let processChat use the session ref.
-      await processChat(fullMessage.trim(), undefined, extractedFilesContext)
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)
@@ -832,6 +880,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           : quickActions.value?.find((a: QuickAction) => a.key === actionKey)
 
     const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
+    const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
     const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
 
     if (actionKey === 'visual' && hostIsPowerPoint) {
@@ -932,7 +981,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       if (hostIsOutlook) {
         action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
       } else if (hostIsPowerPoint) {
-        action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+        if (selectedPowerPointQuickAction?.systemPrompt) {
+          systemMsg = selectedPowerPointQuickAction.systemPrompt
+          userMsg = selectedText || t('applyToCurrentSlide') || 'Apply to the current slide.'
+        } else {
+          action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+        }
       } else if (hostIsExcel) {
         if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
           systemMsg = selectedExcelQuickAction.systemPrompt
@@ -1023,5 +1077,24 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
   }
 
-  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction, sessionStats, resetSessionStats }
+  /**
+   * Rebuilds sessionUploadedFiles from history after a session switch or restore.
+   * Call this whenever history is replaced from IndexedDB.
+   */
+  function rebuildSessionFiles() {
+    const seen = new Set<string>()
+    sessionUploadedFiles.value = []
+    for (const msg of history.value) {
+      if (msg.attachedFiles) {
+        for (const f of msg.attachedFiles) {
+          if (!seen.has(f.filename)) {
+            seen.add(f.filename)
+            sessionUploadedFiles.value.push(f)
+          }
+        }
+      }
+    }
+  }
+
+  return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction, sessionStats, resetSessionStats, rebuildSessionFiles }
 }

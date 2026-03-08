@@ -66,16 +66,16 @@ User uploads chart image
   - **Chart type**: e.g., `"line"` (visual classification)
 
 ### 3. Pixel Extraction (Backend)
-- LLM calls `extract_chart_data` tool with semantic parameters + `imageId`
+- LLM calls `extract_chart_data` tool with semantic parameters + `imageId` + `plotAreaBox`
 - Frontend sends `POST /api/chart-extract` with JSON payload
 - Backend retrieves image buffer from ImageStore by `imageId`
 - **PlotDigitizerService** runs the algorithm:
   1. Loads image with **jimp** (pure JS, no native deps)
-  2. Scans all pixels, computes Euclidean RGB distance to target color
-  3. Keeps pixels within `colorTolerance` (default: 80)
-  4. Auto-detects plot area bounding box from matched pixels
-  5. Maps pixel (x, y) → real values via axis ranges (rule of three)
-  6. Buckets by X (or Y for bar charts), averages to produce ~40 points
+  2. Resolves `plotAreaBox` (fraction [0,1] or raw pixels) to pixel coordinates
+  3. Scans all pixels **inside the plot area bounding box**, computes Euclidean RGB distance to target color
+  4. Keeps pixels with `d <= colorTolerance` (default: 120)
+  5. Buckets matching pixels by X column into `numPoints` buckets
+  6. Averages Y pixel positions per bucket, maps to real (x, y) via axis ranges
 - Returns `{ points: [{x, y}], pixelsMatched, imageSize, plotBounds }`
 
 ### 4. Excel Chart Creation (LLM)
@@ -92,7 +92,7 @@ User uploads chart image
 | File | Purpose |
 |---|---|
 | `backend/src/services/imageStore.js` | In-memory image buffer storage with UUID keys and 30-min TTL |
-| `backend/src/services/plotDigitizerService.js` | Core pixel scanning algorithm inspired by WebPlotDigitizer |
+| `backend/src/services/plotDigitizerService.js` | Core pixel scanning algorithm — pure JS bucket-based implementation |
 | `backend/src/routes/plotDigitizer.js` | Express route `POST /api/chart-extract` with input validation |
 
 ## Files Modified
@@ -113,61 +113,47 @@ User uploads chart image
 
 ## Algorithm Details (PlotDigitizerService)
 
-### Core: WebPlotDigitizer Algorithms (AGPL-3.0)
+### Pure-JS Bucket Algorithm
 
-The extraction engine uses adapted algorithms from [WebPlotDigitizer](https://github.com/ankitrohatgi/WebPlotDigitizer) (Copyright 2025 Ankit Rohatgi, AGPL-3.0). The adapted source files live in `backend/src/services/wpd/`.
+The extraction engine is a fully original implementation using only **jimp** (pure JavaScript image processing, no native dependencies).
 
 **Pipeline:**
 
-1. **Color detection** (`dist3d` from `wpd/mathFunctions.js`):
+1. **Plot area resolution** (`resolvePlotBox`):
+   - Accepts `plotAreaBox` with `{xMinPx, xMaxPx, yMinPx, yMaxPx}`
+   - Values in `[0, 1]` are treated as fractions of image dimensions (auto-detection)
+   - Values `> 1` are treated as raw pixel coordinates
+   - Clamped to valid image bounds
+
+2. **Color detection**:
    - Euclidean RGB distance: `d = sqrt((R1-R2)^2 + (G1-G2)^2 + (B1-B2)^2)`
-   - Pixels with `d <= colorTolerance` (default: 120, WPD default) are stored in a `Set<pixelIndex>`
-   - Transparent pixels (alpha=0) are treated as white (WPD convention)
+   - Scans only pixels **inside the plot area bounding box** (not the full image)
+   - Pixels with `d <= colorTolerance` (default: 120) are collected
+   - Transparent pixels (alpha=0) are treated as white (no match)
 
-2. **Line/scatter extraction** (`AveragingWindowCore` from `wpd/averagingWindowCore.js`):
-   - Scans each image column vertically for "blobs" (groups of matching pixels separated by `yStep` gap)
-   - Averages the Y position of each blob per column
-   - Second pass: merges nearby points within a `(xStep, yStep)` proximity window
-   - Much more accurate than naive bucket-averaging
+3. **X-axis bucketing**:
+   - Matching pixels are assigned to one of `numPoints` equal-width columns based on their relative X position within the plot area
+   - Each bucket accumulates pixel Y values
 
-3. **Bar chart extraction** (`BarExtractionAlgo` from `wpd/barExtraction.js`):
-   - Vertical bars: for each column, finds top and bottom matching pixels
-   - Horizontal bars: for each row, finds left and right matching pixels
-   - Groups detected edges by proximity (`delX`, `delVal` thresholds)
-   - Returns center position of each bar group
-
-4. **Coordinate mapping** (our adapter in `plotDigitizerService.js`):
+4. **Coordinate mapping**:
    ```
-   realX = xMin + ((pixelX - pxMin) / pxSpan) * (xMax - xMin)
-   realY = yMax - ((pixelY - pyMin) / pySpan) * (yMax - yMin)  // Y inverted
+   relX = (i + 0.5) / numPoints                          // bucket center
+   realX = xMin + relX * (xMax - xMin)
+
+   avgPy = average(bucket[i].yValues)
+   relY = (avgPy - pyMin) / (pyMax - pyMin)
+   realY = yMax - relY * (yMax - yMin)                   // Y axis inverted
    ```
 
-5. **Cubic spline smoothing** (`cspline` / `csplineInterp` from `wpd/mathFunctions.js`):
-   - For line/area charts with many raw points, interpolates at `numPoints` evenly spaced X values
-   - Produces clean, smooth output curves
-
-### Adapted WPD Files
-
-| File | WPD Source | Purpose |
-|---|---|---|
-| `wpd/mathFunctions.js` | `core/mathFunctions.js` | `dist3d`, `cspline`, `csplineInterp` |
-| `wpd/averagingWindowCore.js` | `core/curve_detection/averagingWindowCore.js` | Column blob detection + neighbor merging |
-| `wpd/barExtraction.js` | `core/curve_detection/barExtraction.js` | Bar top/bottom edge detection + grouping |
-| `wpd/dataset.js` | `core/dataset.js` | Minimal `{x, y}` point container |
-
-**Adaptations made** (structural only, algorithm logic preserved):
-- Converted `var wpd = wpd || {}` global namespace → ESM `export class` / `export function`
-- Removed UI-specific serialization/deserialization methods
-- Removed dependencies on WPD's axes calibration (replaced with linear mapping)
-- `BarExtractionAlgo`: constructor accepts orientation directly instead of axes object
+5. **Output**: `points` sorted by `x`, rounded to 3 decimal places.
 
 ### Key Design Decisions
 
-- **Pure JavaScript**: Uses `jimp` (no native binaries like canvas/opencv) for NAS compatibility
-- **LLM-driven semantics**: The LLM determines axis ranges and colors (human-level understanding of charts), the backend does pure math (pixel → coordinates)
-- **Hybrid approach**: Vision AI for semantic understanding + deterministic WPD algorithm for precise extraction
-- **WPD-grade accuracy**: Uses the same blob detection and spline interpolation as the industry-standard WebPlotDigitizer
-- **Graceful degradation**: Returns a warning with 0 points if no pixels match, suggesting parameter adjustments
+- **LLM provides `plotAreaBox`**: The LLM uses vision to identify the exact plot area (axes origin, bounds), eliminating auto-detection errors from chart decorations (titles, legends, gridlines)
+- **Pure JavaScript**: Uses `jimp` (no native binaries, no canvas/opencv) — safe for NAS and containerized deployment
+- **LLM-driven semantics + deterministic math**: Vision AI for axis ranges, colors, and bounding box; backend for pixel-level coordinate mapping
+- **License-clean**: Entirely original implementation with no dependency on external chart digitization libraries
+- **Graceful degradation**: Returns warning with 0 points if no pixels match
 
 ---
 
@@ -184,8 +170,9 @@ The extraction engine uses adapted algorithms from [WebPlotDigitizer](https://gi
   "xAxisRange": [0, 100],
   "yAxisRange": [0, 50],
   "targetColor": "#FF0000",
+  "plotAreaBox": { "xMinPx": 0.08, "xMaxPx": 0.95, "yMinPx": 0.05, "yMaxPx": 0.88 },
   "chartType": "line",
-  "colorTolerance": 80,
+  "colorTolerance": 120,
   "numPoints": 40
 }
 ```
@@ -196,8 +183,9 @@ The extraction engine uses adapted algorithms from [WebPlotDigitizer](https://gi
 | `xAxisRange` | [number, number] | Yes | — | Real X axis [min, max] |
 | `yAxisRange` | [number, number] | Yes | — | Real Y axis [min, max] |
 | `targetColor` | string | Yes | — | Hex color (#RGB or #RRGGBB) |
+| `plotAreaBox` | object | Yes | — | Plot area bounds. Values in [0,1] = fraction of image size; values > 1 = raw pixels. Fields: `xMinPx`, `xMaxPx`, `yMinPx`, `yMaxPx` |
 | `chartType` | string | No | "line" | "line", "scatter", "bar", "area" |
-| `colorTolerance` | number | No | 80 | RGB distance threshold (0-441) |
+| `colorTolerance` | number | No | 120 | Euclidean RGB distance threshold (0-441) |
 | `numPoints` | number | No | 40 | Output sample size (5-200) |
 
 **Success Response** (200):

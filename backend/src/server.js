@@ -26,6 +26,7 @@ import { uploadRouter } from './routes/upload.js'
 import { feedbackRouter } from './routes/feedback.js'
 import { logsRouter } from './routes/logs.js'
 import { plotDigitizerRouter } from './routes/plotDigitizer.js'
+import { filesRouter } from './routes/files.js'
 import { logAndRespond } from './utils/http.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -163,7 +164,7 @@ app.use((req, res, next) => {
 
 // Reject POST/PUT/PATCH requests that don't declare application/json to avoid silent empty bodies
 app.use((req, res, next) => {
-  if (req.path === '/api/upload') return next()
+  if (req.path === '/api/upload' || req.path.startsWith('/api/files')) return next()
   if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.is('application/json')) {
     return res.status(415).json({ error: 'Content-Type must be application/json' })
   }
@@ -223,6 +224,7 @@ app.use('/api/upload', ensureUserCredentials, uploadLimiter, uploadRouter)
 app.use('/api/feedback', ensureUserCredentials, feedbackRouter)
 app.use('/api/logs', ensureUserCredentials, logsLimiter, logsRouter)
 app.use('/api/chart-extract', ensureUserCredentials, uploadLimiter, plotDigitizerRouter)
+app.use('/api/files', ensureLlmApiKey, ensureUserCredentials, uploadLimiter, filesRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

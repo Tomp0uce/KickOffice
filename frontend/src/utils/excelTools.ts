@@ -407,7 +407,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       required: ['operation', 'objectType'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { operation, objectType, sheetName, source, chartType, title, name, anchor, seriesBy = 'columns' } = args as Record<string, any>
+      const { operation, objectType, sheetName, source, chartType, title, name, anchor, seriesBy = 'columns', hasHeaders = true } = args as Record<string, any>
 
       const chartTypeMap: Record<string, any> = {
         ColumnClustered: Excel.ChartType.columnClustered,
@@ -428,27 +428,39 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         if (objectType === 'chart') {
           if (!source) return 'Error: source range is required to create a chart.'
           const dataRange = sheet.getRange(source)
-          dataRange.load('values')
+          dataRange.load(['values', 'columnCount', 'rowCount'])
           await context.sync()
 
           if (!dataRange.values || (dataRange.values.length <= 1 && dataRange.values[0]?.length <= 1)) {
             return 'Error: source range is too small. Provide a range with headers and data (at least 2 rows or 2 columns).'
           }
 
-          const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
-          // Use explicit seriesBy to avoid Excel misinterpreting the first row/column as a data series
-          const seriesByEnum = seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns
-          const chart = sheet.charts.add(excelChartType, dataRange, seriesByEnum)
+          // XL-M1 Fix: Split the label column/row from the data range so Excel never
+          // plots it as an extra data series (especially problematic with numeric labels like years).
+          let plotRange: Excel.Range = dataRange
+          let categoryRange: Excel.Range | null = null
 
-          // XL-M1 Fix: Explicitly set category axis (X-Axis) and ensure it's not treated as a data series
-          try {
-            if (seriesBy === 'rows') {
-              chart.axes.categoryAxis.setCategoryNames(dataRange.getRow(0))
-            } else {
-              chart.axes.categoryAxis.setCategoryNames(dataRange.getColumn(0))
+          if (hasHeaders) {
+            if (seriesBy === 'columns' && dataRange.columnCount > 1) {
+              categoryRange = dataRange.getColumn(0)
+              plotRange = dataRange.getOffsetRange(0, 1).getResizedRange(0, -1)
+            } else if (seriesBy === 'rows' && dataRange.rowCount > 1) {
+              categoryRange = dataRange.getRow(0)
+              plotRange = dataRange.getOffsetRange(1, 0).getResizedRange(-1, 0)
             }
-          } catch (e) {
-            console.warn('[ExcelTools] Failed to explicitly set category names', e)
+          }
+
+          const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
+          const seriesByEnum = seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns
+          const chart = sheet.charts.add(excelChartType, plotRange, seriesByEnum)
+
+          // Explicitly bind the category axis to the label range to ensure correct axis labels
+          if (categoryRange) {
+            try {
+              chart.axes.categoryAxis.setCategoryNames(categoryRange)
+            } catch (e) {
+              console.warn('[ExcelTools] Failed to explicitly set category names', e)
+            }
           }
 
           if (title) chart.title.text = title
@@ -461,7 +473,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
 
           await context.sync()
-          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}. Series interpreted by ${seriesBy} with explicit Category Axis.`
+          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}. Series interpreted by ${seriesBy}${hasHeaders ? ' (label column/row excluded from plot range)' : ''}.`
         }
 
         if (objectType === 'pivotTable') {
@@ -1603,7 +1615,11 @@ const extractChartDataTool: ToolDefinition = {
   description:
     'Extract numerical data points from a chart/graph image using pixel color analysis. ' +
     'You MUST first analyze the image yourself (via vision) to determine: (1) the axis ranges, ' +
-    '(2) the dominant color of the data series, (3) the chart type. Then call this tool with those parameters. ' +
+    '(2) the dominant color of the data series, (3) the chart type, AND (4) the bounding box of the plot area ' +
+    '(the rectangle delimited by the X and Y axes, excluding titles, legends and labels). ' +
+    'Estimate plotAreaBox as fractions of the image (0.0–1.0): xMinPx = where the Y-axis line sits (left edge), ' +
+    'xMaxPx = rightmost gridline/tick (right edge), yMinPx = topmost gridline (top edge), ' +
+    'yMaxPx = where the X-axis line sits (bottom edge). ' +
     'Returns a JSON array of {x, y} points that you can write into Excel with setCellRange and chart with manageObject. ' +
     'The imageId is provided in the <uploaded_images> context block when the user uploads a chart image.',
   inputSchema: {
@@ -1615,7 +1631,7 @@ const extractChartDataTool: ToolDefinition = {
       },
       xAxisRange: {
         type: 'array',
-        description: 'Real-world min and max values of the X axis as [min, max]. Example: [0, 100]. Determine this by reading the axis labels in the image.',
+        description: 'Real-world min and max values of the X axis as [min, max]. Example: [2000, 2024]. Determine this by reading the axis labels in the image.',
         items: { type: 'number' },
       } as any,
       yAxisRange: {
@@ -1627,6 +1643,23 @@ const extractChartDataTool: ToolDefinition = {
         type: 'string',
         description: 'Hex color of the data series line/bars/points in the chart. Example: "#FF0000" for red, "#0000FF" for blue. Determine this by observing the chart image.',
       },
+      plotAreaBox: {
+        type: 'object',
+        description:
+          'Bounding box of the chart\'s plot area (the area delimited by the axes, excluding labels and legends). ' +
+          'Provide values as fractions of the image dimensions between 0.0 and 1.0. ' +
+          'xMinPx: fraction from left where the Y-axis line is (e.g. 0.12). ' +
+          'xMaxPx: fraction from left where the rightmost tick/gridline is (e.g. 0.95). ' +
+          'yMinPx: fraction from top where the topmost gridline is (e.g. 0.08). ' +
+          'yMaxPx: fraction from top where the X-axis line is (e.g. 0.88).',
+        properties: {
+          xMinPx: { type: 'number', description: 'Left edge of plot area as fraction [0,1] of image width.' },
+          xMaxPx: { type: 'number', description: 'Right edge of plot area as fraction [0,1] of image width.' },
+          yMinPx: { type: 'number', description: 'Top edge of plot area as fraction [0,1] of image height.' },
+          yMaxPx: { type: 'number', description: 'Bottom edge of plot area as fraction [0,1] of image height.' },
+        },
+        required: ['xMinPx', 'xMaxPx', 'yMinPx', 'yMaxPx'],
+      },
       chartType: {
         type: 'string',
         description: 'Type of chart: "line", "scatter", "bar" (horizontal bars), or "area". Defaults to "line".',
@@ -1634,14 +1667,14 @@ const extractChartDataTool: ToolDefinition = {
       },
       colorTolerance: {
         type: 'number',
-        description: 'Color matching tolerance (0-441, Euclidean RGB distance). Higher = more permissive. Default: 80. Increase if few points are returned.',
+        description: 'Color matching tolerance (0-441, Euclidean RGB distance). Higher = more permissive. Default: 120. Increase if few points are returned.',
       },
       numPoints: {
         type: 'number',
         description: 'Desired number of output data points (5-200). Default: 40.',
       },
     },
-    required: ['imageId', 'xAxisRange', 'yAxisRange', 'targetColor'],
+    required: ['imageId', 'xAxisRange', 'yAxisRange', 'targetColor', 'plotAreaBox'],
   },
   execute: async (args) => {
     try {
@@ -1650,6 +1683,7 @@ const extractChartDataTool: ToolDefinition = {
         xAxisRange: args.xAxisRange,
         yAxisRange: args.yAxisRange,
         targetColor: args.targetColor,
+        plotAreaBox: args.plotAreaBox,
         chartType: args.chartType,
         colorTolerance: args.colorTolerance,
         numPoints: args.numPoints,

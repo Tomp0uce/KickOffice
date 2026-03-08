@@ -120,7 +120,7 @@ The tool will automatically find the title and body shapes of the layout and fil
 When the user provides an image and asks to create a slide:
 
 1. Call `addSlide` with an appropriate layout and a generated title/body based on what you can see in the image.
-2. Call `insertImageOnSlide` with the image data to place the image on the new slide.
+2. Call `insertImageOnSlide` with `base64Data` (the raw base64 string of the image) to place the image on the new slide.
 3. **Do NOT call `getAllSlidesOverview` more than once** — it is only needed for initial discovery, not for image insertion.
 4. **Never loop on `getAllSlidesOverview`** — if a slide overview returns empty shapes, skip it and proceed with the image insertion directly.
 

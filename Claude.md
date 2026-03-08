@@ -64,9 +64,13 @@ backend/src/
 │   ├── health.js          # GET /health
 │   ├── image.js           # POST /api/image
 │   ├── models.js          # GET /api/models
-│   └── upload.js          # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
+│   ├── upload.js          # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
+│   ├── files.js           # POST /api/files (proxy to LLM provider /v1/files — returns file_id)
+│   └── plotDigitizer.js   # POST /api/chart-extract (chart pixel extraction)
 ├── services/
-│   └── llmClient.js       # Centralized LLM API client (chatCompletion, imageGeneration, handleErrorResponse)
+│   ├── llmClient.js       # Centralized LLM API client (chatCompletion, imageGeneration, RateLimitError)
+│   ├── plotDigitizerService.js  # Pure-JS bucket algorithm: pixel scan → {x,y} points (Jimp)
+│   └── imageStore.js      # In-memory image buffer storage (UUID key, 30-min TTL)
 └── utils/
     └── http.js            # fetchWithTimeout, logAndRespond, sanitizeErrorText
 ```
@@ -154,8 +158,8 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
 - **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
 - **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps `office-word-diff` local library — Token Map → Sentence Diff → Block Replace cascade). `proposeRevision` is the only Word tool that preserves formatting on unchanged text; agent is instructed to always call `getSelectedTextWithFormatting` first, and is explicitly forbidden from using `eval_wordjs` with `insertText(..., 'Replace')` which destroys formatting. `office-word-diff` is Word-only (PowerPoint/Outlook lack the Range API and Track Changes).
-- **Vision Image Handling (Registry Pattern)**: Large Base64 image data MUST BE decoupled from the agent prompt. Use `powerpointImageRegistry` (Map) in `powerpointTools.ts` to store raw Base64. Agent tools (like `insertImageOnSlide`) MUST accept a `filename` parameter and retrieve the data from the registry.
-- **Session Persistence**: Uploaded files and images MUST be persisted in `sessionUploadedFiles` and `sessionUploadedImages` refs in `useAgentLoop.ts`. Their context (extracted text for files, filename list for images) MUST be re-injected into every message to prevent amnesia.
+- **Vision Image Handling**: `insertImageOnSlide` in `powerpointTools.ts` accepts a `base64Data` parameter directly (raw base64 string, no data URI prefix). The `powerpointImageRegistry` Map still holds images for other access patterns, but `insertImageOnSlide` no longer requires a registry lookup.
+- **Session Persistence**: Uploaded files are persisted in `sessionUploadedFiles` ref in `useAgentLoop.ts`. Text files also store `fileId?` (from LLM provider `/v1/files` upload). Each user `DisplayMessage` stores `attachedFiles?: Array<{filename, content, fileId?}>` so context is rebuilt via `rebuildSessionFiles()` after session switch or init. Call `rebuildSessionFiles()` (returned from `useAgentLoop`) after any `history` replace from IndexedDB.
 - **Log Sanitization**: All payloads containing potential Base64 images MUST pass through `sanitizePayloadForLogs` in `backend.ts` before being logged to prevent disk saturation and terminal crashes.
 - **Token Manager**: Images in multi-part content MUST have a fixed token cost (default 1000) in `tokenManager.ts` to prevent the manager from truncating history due to Base64 length.
 - **Sandbox Enhancement**: Host filtering in `sandbox.ts` prevents cross-namespace API access (e.g., Word API blocked in Excel context)
@@ -166,7 +170,8 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - Log upstream provider errors on the server, but return sanitized client-facing messages (no raw upstream `details`).
 - Do not leak API keys or environment secrets in logs or responses.
 - Keep input validation strict for: `messages`, `tools`, `temperature`, `maxTokens`, image prompt/size/quality/count. All validation is in `middleware/validate.js`.
-- Preserve timeout behavior per endpoint/tier (120s for standard, 300s for reasoning).
+- Preserve timeout behavior per endpoint/tier (300s for both standard and reasoning, 180s for image).
+- `RateLimitError` is exported from `llmClient.js`. When all retries are exhausted on a 429, `withRetry` throws it (with `Retry-After` header parsed). Both `/api/chat` and `/api/chat/sync` catch it and return `429 RATE_LIMITED`.
 - Use `logAndRespond()` from `utils/http.js` for all error responses — never use bare `res.status().json()`.
 - **`buildChatBody` in `config/models.js` is the single source of truth** for request shaping. When changing model parameters, update this function and ensure both streaming and sync paths are tested.
 - **Do not send `reasoning_effort: 'none'` to the API**. Either omit the parameter or use a valid value (`low`, `medium`, `high`).

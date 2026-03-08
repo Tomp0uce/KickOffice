@@ -9,9 +9,20 @@ import logger from '../utils/logger.js'
 
 // Centralized timeout configuration (in milliseconds)
 const TIMEOUTS = {
-  CHAT_STANDARD: 120_000,   // 2 minutes for standard chat
+  CHAT_STANDARD: 300_000,   // 5 minutes for standard chat (large files)
   CHAT_REASONING: 300_000,  // 5 minutes for reasoning models
   IMAGE: 180_000,           // 3 minutes for image generation
+}
+
+/**
+ * Error thrown when the upstream LLM API rate-limits us and all retries are exhausted.
+ */
+export class RateLimitError extends Error {
+  constructor(retryAfterMs) {
+    super(`Rate limit exceeded. Retry after ${retryAfterMs}ms.`)
+    this.name = 'RateLimitError'
+    this.retryAfterMs = retryAfterMs
+  }
 }
 
 /**
@@ -38,18 +49,40 @@ function getImageTimeoutMs() {
  */
 async function withRetry(fetchFn, maxAttempts = 3) {
   let lastError
+  let lastRateLimitMs = 0
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await fetchFn()
       // Retry on rate-limit or server-side transient errors
       if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
-        const delay = Math.min(1000 * 2 ** (attempt - 1), 8000) // 1s, 2s, 4s … capped at 8s
+        let delay = Math.min(1000 * 2 ** (attempt - 1), 8000) // 1s, 2s, 4s … capped at 8s
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After')
+          if (retryAfter) {
+            const parsed = parseFloat(retryAfter)
+            // Retry-After may be seconds (float) or an HTTP-date
+            const retryMs = isFinite(parsed) ? parsed * 1000 : new Date(retryAfter).getTime() - Date.now()
+            if (retryMs > 0) delay = Math.min(retryMs, 60_000) // cap at 60s
+          }
+          lastRateLimitMs = delay
+        }
         logger.warn(`[llmClient] HTTP ${response.status} on attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`, { traffic: 'system' })
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
+      if (response.status === 429) {
+        // All retries exhausted on rate limit
+        const retryAfter = response.headers.get('Retry-After')
+        let retryMs = lastRateLimitMs || 60_000
+        if (retryAfter) {
+          const parsed = parseFloat(retryAfter)
+          retryMs = isFinite(parsed) ? parsed * 1000 : Math.max(retryMs, new Date(retryAfter).getTime() - Date.now())
+        }
+        throw new RateLimitError(retryMs)
+      }
       return response
     } catch (err) {
+      if (err instanceof RateLimitError) throw err
       lastError = err
       if (attempt < maxAttempts) {
         const delay = Math.min(1000 * 2 ** (attempt - 1), 8000)

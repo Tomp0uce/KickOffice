@@ -1,37 +1,73 @@
 /**
- * Chart data extraction service — powered by WebPlotDigitizer algorithms.
+ * Chart data extraction service — pure JS implementation using Jimp.
  *
- * Uses adapted core algorithms from WebPlotDigitizer (Copyright 2025 Ankit Rohatgi, AGPL-3.0)
- * for color-based pixel detection, blob averaging, and bar extraction.
- * Image loading via jimp (pure JS, no native binaries).
- *
- * See backend/src/services/wpd/ for the adapted WPD source files.
+ * Algorithm:
+ * 1. Load image with Jimp → RGBA pixel buffer.
+ * 2. Color detection: scan pixels inside plotAreaBox using Euclidean RGB distance.
+ * 3. Bucket matching pixels into numPoints columns along the X axis.
+ * 4. Average the Y positions within each bucket.
+ * 5. Map (bucketCenter_px, avgY_px) → real (x, y) values via plotAreaBox and axis ranges.
+ *    Note: pixel Y axis is inverted (0 = top of image).
  */
 
 import { Jimp } from 'jimp'
-import { dist3d, cspline, csplineInterp } from './wpd/mathFunctions.js'
-import { AveragingWindowCore } from './wpd/averagingWindowCore.js'
-import { BarExtractionAlgo } from './wpd/barExtraction.js'
-import { Dataset } from './wpd/dataset.js'
 
 /**
- * Extract data points from a chart image by scanning pixels matching a target color.
+ * Resolve plotAreaBox coordinates to pixel values.
+ * If all four values are in [0, 1], they are treated as fractions of image dimensions.
+ * Otherwise, they are treated as raw pixel values and clamped to image bounds.
  *
- * Pipeline:
- * 1. Load image via jimp → get RGBA pixel buffer.
- * 2. Color detection (WPD dist3d): build a Set<pixelIndex> of matching pixels.
- * 3. Curve extraction (WPD AveragingWindowCore or BarExtractionAlgo).
- * 4. Coordinate mapping: pixel → real values via axis ranges.
- * 5. Optional cubic spline smoothing (WPD cspline).
+ * @param {{ xMinPx: number, xMaxPx: number, yMinPx: number, yMaxPx: number }} box
+ * @param {number} width  - Image width in pixels
+ * @param {number} height - Image height in pixels
+ * @returns {{ pxMin: number, pxMax: number, pyMin: number, pyMax: number }}
+ */
+function resolvePlotBox(box, width, height) {
+  const { xMinPx, xMaxPx, yMinPx, yMaxPx } = box
+
+  const isFraction =
+    xMinPx >= 0 && xMinPx <= 1 &&
+    xMaxPx >= 0 && xMaxPx <= 1 &&
+    yMinPx >= 0 && yMinPx <= 1 &&
+    yMaxPx >= 0 && yMaxPx <= 1
+
+  let pxMin, pxMax, pyMin, pyMax
+  if (isFraction) {
+    pxMin = Math.round(xMinPx * width)
+    pxMax = Math.round(xMaxPx * width)
+    pyMin = Math.round(yMinPx * height)
+    pyMax = Math.round(yMaxPx * height)
+  } else {
+    pxMin = Math.round(xMinPx)
+    pxMax = Math.round(xMaxPx)
+    pyMin = Math.round(yMinPx)
+    pyMax = Math.round(yMaxPx)
+  }
+
+  // Clamp to valid image bounds
+  pxMin = Math.max(0, Math.min(pxMin, width - 1))
+  pxMax = Math.max(pxMin + 1, Math.min(pxMax, width - 1))
+  pyMin = Math.max(0, Math.min(pyMin, height - 1))
+  pyMax = Math.max(pyMin + 1, Math.min(pyMax, height - 1))
+
+  return { pxMin, pxMax, pyMin, pyMax }
+}
+
+/**
+ * Extract data points from a chart image by scanning pixels matching a target color
+ * within the defined plot area bounding box.
  *
  * @param {Object} options
- * @param {Buffer} options.imageBuffer - Raw image file buffer (PNG, JPEG, etc.)
+ * @param {Buffer} options.imageBuffer    - Raw image file buffer (PNG, JPEG, etc.)
  * @param {[number, number]} options.xAxisRange - [min, max] real values on the X axis
  * @param {[number, number]} options.yAxisRange - [min, max] real values on the Y axis
- * @param {string} options.targetColor - Hex color of the data series (e.g. "#FF0000")
- * @param {string} [options.chartType="line"] - "line", "scatter", "bar", "area"
- * @param {number} [options.colorTolerance=120] - Max Euclidean RGB distance (0–441). WPD default is 120.
- * @param {number} [options.numPoints=40] - Desired number of output points
+ * @param {string}  options.targetColor   - Hex color of the data series (e.g. "#FF0000")
+ * @param {{ xMinPx: number, xMaxPx: number, yMinPx: number, yMaxPx: number }} options.plotAreaBox
+ *   Bounding box of the chart's plot area. Values in [0,1] are treated as fractions;
+ *   values > 1 are treated as raw pixel coordinates.
+ * @param {string}  [options.chartType="line"] - "line", "scatter", "bar", or "area"
+ * @param {number}  [options.colorTolerance=120] - Max Euclidean RGB distance (0–441)
+ * @param {number}  [options.numPoints=40]  - Number of X-axis buckets
  * @returns {Promise<Object>} { points: [{x, y}], pixelsMatched, imageSize, plotBounds }
  */
 export async function extractChartData({
@@ -39,6 +75,7 @@ export async function extractChartData({
   xAxisRange,
   yAxisRange,
   targetColor,
+  plotAreaBox,
   chartType = 'line',
   colorTolerance = 120,
   numPoints = 40,
@@ -60,35 +97,41 @@ export async function extractChartData({
     throw new Error(`Invalid targetColor "${targetColor}". Expected hex format #RRGGBB or #RGB.`)
   }
 
-  // --- Load image with jimp ---
+  // --- Load image ---
   const image = await Jimp.read(imageBuffer)
   const { width, height } = image
   const data = image.bitmap.data
 
-  // --- Step 1: Color detection — build binary data (WPD approach) ---
-  // Uses dist3d for Euclidean RGB distance, stores matching pixel indices in a Set.
-  // This matches WPD's AutoDetectionData.generateBinaryDataUsingFullImage().
-  const binaryData = new Set()
-  for (let idx = 0; idx < width * height; idx++) {
-    let ir = data[idx * 4]
-    let ig = data[idx * 4 + 1]
-    let ib = data[idx * 4 + 2]
-    const ia = data[idx * 4 + 3]
+  // --- Resolve plot area bounding box to pixel coordinates ---
+  const { pxMin, pxMax, pyMin, pyMax } = resolvePlotBox(plotAreaBox, width, height)
+  const plotWidth = pxMax - pxMin
+  const plotHeight = pyMax - pyMin
 
-    // WPD convention: for fully transparent pixels, assume white
-    if (ia === 0) {
-      ir = 255
-      ig = 255
-      ib = 255
-    }
+  // --- Step 1: Scan pixels inside the plot area for color match ---
+  const matchingPixels = [] // { px, py }
+  for (let py = pyMin; py <= pyMax; py++) {
+    for (let px = pxMin; px <= pxMax; px++) {
+      const i = (py * width + px) * 4
+      let r = data[i]
+      let g = data[i + 1]
+      let b = data[i + 2]
+      const a = data[i + 3]
 
-    const d = dist3d(ir, ig, ib, targetR, targetG, targetB)
-    if (d <= colorTolerance) {
-      binaryData.add(idx)
+      // Fully transparent pixels are treated as white (no match expected)
+      if (a === 0) { r = 255; g = 255; b = 255 }
+
+      const d = Math.sqrt(
+        (r - targetR) ** 2 +
+        (g - targetG) ** 2 +
+        (b - targetB) ** 2
+      )
+      if (d <= colorTolerance) {
+        matchingPixels.push({ px, py })
+      }
     }
   }
 
-  if (binaryData.size === 0) {
+  if (matchingPixels.length === 0) {
     return {
       points: [],
       pixelsMatched: 0,
@@ -97,95 +140,44 @@ export async function extractChartData({
     }
   }
 
-  // --- Step 2: Curve extraction using WPD algorithms ---
-  const dataSeries = new Dataset()
-  const isBar = chartType === 'bar'
-
-  if (isBar) {
-    // WPD BarExtractionAlgo: finds top/bottom edges of bars, groups by proximity
-    const delX = Math.max(10, Math.round(width / (numPoints * 2)))
-    const delVal = Math.max(5, Math.round(height / 50))
-    const barAlgo = new BarExtractionAlgo(binaryData, height, width, delX, delVal, dataSeries, 'vertical')
-    barAlgo.run()
-  } else {
-    // WPD AveragingWindowCore: column-by-column blob detection + neighbor merging
-    // xStep and yStep control the merging window (in pixels)
-    const xStep = Math.max(3, Math.round(width / numPoints))
-    const yStep = Math.max(3, Math.round(height / 50))
-    const avgCore = new AveragingWindowCore(binaryData, height, width, xStep, yStep, dataSeries)
-    avgCore.run()
+  // --- Step 2: Bucket matching pixels into numPoints columns along X ---
+  const buckets = Array.from({ length: numPoints }, () => /** @type {number[]} */ ([]))
+  for (const { px, py } of matchingPixels) {
+    const relX = (px - pxMin) / plotWidth
+    const bucketIdx = Math.min(numPoints - 1, Math.floor(relX * numPoints))
+    buckets[bucketIdx].push(py)
   }
 
-  if (dataSeries.getCount() === 0) {
-    return {
-      points: [],
-      pixelsMatched: binaryData.size,
-      imageSize: { width, height },
-      warning: 'Pixels matched but no coherent data points could be extracted. Try adjusting colorTolerance.',
-    }
+  // --- Step 3: Map each non-empty bucket to real (x, y) coordinates ---
+  const [xMin, xMax] = xAxisRange
+  const [yMin, yMax] = yAxisRange
+
+  const points = []
+  for (let i = 0; i < numPoints; i++) {
+    if (buckets[i].length === 0) continue
+
+    // Average pixel Y for this bucket
+    const avgPy = buckets[i].reduce((sum, py) => sum + py, 0) / buckets[i].length
+
+    // Map bucket center → real X (linear interpolation within plot area)
+    const relX = (i + 0.5) / numPoints
+    const realX = xMin + relX * (xMax - xMin)
+
+    // Map average pixel Y → real Y
+    // Pixel Y=pyMin is the TOP of the plot area → yMax
+    // Pixel Y=pyMax is the BOTTOM of the plot area → yMin
+    const relY = (avgPy - pyMin) / plotHeight
+    const realY = yMax - relY * (yMax - yMin)
+
+    points.push({ x: round(realX, 3), y: round(realY, 3) })
   }
-
-  // --- Step 3: Determine bounding box from detected pixels ---
-  let pxMin = Infinity, pxMax = -Infinity
-  let pyMin = Infinity, pyMax = -Infinity
-  for (const idx of binaryData) {
-    const px = idx % width
-    const py = Math.floor(idx / width)
-    if (px < pxMin) pxMin = px
-    if (px > pxMax) pxMax = px
-    if (py < pyMin) pyMin = py
-    if (py > pyMax) pyMax = py
-  }
-
-  const pxSpan = pxMax - pxMin || 1
-  const pySpan = pyMax - pyMin || 1
-
-  // --- Step 4: Map pixel coordinates → real-world values ---
-  const xMin = xAxisRange[0]
-  const xMax = xAxisRange[1]
-  const yMin = yAxisRange[0]
-  const yMax = yAxisRange[1]
-
-  const rawPixelPoints = dataSeries.getAllPixels()
-  const realPoints = rawPixelPoints.map(({ x: px, y: py }) => ({
-    x: xMin + ((px - pxMin) / pxSpan) * (xMax - xMin),
-    y: yMax - ((py - pyMin) / pySpan) * (yMax - yMin), // Y inverted: top of image = yMax
-  }))
 
   // Sort by X
-  realPoints.sort((a, b) => a.x - b.x)
-
-  // --- Step 5: Optional cubic spline smoothing (WPD cspline) ---
-  let outputPoints = realPoints
-
-  if (realPoints.length >= 3 && (chartType === 'line' || chartType === 'area') && realPoints.length > numPoints) {
-    // Use WPD's cubic spline to interpolate at evenly spaced X values
-    const xVals = realPoints.map(p => p.x)
-    const yVals = realPoints.map(p => p.y)
-    const cs = cspline(xVals, yVals)
-
-    if (cs) {
-      const interpPoints = []
-      const step = (xMax - xMin) / (numPoints - 1)
-      for (let i = 0; i < numPoints; i++) {
-        const xi = xMin + i * step
-        const yi = csplineInterp(cs, xi)
-        if (yi !== null) {
-          interpPoints.push({ x: round(xi, 3), y: round(yi, 3) })
-        }
-      }
-      if (interpPoints.length > 0) {
-        outputPoints = interpPoints
-      }
-    }
-  }
-
-  // Round the final output
-  outputPoints = outputPoints.map(p => ({ x: round(p.x, 3), y: round(p.y, 3) }))
+  points.sort((a, b) => a.x - b.x)
 
   return {
-    points: outputPoints,
-    pixelsMatched: binaryData.size,
+    points,
+    pixelsMatched: matchingPixels.length,
     imageSize: { width, height },
     plotBounds: { pxMin, pxMax, pyMin, pyMax },
   }

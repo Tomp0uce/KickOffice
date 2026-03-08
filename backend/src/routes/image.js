@@ -18,11 +18,14 @@ imageRouter.post('/', async (req, res) => {
 
   const imageModel = models.image
 
+  const FRAMING_INSTRUCTION = 'Always fit the entire subject inside the frame with visible padding margins. Do not crop the left or right edges.'
+
   try {
     const response = await imageGeneration({
       body: {
         model: imageModel.id,
         ...parsedPayload.value,
+        prompt: `${FRAMING_INSTRUCTION}\n\n${parsedPayload.value.prompt}`,
       },
       userCredentials: req.userCredentials,
     })

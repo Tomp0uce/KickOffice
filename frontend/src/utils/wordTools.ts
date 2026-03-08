@@ -252,7 +252,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
   formatText: {
     name: 'formatText',
     category: 'format',
-    description: 'Apply formatting to the currently selected text. At least one text character must be selected.',
+    description: 'Apply formatting to the currently selected text. WARNING: NEVER use this tool unless the user explicitly asks to format their CURRENT SELECTION. If you need to format specific text that is not selected (e.g., text extracted from a PDF or identified in the document), you MUST use "searchAndFormat" instead. At least one text character must be manually selected by the user for this to work.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -360,7 +360,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
     name: 'searchAndFormat',
     category: 'format',
     description:
-      'Search for text in the document and apply formatting (color, bold, italic, highlight, etc.) to each occurrence WITHOUT changing the text content. PREFERRED for requests like "color verbs in green", "highlight errors", "bold all names". Multiple calls expected — one per word/phrase to format.',
+      'DEFAULT tool for applying formatting to existing text in the document. Finds text by content and applies formatting WITHOUT changing the text. Use this whenever you need to format text that is NOT the user\'s current selection — including text extracted from a PDF, text identified in the document, or any specific words/phrases. PREFERRED for requests like "color verbs in green", "highlight errors", "bold all names". Multiple calls expected — one per word/phrase to format.',
     inputSchema: {
       type: 'object',
       properties: {
