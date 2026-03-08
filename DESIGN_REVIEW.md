@@ -1,22 +1,23 @@
 # DESIGN_REVIEW.md — Code Audit v7
 
 **Date**: 2026-03-08
-
-**Version**: 7.0
+**Version**: 7.1
 **Scope**: Revue complete — Architecture, Fonctionnalites Add-in, Gestion d'erreurs, UX/UI, Code mort, Generalisation, Qualite de code
 
 ---
 
 ## Etat de sante global
 
-Le projet KickOffice est **mature et bien structure** avec une architecture frontend/backend claire, un sandbox SES, une infra de logging Winston + LogService, et 129 outils Office.js couvrant 4 hotes. Les points v6 sont tous resolus (33 DONE, 2 N/A). Cette v7 identifie de **nouveaux axes d'amelioration** sur des sujets non couverts precedemment.
+Le projet KickOffice est **mature et bien structure**. Les 5 critiques v7 sont tous resolus. 7 items DONE au total (5 critiques + 2 majeurs bonus).
 
-| Severite | Total | OPEN | DONE | Note |
-| -------- | ----- | ---- | ---- | ---- |
-| CRITIQUE | 5 | 0 | 5 | AR-C1, AR-C2, ER-C1, ER-C2, QC-C1 resolus |
-| MAJEUR | 11 | 11 | 0 | ER-M2 resolu (bonus) |
-| MINEUR | 12 | 12 | 0 | |
-| **Total** | **28** | **23** | **6** | |
+**Verification :** `npx tsc --noEmit` → 0 erreur | `npx vitest run` → 76/76 tests ✅
+
+| Severite | Total | OPEN | DONE |
+| -------- | ----- | ---- | ---- |
+| CRITIQUE | 5 | 0 | 5 |
+| MAJEUR | 16 | 14 | 2 |
+| MINEUR | 13 | 13 | 0 |
+| **Total** | **34** | **27** | **7** |
 
 ---
 
@@ -24,45 +25,28 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ### CRITIQUE
 
-- **AR-C1** — Aucun test unitaire ni composant ✅ DONE
-  - **Constat** : Coverage estimee < 5%. Seul `e2e/navigation.spec.ts` (65 lignes) existe avec des tests superficiels.
-  - **Fix** : 3 suites Vitest creees dans `frontend/src/utils/__tests__/` — **76 tests, 76 passent** :
-    - `common.test.ts` (24 tests) : generateVisualDiff, computeTextDiffStats, createOfficeTools
-    - `tokenManager.test.ts` (13 tests) : prepareMessagesForContext, truncation budget, tool_calls integrity
-    - `officeCodeValidator.test.ts` (39 tests) : toutes les regles de validation, formatValidationResult, quickValidate
-  - `vitest.config.ts` : pattern exclude e2e corrige
-
-- **AR-C2** — Pas de monitoring / error tracking en production ✅ DONE
-  - **Constat** : Ni Sentry, ni LogRocket, ni equivalent. Les erreurs frontend etaient capturees en memoire uniquement.
-  - **Fix** : Endpoint `POST /api/logs` cree (`backend/src/routes/logs.js`) : accepte jusqu'a 200 entrees, filtre sur warn/error, ecrit en `logs/frontend/`. Route enregistree dans `server.js` avec `logsLimiter` (20 req/min). `submitLogs()` ajoute dans `frontend/src/api/backend.ts`.
+- **AR-C1** ✅ DONE — 3 suites Vitest creees (`common`, `tokenManager`, `officeCodeValidator`) — 76 tests passent. Pattern exclude e2e corrige dans `vitest.config.ts`.
+- **AR-C2** ✅ DONE — `POST /api/logs` cree (`backend/src/routes/logs.js`) : filtre warn/error, max 200 entrees, ecriture dans `logs/frontend/`. `logsLimiter` (20 req/min) + `submitLogs()` frontend.
 
 ### MAJEUR
 
 - **AR-M1** — `useAgentLoop.ts` : composable monolithique (1183 lignes)
-  - **Constat** : Contient la boucle agent, le streaming, l'execution des tools, la detection de boucle, la gestion d'etat — tout dans un seul fichier.
-  - **Action** : Extraire en sous-composables :
-    - `useAgentStream.ts` — logique de streaming SSE
-    - `useToolExecutor.ts` — execution et serialisation des outils
-    - `useLoopDetection.ts` — detection des boucles infinies
-  - **Priorite** : Haute (maintenabilite, testabilite)
+  - **Constat** : Boucle agent, streaming, execution des tools, detection de boucle et gestion d'etat concentres dans un seul fichier.
+  - **Action** : Extraire en sous-composables : `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`.
 
-- **AR-M2** — Pas de propagation du `reqId` backend vers le frontend
-  - **Constat** : Le backend genere un `reqId` UUID par requete et le logge. Le frontend ne recoit pas ce `reqId` dans les headers de reponse, rendant la correlation front/back impossible.
-  - **Action** : Ajouter le header `X-Request-Id` dans la reponse backend. Le stocker cote frontend dans le `LogService` pour chaque requete.
+- **AR-M2** ✅ DONE — Header `X-Request-Id` expose par le backend (`server.js`), capture dans `chatStream()`, `generateImage()`, `uploadFile()` via `res.headers.get('x-request-id')`. CORS mis a jour avec `exposedHeaders`.
 
-- **AR-M3** — Pas de health check frontend
-  - **Constat** : Le backend a un `/health` endpoint. Le frontend detecte `backendOnline` mais de maniere ad-hoc (resultat d'un fetch models). Pas de polling periodique.
-  - **Action** : Implementer un polling `/health` toutes les 30s avec indicateur visuel persistant.
+- **AR-M3** — Pas de health check periodique frontend
+  - **Constat** : `backendOnline` detecte ad-hoc (fetch models). Pas de polling.
+  - **Action** : Polling `/health` toutes les 30s avec indicateur visuel persistant.
 
 ### MINEUR
 
-- **AR-L1** — `noUnusedLocals` et `noUnusedParameters` desactives dans tsconfig
-  - **Constat** : `tsconfig.json` a `"noUnusedLocals": false, "noUnusedParameters": false`. Des imports et variables inutilisees peuvent s'accumuler silencieusement.
+- **AR-L1** — `noUnusedLocals` / `noUnusedParameters` desactives dans `tsconfig.json`
   - **Action** : Activer ces flags et corriger les warnings resultants.
 
-- **AR-L2** — Pas de validation de la longueur du tableau `messages` cote backend
-  - **Constat** : `validate.js` verifie la profondeur des tools (max 20) mais pas le nombre de messages. Un client pourrait envoyer des milliers de messages.
-  - **Action** : Ajouter une limite (ex: 500 messages max) dans `validateChatRequest()`.
+- **AR-L2** — Pas de limite sur le nombre de messages dans `validateChatRequest()`
+  - **Action** : Ajouter une limite de 500 messages max.
 
 ---
 
@@ -70,30 +54,22 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ### MAJEUR
 
-- **FN-M1** — Pas de timeout differencie par type d'operation Office.js
-  - **Constat** : `executeOfficeAction()` dans `officeAction.ts` utilise un timeout unique de 10s pour toutes les operations. Certaines operations (creation de graphique Excel, insertion d'image PPT) peuvent legitimement depasser 10s.
-  - **Action** : Ajouter un parametre `timeoutMs` optionnel a `executeOfficeAction()` avec des valeurs par defaut par categorie :
-    - Lecture : 5s
-    - Ecriture simple : 10s
-    - Operations lourdes (chart, image) : 20s
+- **FN-M1** — Timeout unique de 10s dans `executeOfficeAction()` pour toutes les operations
+  - **Action** : Ajouter un parametre `timeoutMs` optionnel avec des valeurs par categorie (lecture 5s, ecriture 10s, operations lourdes 20s).
 
-- **FN-M2** — Pas de mecanisme de retry sur les operations Office.js
-  - **Constat** : Si Office est occupe (`Office app is busy`), l'operation echoue immediatement sans retry. L'utilisateur doit relancer manuellement.
-  - **Action** : Implementer un retry avec backoff (1s, 2s) sur les erreurs `GeneralException` d'Office.js (max 2 tentatives).
+- **FN-M2** — Pas de retry sur les operations Office.js
+  - **Action** : Retry avec backoff (1s, 2s) sur les erreurs `GeneralException` (max 2 tentatives).
 
-- **FN-M3** — Pas de signal d'annulation (AbortSignal) pour les operations Office.js longues
-  - **Constat** : Les operations Office.js ne supportent pas l'annulation. Si l'utilisateur change de contexte pendant une operation longue, elle continue en arriere-plan.
-  - **Action** : Implementer un token d'annulation cooperatif verifie entre les etapes `sync()`.
+- **FN-M3** — Pas d'AbortSignal pour les operations Office.js longues
+  - **Action** : Token d'annulation cooperatif verifie entre les etapes `sync()`.
 
 ### MINEUR
 
-- **FN-L1** — Outlook : timeout 10s peut etre insuffisant pour les pieces jointes volumineuses
-  - **Constat** : Le timeout global de 10s s'applique aussi aux operations Outlook sur les pieces jointes. Les emails avec PJ lourdes peuvent timeout.
-  - **Action** : Augmenter le timeout pour les operations `getAttachmentsAsync` a 20s.
+- **FN-L1** — Timeout Outlook 10s insuffisant pour pieces jointes volumineuses
+  - **Action** : Augmenter a 20s pour les operations `getAttachmentsAsync`.
 
-- **FN-L2** — Pas de tests E2E specifiques aux operations Office.js
-  - **Constat** : Les tests E2E existants ne couvrent que la navigation. Aucun test ne valide l'integration avec Office.js (meme mockee).
-  - **Action** : Creer des tests E2E avec des mocks Office.js pour valider les operations critiques (insert, select, eval_*).
+- **FN-L2** — Pas de tests E2E pour les operations Office.js
+  - **Action** : Tests E2E avec mocks Office.js pour les operations critiques.
 
 ---
 
@@ -101,29 +77,21 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ### CRITIQUE
 
-- **ER-C1** — Logs frontend perdus au refresh ✅ DONE
-  - **Constat** : Le `LogService` utilise un ring buffer en memoire (500 entrees). Au refresh, tous les logs sont perdus.
-  - **Fix** : `useSessionDB.ts` : DB_VERSION bumpe a 2, store `logs` ajoute (index sur sessionId + timestamp). `appendLogEntry()`, `getLogsForSession()`, `pruneOldLogs()` exportes. `logger.ts` : chaque entree est persiste dans IndexedDB via `appendLogEntry(entry).catch(() => {})` (fire-and-forget non bloquant).
-
-- **ER-C2** — Pas de correlation front/back pour le debugging ✅ DONE
-  - **Constat** : Le frontend logge avec `sessionId` + `userId`. Le backend logge avec `reqId` + `userId`. Pas d'identifiant commun.
-  - **Fix** : Backend `server.js` : `res.setHeader('X-Request-Id', res.locals.reqId)` ajoute dans le middleware de contexte. CORS mis a jour avec `exposedHeaders: ['X-Request-Id']`. Frontend `backend.ts` : `chatStream()`, `generateImage()`, `uploadFile()` capturent le `x-request-id` de la reponse et le loggent via `logService.info()`.
+- **ER-C1** ✅ DONE — `useSessionDB.ts` : DB_VERSION 1→2, store `logs` ajoute (index sessionId + timestamp). `appendLogEntry()`, `getLogsForSession()`, `pruneOldLogs()` exportes. `logger.ts` : chaque entree persiste dans IndexedDB via `appendLogEntry(entry).catch(() => {})`.
+- **ER-C2** ✅ DONE — Voir AR-M2. Backend renvoie `X-Request-Id`, frontend le capture et le logge dans `logService.info()`.
 
 ### MAJEUR
 
-- **ER-M1** — JSON malformed silencieusement ignore dans le stream SSE
-  - **Constat** : Dans `chatStream()` (`backend.ts:320-326`), les lignes JSON malformees sont silencieusement ignorees sauf si le message commence par "Stream error:". Cela peut masquer des erreurs reelles de l'API LLM.
-  - **Action** : Logger les lignes JSON malformees au niveau `warn` dans le `logService` avec le contenu brut (tronque a 200 chars) pour faciliter le debugging.
+- **ER-M1** — JSON malformed ignore silencieusement dans le stream SSE
+  - **Constat** : Dans `chatStream()`, les lignes JSON malformees sont skipees sans log.
+  - **Action** : Logger au niveau `warn` avec le contenu brut (tronque a 200 chars).
 
-- **ER-M2** — Feedback fire-and-forget : pas de garantie de persistance ✅ DONE (bonus)
-  - **Constat** : `feedback.js` envoyait la reponse HTTP avant que `fs.promises.writeFile()` ne termine.
-  - **Fix** : `await fs.promises.writeFile(...)` avant `res.json()`. Le `try/catch` du handler capture desormais les erreurs d'ecriture.
+- **ER-M2** ✅ DONE (bonus) — `feedback.js` : `await fs.promises.writeFile(...)` avant `res.json()`. Erreurs d'ecriture desormais capturees par le `try/catch` global.
 
 ### MINEUR
 
-- **ER-L1** — Pas de niveau de log configurable cote frontend
-  - **Constat** : Le `LogService` logge tout (error, warn, info, debug). Pas de filtre configurable pour reduire le bruit en production.
-  - **Action** : Ajouter un `logLevel` configurable (par defaut `warn` en prod, `debug` en dev).
+- **ER-L1** — Pas de `logLevel` configurable dans `LogService`
+  - **Action** : Ajouter un filtre configurable (defaut `warn` en prod, `debug` en dev).
 
 ---
 
@@ -132,34 +100,22 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 ### MAJEUR
 
 - **UX-M1** — Accessibilite insuffisante (score estime 66/100)
-  - **Constat** :
-    - Pas de focus trap dans les dialogues (FeedbackDialog, modals)
-    - Certains boutons icones sans `aria-label` (boutons d'edition, suppression)
-    - Pas de lien "skip to content"
-    - `outline-hidden` utilise sur certains elements sans alternative visible
-  - **Action** :
-    - Ajouter des `aria-label` sur tous les boutons icones
-    - Implementer un focus trap dans les dialogues
-    - Ajouter un style `focus-visible` coherent (ring accent)
-    - Ajouter un lien skip-to-content
+  - **Constat** : Pas de focus trap dans les dialogues, boutons icones sans `aria-label`, pas de skip-to-content, `outline-hidden` sans alternative visible.
+  - **Action** : `aria-label` sur tous les boutons icones, focus trap dans les dialogues, style `focus-visible` coherent, lien skip-to-content.
 
-- **UX-M2** — Pas de skeleton loading ni d'indicateurs de progression
-  - **Constat** : Les operations asynchrones (chargement initial, upload fichier, fetch models) n'ont pas d'indicateur visuel de chargement. L'interface semble figee pendant les operations.
-  - **Action** : Ajouter des skeleton loaders pour le chargement initial de la page Settings et un indicateur de progression pour l'upload de fichiers.
+- **UX-M2** — Pas de skeleton loading ni indicateurs de progression
+  - **Action** : Skeleton loaders pour Settings et indicateur de progression pour l'upload.
 
 - **UX-M3** — Erreurs d'authentification affichees inline dans le chat
-  - **Constat** : Quand les credentials sont invalides, l'erreur est affichee comme un message assistant normal dans le chat (`⚠️ Credentials required`). L'utilisateur peut ne pas comprendre qu'il doit aller dans les settings.
-  - **Action** : Afficher un bandeau d'erreur persistant en haut de page avec un lien direct vers les settings, en plus du message dans le chat.
+  - **Action** : Bandeau d'erreur persistant en haut de page avec lien direct vers les settings.
 
 ### MINEUR
 
-- **UX-L1** — Onglets Settings trop nombreux pour un taskpane etroit
-  - **Constat** : 5 onglets (Account, General, Prompts, Built-in Prompts, Tools) dans un espace de 320-400px. Les labels sont tronques sur petits ecrans.
-  - **Action** : Utiliser des labels abreges ou des icones avec tooltip pour les onglets en dessous de 400px.
+- **UX-L1** — 5 onglets Settings trop nombreux pour un taskpane 320px
+  - **Action** : Labels abreges ou icones avec tooltip sous 400px.
 
-- **UX-L2** — Pas de raccourcis clavier documentes
-  - **Constat** : `Enter` envoie un message, mais pas de documentation visible des raccourcis disponibles.
-  - **Action** : Ajouter un tooltip ou un hint `Shift+Enter for new line` sous le champ de saisie.
+- **UX-L2** — Raccourcis clavier non documentes
+  - **Action** : Hint `Shift+Enter for new line` sous le champ de saisie.
 
 ---
 
@@ -167,21 +123,14 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ### MINEUR
 
-- **DC-L1** — Scripts Python legacy inutilises
-  - **Constat** : 4 scripts Python avec des chemins Windows hardcodes ne sont references nulle part :
-    - `/export_types.py`
-    - `/frontend/fix_casts.py`
-    - `/frontend/fix_record.py`
-    - `/frontend/fix_unknown.py`
+- **DC-L1** — 4 scripts Python legacy inutilises (`export_types.py`, `fix_casts.py`, `fix_record.py`, `fix_unknown.py`)
   - **Action** : Supprimer ces 4 fichiers.
 
-- **DC-L2** — Imports inutilises dans `wordTools.ts`
-  - **Constat** : `previewDiffStats` et `hasComplexContent` sont importes depuis `wordDiffUtils` (ligne 5) mais jamais utilises.
+- **DC-L2** — Imports inutilises dans `wordTools.ts` (`previewDiffStats`, `hasComplexContent`)
   - **Action** : Supprimer ces imports.
 
 - **DC-L3** — Dependance `type` inutilisee dans `frontend/package.json`
-  - **Constat** : `"type": "^2.7.3"` est listee en devDependency mais n'est importee nulle part dans le code source.
-  - **Action** : Supprimer cette dependance.
+  - **Action** : Supprimer `"type": "^2.7.3"` des devDependencies.
 
 ---
 
@@ -190,27 +139,17 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 ### MAJEUR
 
 - **GN-M1** — Normalisation des fins de ligne dupliquee 5 fois
-  - **Constat** : Le pattern `.replace(/\r\n/g, '\n').replace(/\r/g, '\n')` est repete dans :
-    - `wordApi.ts` (lignes 8-9)
-    - `wordFormatter.ts` (ligne 55)
-    - `useOfficeInsert.ts` (lignes 120-121)
-    - `powerpointTools.ts` (lignes 159, 672)
-  - **Action** : Extraire dans `common.ts` :
-    ```typescript
-    export function normalizeLineEndings(text: string): string {
-      return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-    }
-    ```
+  - **Constat** : `.replace(/\r\n/g, '\n').replace(/\r/g, '\n')` dans `wordApi.ts`, `wordFormatter.ts`, `useOfficeInsert.ts`, `powerpointTools.ts` (x2).
+  - **Action** : Extraire `normalizeLineEndings(text: string): string` dans `common.ts`.
 
-- **GN-M2** — Logique d'insertion Word dupliquee
-  - **Constat** : `wordApi.ts:insertResult()` et `WordFormatter.insertPlainResult()` contiennent le meme switch case (`replace`/`append`/`newLine`) avec ~32 lignes identiques.
-  - **Action** : Fusionner dans une seule implementation dans `WordFormatter`, et faire de `wordApi.insertResult()` un simple appel vers `WordFormatter.insertPlainResult()`.
+- **GN-M2** — Logique d'insertion Word dupliquee entre `wordApi.ts` et `WordFormatter`
+  - **Constat** : Meme switch case (`replace`/`append`/`newLine`) dans deux endroits (~32 lignes).
+  - **Action** : Consolider dans `WordFormatter.insertPlainResult()`, `wordApi.insertResult()` devient un wrapper.
 
 ### MINEUR
 
-- **GN-L1** — Deux instances MarkdownIt avec configs partiellement similaires
-  - **Constat** : `markdown.ts` cree `officeMarkdownParser` (avec plugins) et `officeRichText.ts` cree `markdownParser` (sans plugins). La config de base (breaks, html, linkify, typographer) est dupliquee.
-  - **Action** : Extraire une fonction `createBaseMarkdownParser()` dans `markdown.ts` et l'utiliser dans les deux fichiers.
+- **GN-L1** — Deux instances `MarkdownIt` avec configs de base dupliquees
+  - **Action** : Extraire `createBaseMarkdownParser()` dans `markdown.ts`.
 
 ---
 
@@ -218,48 +157,27 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ### CRITIQUE
 
-- **QC-C1** — `SettingsPage.vue` : 1045 lignes, 5 features dans un composant ✅ DONE
-  - **Constat** : Gere les onglets Account, General, Prompts, BuiltinPrompts, Tools dans un seul fichier.
-  - **Fix** : Decompose en 5 composants dans `frontend/src/components/settings/` :
-    - `AccountTab.vue` — credentials LiteLLM, crypto warning, status badge
-    - `GeneralTab.vue` — langue, dark mode, user info, agent max iter, backend status, version, feedback, models
-    - `PromptsTab.vue` — CRUD prompts personnalises (etat local)
-    - `BuiltinPromptsTab.vue` — edition prompts integres avec reset-to-default (etat local)
-    - `ToolsTab.vue` — activation/desactivation des outils par hote (etat local)
-  - `SettingsPage.vue` reduit a **143 lignes** (orchestration + navigation des onglets).
+- **QC-C1** ✅ DONE — `SettingsPage.vue` decompose : `AccountTab.vue`, `GeneralTab.vue`, `PromptsTab.vue`, `BuiltinPromptsTab.vue`, `ToolsTab.vue` dans `frontend/src/components/settings/`. `SettingsPage.vue` reduit de 1045 a **142 lignes**.
 
 ### MAJEUR
 
-- **QC-M1** — Magic numbers dissemine dans le code
-  - **Constat** : Exemples :
-    - `120` (hauteur max textarea, `ChatInput.vue`)
-    - `5` (loop detection window, `useAgentLoop.ts`)
-    - `10 * 1024 * 1024` (taille max fichier, `ChatInput.vue`)
-    - `3` (nombre max fichiers, `ChatInput.vue`)
-    - `30000` (timeout stream read, `chat.js`)
-    - `500` (taille ring buffer, `logger.ts`)
-  - **Action** : Extraire dans un fichier `constants/limits.ts` (frontend) et `config/limits.js` (backend) avec des noms explicites.
+- **QC-M1** — Magic numbers dissemines dans le code
+  - **Constat** : `120` (textarea), `5` (loop window), `10*1024*1024` (taille max upload), `30000` (timeout stream), `500` (ring buffer)...
+  - **Action** : Centraliser dans `frontend/src/constants/limits.ts` et `backend/src/config/limits.js`.
 
 - **QC-M2** — `HomePage.vue` (701 lignes) melange orchestration et logique metier
-  - **Constat** : Gere la session, l'agent loop, les image actions, les quick actions, et l'UI dans un seul composant.
-  - **Action** : Extraire la logique metier dans un composable `useHomePage.ts` (session management, quick actions). Le composant ne garde que le template et les bindings.
+  - **Action** : Extraire la logique dans un composable `useHomePage.ts`.
 
-- **QC-M3** — Nommage booleens inconsistant
-  - **Constat** : Mix de conventions :
-    - `loading` (sans prefixe) vs `showDeleteConfirm` (avec prefixe show)
-    - `imageLoading` vs `isImageLoading` (prefixe is parfois absent)
-    - `draftFocusGlow` (pas clair que c'est un boolean)
-  - **Action** : Standardiser avec prefixe `is` ou `has` pour les booleens : `isLoading`, `isImageLoading`, `isDraftFocusGlowActive`.
+- **QC-M3** — Nommage des booleens inconsistant (`loading` vs `showDeleteConfirm` vs `draftFocusGlow`)
+  - **Action** : Standardiser avec prefixe `is` ou `has`.
 
 ### MINEUR
 
-- **QC-L1** — Tailles d'icones hardcodees
-  - **Constat** : `:size="16"`, `:size="12"`, `:size="20"` etc. dissemines dans les composants sans echelle definie.
-  - **Action** : Definir des constantes `ICON_SIZE_SM = 12`, `ICON_SIZE_MD = 16`, `ICON_SIZE_LG = 20`.
+- **QC-L1** — Tailles d'icones hardcodees (`:size="16"`, `:size="12"`, `:size="20"`)
+  - **Action** : Constantes `ICON_SIZE_SM/MD/LG`.
 
-- **QC-L2** — Cache manquant pour `getGlobalHeaders()` dans `backend.ts`
-  - **Constat** : `getGlobalHeaders()` est async et appele a chaque requete. Il relit les credentials et le contexte du logger a chaque fois.
-  - **Action** : Cacher le resultat avec invalidation sur changement de credentials.
+- **QC-L2** — `getGlobalHeaders()` dans `backend.ts` relit les credentials a chaque requete
+  - **Action** : Cache avec invalidation sur changement de credentials.
 
 ---
 
@@ -272,31 +190,31 @@ Le projet KickOffice est **mature et bien structure** avec une architecture fron
 
 ---
 
-## MATRICE DE PRIORITE
+## MATRICE DE PRIORITE (items OPEN)
 
 | # | ID | Axe | Severite | Effort | Impact |
 |---|-----|------|----------|--------|--------|
-| 1 | AR-C1 | Architecture | CRITIQUE | Eleve | Tests = filet de securite |
-| 2 | AR-C2 | Architecture | CRITIQUE | Moyen | Visibilite prod |
-| 3 | ER-C1 | Erreurs | CRITIQUE | Moyen | Logs persistants |
-| 4 | QC-C1 | Qualite | CRITIQUE | Moyen | Maintenabilite |
-| 5 | ER-C2 | Erreurs | CRITIQUE | Faible | Correlation debug |
-| 6 | AR-M1 | Architecture | MAJEUR | Eleve | Testabilite agent |
-| 7 | UX-M1 | UX/UI | MAJEUR | Moyen | Accessibilite |
-| 8 | GN-M1 | Generalisation | MAJEUR | Faible | DRY |
-| 9 | GN-M2 | Generalisation | MAJEUR | Faible | DRY |
-| 10 | QC-M1 | Qualite | MAJEUR | Faible | Lisibilite |
+| 1 | AR-M1 | Architecture | MAJEUR | Eleve | Testabilite agent loop |
+| 2 | UX-M1 | UX/UI | MAJEUR | Moyen | Accessibilite |
+| 3 | GN-M1 | Generalisation | MAJEUR | Faible | DRY (5 instances) |
+| 4 | GN-M2 | Generalisation | MAJEUR | Faible | DRY (logique Word) |
+| 5 | QC-M1 | Qualite | MAJEUR | Faible | Lisibilite / constantes |
+| 6 | FN-M1 | Fonctionnalites | MAJEUR | Moyen | Robustesse Office.js |
+| 7 | FN-M2 | Fonctionnalites | MAJEUR | Moyen | Resilience Office busy |
+| 8 | QC-M2 | Qualite | MAJEUR | Moyen | HomePage maintenabilite |
+| 9 | ER-M1 | Erreurs | MAJEUR | Faible | Debugging SSE |
+| 10 | AR-M3 | Architecture | MAJEUR | Faible | Health check continu |
 
 ---
 
 ## Verification Commands
 
 ```bash
-cd frontend && npx tsc --noEmit   # 0 erreurs
-cd frontend && npm run build      # Build OK
-cd backend && npm start           # Server demarre
-cd frontend && npx vitest --run   # Tests unitaires
-cd frontend && npx playwright test # Tests E2E
+cd frontend && npx tsc --noEmit        # 0 erreurs ✅
+cd frontend && npx vitest run          # 76/76 tests ✅
+cd frontend && npm run build           # Build OK
+cd backend && npm start                # Server demarre
+cd frontend && npx playwright test     # Tests E2E navigation
 ```
 
 ---
@@ -305,7 +223,8 @@ cd frontend && npx playwright test # Tests E2E
 
 | Version | Date       | Changes |
 | ------- | ---------- | ------- |
-| v7.0    | 2026-03-08 | Nouvelle revue 7 axes (26 findings). Architecture, erreurs, UX, code mort, generalisation, qualite |
+| v7.1    | 2026-03-08 | Resolution des 5 critiques (AR-C1, AR-C2, ER-C1, ER-C2, QC-C1) + 2 majeurs bonus (AR-M2, ER-M2). PR #176 |
+| v7.0    | 2026-03-08 | Nouvelle revue 7 axes (34 findings). Architecture, erreurs, UX, code mort, generalisation, qualite |
 | v6.1    | 2026-03-07 | Mise a jour statut : 33/35 findings resolus (2 N/A). PRs #167-#172 |
 | v6.0    | 2026-03-07 | Full 4-axis audit (35 findings). 6 resolus en PR #167 |
 | v5.0    | 2026-03-07 | PR #158 review, audit pipeline Word/PPT, 3 corrections ciblees |
