@@ -104,6 +104,30 @@ Office.context.document.getSelectedDataAsync(
 3. Call insertContent or proposeShapeTextRevision → modify specific shape
 ```
 
+## WORKFLOW: Adding a new slide with content
+
+Use `addSlide` with `title` and `body` parameters to create a slide and populate its template text boxes in one step:
+
+```json
+{ "layout": "TitleAndContent", "title": "My Slide Title", "body": "- Bullet one\n- Bullet two\n- Bullet three" }
+```
+
+The tool will automatically find the title and body shapes of the layout and fill them.
+**Do NOT** call `getShapes` then `insertContent` manually — use `addSlide` with content directly.
+
+## WORKFLOW: Creating a slide from an image
+
+When the user provides an image and asks to create a slide:
+
+1. Call `addSlide` with an appropriate layout and a generated title/body based on what you can see in the image.
+2. Call `insertImageOnSlide` with the image data to place the image on the new slide.
+3. **Do NOT call `getAllSlidesOverview` more than once** — it is only needed for initial discovery, not for image insertion.
+4. **Never loop on `getAllSlidesOverview`** — if a slide overview returns empty shapes, skip it and proceed with the image insertion directly.
+
+## WORKFLOW: Speaker notes
+
+After generating speaker notes text, ALWAYS call `setSpeakerNotes` to insert them directly into the slide's notes section. Do NOT just display the notes in the chat — always persist them to the slide.
+
 ## COMMON PATTERNS
 
 ### Get all slides

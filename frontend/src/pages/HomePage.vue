@@ -324,17 +324,19 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     key: 'autograph',
     label: t('excelAutoGraph', 'Auto-Graph'),
     icon: LineChart,
-    mode: 'draft',
-    prefix:
-      "You are a data visualization expert. Analyze the data. Generate new columns if necessary (and visually highlight them with 'formatRange'). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
+    mode: 'immediate',
+    executeWithAgent: true,
+    systemPrompt:
+      "You are a data visualization expert. Analyze the selected data. Generate new columns if necessary (and visually highlight them with 'formatRange'). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool with hasHeaders: true when the first row/column contains labels. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
     tooltipKey: 'excelAutoGraph_tooltip',
   },
   {
     key: 'explain',
     label: t('excelExplain', 'Explain Formula'),
     icon: BookOpen,
-    mode: 'draft',
-    prefix: t('excelExplainPrefix', 'Explain this formula'),
+    mode: 'immediate',
+    executeWithAgent: true,
+    systemPrompt: "You are an Excel expert. Explain the selected formula or data in simple terms: what it does, how it works, and any edge cases to be aware of.",
     tooltipKey: 'excelExplain_tooltip',
   },
   {
@@ -349,8 +351,9 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     key: 'dataTrend',
     label: t('excelDataTrend', 'Data Trend'),
     icon: TrendingUp,
-    mode: 'draft',
-    prefix: t('excelDataTrendPrefix', 'Analyze trends'),
+    mode: 'immediate',
+    executeWithAgent: true,
+    systemPrompt: "You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.",
     tooltipKey: 'excelDataTrend_tooltip',
   },
 ])
