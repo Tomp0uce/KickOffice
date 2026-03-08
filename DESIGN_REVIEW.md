@@ -14,9 +14,9 @@ Tous les points critiques et majeurs identifiés dans la V9.0 ont été audités
 
 ## ITEMS CRITIQUES (Bloquants ou impactant lourdement l'application)
 
-### GEN-C1 — L'ajout de fichier est cassé [VÉRIFIÉ — OK]
+### GEN-C1 — L'ajout de fichier est cassé [CORRIGÉ — OK]
 
-**Statut :** Fonctionnel. Le composant `ChatInput.vue` capte correctement les fichiers et les transmet à `useAgentLoop.ts` via l'événement `submit`. L'extraction est gérée par `uploadFile`.
+**Statut :** [CORRIGÉ — OK]. Une race condition dans `ChatInput.vue` a été corrigée en rendant `onFileSelected` asynchrone pour attendre le traitement des fichiers avant de vider l'input (FileList). La validation de `sendMessage` dans `useAgentLoop.ts` a été assouplie pour autoriser l'envoi de fichiers sans texte. Le parsing PDF en backend est rétabli avec la nouvelle API `pdf-parse`.
 **Stratégie d'implémentation :**
 
 1. Inspecter le composant de téléchargement (ex: `FileUpload.vue` ou la zone de drag-and-drop).
