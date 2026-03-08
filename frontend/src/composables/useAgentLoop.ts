@@ -615,7 +615,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     textToSend = textToSend?.trim() || ''
 
-    if (!textToSend) {
+    if (!textToSend && (!files || files.length === 0)) {
       if (availableModels.value[selectedModelTier.value]?.type !== 'image') {
         return
       }

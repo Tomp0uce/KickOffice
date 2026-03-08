@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 
 - **PPT-C2 Infinite Loop**: Resolved the critical infinite loop issue in PowerPoint slide generation by correctly accounting for vision image costs and preventing history truncation.
 - **Vision Token Costing**: Updated `tokenManager.ts` to assign a fixed token weight (1000) to image parts, ensuring the context window is accurately estimated regardless of Base64 string length.
+- **Fixed File Upload Race Condition**: Made `onFileSelected` async in `ChatInput.vue` to ensure the browser's `FileList` remains valid during processing.
+- **Improved Message Validation**: Allowed sending messages with attachments only (no text) in `useAgentLoop.ts`.
+- **Restored PDF Parsing**: Updated backend `pdf-parse` usage to v2.4.5 API.
 - **ChatMessage Type Safety**: Updated `ChatMessage` interface in `backend.ts` to support multi-part content (text + items), enabling robust vision integration.
 
 ## [Unreleased]

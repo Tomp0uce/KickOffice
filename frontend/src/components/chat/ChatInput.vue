@@ -214,10 +214,12 @@ const triggerFileInput = () => {
   fileInputEl.value?.click()
 }
 
-const onFileSelected = (e: Event) => {
+const onFileSelected = async (e: Event) => {
   const target = e.target as HTMLInputElement
-  if (target.files) processFiles(target.files)
-  // Reset input so the same file can be selected again if removed
+  if (target.files) {
+    await processFiles(target.files)
+  }
+  // Reset input seulement une fois que les fichiers ont été extraits en mémoire
   if (fileInputEl.value) fileInputEl.value.value = ''
 }
 
