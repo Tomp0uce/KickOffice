@@ -6,13 +6,32 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- **Message Timestamps**: Chat messages now display the creation time (HH:MM format) for better conversation context tracking
+- **Frontend Logging System**: Secure collection of frontend logs (warn/error) sent to the backend (`POST /api/logs`) and stored in server-side files.
+- **Persistent Log Storage**: Local logs are now persisted in IndexedDB (`useSessionDB.ts`) to survive taskpane reloads.
+- **Request Tracing**: Added `X-Request-Id` header to all API requests, captured in both frontend and backend logs for full-stack debugging.
+- **Header Caching**: Implemented a Promise-based cache for global headers in `backend.ts` with explicit invalidation on credential changes, reducing storage access overhead.
+- **Centralized Constants**: Created `limits.ts` (frontend) and `limits.js` (backend) to eliminate magic numbers for timeouts, buffer sizes, and limits.
+- **Modular Settings**: Refactored `SettingsPage.vue` into 5 independent tab components for better maintainability and performance.
+- **`useHomePage` Composable**: Extracted business logic, session management, and navigation from `HomePage.vue`.
+- **Skeleton Loaders**: Added animated skeleton states for Settings page loading.
+- **Accessibility Enhancements**: Added `aria-label` to all interactive elements, implemented focus traps in dialogues, and unified `:focus-visible` styles.
+- **Keyboard Shortcut Hint**: Added a visible hint for `Shift + Enter` (new line) in the chat input.
 
 ### Fixed
 
-- **Credential Storage & Crypto API Fallback**: Fixed critical issue where credentials disappear when Web Crypto API is unavailable (HTTP contexts or insecure environments). Added polyfill for `crypto.randomUUID()` and graceful fallback to unencrypted storage when `crypto.subtle` is not available. User receives clear warning in Settings when encryption is not available. Improved error handling and validation to prevent credentials from being silently lost
-- **Credential Decryption Error Handling**: Improved error handling in credential storage. Corrupted encrypted data in localStorage is now automatically cleaned up when decryption fails, preventing repeated console errors
-- **Reverse Proxy Compatibility**: Enabled Express `trust proxy` setting for proper operation behind Synology/nginx reverse proxies. Fixes rate limiting errors (`ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`) when running behind a reverse proxy
+- **Taskpane Width**: Increased default `RequestedWidth` to 450px in manifest templates for better readability of indicators and settings.
+- **Word Insertion Logic**: Consolidated duplicated insertion logic between `wordApi.ts` and `WordFormatter.ts`.
+- **Line Ending Normalization**: Centralized newline normalization into a single `common.ts` helper.
+- **Markdown Config**: Deduplicated `MarkdownIt` initialization into a reusable helper.
+- **Dead Code Removal**: Deleted 4 legacy Python scripts, unused imports in `wordTools.ts`, and redundant dependencies.
+- **Boolean Naming**: Standardized boolean variables with `is*` and `has*` prefixes across the codebase.
+- **Feedback Writing**: Improved reliability of the feedback submission route with atomic file writes.
+
+### [1.0.112] - 2026-03-08
+
+### Added
+
+- **Message Timestamps**: Chat messages now display the creation time (HH:MM format) for better conversation context tracking
 
 ---
 

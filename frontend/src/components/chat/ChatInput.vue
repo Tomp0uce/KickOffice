@@ -21,11 +21,7 @@
           class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none"
           @change="handleModelTierChange"
         >
-          <option
-            v-for="(info, tier) in availableModels"
-            :key="tier"
-            :value="tier"
-          >
+          <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
             {{ $te(`modelTier.${tier}`) ? $t(`modelTier.${tier}`) : info.label }}
           </option>
         </select>
@@ -53,14 +49,9 @@
     <div
       class="card-base flex min-w-12 items-center gap-2 focus-within:border-accent"
       :class="{
-        'ring-2 ring-accent animate-pulse transition-all duration-300':
-          draftFocusGlow,
+        'ring-2 ring-accent animate-pulse transition-all duration-300': isDraftFocusGlowing,
       }"
-      :style="
-        draftFocusGlow
-          ? 'animation-iteration-count: 3; animation-duration: 0.5s;'
-          : ''
-      "
+      :style="isDraftFocusGlowing ? 'animation-iteration-count: 3; animation-duration: 0.5s;' : ''"
     >
       <textarea
         ref="textareaEl"
@@ -71,16 +62,19 @@
         rows="1"
         @keydown.enter.exact.prevent="triggerSubmit()"
         @input="handleInput"
+        @focus="handleFocus"
+        @blur="handleBlur"
       />
 
-      <!-- Bouton trombone pour ajouter un fichier -->
       <button
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent hover:bg-surface text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
         :title="$t('attachDocument')"
-        :disabled="loading || attachedFiles.length >= 3"
+        :aria-label="$t('attachDocument')"
+        :disabled="loading || processingFiles || attachedFiles.length >= 3"
         @click="triggerFileInput"
       >
-        <Paperclip :size="16" />
+        <Loader2 v-if="processingFiles" :size="ICON_SIZE_MD" class="animate-spin text-accent" />
+        <Paperclip v-else :size="ICON_SIZE_MD" />
       </button>
       <input
         type="file"
@@ -104,9 +98,7 @@
         v-else
         class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50"
         :title="sendLabel"
-        :disabled="
-          (!modelValue.trim() && attachedFiles.length === 0) || !backendOnline
-        "
+        :disabled="(!modelValue.trim() && attachedFiles.length === 0) || !backendOnline"
         :aria-label="sendLabel"
         @click="triggerSubmit()"
       >
@@ -142,187 +134,212 @@
         <span>{{ includeSelectionLabel }}</span>
       </label>
     </div>
+
+    <!-- UX-L2 Keyboard Shortcuts Hint -->
+    <div
+      class="flex justify-start px-2 mt-0.5 opacity-0 transition-opacity duration-300"
+      :class="{ 'opacity-100': isFocused }"
+    >
+      <span class="text-[10px] text-secondary/60 font-medium">
+        {{ t('shiftEnterHint', 'Shift + Enter for new line') }}
+      </span>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from "@/types";
-import { Send, Square, Paperclip } from "lucide-vue-next";
-import { ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { message as messageUtil } from "@/utils/message";
+import type { ModelInfo } from '@/types'
+import { Send, Square, Paperclip, Loader2 } from 'lucide-vue-next'
+import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { message as messageUtil } from '@/utils/message'
+import { ICON_SIZE_MD, MAX_UPLOAD_BYTES } from '@/constants/limits'
 
-const { t } = useI18n();
+const { t } = useI18n()
 
 const props = defineProps<{
-  availableModels: Record<string, ModelInfo>;
-  selectedModelTier: string;
-  modelValue: string;
-  inputPlaceholder: string;
-  loading: boolean;
-  backendOnline: boolean;
-  showWordFormatting: boolean;
-  useWordFormatting: boolean;
-  useSelectedText: boolean;
-  useWordFormattingLabel: string;
-  includeSelectionLabel: string;
-  taskTypeLabel: string;
-  sendLabel: string;
-  stopLabel: string;
-  draftFocusGlow?: boolean;
-}>();
+  availableModels: Record<string, ModelInfo>
+  selectedModelTier: string
+  modelValue: string
+  inputPlaceholder: string
+  loading: boolean
+  backendOnline: boolean
+  showWordFormatting: boolean
+  useWordFormatting: boolean
+  useSelectedText: boolean
+  useWordFormattingLabel: string
+  includeSelectionLabel: string
+  taskTypeLabel: string
+  sendLabel: string
+  stopLabel: string
+  isDraftFocusGlowing?: boolean
+}>()
 
 const emit = defineEmits<{
-  (e: "update:selectedModelTier", value: string): void;
-  (e: "update:modelValue", value: string): void;
-  (e: "update:useWordFormatting", value: boolean): void;
-  (e: "update:useSelectedText", value: boolean): void;
-  (e: "submit", value: string, files?: File[]): void;
-  (e: "stop"): void;
-}>();
+  (e: 'update:selectedModelTier', value: string): void
+  (e: 'update:modelValue', value: string): void
+  (e: 'update:useWordFormatting', value: boolean): void
+  (e: 'update:useSelectedText', value: boolean): void
+  (e: 'submit', value: string, files?: File[]): void
+  (e: 'stop'): void
+}>()
 
-const isDragOver = ref(false);
-const dragCounter = ref(0);
-const attachedFiles = ref<File[]>([]);
-const fileInputEl = ref<HTMLInputElement>();
+const isDragOver = ref(false)
+const dragCounter = ref(0)
+const attachedFiles = ref<File[]>([])
+const fileInputEl = ref<HTMLInputElement>()
+const isFocused = ref(false)
 
 const handleModelTierChange = (event: Event) => {
-  emit("update:selectedModelTier", (event.target as HTMLSelectElement).value);
-};
+  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value)
+}
 
 const handleInput = (event: Event) => {
-  const val = (event.target as HTMLTextAreaElement).value;
-  emit("update:modelValue", val);
-};
+  const val = (event.target as HTMLTextAreaElement).value
+  emit('update:modelValue', val)
+}
+
+const handleFocus = () => {
+  isFocused.value = true
+}
+
+const handleBlur = () => {
+  isFocused.value = false
+}
 
 // --- FILE UPLOAD LOGIC ---
 const allowedTypes = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-  "text/plain",
-  "text/markdown",
-  "image/png",
-  "image/jpeg",
-];
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'text/plain',
+  'text/markdown',
+  'image/png',
+  'image/jpeg',
+]
 
 const handleDragOver = (e: DragEvent) => {
-  e.preventDefault(); // Ensure default behavior is prevented
-  if (e.dataTransfer?.types.includes("Files")) {
-    dragCounter.value++;
-    isDragOver.value = true;
+  e.preventDefault() // Ensure default behavior is prevented
+  if (e.dataTransfer?.types.includes('Files')) {
+    dragCounter.value++
+    isDragOver.value = true
   }
-};
+}
 
 const handleDragLeave = () => {
-  dragCounter.value--;
+  dragCounter.value--
   if (dragCounter.value === 0) {
-    isDragOver.value = false;
+    isDragOver.value = false
   }
-};
+}
 
 const handleDrop = (e: DragEvent) => {
-  isDragOver.value = false;
-  const files = e.dataTransfer?.files;
-  if (files) processFiles(files);
-};
+  isDragOver.value = false
+  const files = e.dataTransfer?.files
+  if (files) processFiles(files)
+}
 
 const triggerFileInput = () => {
-  fileInputEl.value?.click();
-};
+  fileInputEl.value?.click()
+}
 
 const onFileSelected = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  if (target.files) processFiles(target.files);
+  const target = e.target as HTMLInputElement
+  if (target.files) processFiles(target.files)
   // Reset input so the same file can be selected again if removed
-  if (fileInputEl.value) fileInputEl.value.value = "";
-};
+  if (fileInputEl.value) fileInputEl.value.value = ''
+}
 
-const processFiles = (fileList: FileList) => {
+const processingFiles = ref(false)
+
+const processFiles = async (fileList: FileList) => {
+  processingFiles.value = true
+  // Small artificial delay to show UI feedback for large files
+  await new Promise(resolve => setTimeout(resolve, 300))
+
   // Check for allowed extensions if mime type misses
   const allowedExtensions = [
-    ".pdf",
-    ".docx",
-    ".xlsx",
-    ".xls",
-    ".csv",
-    ".txt",
-    ".md",
-    ".png",
-    ".jpeg",
-    ".jpg",
-  ];
-  let rejectedCount = 0;
-  let oversizedCount = 0;
+    '.pdf',
+    '.docx',
+    '.xlsx',
+    '.xls',
+    '.csv',
+    '.txt',
+    '.md',
+    '.png',
+    '.jpeg',
+    '.jpg',
+  ]
+  let rejectedCount = 0
+  let oversizedCount = 0
 
   for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i];
+    const file = fileList[i]
 
     // Limits: Max 3 files
     if (attachedFiles.value.length >= 3) {
-      messageUtil.warning(t("maxFilesWarning"));
-      break;
+      messageUtil.warning(t('maxFilesWarning'))
+      break
     }
 
-    const isExtensionOk = allowedExtensions.some((ext) =>
-      file.name.toLowerCase().endsWith(ext),
-    );
+    const isExtensionOk = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
 
-    if (file.size > 10 * 1024 * 1024) {
-      oversizedCount++;
-      continue;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      oversizedCount++
+      continue
     }
 
     if (allowedTypes.includes(file.type) || isExtensionOk) {
       // Avoid duplicate by name
-      if (!attachedFiles.value.some((f) => f.name === file.name)) {
-        attachedFiles.value.push(file);
+      if (!attachedFiles.value.some(f => f.name === file.name)) {
+        attachedFiles.value.push(file)
       }
     } else {
-      rejectedCount++;
+      rejectedCount++
     }
   }
 
   if (oversizedCount > 0) {
-    messageUtil.error(t("filesOversized", { count: oversizedCount }));
+    messageUtil.error(t('filesOversized', { count: oversizedCount }))
   }
   if (rejectedCount > 0) {
-    messageUtil.error(t("filesRejected", { count: rejectedCount }));
+    messageUtil.error(t('filesRejected', { count: rejectedCount }))
   }
-};
+  processingFiles.value = false
+}
 
 const removeFile = (index: number) => {
-  attachedFiles.value.splice(index, 1);
-};
+  attachedFiles.value.splice(index, 1)
+}
 // -------------------------
 
 const triggerSubmit = () => {
   if (!props.modelValue.trim() && attachedFiles.value.length === 0) {
-    return;
+    return
   }
 
   // Pass a copy of the files to prevent issues, then clear immediately
-  emit("submit", props.modelValue, [...attachedFiles.value]);
-  attachedFiles.value = [];
-};
+  emit('submit', props.modelValue, [...attachedFiles.value])
+  attachedFiles.value = []
+}
 
 const handleStop = () => {
-  emit("stop");
-};
+  emit('stop')
+}
 
 const handleWordFormattingChange = (event: Event) => {
-  emit("update:useWordFormatting", (event.target as HTMLInputElement).checked);
-};
+  emit('update:useWordFormatting', (event.target as HTMLInputElement).checked)
+}
 
 const handleSelectedTextChange = (event: Event) => {
-  emit("update:useSelectedText", (event.target as HTMLInputElement).checked);
-};
+  emit('update:useSelectedText', (event.target as HTMLInputElement).checked)
+}
 
-const textareaEl = ref<HTMLTextAreaElement>();
-const modelTierSelectId = "chat-model-tier-select";
-const modelTierLabelId = "chat-model-tier-label";
-const wordFormattingCheckboxId = "chat-word-formatting-checkbox";
-const selectedTextCheckboxId = "chat-selected-text-checkbox";
-defineExpose({ textareaEl });
+const textareaEl = ref<HTMLTextAreaElement>()
+const modelTierSelectId = 'chat-model-tier-select'
+const modelTierLabelId = 'chat-model-tier-label'
+const wordFormattingCheckboxId = 'chat-word-formatting-checkbox'
+const selectedTextCheckboxId = 'chat-selected-text-checkbox'
+defineExpose({ textareaEl })
 </script>

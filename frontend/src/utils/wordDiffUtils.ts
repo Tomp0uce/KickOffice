@@ -7,7 +7,7 @@
  */
 
 import { OfficeWordDiff, getDiffStats, computeDiff } from 'office-word-diff'
-import type { DiffResult, DiffStats } from 'office-word-diff'
+import type { DiffStats } from 'office-word-diff'
 
 export interface RevisionResult {
   success: boolean

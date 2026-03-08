@@ -2,6 +2,7 @@ import { Ref } from 'vue'
 
 import { detectOfficeHost } from './hostDetection'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './markdown'
+import { normalizeLineEndings } from './common'
 
 function insertHtmlWithCommonApi(html: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -52,7 +53,7 @@ class WordFormatter {
   }
 
   static async insertPlainResult(result: string, insertType: Ref<string>): Promise<void> {
-    const normalizedResult = stripRichFormattingSyntax(result.replace(/\r\n/g, '\n').replace(/\r/g, '\n'))
+    const normalizedResult = stripRichFormattingSyntax(normalizeLineEndings(result))
 
     if (!normalizedResult.trim()) return
 

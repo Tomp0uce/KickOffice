@@ -4,9 +4,9 @@ import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 import { applyRevisionToSelection, previewDiffStats, hasComplexContent } from './wordDiffUtils'
 
-import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, stripRichFormattingSyntax, htmlToMarkdown } from './markdown'
+import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, htmlToMarkdown } from './markdown'
 
-import { generateVisualDiff, createOfficeTools } from './common'
+import { createOfficeTools } from './common'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -36,30 +36,13 @@ export type WordToolName =
   | 'setPageSetup'
   | 'insertSectionBreak'
   | 'proposeRevision'
+  | 'previewRevision'
   | 'eval_wordjs'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action))
 
-/**
- * Detect whether the current selection is inside a Word native list
- * (bulleted or numbered paragraph). Used to prevent double-bullet issues
- * when inserting HTML list content into an already-bulleted context.
- */
-async function isInsertionInList(context: Word.RequestContext): Promise<boolean> {
-  try {
-    const selection = context.document.getSelection()
-    const para = selection.paragraphs.getFirst()
-    para.load('style')
-    await context.sync()
-    // listItem throws if the paragraph is not part of a list
-    para.listItem.load('level')
-    await context.sync()
-    return true
-  } catch {
-    return false
-  }
-}
+
 
 /**
  * Strip outer <ul>/<ol> wrapper tags from HTML while keeping <li> elements.
@@ -1401,6 +1384,50 @@ WHEN NOT TO USE:
         },
         message: result.message,
         trackChangesEnabled: enableTrackChanges,
+      }, null, 2)
+    },
+  },
+
+  previewRevision: {
+    name: 'previewRevision',
+    category: 'read',
+    description: `Preview the changes that would be made by proposeRevision without actually applying them, and check if the selected text has complex content (like tables or images) that may not diff well.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        revisedText: {
+          type: 'string',
+          description: 'The complete revised version of the selected text.',
+        },
+      },
+      required: ['revisedText'],
+    },
+    executeWord: async (context, args: Record<string, any>) => {
+      const { revisedText } = args
+      
+      const range = context.document.getSelection()
+      range.load('text')
+      await context.sync()
+
+      const originalText = range.text
+      if (!originalText || !originalText.trim()) {
+        return JSON.stringify({
+          error: 'No text selected. Please select text before using previewRevision.',
+        }, null, 2)
+      }
+
+      const isComplex = hasComplexContent(originalText)
+      const stats = previewDiffStats(originalText, revisedText)
+
+      return JSON.stringify({
+        hasComplexContent: isComplex,
+        complexContentWarning: isComplex ? 'Warning: The selected text contains complex content (like tables or images). The proposeRevision tool might fail or produce unexpected results.' : undefined,
+        stats: {
+          insertions: stats.insertions,
+          deletions: stats.deletions,
+          unchanged: stats.unchanged,
+          totalChanges: stats.totalChanges,
+        },
       }, null, 2)
     },
   },

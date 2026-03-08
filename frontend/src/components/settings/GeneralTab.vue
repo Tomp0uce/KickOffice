@@ -1,8 +1,5 @@
 <template>
-  <div
-    role="tabpanel"
-    class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
-  >
+  <div role="tabpanel" class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1">
     <SettingCard>
       <SingleSelect
         v-model="localLanguage"
@@ -76,8 +73,7 @@
         :title="t('userGenderLabel')"
         :fronticon="false"
         :placeholder="
-          genderOptions.find(o => o.value === userGender)?.label ||
-          t('userGenderUnspecified')
+          genderOptions.find(o => o.value === userGender)?.label || t('userGenderUnspecified')
         "
       >
         <template #item="{ item }">
@@ -135,26 +131,39 @@
     </SettingCard>
 
     <!-- Available models (read-only) -->
-    <SettingCard v-if="Object.keys(availableModels).length > 0">
+    <SettingCard v-if="loadingModels || Object.keys(availableModels).length > 0">
       <div class="flex flex-col gap-2">
-        <span class="text-sm font-semibold text-secondary">{{
-          t('configuredModels')
-        }}</span>
-        <div
-          v-for="(info, tier) in availableModels"
-          :key="tier"
-          class="card-base flex items-center justify-between"
-        >
-          <span class="text-xs font-medium text-main">{{ info.label }}</span>
-          <div class="flex items-center gap-1.5">
-            <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{
-              info.id
-            }}</span>
-            <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{
-              tier
-            }}</span>
+        <span class="text-sm font-semibold text-secondary">{{ t('configuredModels') }}</span>
+        <template v-if="loadingModels">
+          <div
+            v-for="i in 3"
+            :key="i"
+            class="card-base flex items-center justify-between animate-pulse"
+          >
+            <div class="h-4 w-24 bg-surface/80 rounded"></div>
+            <div class="flex items-center gap-1.5">
+              <div class="h-4 w-16 bg-surface/80 rounded"></div>
+              <div class="h-4 w-12 bg-accent/20 rounded"></div>
+            </div>
           </div>
-        </div>
+        </template>
+        <template v-else>
+          <div
+            v-for="(info, tier) in availableModels"
+            :key="tier"
+            class="card-base flex items-center justify-between"
+          >
+            <span class="text-xs font-medium text-main">{{ info.label }}</span>
+            <div class="flex items-center gap-1.5">
+              <span class="rounded-sm bg-bg-secondary px-1.5 py-0.5 text-xs text-secondary">{{
+                info.id
+              }}</span>
+              <span class="rounded-sm bg-accent/10 px-2 py-0.5 text-xs text-accent">{{
+                tier
+              }}</span>
+            </div>
+          </div>
+        </template>
       </div>
     </SettingCard>
   </div>
@@ -179,6 +188,7 @@ const props = defineProps<{
   backendOnline: boolean
   availableModels: Record<string, ModelInfo>
   appVersion: string
+  loadingModels?: boolean
 }>()
 
 const emit = defineEmits<{

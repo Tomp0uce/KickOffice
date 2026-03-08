@@ -1,8 +1,5 @@
 <template>
-  <div
-    role="tabpanel"
-    class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1"
-  >
+  <div role="tabpanel" class="flex h-full w-full flex-col items-center gap-2 bg-bg-secondary p-1">
     <SettingCard>
       <CustomInput
         v-model="litellmUserKey"
@@ -23,12 +20,8 @@
     <SettingCard>
       <label class="flex cursor-pointer items-center justify-between gap-2">
         <div class="flex flex-col">
-          <span class="text-sm font-semibold text-main">{{
-            t('rememberCredentialsLabel')
-          }}</span>
-          <span class="text-xs text-secondary">{{
-            t('rememberCredentialsDescription')
-          }}</span>
+          <span class="text-sm font-semibold text-main">{{ t('rememberCredentialsLabel') }}</span>
+          <span class="text-xs text-secondary">{{ t('rememberCredentialsDescription') }}</span>
         </div>
         <input
           v-model="rememberCredentials"
@@ -47,9 +40,7 @@
         <div
           class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
           :class="
-            litellmConfigured
-              ? 'bg-green-100 text-green-700'
-              : 'bg-yellow-100 text-yellow-700'
+            litellmConfigured ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
           "
         >
           <div
@@ -57,9 +48,7 @@
             :class="litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'"
           />
           {{
-            litellmConfigured
-              ? t('litellmCredentialsConfigured')
-              : t('litellmCredentialsMissing')
+            litellmConfigured ? t('litellmCredentialsConfigured') : t('litellmCredentialsMissing')
           }}
         </div>
       </div>
@@ -110,6 +99,7 @@ import {
   setRememberCredentials as setRememberCredentialsPersist,
 } from '@/utils/credentialStorage'
 import { isCryptoAvailable } from '@/utils/cryptoPolyfill'
+import { invalidateHeaderCache } from '@/api/backend'
 
 const { t } = useI18n()
 
@@ -124,10 +114,12 @@ const litellmConfigured = computed(() => {
 
 watch(litellmUserKey, async value => {
   await setUserKey(value)
+  invalidateHeaderCache()
 })
 
 watch(litellmUserEmail, async value => {
   await setUserEmail(value)
+  invalidateHeaderCache()
 })
 
 watch(rememberCredentials, async value => {

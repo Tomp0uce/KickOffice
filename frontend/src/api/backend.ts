@@ -172,21 +172,41 @@ function getCsrfToken(): string {
   return ''
 }
 
-async function getGlobalHeaders(): Promise<Record<string, string>> {
+// ─── QC-L2: Header cache ─────────────────────────────────────────────────────
+// getGlobalHeaders() is called on every network request. The calls to
+// getUserKey(), getUserEmail() and logService.getContext() touch async storage
+// on each invocation. We cache the resolved headers and expose
+// invalidateHeaderCache() so callers can bust the cache after credential changes.
+let _headerCache: Promise<Record<string, string>> | null = null
+
+/** Bust the cached credentials headers (call after saving new credentials). */
+export function invalidateHeaderCache(): void {
+  _headerCache = null
+}
+
+async function buildGlobalHeaders(): Promise<Record<string, string>> {
   const userKey = await getUserKey()
   const userEmail = await getUserEmail()
   const ctx = await logService.getContext()
-  
+
   const headers: Record<string, string> = {}
   if (userKey) headers['X-User-Key'] = userKey
   if (userEmail) headers['X-User-Email'] = userEmail
   if (ctx.host) headers['X-Office-Host'] = ctx.host
   if (ctx.sessionId) headers['X-Session-Id'] = ctx.sessionId
 
-  const csrf = getCsrfToken()
-  if (csrf) headers['x-csrf-token'] = csrf
-
   return headers
+}
+
+async function getGlobalHeaders(): Promise<Record<string, string>> {
+  if (!_headerCache) {
+    _headerCache = buildGlobalHeaders()
+  }
+  const cached = await _headerCache
+  // CSRF token reads from document.cookie — always fresh (not cached)
+  const csrf = getCsrfToken()
+  if (csrf) return { ...cached, 'x-csrf-token': csrf }
+  return cached
 }
 
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
@@ -321,11 +341,15 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
           })
         }
       } catch (parseError) {
-        // Only re-throw if it was our own explicit stream error; skip malformed JSON
+        // Re-throw explicit stream errors
         if (parseError instanceof Error && parseError.message.startsWith('Stream error:')) {
           throw parseError
         }
-        // Otherwise skip malformed JSON line silently
+        // Log malformed JSON
+        logService.warn('Malformed JSON in chatStream SSE', {
+          data: data.length > 200 ? data.slice(0, 200) + '...' : data,
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        })
       }
     }
   }

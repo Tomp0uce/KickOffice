@@ -24,19 +24,7 @@ const VALID_WORD_CODE = `
   })
 `
 
-/** Minimal valid Excel snippet. */
-const VALID_EXCEL_CODE = `
-  await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getActiveWorksheet()
-    sheet.load("name")
-    await context.sync()
-    try {
-      console.log(sheet.name)
-    } catch (e) {
-      console.error(e)
-    }
-  })
-`
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // validateOfficeCode — Rule 1: context.sync()

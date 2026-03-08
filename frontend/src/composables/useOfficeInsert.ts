@@ -90,7 +90,7 @@ interface UseOfficeInsertOptions {
   hostIsExcel: boolean
   hostIsWord: boolean
   useWordFormatting: Ref<boolean>
-  insertType: Ref<InsertType>
+
   t: (key: string) => string
   shouldTreatMessageAsImage: (message: DisplayMessage) => boolean
   getMessageActionPayload: (message: DisplayMessage) => string
@@ -106,7 +106,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     hostIsExcel,
     hostIsWord,
     useWordFormatting,
-    insertType,
+
     t,
     shouldTreatMessageAsImage,
     getMessageActionPayload,

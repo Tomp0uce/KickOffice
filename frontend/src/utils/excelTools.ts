@@ -1,4 +1,4 @@
-import type { ToolProperty, ToolDefinition } from '@/types'
+import type { ToolDefinition } from '@/types'
 import { executeOfficeAction } from './officeAction'
 import { createOfficeTools } from './common'
 import { localStorageKey } from './enum'
@@ -729,7 +729,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         range.load('values, rowCount, columnCount')
         await context.sync()
 
-        const dataRange = hasHeaders ? range.getResizedRange(-1, 0).getOffsetRange(1, 0) : range
+        hasHeaders ? range.getResizedRange(-1, 0).getOffsetRange(1, 0) : range
 
         // Manual sort as fallback-safe approach
         const values = range.values.slice()

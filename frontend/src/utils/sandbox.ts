@@ -94,18 +94,4 @@ function buildHostGlobals(
   return result
 }
 
-/**
- * Create a safe error message from an execution error.
- * Strips sensitive information while keeping useful details.
- */
-function sanitizeExecutionError(error: any): string {
-  const message = error?.message || String(error)
 
-  // Remove stack traces that might expose internal paths
-  const sanitized = message
-    .replace(/at\s+.*:\d+:\d+/g, '')  // Remove stack trace lines
-    .replace(/\n\s*\n/g, '\n')         // Remove empty lines
-    .trim()
-
-  return sanitized || 'Unknown error occurred during code execution'
-}

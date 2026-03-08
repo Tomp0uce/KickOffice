@@ -1,5 +1,5 @@
 /* stylelint-disable nesting-selector-no-missing-scoping-root */
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @utility no-scrollbar {
   &::-webkit-scrollbar {
@@ -90,7 +90,7 @@
   }
 
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent outline-solid;
+    @apply outline outline-2 outline-offset-2 outline-accent transition-all;
   }
 
   ::selection {
@@ -130,8 +130,8 @@
   :root {
     font-size: 16px;
     font-family:
-      -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
-      Helvetica, Arial, sans-serif;
+      -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial,
+      sans-serif;
     font-weight: 400;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -141,7 +141,7 @@
 
   :root,
   .light,
-  [data-theme="light"] {
+  [data-theme='light'] {
     --background-image: none;
     --background-image-opacity: 1;
     --color-text-primary: #1d1d1f;
@@ -170,7 +170,7 @@
 
   :root.dark,
   .dark,
-  [data-theme="dark"] {
+  [data-theme='dark'] {
     --color-text-primary: #f5f5f7;
     --color-text-secondary: #a1a1a6;
     --color-text-tertiary: #86868b;
@@ -232,14 +232,12 @@
     0%,
     100% {
       transform: scale(1);
-      box-shadow: 0 2px 6px
-        color-mix(in srgb, var(--color-accent) 60%, transparent);
+      box-shadow: 0 2px 6px color-mix(in srgb, var(--color-accent) 60%, transparent);
     }
 
     50% {
       transform: scale(1.1);
-      box-shadow: 0 2px 6px
-        color-mix(in srgb, var(--color-accent) 60%, transparent);
+      box-shadow: 0 2px 6px color-mix(in srgb, var(--color-accent) 60%, transparent);
     }
   }
 

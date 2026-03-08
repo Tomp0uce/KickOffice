@@ -58,6 +58,8 @@
                 <button
                   type="button"
                   class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] uppercase tracking-wider text-accent hover:bg-bg-tertiary transition-colors"
+                  :aria-expanded="isThoughtOpen(item.key, idx)"
+                  :aria-label="thoughtProcessLabel"
                   @click="toggleThought(item.key, idx)"
                 >
                   <component
@@ -172,7 +174,7 @@
         >
           <div class="flex items-center gap-2 text-accent" role="status" aria-live="polite">
             <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
-            <Terminal :size="12" v-if="currentAction" />
+            <Terminal :size="ICON_SIZE_SM" v-if="currentAction" />
             <span class="truncate" v-if="currentAction">{{ currentAction }}</span>
             <span v-else class="animate-pulse">▊</span>
           </div>
@@ -201,6 +203,7 @@ import CustomButton from '@/components/CustomButton.vue'
 import MarkdownRenderer from '@/components/chat/MarkdownRenderer.vue'
 import ToolCallBlock from '@/components/chat/ToolCallBlock.vue'
 import type { DisplayMessage, RenderSegment } from '@/types/chat'
+import { ICON_SIZE_SM } from '@/constants/limits'
 
 const props = defineProps<{
   history: DisplayMessage[]
@@ -251,11 +254,6 @@ function isThoughtOpen(itemKey: string, segmentIndex: number): boolean {
 function toggleThought(itemKey: string, segmentIndex: number): void {
   const key = thoughtKey(itemKey, segmentIndex)
   expandedThoughts.value[key] = !expandedThoughts.value[key]
-}
-
-function onThoughtToggle(itemKey: string, segmentIndex: number, event: Event): void {
-  const detailsEl = event.target as HTMLDetailsElement
-  expandedThoughts.value[thoughtKey(itemKey, segmentIndex)] = detailsEl.open
 }
 
 const liveAnnouncement = ref('')

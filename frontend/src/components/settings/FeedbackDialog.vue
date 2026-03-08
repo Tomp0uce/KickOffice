@@ -1,6 +1,10 @@
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div class="card-base w-full max-w-md flex flex-col gap-4 bg-surface p-4">
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    aria-modal="true"
+    role="dialog"
+  >
+    <div ref="dialogRef" class="card-base w-full max-w-md flex flex-col gap-4 bg-surface p-4">
       <h3 class="text-lg font-semibold text-main">
         {{ t('feedbackTitle') || 'Report Bug / Feedback' }}
       </h3>
@@ -64,12 +68,16 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFocusTrap } from '@vueuse/integrations/useFocusTrap'
 import CustomButton from '@/components/CustomButton.vue'
 import { logService } from '@/utils/logger'
 import { submitFeedback } from '@/api/backend'
 
 const { t } = useI18n()
 const emit = defineEmits(['close'])
+
+const dialogRef = ref<HTMLElement>()
+useFocusTrap(dialogRef, { immediate: true })
 
 const category = ref('bug')
 const comment = ref('')

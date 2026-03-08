@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [vue()],
   test: {
-    environment: 'jsdom',
+    environment: 'happy-dom',
     exclude: ['node_modules', 'dist', 'tests/e2e/**', 'e2e/**', '.git'],
     root: fileURLToPath(new URL('./', import.meta.url)),
   },
