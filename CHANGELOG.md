@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - **Dead Code Removal**: Deleted 4 legacy Python scripts, unused imports in `wordTools.ts`, and redundant dependencies.
 - **Boolean Naming**: Standardized boolean variables with `is*` and `has*` prefixes across the codebase.
 - **Feedback Writing**: Improved reliability of the feedback submission route with atomic file writes.
+- **Build Fix**: Added missing `focus-trap` dependency required by `@vueuse/integrations` (fixes Docker build error).
 
 ### [1.0.112] - 2026-03-08
 
