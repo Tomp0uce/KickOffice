@@ -4,6 +4,7 @@ import { createOfficeTools } from './common'
 import { localStorageKey } from './enum'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
+import { extractChartData } from '@/api/backend'
 
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action))
@@ -1595,8 +1596,87 @@ try {
   }
 })
 
+/** Backend-calling tool: extracts data points from a chart image via pixel analysis. */
+const extractChartDataTool: ToolDefinition = {
+  name: 'extract_chart_data',
+  category: 'read',
+  description:
+    'Extract numerical data points from a chart/graph image using pixel color analysis. ' +
+    'You MUST first analyze the image yourself (via vision) to determine: (1) the axis ranges, ' +
+    '(2) the dominant color of the data series, (3) the chart type. Then call this tool with those parameters. ' +
+    'Returns a JSON array of {x, y} points that you can write into Excel with setCellRange and chart with manageObject. ' +
+    'The imageId is provided in the <uploaded_images> context block when the user uploads a chart image.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      imageId: {
+        type: 'string',
+        description: 'The imageId from the <uploaded_images> context block (UUID returned by the upload endpoint).',
+      },
+      xAxisRange: {
+        type: 'array',
+        description: 'Real-world min and max values of the X axis as [min, max]. Example: [0, 100]. Determine this by reading the axis labels in the image.',
+        items: { type: 'number' },
+      } as any,
+      yAxisRange: {
+        type: 'array',
+        description: 'Real-world min and max values of the Y axis as [min, max]. Example: [0, 50]. Determine this by reading the axis labels in the image.',
+        items: { type: 'number' },
+      } as any,
+      targetColor: {
+        type: 'string',
+        description: 'Hex color of the data series line/bars/points in the chart. Example: "#FF0000" for red, "#0000FF" for blue. Determine this by observing the chart image.',
+      },
+      chartType: {
+        type: 'string',
+        description: 'Type of chart: "line", "scatter", "bar" (horizontal bars), or "area". Defaults to "line".',
+        enum: ['line', 'scatter', 'bar', 'area'],
+      },
+      colorTolerance: {
+        type: 'number',
+        description: 'Color matching tolerance (0-441, Euclidean RGB distance). Higher = more permissive. Default: 80. Increase if few points are returned.',
+      },
+      numPoints: {
+        type: 'number',
+        description: 'Desired number of output data points (5-200). Default: 40.',
+      },
+    },
+    required: ['imageId', 'xAxisRange', 'yAxisRange', 'targetColor'],
+  },
+  execute: async (args) => {
+    try {
+      const result = await extractChartData({
+        imageId: args.imageId,
+        xAxisRange: args.xAxisRange,
+        yAxisRange: args.yAxisRange,
+        targetColor: args.targetColor,
+        chartType: args.chartType,
+        colorTolerance: args.colorTolerance,
+        numPoints: args.numPoints,
+      })
+
+      if (result.warning) {
+        return JSON.stringify({ success: false, warning: result.warning, pixelsMatched: 0 }, null, 2)
+      }
+
+      return JSON.stringify({
+        success: true,
+        pointCount: result.points.length,
+        pixelsMatched: result.pixelsMatched,
+        points: result.points,
+      }, null, 2)
+    } catch (error: any) {
+      return JSON.stringify({
+        error: true,
+        message: error.message || String(error),
+        suggestion: 'Check that the imageId is valid and the image was recently uploaded. Adjust colorTolerance or targetColor if needed.',
+      }, null, 2)
+    }
+  },
+}
+
 export function getToolDefinitions(): ToolDefinition[] {
-  return Object.values(excelToolDefinitions)
+  return [...Object.values(excelToolDefinitions), extractChartDataTool]
 }
 
 export const getExcelToolDefinitions = getToolDefinitions

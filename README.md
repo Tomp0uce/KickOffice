@@ -52,7 +52,8 @@ Express.js proxy server. Holds all secrets (API keys), validates requests, rate-
 - `POST /api/chat` — Streaming chat with SSE
 - `POST /api/chat/sync` — Synchronous chat for agent tool loops
 - `POST /api/image` — Image generation
-- `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV)
+- `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV, images)
+- `POST /api/chart-extract` — Chart image data extraction (pixel analysis)
 - `GET /api/models` — Available model tiers
 - `GET /health` — Health check
 
@@ -192,7 +193,8 @@ KickOffice/
 │       ├── config/             # env.js, models.js, limits.js (centralized)
 │       ├── middleware/         # auth.js, validate.js
 │       ├── routes/             # chat, image, upload, models, health, logs
-│       ├── services/           # llmClient.js
+│       ├── services/           # llmClient.js, plotDigitizerService.js
+│       │   └── wpd/            # Adapted WebPlotDigitizer algorithms (AGPL-3.0)
 │       └── utils/              # http.js, logger.js
 ├── frontend/                   # Vue 3 + TypeScript
 │   └── src/
@@ -316,6 +318,18 @@ Integrated as a local package for format-preserving text editing:
 - **Cascading strategies** — Token → Sentence → Block fallback
 - **diff-match-patch extension** — Google's algorithm with word-mode
 
+### [WebPlotDigitizer](https://github.com/ankitrohatgi/WebPlotDigitizer) (AGPL-3.0 License)
+
+Core algorithms adapted for chart image data extraction (`backend/src/services/wpd/`):
+
+- **Color detection** — Euclidean RGB distance (`dist3d`) for foreground pixel identification
+- **AveragingWindowCore** — Column-by-column blob detection with neighbor merging for line/scatter charts
+- **BarExtractionAlgo** — Top/bottom edge detection with proximity grouping for bar charts
+- **Cubic spline** — `cspline` / `csplineInterp` for smooth interpolation of extracted data points
+- **Dataset** — Minimal data point container compatible with WPD algorithms
+
+The adapted files preserve the original AGPL-3.0 copyright headers. Only structural changes were made (global `var wpd` namespace → ESM exports) to integrate with our Node.js backend.
+
 ### [Redink](https://github.com/LawDigital/redink) (MIT License)
 
 Conceptual inspiration for document comparison and revision workflows.
@@ -324,7 +338,7 @@ Conceptual inspiration for document comparison and revision workflows.
 
 ## License
 
-This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. Third-party dependencies retain their original licenses.
+This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. The chart extraction algorithms in `backend/src/services/wpd/` are adapted from [WebPlotDigitizer](https://github.com/ankitrohatgi/WebPlotDigitizer) and licensed under AGPL-3.0. Third-party dependencies retain their original licenses.
 
 ---
 

@@ -83,6 +83,8 @@ const ERROR_CODE_MAP: Record<string, CategorizedError> = {
   NO_FILE_UPLOADED: { type: 'unknown', i18nKey: 'failedToResponse' },
   UNSUPPORTED_FILE_TYPE: { type: 'unknown', i18nKey: 'failedToResponse' },
   FILE_EMPTY: { type: 'unknown', i18nKey: 'failedToResponse' },
+  CHART_IMAGE_NOT_FOUND: { type: 'unknown', i18nKey: 'failedToResponse' },
+  CHART_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
 }
 
 export function categorizeError(error: unknown): CategorizedError {
@@ -427,7 +429,7 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
   return ''
 }
 
-export async function uploadFile(file: File): Promise<{ filename: string; extractedText: string; imageBase64?: string }> {
+export async function uploadFile(file: File): Promise<{ filename: string; extractedText: string; imageBase64?: string; imageId?: string }> {
   const formData = new FormData()
   formData.append('file', file)
 
@@ -462,6 +464,43 @@ export async function submitLogs(entries: unknown[]): Promise<void> {
   } catch {
     // Silent: log submission failure should never break the UI
   }
+}
+
+export interface ChartExtractParams {
+  imageId: string
+  xAxisRange: [number, number]
+  yAxisRange: [number, number]
+  targetColor: string
+  chartType?: string
+  colorTolerance?: number
+  numPoints?: number
+}
+
+export interface ChartExtractResult {
+  points: Array<{ x: number; y: number }>
+  pixelsMatched: number
+  imageSize: { width: number; height: number }
+  plotBounds?: { pxMin: number; pxMax: number; pyMin: number; pyMax: number }
+  warning?: string
+}
+
+export async function extractChartData(params: ChartExtractParams): Promise<ChartExtractResult> {
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chart-extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
+    body: JSON.stringify(params),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    logService.error('Chart extraction error', undefined, { status: res.status, error: err })
+    throw new Error(`Chart extraction error ${res.status}: ${err}`)
+  }
+
+  const reqId = res.headers.get('x-request-id')
+  if (reqId) logService.info(`Request correlated: ${reqId}`, 'system', { reqId })
+
+  return res.json()
 }
 
 export async function submitFeedback(sessionId: string, payload: { category: string; comment: string; logs: unknown[] }): Promise<{ success: boolean }> {
