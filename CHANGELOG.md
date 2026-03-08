@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.113] - 2026-03-08
+
+### Added
+
+- **Session Persistence**: Extracted text from uploaded documents (PDF, DOCX, etc.) and references to uploaded images now persist across the entire conversation, eliminating "context amnesia" between user turns.
+- **PowerPoint Image Registry**: Implemented a memory-based registry (`powerpointImageRegistry`) that decouples large Base64 image data from the LLM prompt. Tools now use stable filenames for architectural stability.
+- **Log Sanitization Utility**: Introduced `sanitizePayloadForLogs` to automatically truncate large Base64 data in API payloads, protecting server logs from saturation and preventing monitoring tool crashes.
+
+### Fixed
+
+- **PPT-C2 Infinite Loop**: Resolved the critical infinite loop issue in PowerPoint slide generation by correctly accounting for vision image costs and preventing history truncation.
+- **Vision Token Costing**: Updated `tokenManager.ts` to assign a fixed token weight (1000) to image parts, ensuring the context window is accurately estimated regardless of Base64 string length.
+- **ChatMessage Type Safety**: Updated `ChatMessage` interface in `backend.ts` to support multi-part content (text + items), enabling robust vision integration.
+
 ## [Unreleased]
 
 ### Added

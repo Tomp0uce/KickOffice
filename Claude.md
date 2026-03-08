@@ -154,6 +154,10 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
 - **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
 - **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps `office-word-diff` local library — Token Map → Sentence Diff → Block Replace cascade). `proposeRevision` is the only Word tool that preserves formatting on unchanged text; agent is instructed to always call `getSelectedTextWithFormatting` first, and is explicitly forbidden from using `eval_wordjs` with `insertText(..., 'Replace')` which destroys formatting. `office-word-diff` is Word-only (PowerPoint/Outlook lack the Range API and Track Changes).
+- **Vision Image Handling (Registry Pattern)**: Large Base64 image data MUST BE decoupled from the agent prompt. Use `powerpointImageRegistry` (Map) in `powerpointTools.ts` to store raw Base64. Agent tools (like `insertImageOnSlide`) MUST accept a `filename` parameter and retrieve the data from the registry.
+- **Session Persistence**: Uploaded files and images MUST be persisted in `sessionUploadedFiles` and `sessionUploadedImages` refs in `useAgentLoop.ts`. Their context (extracted text for files, filename list for images) MUST be re-injected into every message to prevent amnesia.
+- **Log Sanitization**: All payloads containing potential Base64 images MUST pass through `sanitizePayloadForLogs` in `backend.ts` before being logged to prevent disk saturation and terminal crashes.
+- **Token Manager**: Images in multi-part content MUST have a fixed token cost (default 1000) in `tokenManager.ts` to prevent the manager from truncating history due to Base64 length.
 - **Sandbox Enhancement**: Host filtering in `sandbox.ts` prevents cross-namespace API access (e.g., Word API blocked in Excel context)
 
 ## 6) Backend Editing Guidelines

@@ -7,7 +7,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes, powerpointImageRegistry } from '@/utils/powerpointTools'
 import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
@@ -95,6 +95,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   const { executeStream } = useAgentStream()
   const { addSignatureAndCheckLoop, clearSignatures } = useLoopDetection(5, 2)
+
+  // Step 4: Persistent session memory for uploaded content (Point 2)
+  const sessionUploadedFiles = ref<{ filename: string; content: string }[]>([])
+  const sessionUploadedImages = ref<{ filename: string; dataUri: string }[]>([])
 
 
   // Destructure refs
@@ -272,7 +276,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         currentAction.value = t('agentWaitingForLLM')
       }
 
-      const currentSystemPrompt = messages[0]?.role === 'system' ? messages[0].content : ''
+      const currentSystemPrompt = messages[0]?.role === 'system' ? (typeof messages[0].content === 'string' ? messages[0].content : '') : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
       logService.info('llm_request', 'llm', { model: modelTier, messageCount: contextSafeMessages.length })
 
@@ -575,29 +579,26 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
 
     // Inject vision images as multipart content into the last user message
-    if (visionImages && visionImages.length > 0) {
+    // Point 2 Fix: Use ALL session images for vision injection (Session Persistence)
+    if ((visionImages && visionImages.length > 0) || sessionUploadedImages.value.length > 0) {
       const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
       if (lastUserIdx !== -1) {
-        // Build text prefix: inject base64 data so the agent can pass it to insertImageOnSlide
         let textContent = messages[lastUserIdx].content || userMessage
-        const imageContextLines: string[] = []
-        for (const img of visionImages) {
-          // Strip the data URI prefix (data:image/png;base64,) to get raw base64
-          const base64 = img.dataUri.replace(/^data:[^;]+;base64,/, '')
-          imageContextLines.push(`[${img.filename}]: ${base64}`)
-        }
+        const imageContextLines = sessionUploadedImages.value.map(img => `- ${img.filename}`)
+
         if (imageContextLines.length > 0) {
-          textContent += `\n\n<uploaded_images>\nThe following images are attached. To embed an image in a slide, use insertImageOnSlide with the base64 string below (already stripped of the data URI prefix):\n${imageContextLines.join('\n')}\n</uploaded_images>`
+          textContent += `\n\n<uploaded_images>\nLes images suivantes sont disponibles en mémoire :\n${imageContextLines.join('\n')}\nPour insérer une de ces images dans une slide, utilisez l'outil 'insertImageOnSlide' avec le 'filename' exact.\n</uploaded_images>`
         }
-        const parts: any[] = [{ type: 'text', text: textContent }]
-        for (const img of visionImages) {
+        
+        const parts: any[] = [{ type: 'text', text: String(textContent) }]
+        for (const img of sessionUploadedImages.value) {
           parts.push({ type: 'image_url', image_url: { url: img.dataUri } })
         }
         ;(messages[lastUserIdx] as any).content = parts
       }
     }
 
-    await runAgentLoop(messages, modelTier)
+    return await runAgentLoop(messages, modelTier)
   }
 
   async function sendMessage(payload?: string, files?: File[]) {
@@ -737,29 +738,39 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       let fullMessage = displayMessageText
-      let extractedFilesContext = ''
-      // Images uploaded are sent as vision content (base64 data-URIs)
-      const uploadedImages: Array<{ filename: string; dataUri: string }> = []
-
+      
       if (files && files.length > 0) {
         currentAction.value = t('agentUploadingFiles') || 'Extraction des fichiers...'
         try {
            for (const file of files) {
              const result = await uploadFile(file)
              if (result.imageBase64) {
-               // Image file: store for vision injection
-               uploadedImages.push({ filename: result.filename, dataUri: result.imageBase64 })
+               // Step 4: Store in session images
+               sessionUploadedImages.value.push({ filename: result.filename, dataUri: result.imageBase64 })
+               
+               // Point 3 Fix: Store in PPT registry for tool access
+               if (hostIsPowerPoint) {
+                 powerpointImageRegistry.set(result.filename, result.imageBase64.replace(/^data:[^;]+;base64,/, ''))
+               }
                // Show a preview thumbnail in the user message bubble
                history.value[history.value.length - 1].imageSrc = result.imageBase64
              } else {
-               extractedFilesContext += `\n\n[Contenu extrait du fichier "${result.filename}"]:\n${result.extractedText}\n[Fin du fichier]`
+               // Step 4: Store extracted text in persistent session memory (Fix Point 2)
+               sessionUploadedFiles.value.push({ filename: result.filename, content: result.extractedText })
              }
            }
         } catch (uploadObjErr: unknown) {
-           console.error('[AgentLoop] File upload/extraction failed', uploadObjErr)
-           messageUtil.error(t('somethingWentWrong'))
-           return
+           console.error('[AgentLoop] File upload failed', uploadObjErr)
+           return messageUtil.error(t('somethingWentWrong'))
         }
+      }
+
+      // Step 4: Reinject context of ALL session-uploaded files into every message (Fix Point 2)
+      let extractedFilesContext = ''
+      if (sessionUploadedFiles.value.length > 0) {
+         extractedFilesContext = sessionUploadedFiles.value
+           .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
+           .join('')
       }
 
       // Only append context to standard text chats, not pure image generations
@@ -775,10 +786,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
            const sanitizedText = '\\n<document_content>\\n' + selectedText.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
            fullMessage += '\\n\\n[' + selectionLabel + ']: ' + sanitizedText
         }
-        history.value[history.value.length - 1].content = fullMessage.trim()
+       history.value[history.value.length - 1].content = fullMessage.trim()
       }
 
-      await processChat(fullMessage.trim(), uploadedImages.length > 0 ? uploadedImages : undefined, extractedFilesContext)
+      // Step 4: Call processChat. visionImages is now handled via sessionUploadedImages internal ref, 
+      // but we pass a flag or just let processChat use the session ref.
+      await processChat(fullMessage.trim(), undefined, extractedFilesContext)
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
         console.error('[AgentLoop] sendMessage failed', error)
