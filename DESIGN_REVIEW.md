@@ -139,3 +139,49 @@ Tous les points critiques et majeurs identifiés dans la V9.0 ont été audités
    - Ajouter une directive claire sur l'exploitation de ce contexte selon l'hôte (Excel, PPT, Word, Outlook).
    - "Le système vous joint ci-dessous la sélection ou le contexte actuel de l'utilisateur (texte, slide, cellules excel, email). Pensez `Modificateur intelligent` : Si la demande de l'utilisateur implique de modifier son brouillon de travail actuel, basez-vous sur ce contexte envoyé pour effectuer l'action (en utilisant les outils d'édition/écriture). Si la demande est d'ordre général, exploitez cette sélection uniquement à titre informatif, comme contexte."
    - L'objectif est que la bascule de "Dois-je utiliser le texte de la slide ?" se fasse dynamiquement par le LLM.
+
+---
+
+## ITEMS DEFERRED (Planifiés pour une future release)
+
+Suite à l'analyse comparative avec le projet **office-agents**, les fonctionnalités suivantes ont été identifiées mais **reportées intentionnellement** pour les prochaines releases. Voir `OFFICE_AGENTS_ANALYSIS.md` pour la justification complète.
+
+### WEB-DEF1 — Web Search Integration ⏸️ DEFERRED
+
+**Déscription :** Permettre à l'agent d'effectuer des recherches web en temps réel (via DuckDuckGo, Serper, ou équivalent). Cela permet au LLM d'accéder à des données récentes ou des références externes.
+
+**Impact :** Très haut — L'agent pourrait remplir des fichiers Excel avec des données actuelles, rédiger des emails Outlook avec des infos à jour, ou justifier ses analyses par des sources externes.
+
+**Complexité :** 3h (backend route + DuckDuckGo scraping ou API Serper)
+
+**Raison du report :**
+- Nécessite des dépendances externes (Serper API key optionnel)
+- Peut augmenter la latence globale des appels
+- Mieux de valider la stabilité de l'agent loop actuel avant d'ajouter de nouvelles sources de données
+
+**Prérequis pour futur déploiement :**
+- Route backend `/api/web/search` avec support DuckDuckGo (gratuit)
+- Optional : intégration Serper API key pour meilleure fiabilité
+- Frontend tool `webSearch(query, maxResults, region)` pour l'agent
+
+### WEB-DEF2 — Web Fetch Integration ⏸️ DEFERRED
+
+**Description :** Permettre à l'agent de télécharger et lire le contenu d'une URL. Utile pour extraire des données précises après une recherche web.
+
+**Impact :** Haut — Complément essentiel du web search. Après trouver une page, l'agent peut la lire pour obtenir des données détaillées.
+
+**Complexité :** 3h (backend route avec Readability + Turndown pour extraction HTML)
+
+**Raison du report :**
+- Dépend logiquement du web search (sinon, quelle URL passer ?)
+- Ajoute `jsdom`, `@mozilla/readability`, `turndown` aux dépendances npm
+- Peut poser des problèmes CORS sur certains domaines
+- Mieux de tester ensemble avec web search dans une release future
+
+**Prérequis pour futur déploiement :**
+- Route backend `/api/web/fetch`
+- Extraction HTML → Markdown via Readability + Turndown
+- Frontend tool `webFetch(url, maxLength)` pour l'agent
+- Gestion des timeouts et des erreurs de contenu
+
+**Remarque :** Ces deux features forment un ensemble cohérent "Web Integration Phase 2". Recommandé de les implémenter ensemble dans une release dédiée.
