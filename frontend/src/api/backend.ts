@@ -372,10 +372,11 @@ export interface ImageGenerateOptions {
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
+  const payload = { ...options, size: options.size || '1024x1024' }
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
-    body: JSON.stringify(options),
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {

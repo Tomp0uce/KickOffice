@@ -283,8 +283,9 @@ export const powerPointBuiltInPrompt = {
 
       Techniques to use:
       - "Less is more": Cut fluff, use strong verbs.
-      - Each bullet: max 8-10 words. No full sentences — fragments are better.
-      - Max 6-7 bullets total.
+      - Evaluate the best format: Use either ONE short, highly impactful sentence, OR 3 to 5 very concise bullet points.
+      - Do NOT force bullet points if a single short, direct slogan or text is more powerful.
+      - If using bullets: max 8-10 words per bullet, no full sentences.
       - Use active voice, present tense.
       - Focus on benefits/outcomes rather than features.
       - Start each bullet with a power verb or strong noun.

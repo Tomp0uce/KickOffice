@@ -94,7 +94,15 @@
               alt="Generated image"
             />
           </div>
-          <div v-if="item.message.timestamp" class="text-[10px] text-secondary/60 px-1">
+          <div
+            v-if="
+              item.message.timestamp &&
+              (item.segments.some(s => s.type !== 'text' || s.text.trim() !== '') ||
+                (item.message.toolCalls && item.message.toolCalls.length > 0) ||
+                item.message.imageSrc)
+            "
+            class="text-[10px] text-secondary/60 px-1"
+          >
             {{ formatTime(item.message.timestamp) }}
           </div>
         </div>

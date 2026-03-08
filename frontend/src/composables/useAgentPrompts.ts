@@ -209,7 +209,7 @@ When the user provides an image and asks to create a slide from it:
 2. Use your vision capability to analyze the image content (text, structure, layout).
 3. Call \`addSlide\` with \`title\` and \`body\` extracted from the image analysis — DO NOT loop on getAllSlidesOverview.
 4. If the user wants the image itself embedded in the slide, call \`insertImageOnSlide\` with the base64 from the <uploaded_images> context block (strip the "data:image/...;base64," prefix).
-5. Confirm completion. Do NOT retry or re-call overview tools.
+5. Confirm completion. **CRITICAL**: Do NOT call \`getAllSlidesOverview\` to verify the image insertion after \`insertImageOnSlide\`. Assume the insertion was successful. Do NOT retry or re-call overview tools.
 
 # Guidelines
 1. **One overview call**: Call \`getAllSlidesOverview\` at most once. If you need details on a specific slide, use \`getSlideContent\` or \`getShapes\`.
@@ -273,7 +273,7 @@ ${COMMON_SHELL_INSTRUCTIONS}`
     const skills = getSkillForHost(hostType)
     const skillsSection = skills ? `\n\n# Office.js Skills and Best Practices\n\n${skills}\n\n` : ''
 
-    return `${base}${skillsSection}${userProfilePromptBlock()}\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+    return `${base}${skillsSection}${userProfilePromptBlock()}\n\n# Contextual Awareness (Selection)\n- The user message may include a block labeled "[Selected text]", "[Selected cells]", etc.\n- **Smart Modifier Pattern**: If the user asks to "fix", "improve", "rewrite", or "format" something without specifying what, apply the action to this selected context.\n- If the user's request is general, use the selection only as background information.\n- Always preserve existing formatting unless instructed to change it.\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
   }
 
   return { agentPrompt }

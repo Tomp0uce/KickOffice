@@ -58,7 +58,6 @@ interface AgentLoopHost {
 interface AgentLoopSettings {
   customSystemPrompt: Ref<string>
   agentMaxIterations: Ref<number>
-  useSelectedText: Ref<boolean>
   excelFormulaLanguage: Ref<'en' | 'fr'>
   userGender: Ref<string>
   userFirstName: Ref<string>
@@ -129,7 +128,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const {
     customSystemPrompt,
     agentMaxIterations,
-    useSelectedText,
     excelFormulaLanguage,
     userGender,
     userFirstName,
@@ -733,8 +731,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         return
       }
 
-      // If we haven't fetched it yet and it's enabled
-      if (useSelectedText.value && !isImageFromSelection) {
+      // GEN-L3: Always fetch selected text as Phantom Context (if not already purely image generation)
+      if (!isImageFromSelection) {
         selectedText = await fetchSelectionWithTimeout()
       }
 

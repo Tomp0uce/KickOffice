@@ -12,6 +12,7 @@ import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownList
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 import { computeTextDiffStats, createOfficeTools, normalizeLineEndings } from './common'
+import { message as messageUtil } from '@/utils/message'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -81,21 +82,33 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
     const slideNumber = await getCurrentSlideNumber()
     await executeOfficeAction(() =>
       PowerPoint.run(async (context: any) => {
+        // PPT-M5: Check for API support (1.5 required for notesSlide)
+        if (!isPowerPointApiSupported('1.5')) {
+          throw new Error('Speaker notes modification requires PowerPoint API 1.5 or newer.')
+        }
+
         const slides = context.presentation.slides
         slides.load('items')
         await context.sync()
         const index = slideNumber - 1
-        if (index >= slides.items.length) return
+        if (index < 0 || index >= slides.items.length) {
+          throw new Error(`Slide ${slideNumber} not found.`)
+        }
+        
         const slide = slides.getItemAt(index)
         const notesPage = slide.notesSlide
+        // Attempt to load. If it fails, the notes slide might not be initialized.
         notesPage.load('notesTextFrame/textRange')
         await context.sync()
+        
         notesPage.notesTextFrame.textRange.text = notes
         await context.sync()
       })
     )
     return true
-  } catch {
+  } catch (err) {
+    console.error('[PowerPointTools] Failed to set speaker notes:', err)
+    messageUtil.error(`Impossible d'insérer les notes: ${err instanceof Error ? err.message : 'Erreur API'}`)
     return false
   }
 }
@@ -559,10 +572,10 @@ PARAMETERS:
       properties: {
         slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
         base64Image: { type: 'string', description: 'Base64-encoded image string WITHOUT the data URI prefix (e.g. just the raw base64 characters, no "data:image/png;base64,").' },
-        left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
-        top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
-        width: { type: 'number', description: 'Width in points. Default: 400.' },
-        height: { type: 'number', description: 'Height in points. Default: 300.' },
+        left: { type: 'number', description: 'Left position in points. Default: 300 (centered on 960pt slide).' },
+        top: { type: 'number', description: 'Top position in points. Default: 90 (centered on 540pt slide).' },
+        width: { type: 'number', description: 'Width in points. Default: 360.' },
+        height: { type: 'number', description: 'Height in points. Default: 360.' },
       },
       required: ['slideNumber', 'base64Image'],
     },
@@ -581,13 +594,13 @@ PARAMETERS:
 
       // Strip data URI prefix if accidentally included
       const base64 = String(args.base64Image).replace(/^data:[^;]+;base64,/, '')
-
       const slide = slides.getItemAt(index)
       const shape = slide.shapes.addImage(base64)
-      shape.left = typeof args.left === 'number' ? args.left : 100
-      shape.top = typeof args.top === 'number' ? args.top : 100
-      shape.width = typeof args.width === 'number' ? args.width : 400
-      shape.height = typeof args.height === 'number' ? args.height : 300
+      // Default to square 360pt (1:1) centered on 960x540 slide
+      shape.left = typeof args.left === 'number' ? args.left : 300
+      shape.top = typeof args.top === 'number' ? args.top : 90
+      shape.width = typeof args.width === 'number' ? args.width : 360
+      shape.height = typeof args.height === 'number' ? args.height : 360
       await context.sync()
       return `Successfully inserted image on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
     },
@@ -771,48 +784,8 @@ try {
       if (!Number.isFinite(slideNumber) || slideNumber < 1) {
         throw new Error('Error: slideNumber must be a number greater than or equal to 1.')
       }
-
-      
-        const slides = context.presentation.slides
-        slides.load('items')
-        await context.sync()
-
-        const index = Math.trunc(slideNumber) - 1
-        if (index >= slides.items.length) {
-          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`)
-        }
-
-        const slide = slides.getItemAt(index)
-        const shapes = slide.shapes
-        shapes.load('items')
-        await context.sync()
-
-        const shapeEntries: { shape: any; idx: number }[] = []
-        for (let i = 0; i < shapes.items.length; i++) {
-          const shape = shapes.items[i]
-          try {
-            shape.textFrame.textRange.load('text')
-            shapeEntries.push({ shape, idx: i + 1 })
-          } catch {
-            // Non-text shape
-          }
-        }
-
-        if (shapeEntries.length === 0) {
-          return ''
-        }
-
-        await context.sync()
-
-        const lines = shapeEntries
-          .map(({ shape, idx }) => {
-            const text = (shape.textFrame.textRange.text || '').trim()
-            return text ? `[Shape ${idx}] ${text}` : ''
-          })
-          .filter(Boolean)
-
-        return lines.join('\n')
-      },
+      return getSlideContentStandalone(context, slideNumber)
+    },
   },
 
   addSlide: {
@@ -1008,19 +981,18 @@ try {
 
         for (let j = 0; j < shapes.items.length; j++) {
           const shape = shapes.items[j]
-          // Skip image/picture shapes — they have no textFrame and would cause silent errors
           const shapeType = String(shape.type || '').toLowerCase()
-          if (shapeType.includes('picture') || shapeType === '13') continue
+          if (shapeType.includes('picture') || shapeType === '13') continue // keep skipping text load for images
           try { shape.textFrame.textRange.load('text') } catch {}
         }
         await context.sync()
 
         const lines = shapes.items
-          .filter((s: any) => {
-            const t = String(s.type || '').toLowerCase()
-            return !t.includes('picture') && t !== '13'
-          })
           .map((s: any) => {
+            const t = String(s.type || '').toLowerCase()
+            if (t.includes('picture') || t === '13') {
+               return `[Image ${s.width}x${s.height}]`
+            }
             let text = ''
             try { text = s.textFrame.textRange.text } catch {}
             return text.trim()
@@ -1048,6 +1020,46 @@ try {
     }, null, 2)
   }
 })
+
+export async function getSlideContentStandalone(context: any, slideNumber: number): Promise<string> {
+  const slides = context.presentation.slides
+  slides.load('items')
+  await context.sync()
+
+  const index = Math.trunc(slideNumber) - 1
+  if (index < 0 || index >= slides.items.length) {
+    return ''
+  }
+
+  const slide = slides.getItemAt(index)
+  const shapes = slide.shapes
+  shapes.load('items')
+  await context.sync()
+
+  const shapeEntries: { shape: any; idx: number }[] = []
+  for (let i = 0; i < shapes.items.length; i++) {
+    const shape = shapes.items[i]
+    try {
+      shape.textFrame.textRange.load('text')
+      shapeEntries.push({ shape, idx: i + 1 })
+    } catch {
+      // Non-text shape
+    }
+  }
+
+  if (shapeEntries.length === 0) return ''
+
+  await context.sync()
+
+  const lines = shapeEntries
+    .map(({ shape, idx }) => {
+      const text = (shape.textFrame.textRange.text || '').trim()
+      return text ? `[Shape ${idx}] ${text}` : ''
+    })
+    .filter(Boolean)
+
+  return lines.join('\n')
+}
 
 export function getToolDefinitions(): ToolDefinition[] {
   return Object.values(powerpointToolDefinitions)
