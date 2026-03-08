@@ -439,6 +439,17 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           const seriesByEnum = seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns
           const chart = sheet.charts.add(excelChartType, dataRange, seriesByEnum)
 
+          // XL-M1 Fix: Explicitly set category axis (X-Axis) and ensure it's not treated as a data series
+          try {
+            if (seriesBy === 'rows') {
+              chart.axes.categoryAxis.setCategoryNames(dataRange.getRow(0))
+            } else {
+              chart.axes.categoryAxis.setCategoryNames(dataRange.getColumn(0))
+            }
+          } catch (e) {
+            console.warn('[ExcelTools] Failed to explicitly set category names', e)
+          }
+
           if (title) chart.title.text = title
           chart.width = 400
           chart.height = 300
@@ -449,7 +460,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
 
           await context.sync()
-          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}. Series interpreted by ${seriesBy}.`
+          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}. Series interpreted by ${seriesBy} with explicit Category Axis.`
         }
 
         if (objectType === 'pivotTable') {

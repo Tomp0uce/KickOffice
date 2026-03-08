@@ -1,5 +1,11 @@
-import { getPowerPointSelection, getPowerPointSelectionAsHtml } from '@/utils/powerpointTools'
+import { getPowerPointSelection, getPowerPointSelectionAsHtml, getCurrentSlideNumber, getSlideContentStandalone } from '@/utils/powerpointTools'
+import { executeOfficeAction as runOfficeAction } from '@/utils/officeAction'
 import { getOfficeTextCoercionType, getOfficeHtmlCoercionType, getOutlookMailbox, isOfficeAsyncSucceeded, type OfficeAsyncResult } from '@/utils/officeOutlook'
+
+declare const Office: any
+declare const Word: any
+declare const Excel: any
+declare const PowerPoint: any
 
 export interface UseOfficeSelectionOptions {
   hostIsOutlook: boolean
@@ -101,20 +107,39 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText()
         if (selected) return selected
-        // For proofread: fall through to full body (compose body only, no history)
       }
-      
-      // Fall back to the full email compose body (Outlook API only returns the reply being drafted)
       return getOutlookMailBody()
     }
-    if (hostIsPowerPoint) return getPowerPointSelection()
+
+    if (hostIsPowerPoint) {
+      const selection = await getPowerPointSelection()
+      if (selection) return selection
+      
+      // PowerPoint fallback: get current slide content
+      try {
+        const slideNum = await getCurrentSlideNumber()
+        return await runOfficeAction(() => PowerPoint.run((ctx: any) => getSlideContentStandalone(ctx, slideNum)))
+      } catch { return '' }
+    }
+
     if (hostIsExcel) {
-      return Excel.run(async (ctx) => {
+      return Excel.run(async (ctx: any) => {
         const range = ctx.workbook.getSelectedRange()
-        range.load('values, address')
+        range.load('values, address, rowCount, columnCount')
         await ctx.sync()
         
-        // Escape tabs and newlines in cell values to prevent ambiguous output
+        let targetRange = range
+        // If selection is just one cell, check if we should fallback to used range
+        if (range.rowCount === 1 && range.columnCount === 1) {
+          const activeSheet = ctx.workbook.worksheets.getActiveWorksheet()
+          const usedRange = activeSheet.getUsedRangeOrNullObject()
+          usedRange.load('values, address, rowCount, columnCount, isNullObject')
+          await ctx.sync()
+          if (!usedRange.isNullObject) {
+            targetRange = usedRange
+          }
+        }
+        
         const escapeCell = (val: any) => {
           if (val === null || val === undefined) return ''
           const str = String(val)
@@ -124,14 +149,23 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           return str
         }
         
-        return `[${range.address}]\n${range.values.map((row: any[]) => row.map(escapeCell).join('\t')).join('\n')}`
+        return `[${targetRange.address}]\n${targetRange.values.map((row: any[]) => row.map(escapeCell).join('\t')).join('\n')}`
       })
     }
-    return Word.run(async (ctx) => {
+
+    // Word Fallback
+    return Word.run(async (ctx: any) => {
       const range = ctx.document.getSelection()
       range.load('text')
       await ctx.sync()
-      return range.text
+      
+      if (range.text) return range.text
+      
+      // Fallback to full document body
+      const body = ctx.document.body
+      body.load('text')
+      await ctx.sync()
+      return body.text || ''
     })
   }
 
@@ -145,27 +179,41 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selectedHtml = await getOutlookSelectedHtml()
         if (selectedHtml) return selectedHtml
-        // For proofread: fall through to full compose body HTML (no history)
       }
       
-      // Fall back to the full email compose body HTML
       const html = await getOutlookMailBodyAsHtml()
       return html || getOutlookMailBody()
     }
+
     if (hostIsExcel) {
-      // Excel cells don't have meaningful HTML content
-      return ''
+      return '' // Still no HTML for Excel
     }
+
     if (hostIsPowerPoint) {
-      return getPowerPointSelectionAsHtml()
+      const selectionHtml = await getPowerPointSelectionAsHtml()
+      if (selectionHtml) return selectionHtml
+      
+      // PPT Fallback: get text of current slide (no real HTML fallback since it's shape-based)
+      try {
+        const slideNum = await getCurrentSlideNumber()
+        return await runOfficeAction(() => PowerPoint.run((ctx: any) => getSlideContentStandalone(ctx, slideNum)))
+      } catch { return '' }
     }
-    // Word: get selection as HTML
+
+    // Word Fallback
     try {
-      return await Word.run(async (ctx) => {
+      return await Word.run(async (ctx: any) => {
         const range = ctx.document.getSelection()
         const htmlResult = range.getHtml()
+        range.load('text')
         await ctx.sync()
-        return htmlResult.value || ''
+        
+        if (range.text) return htmlResult.value || ''
+        
+        // Fallback to full document HTML
+        const bodyHtml = ctx.document.body.getHtml()
+        await ctx.sync()
+        return bodyHtml.value || ''
       })
     } catch (err) {
       console.warn('[useOfficeSelection] Word getHtml failed', err)

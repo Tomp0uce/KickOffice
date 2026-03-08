@@ -136,25 +136,14 @@
         ref="chatInputRef"
         v-model:selected-model-tier="selectedModelTier"
         v-model="userInput"
-        v-model:use-word-formatting="useWordFormatting"
-        v-model:use-selected-text="useSelectedText"
+        :use-word-formatting="true"
+        :use-selected-text="true"
         :available-models="availableModels"
         :input-placeholder="inputPlaceholder"
         :loading="loading"
         :backend-online="backendOnline"
-        :show-word-formatting="!hostIsExcel && !hostIsPowerPoint && !hostIsOutlook"
-        :use-word-formatting-label="t('useWordFormattingLabel')"
-        :include-selection-label="
-          t(
-            forHost({
-              outlook: 'includeSelectionLabelOutlook',
-              powerpoint: 'includeSelectionLabelPowerPoint',
-              excel: 'includeSelectionLabelExcel',
-              word: 'includeSelectionLabel',
-            }) || 'includeSelectionLabel',
-          )
-        "
-        :task-type-label="t('taskTypeLabel')"
+        :show-word-formatting="false"
+        :task_type_label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
         :draft-focus-glow="isDraftFocusGlowing"
@@ -259,8 +248,7 @@ const userInput = ref('')
 const loading = ref(false)
 const imageLoading = ref(false)
 const abortController = ref<AbortController | null>(null)
-const useWordFormatting = useStorage(localStorageKey.useWordFormatting, true)
-const useSelectedText = useStorage(localStorageKey.useSelectedText, true)
+// GEN-L3: Format UI options removed, but keeping logic vars true implicitly in prompt logic
 const agentMaxIterationsRaw = useStorage(localStorageKey.agentMaxIterations, 25)
 const agentMaxIterations = computed(() => {
   const val = Number(agentMaxIterationsRaw.value)
@@ -336,7 +324,8 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: BookOpen,
     mode: 'immediate',
     executeWithAgent: true,
-    systemPrompt: "You are an Excel expert. Explain the selected formula or data in simple terms: what it does, how it works, and any edge cases to be aware of.",
+    systemPrompt:
+      'You are an Excel expert. Explain the selected formula or data in simple terms: what it does, how it works, and any edge cases to be aware of.',
     tooltipKey: 'excelExplain_tooltip',
   },
   {
@@ -353,7 +342,8 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     icon: TrendingUp,
     mode: 'immediate',
     executeWithAgent: true,
-    systemPrompt: "You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.",
+    systemPrompt:
+      'You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.',
     tooltipKey: 'excelDataTrend_tooltip',
   },
 ])
@@ -457,7 +447,7 @@ const officeInsert = useOfficeInsert({
   hostIsPowerPoint,
   hostIsExcel,
   hostIsWord,
-  useWordFormatting,
+  useWordFormatting: ref(true), // GEN-L3: Always true
   t,
   shouldTreatMessageAsImage: imageActions.shouldTreatMessageAsImage,
   getMessageActionPayload: imageActions.getMessageActionPayload,
@@ -534,7 +524,7 @@ const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSession
     settings: {
       customSystemPrompt,
       agentMaxIterations,
-      useSelectedText,
+      useSelectedText: ref(true), // GEN-L3: Always true
       excelFormulaLanguage,
       userGender,
       userFirstName,

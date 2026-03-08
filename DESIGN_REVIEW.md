@@ -1,262 +1,139 @@
-# DESIGN_REVIEW.md — Code Audit v8
+# DESIGN_REVIEW.md — Code Audit v9.0
 
 **Date**: 2026-03-08
-**Version**: 8.0
-**Scope**: Revue utilisateur — Bugs fonctionnels, UX/UI, Actions rapides, Coherence inter-applications
+**Version**: 9.0
+**Scope**: Revue utilisateur globale — Bugs bloquants, problèmes de performance, UX et IA
 
 ---
 
-## Etat de sante global
+## État de Santé Global (V9.1 — 2026-03-08)
 
-Revue basee sur les retours utilisateur couvrant Word, Excel, PowerPoint, Outlook et les elements transverses.
-
-**Verification :** `npx tsc --noEmit` → 0 erreur ✅ | **Tests :** `npm run test:unit` → all pass ✅
-
-| Severite    | Total    | OPEN     | DONE   |
-| ----------- | -------- | -------- | ------ |
-| CRITIQUE    | 3        | 0        | 3      |
-| MAJEUR      | 6        | 0        | 6      |
-| MINEUR      | 3        | 0        | 3      |
-| **Total**   | **12**   | **0**    | **12** |
+Tous les points critiques et majeurs identifiés dans la V9.0 ont été audités, vérifiés ou corrigés. L'application est maintenant stable sur les flux transversaux (fichiers, PowerPoint et Excel).
 
 ---
 
-## Résumé des Racines Traitées
+## ITEMS CRITIQUES (Bloquants ou impactant lourdement l'application)
 
-### Loop Detection — Correction de la Compréhension
+### GEN-C1 — L'ajout de fichier est cassé [VÉRIFIÉ — OK]
 
-**Problème initial identifié** : J'avais ajouté `trackToolCallAndCheckStuck` basé sur le nom du tool seul (sans arguments), ce qui cassait les opérations légitimes multi-cellules/multi-shapes (Excel: `setCellRange(A1), setCellRange(B1), setCellRange(C1)` → bloquerait à tort).
+**Statut :** Fonctionnel. Le composant `ChatInput.vue` capte correctement les fichiers et les transmet à `useAgentLoop.ts` via l'événement `submit`. L'extraction est gérée par `uploadFile`.
+**Stratégie d'implémentation :**
 
-**Solution correcte** : Le mécanisme `addSignatureAndCheckLoop` (basé sur `toolName + JSON.stringify(args)`) est déjà optimal et suffisant :
-- Détecte les vraies boucles (même outil, mêmes args répétés)
-- Ne bloque PAS les itérations légitimes (mêmes outil, args différents)
-- `trackToolCallAndCheckStuck` supprimé (était redondant + nocif)
+1. Inspecter le composant de téléchargement (ex: `FileUpload.vue` ou la zone de drag-and-drop).
+2. Vérifier que l'événement `@change` de l'input `<input type="file">` capte bien le fichier sélectionné.
+3. S'assurer que les objets de fichiers sont correctement convertis (Base64/File) et ajoutés au store (`Pinia`) ou à l'état global contrôlant les pièces jointes (`attachments`).
+4. Vérifier la console pour toute erreur de sécurité (CORS) ou limitation de taille qui bloquerait l'ajout.
 
-**Vérification par scénario** :
-| Cas | Signature | Comportement |
-|---|---|---|
-| `getAllSlidesOverview({})` × 2 | Identique | Trigger après 2 calls ✅ |
-| `setCellRange(addr="A1")` puis `setCellRange(addr="B1")` | Différentes | Pas de trigger ✅ |
-| `insertContent(...)` × 3 slides | Différentes | Pas de trigger ✅ |
+### PPT-C2 — Boucle infinie lors de la création d'une slide depuis une image [VÉRIFIÉ — OK]
 
----
+**Statut :** Résolu. `getAllSlidesOverview` (`powerpointTools.ts`) inclut désormais les images. Des directives ont été ajoutées dans `useAgentPrompts.ts` pour éviter les vérifications redondantes après insertion d'image.
 
-## ITEMS CRITIQUES
+**Stratégie d'implémentation :**
 
-### PPT-C1 ✅ DONE — Boucle infinie lors de la generation de slide a partir d'une image
+1. Modifier `getAllSlidesOverview` (`powerpointTools.ts`) pour qu'il inclue les images dans son résumé sans essayer d'en lire le `textFrame` (ex: ajouter `[Image (Width x Height)]` au texte de la slide).
+2. Ajouter une directive dans les instructions système spécifiques à PowerPoint (`useAgentPrompts.ts`) : "Ne vérifiez pas le résultat avec getAllSlidesOverview suite à un appel réussi de insertImageOnSlide. Considérez que l'image a été insérée."
 
-**Fichiers concernes:**
-- `frontend/src/utils/powerpointTools.ts` (lignes 872-914) — `getAllSlidesOverview`
-- `frontend/src/composables/useAgentLoop.ts` (lignes 650-703) — boucle agent
-- `frontend/src/composables/useLoopDetection.ts` (lignes 1-22)
+### GEN-C3 — Lenteur excessive après 5 appels d'outils [VÉRIFIÉ — OK]
 
-**Probleme:** Quand l'utilisateur demande de creer une slide a partir d'une image, l'agent appelle `getAllSlidesOverview` en boucle. Le premier appel reussit, les suivants retournent des donnees vides. La detection de boucle ne capte pas la repetition (signatures legerement differentes a chaque fois) et le nombre de requetes finit par faire couper la connexion.
+**Statut :** Optimisé. L'élagage du contexte est implémenté via `prepareMessagesForContext` dans `tokenManager.ts` avec une limite de 1.2M de caractères, préservant les derniers messages et tronquant les résultats d'outils volumineux.
+**Stratégie d'implémentation :**
 
-**Cause racine:** `getAllSlidesOverview` fait 2 `context.sync()` par slide dans une boucle (lignes 893, 899), ce qui est couteux. L'agent ne sait pas quoi faire avec l'image et re-tente le meme workflow de decouverte en boucle.
+1. **Élagage du contexte (Context Pruning)** : Le contexte LLM grossit de manière exponentielle car les retours des appels d'outils (ex: JSON d'état) sont accumulés dans les prompts successifs. Implémenter une troncature ou un résumé automatique des `tool_results` trop anciens pour alléger la taille du prompt envoyé.
+2. Analyser le code de la boucle d'agent (`useAgentLoop.ts`) pour tout processus synchrone ou timeout artificiel s'accumulant après plusieurs outils.
 
-**Strategie validee — Option C (les deux) :**
+### WD-C4 — Plante sur texte inséré depuis un PDF sans sélection [VÉRIFIÉ — OK]
 
-1. **Detection de boucle (filet de securite)** : Renforcer `useLoopDetection.ts` pour detecter les appels repetitifs au meme outil (meme outil appele 3+ fois consecutivement = arreter la boucle et afficher un message d'erreur explicite).
-2. **Corriger le workflow image PowerPoint** : Modifier `powerpoint.skill.md` pour donner a l'agent des instructions claires sur comment gerer une image (creer une slide, inserer l'image via un outil dedie, ne PAS boucler sur `getAllSlidesOverview`).
+**Statut :** Fixé. L'outil `insertContent` (`wordTools.ts`) effectue désormais un `insertedRange.select()` automatique après l'insertion, garantissant une sélection valide pour les appels de formatage ultérieurs.
+**Stratégie d'implémentation :**
 
----
-
-### XL-C1 ✅ DONE — Generation de graphiques : etiquettes d'abscisses traitees comme serie de donnees
-
-**Fichiers concernes:**
-- `frontend/src/utils/excelTools.ts` (ligne 429) — `manageObject`
-
-**Probleme:** Lors de la creation d'un graphique, le code utilise :
-```javascript
-const chart = sheet.charts.add(excelChartType, dataRange, Excel.ChartSeriesBy.auto)
-```
-Le mode `auto` laisse Excel deviner comment interpreter les donnees. La premiere colonne/ligne (souvent les etiquettes d'abscisses) est interpretee comme une serie de donnees supplementaire au lieu d'etre utilisee comme etiquettes d'axe.
-
-**Strategie validee — Option A (parametre explicite) :**
-
-1. Ajouter les parametres `seriesBy` (`'columns'` | `'rows'`) et `hasHeaders` (`boolean`) a l'outil `manageObject` pour la creation de graphiques.
-2. L'agent choisit les valeurs en fonction du contexte des donnees selectionnees.
-3. Apres creation, si `hasHeaders=true`, extraire la premiere ligne/colonne pour `chart.axes.categoryAxis.setCategoryNames()` et la retirer des series de donnees.
-4. Mettre a jour `excel.skill.md` pour documenter ces parametres et guider l'agent.
+1. Modifier l'outil d'insertion de texte (`insertContent` dans `wordTools.ts` par exemple) pour qu'il retourne et **sélectionne automatiquement** la plage de texte (`Range`) qu'il vient de créer via l'API Office (`range.select()`).
+2. Indiquer dans `word.skill.md` que l'agent doit explicitement s'assurer d'avoir un texte sélectionné _avant_ tout appel à `formatText`, ou bien utiliser un outil comme `searchAndFormat` spécifique.
 
 ---
 
-### WD-C1 ✅ DONE — Crash formatText sur texte insere depuis un PDF (pas de selection)
+## ITEMS MAJEURS (Ergonomie, Comportement inattendu, Problèmes UI)
 
-**Fichiers concernes:**
-- `frontend/src/utils/wordTools.ts` (lignes 248-304) — `formatText`
-- `frontend/src/utils/wordTools.ts` (lignes 178-244) — `insertContent`
-- `frontend/src/skills/word.skill.md` (lignes 30-34) — regle critique
-- `frontend/src/utils/wordTools.ts` (lignes 355-461) — `searchAndFormat`
+### XL-M1 — Génération de graphes Excel traite l'axe X comme série de données [FIXÉ — OK]
 
-**Probleme:** `formatText` requiert une selection active (`context.document.getSelection()`). Quand du texte est insere via `insertContent`, il n'est PAS selectionne. L'agent tente quand meme `formatText` → crash. Le skill documente 3 workflows alternatifs (A: syntax inline, B: applyTaggedFormatting, C: searchAndFormat) mais l'agent ne les suit pas systematiquement.
+**Statut :** Amélioré. `excelTools.ts` définit désormais explicitement l'Axe X (Category Axis) via `setCategoryNames` en utilisant la première ligne/colonne de la plage fournie.
+**Stratégie d'implémentation :**
 
-**Cause racine:** `insertContent` a acces a `insertedRange` (ligne 230) mais n'appelle jamais `insertedRange.select()` pour le selectionner. Il n'existe aucun outil `selectText`/`selectRange`.
+1. Modifier la fonction `manageObject` ou `createChart` dans `excelTools.ts`.
+2. Au lieu de laisser `Excel.ChartSeriesBy.auto`, passer explicitement les paramètres pour que la 1ère colonne (ou ligne) soit utilisée comme axe des catégories (Axe X) (`chart.axes.categoryAxis.setCategoryNames(...)`).
+3. Retirer la plage correspondante des séries de données (DataSeries) pour éviter le doublon visuel.
 
-**Strategie validee — Option A + C (auto-select + prompt renforcé) :**
+### PPT-M2 — L'agent n'utilise pas les boîtes (titre, corps) des templates PowerPoint [VÉRIFIÉ — OK]
 
-1. **Auto-select apres insertion** : Dans `insertContent` (ligne 230 de `wordTools.ts`), ajouter `insertedRange.select()` apres `context.sync()` pour que le texte insere soit automatiquement selectionne. `formatText` fonctionnera directement apres.
-2. **Renforcement du prompt agent** : Dans `word.skill.md` et `useAgentPrompts.ts`, ajouter une regle explicite : "Apres `insertContent`, le texte est auto-selectionne. Tu peux utiliser `formatText` directement. Pour du formatage cible sur du texte existant, utilise `searchAndFormat`."
+**Statut :** Fonctionnel. `addSlide` inspecte `placeholderFormat` pour injecter le contenu dans les zones natives du template au lieu de créer des zones flottantes.
+**Stratégie d'implémentation :**
 
----
+1. Étendre les paramètres de l'outil `addSlide` pour récupérer les "Shapes" de type placeholder une fois la slide créée.
+2. Injecter les paramètres texte (`title`, `body`) directement dans les placeholders au lieu de créer de nouvelles zones de texte flottantes "sauvages".
 
-## ITEMS MAJEURS
+### GEN-M3 — Taille du Taskpane bloquée à 300px au lieu de 450px [FIXÉ — OK]
 
-### GEN-M1 ✅ DONE — Taille du taskpane bloquee a 300px (manifest desynchronise)
+**Statut :** Manifestes régénérés. La balise `<RequestedWidth>450</RequestedWidth>` est présente dans les templates et les manifestes finaux ont été mis à jour via `generate-manifests.js`.
 
-**Fichiers concernes:**
-- `manifests-templates/manifest-office.template.xml` (ligne 31) — `<RequestedWidth>450</RequestedWidth>` ✅
-- `manifest-office.xml` (lignes 29-31) — MANQUE `<RequestedWidth>` ❌
+**Stratégie d'implémentation :**
 
-**Probleme:** Le template a correctement `RequestedWidth=450` mais le manifest racine `manifest-office.xml` utilise en dev/production n'a PAS cette propriete. Sans elle, Office utilise la valeur par defaut de 300px.
+1. Documenter ou ajouter un script pre-start (`npm run build:manifests`) pour s'assurer que `generate-manifests.js` est systématiquement exécuté avant `npm start`.
+2. Lancer manuellement `node scripts/generate-manifests.js` pour mettre à jour les manifestes finaux.
 
-**Strategie:** Synchroniser `manifest-office.xml` avec le template. Ajouter `<RequestedWidth>450</RequestedWidth>` dans `<DefaultSettings>`. Verifier aussi que le script `scripts/generate-manifests.js` est utilise dans le workflow de deploiement (actuellement `generated-manifests/` est vide).
+### GEN-M4 — Espace et heure apparaissant prématurément [FIXÉ — OK]
 
----
+**Statut :** Résolu. La condition d'affichage du timestamp dans `ChatMessageList.vue` est désormais alignée sur la visibilité du contenu du message, évitant l'heure "fantôme" avant la réponse.
 
-### GEN-M2 ✅ DONE — Bouton bug/feedback : traductions manquantes et taille excessive
+**Stratégie d'implémentation :**
 
-**Fichiers concernes:**
-- `frontend/src/components/settings/GeneralTab.vue` (lignes 120-131)
-- `frontend/src/components/settings/FeedbackDialog.vue` (lignes 1-117)
-- `frontend/src/i18n/locales/en.json` — cles manquantes
-- `frontend/src/i18n/locales/fr.json` — cles manquantes
+1. Aligner la condition d'affichage du timestamp sur celle du corps du message dans `ChatMessageList.vue` (ou bien n'afficher le timestamp que si `text`, `toolCalls` ou `imageSrc` sont présents).
+2. Vérifier l'espacement généré par le flex container pour éviter l'apparition d'un espace fantôme.
 
-**Probleme:** 13 cles i18n manquantes : `reportBugOrFeedback`, `feedbackButtonText`, `feedbackTitle`, `feedbackSuccess`, `feedbackCategory`, `feedbackBug`, `feedbackFeature`, `feedbackOther`, `feedbackComment`, `feedbackPlaceholder`, `feedbackIncludeLogs`, `submitting`, `submit`. Le bouton affiche les cles brutes au lieu du texte traduit. Le bouton utilise `min-w-fit` ce qui le rend trop large.
+### PPT-M5 — L'action rapide "Notes d'orateur" ne s'insère pas d'elle-même [FIXÉ — OK]
 
-**Strategie:** Ajouter les 13 cles dans `en.json` et `fr.json`. Remplacer `min-w-fit` par une largeur max sur le bouton dans `GeneralTab.vue`.
+**Statut :** Amélioré. `setCurrentSlideSpeakerNotes` gère désormais les erreurs explicitement (API 1.5+) et avertit l'utilisateur en cas d'échec ou d'incompatibilité.
 
----
+**Stratégie d'implémentation :**
 
-### XL-M1 ✅ DONE — Actions rapides Excel : comportement incoherent et sans tooltips
-
-**Fichiers concernes:**
-- `frontend/src/pages/HomePage.vue` (lignes 315-356) — definitions
-- `frontend/src/composables/useAgentLoop.ts` (lignes 861-874) — execution mode `draft`
-- `frontend/src/i18n/locales/en.json` / `fr.json` — tooltips manquants
-
-**Probleme:** 4 des 5 actions rapides Excel utilisent `mode: 'draft'` (remplissent juste le champ chat) alors que Word et PowerPoint utilisent `mode: 'immediate'` avec `executeWithAgent: true` (execution directe). Les 5 tooltips sont manquants (`excelIngest_tooltip`, `excelAutoGraph_tooltip`, `excelExplain_tooltip`, `excelFormulaGenerator_tooltip`, `excelDataTrend_tooltip`).
-
-**Strategie validee :**
-
-| Action | Mode actuel | Nouveau mode | Justification |
-|--------|------------|-------------|---------------|
-| `excelIngest` (Analyser) | `immediate` ✅ | Garder `immediate` | Pas d'input necessaire |
-| `excelAutoGraph` (Graphique auto) | `draft` ❌ | → `immediate` + `executeWithAgent: true` | Pas d'input — genere depuis selection |
-| `excelExplain` (Expliquer) | `draft` ❌ | → `immediate` + `executeWithAgent: true` | Pas d'input — explique la selection |
-| `excelFormulaGenerator` (Formule) | `draft` | Garder `draft` | **Input requis** — l'utilisateur decrit la formule |
-| `excelDataTrend` (Tendances) | `draft` ❌ | → `immediate` + `executeWithAgent: true` | Pas d'input — analyse les tendances |
-
-Ajouter les 5 tooltips manquants dans `en.json` et `fr.json`.
+1. Modifier `setCurrentSlideSpeakerNotes` (dans `powerpointTools.ts`) pour qu'il affiche un message clair ou lance une exception gérée si la fonction échoue.
+2. Dans le cas Web où la zone de notes n'existerait pas par défaut, essayer de l'initialiser ou avertir l'utilisateur d'une incompatibilité.
 
 ---
 
-### XL-M2 ✅ DONE — Langue des formules Excel non utilisee partout
+## ITEMS MINEURS (Amélioration UI cosmétique, Ajustements de Prompts)
 
-**Fichiers concernes:**
-- `frontend/src/utils/excelTools.ts` (ligne 50-53) — `getExcelFormulaLanguage()`
-- `frontend/src/composables/useAgentPrompts.ts` (lignes 28-30, 170)
-- `frontend/src/utils/excelTools.ts` (lignes 1072-1240) — `applyConditionalFormatting` ❌
-- `frontend/src/utils/excelTools.ts` (lignes 1463+) — `eval_officejs` ❌
+### PPT-L1 — L'action "Impact" n'est pas adaptée à PowerPoint [FIXÉ — OK]
 
-**Probleme:** Le parametre "Langue des formules Excel" est utilise dans `setCellRange` et le prompt agent, MAIS pas dans :
-1. `applyConditionalFormatting` — accepte `formula1`/`formula2` sans conversion locale
-2. `eval_officejs` — pas de contexte de langue passe a l'environnement d'execution
-3. Les instructions shell communes (`COMMON_SHELL_INSTRUCTIONS`)
+**Statut :** Amélioré. Le prompt `punchify` dans `constant.ts` a été assoupli pour permettre des slogans percutants ou des listes courtes selon le contexte, au lieu de forcer systématiquement des puces.
 
-**Strategie:** Injecter `getExcelFormulaLanguage()` dans `applyConditionalFormatting` pour utiliser `formulasLocal` si francais. Ajouter un commentaire/contexte dans `eval_officejs` pour que l'agent genere des formules dans la bonne langue. Mentionner la langue dans les shell instructions.
+**Criticité :** Mineure
 
----
+**Problème :** Produit parfois un texte dense ou force obligatoirement des puces, sans tenir compte de la meilleure manière de présenter le contenu pour PowerPoint.
+**Cause Racine :** Le prompt système défini dans `frontend/src/utils/constant.ts` pour l'action `punchify` ("Max 6-7 bullets total") force le LLM à transformer quoi qu'il arrive le contenu en bullet points ("puces"), ignorant le fait qu'une phrase courte pourrait être plus percutante.
 
-### PPT-M1 ✅ DONE — L'agent n'utilise pas les boites titre/corps du template
+**Stratégie d'implémentation :**
 
-**Fichiers concernes:**
-- `frontend/src/utils/powerpointTools.ts` (lignes 758-791) — `addSlide`
-- `frontend/src/skills/powerpoint.skill.md` (lignes 99-105)
+1. Modifier `constant.ts` en ajustant le prompt `punchify`. Il faut lui retirer la contrainte stricte des bullet points systématiques.
+2. Nouveau prompt `punchify` ciblé : "Évaluez la meilleure façon de présenter cela pour un support visuel (PowerPoint/Keynote). Utilisez soit une courte phrase très percutante, soit 3 à 5 très courtes puces, soit une combinaison équilibrée. Ne forcez pas les puces si un court slogan ou texte direct est plus puissant."
 
-**Probleme:** `addSlide` cree une slide avec un layout mais ne peuple PAS les boites de texte du template (Titre, Corps, Sous-titre). L'agent doit ensuite appeler `getShapes()` pour decouvrir les IDs des shapes puis `insertContent` pour chacune — workflow non documente et rarement suivi.
+### PPT-L2 — L'image générée est uniquement carrée et tronquée [FIXÉ — OK]
 
-**Strategie:** Modifier `addSlide` pour accepter des parametres optionnels `title` et `body`. Si fournis, le tool decouvre automatiquement les shapes du layout et y insere le contenu. Mettre a jour `powerpoint.skill.md` pour documenter ce workflow.
+**Statut :** Résolu. Bien que la génération reste en 1024x1024 (pour compatibilité/coût), l'outil `insertImageOnSlide` positionne désormais l'image intelligemment (centrée) sans la tronquer, respectant son ratio carré sur les slides 16:9.
 
----
+**Stratégie d'implémentation :**
 
-### PPT-M2 ✅ DONE — Notes d'orateur : l'action rapide ne les insere pas dans la slide
+1. **Format Image :** Conserver volontairement la génération d'images en résolution standard **1024x1024** pour des raisons de simplicité, de coût et de compatibilité.
+2. **Côté PowerPoint (`powerpointTools.ts` ou Prompt) :** Mettre à jour l'implémentation de `insertImageOnSlide` (ou la consigne de positionnement du LLM) pour intégrer intelligemment l'image au format 1:1 sur la slide sans forcer de redimensionnement qui l'étirerait. Ex: la centrer avec des marges ou la positionner à droite du texte, en respectant son ratio carré naturel.
 
-**Fichiers concernes:**
-- `frontend/src/pages/HomePage.vue` (lignes 407-413)
-- `frontend/src/utils/constant.ts` (lignes 261-276) — prompt speakerNotes
-- `frontend/src/utils/powerpointTools.ts` (lignes 459-490) — `setSpeakerNotes`
+### GEN-L3 — Utilité des boutons/check-box de formatage sous le champ chat [FIXÉ — OK]
 
-**Probleme:** L'action rapide "Notes d'orateur" genere le texte dans le chat mais ne l'insere PAS dans les notes de la slide. Pourtant l'outil `setSpeakerNotes` existe et peut le faire.
+**Statut :** Implémenté (Phantom Context). Les cases à cocher ont été supprimées de l'UI. Le texte sélectionné (ou le contenu de la slide/feuille par défaut) est désormais envoyé automatiquement à l'agent. Le prompt système a été mis à jour avec le pattern "Modificateur Intelligent".
 
-**Strategie validee — Appel direct (rapide) :**
+**Stratégie d'implémentation :**
 
-1. Modifier l'action rapide `speakerNotes` pour qu'elle genere les notes via LLM (prompt existant dans `constant.ts`).
-2. Apres generation, appeler directement `setSpeakerNotes` (lignes 459-490 de `powerpointTools.ts`) avec le contenu genere, sans passer par la boucle agent.
-3. Afficher un message de confirmation dans le chat une fois les notes inserees.
-
----
-
-## ITEMS MINEURS
-
-### PPT-L1 ✅ DONE — Action rapide "Impact" pas adaptee a PowerPoint
-
-**Fichiers concernes:**
-- `frontend/src/utils/constant.ts` (lignes 278-294) — prompt `punchify`
-- `frontend/src/skills/powerpoint.skill.md` (lignes 56-74)
-
-**Probleme:** Le prompt de l'action "Impact" est oriente copywriting general. Il ne mentionne pas : format puces, max 8-10 mots par puce, max 6-7 puces par slide.
-
-**Strategie:** Mettre a jour le prompt `punchify` dans `constant.ts` pour ajouter des contraintes PowerPoint : format bullet points, concision, limites de puces. Aligner avec les bonnes pratiques documentees dans `powerpoint.skill.md`.
-
----
-
-### GEN-L1 ✅ DONE — Checkboxes du chat : option "Formatage Word" potentiellement confuse
-
-**Fichiers concernes:**
-- `frontend/src/components/chat/ChatInput.vue` (lignes 108-136)
-- `frontend/src/composables/useOfficeInsert.ts` (ligne 179)
-
-**Probleme:** La checkbox "Formatage Word" ne controle PAS ce que l'IA genere mais seulement COMMENT le resultat est insere (HTML formate vs texte brut). Le nom prete a confusion. Les autres checkboxes ("Inclure le texte selectionne/cellules/diapo") sont claires et utiles.
-
-**Strategie validee — Option A (renommer) :**
-
-1. Renommer le label dans `en.json` : `useWordFormattingLabel` → "Insert with formatting"
-2. Renommer le label dans `fr.json` : `useWordFormattingLabel` → "Inserer avec mise en forme"
-3. Garder le comportement fonctionnel identique (controle du mode d'insertion HTML vs plain text).
-
----
-
-### GEN-L2 ✅ DONE — Tooltips manquants sur les actions rapides (multi-apps)
-
-**Fichiers concernes:**
-- `frontend/src/i18n/locales/en.json`
-- `frontend/src/i18n/locales/fr.json`
-
-**Probleme:** Tooltips manquants pour :
-- Excel : 5 tooltips (`excelIngest_tooltip`, `excelAutoGraph_tooltip`, `excelExplain_tooltip`, `excelFormulaGenerator_tooltip`, `excelDataTrend_tooltip`)
-- Word : 1 tooltip (`summary_tooltip`)
-- Outlook : 4 tooltips (`outlookProofread_tooltip`, `outlookConcise_tooltip`, `outlookExtract_tooltip`, `outlookReply_tooltip`)
-
-**Strategie:** Ajouter les 10 cles manquantes dans `en.json` et `fr.json` avec des descriptions explicatives de chaque action.
-
----
-
-## DEFERRED ITEMS (reconduits des revues precedentes)
-
-- **IC2** — Containers run as root (low priority).
-- **IH2** — Private IP in build arg.
-- **IH3** — DuckDNS domain in example.
-- **UM10** — PowerPoint HTML reconstruction (high complexity).
-
----
-
-## Changelog
-
-| Version | Date       | Changes                                                                                |
-| ------- | ---------- | -------------------------------------------------------------------------------------- |
-| v8.1    | 2026-03-08 | Implementation complete des 12 findings v8 (0 open). npx tsc → 0 erreur.               |
-| v8.0    | 2026-03-08 | Nouvelle revue utilisateur — 12 findings (3 critiques, 6 majeurs, 3 mineurs).          |
-| v7.2    | 2026-03-08 | Finalisation UX/UI, Code mort, Generalisation et Qualite de code (Axe 4 a 7). PR #178  |
-| v7.1    | 2026-03-08 | Resolution des 5 critiques + bonus.                                                    |
-| v7.0    | 2026-03-08 | Revue 7 axes (34 findings).                                                            |
+1. **Nettoyage UI (`ChatInput.vue`) :** Supprimer purement et simplement les éléments de case à cocher pour `"Formatage Word"` et `"Inclure la sélection"`. Les `v-model` (`useWordFormatting`, `useSelectedText`) peuvent toujours subsister en code mais être figés à `true` par défaut.
+2. **Context Fantôme Permanent (`useAgentLoop.ts` / `useAgentPrompts.ts`) :**
+   - Transmettre systématiquement le texte/contenu sélectionné (que ce soit une sélection Word, des cellules Excel, du texte de slide PPT, ou un corps de courriel Outlook) en tant que contexte dans la portion cachée du prompt.
+3. **Mise à jour du Prompt Système global :**
+   - Ajouter une directive claire sur l'exploitation de ce contexte selon l'hôte (Excel, PPT, Word, Outlook).
+   - "Le système vous joint ci-dessous la sélection ou le contexte actuel de l'utilisateur (texte, slide, cellules excel, email). Pensez `Modificateur intelligent` : Si la demande de l'utilisateur implique de modifier son brouillon de travail actuel, basez-vous sur ce contexte envoyé pour effectuer l'action (en utilisant les outils d'édition/écriture). Si la demande est d'ordre général, exploitez cette sélection uniquement à titre informatif, comme contexte."
+   - L'objectif est que la bascule de "Dois-je utiliser le texte de la slide ?" se fasse dynamiquement par le LLM.

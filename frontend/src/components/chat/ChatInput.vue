@@ -105,35 +105,7 @@
         <Send :size="18" />
       </button>
     </div>
-    <div class="flex flex-wrap justify-center gap-x-3 gap-y-1 px-1">
-      <label
-        v-if="showWordFormatting"
-        :for="wordFormattingCheckboxId"
-        class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary"
-      >
-        <input
-          :id="wordFormattingCheckboxId"
-          :checked="useWordFormatting"
-          :aria-label="useWordFormattingLabel"
-          type="checkbox"
-          @change="handleWordFormattingChange"
-        />
-        <span>{{ useWordFormattingLabel }}</span>
-      </label>
-      <label
-        :for="selectedTextCheckboxId"
-        class="flex h-3.5 w-3.5 flex-1 cursor-pointer items-center gap-1 text-xs text-secondary"
-      >
-        <input
-          :id="selectedTextCheckboxId"
-          :checked="useSelectedText"
-          :aria-label="includeSelectionLabel"
-          type="checkbox"
-          @change="handleSelectedTextChange"
-        />
-        <span>{{ includeSelectionLabel }}</span>
-      </label>
-    </div>
+    <!-- Formatting checkboxes removed (GEN-L3) -->
 
     <!-- UX-L2 Keyboard Shortcuts Hint -->
     <div
@@ -178,8 +150,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:selectedModelTier', value: string): void
   (e: 'update:modelValue', value: string): void
-  (e: 'update:useWordFormatting', value: boolean): void
-  (e: 'update:useSelectedText', value: boolean): void
   (e: 'submit', value: string, files?: File[]): void
   (e: 'stop'): void
 }>()
@@ -328,18 +298,8 @@ const handleStop = () => {
   emit('stop')
 }
 
-const handleWordFormattingChange = (event: Event) => {
-  emit('update:useWordFormatting', (event.target as HTMLInputElement).checked)
-}
-
-const handleSelectedTextChange = (event: Event) => {
-  emit('update:useSelectedText', (event.target as HTMLInputElement).checked)
-}
-
 const textareaEl = ref<HTMLTextAreaElement>()
 const modelTierSelectId = 'chat-model-tier-select'
 const modelTierLabelId = 'chat-model-tier-label'
-const wordFormattingCheckboxId = 'chat-word-formatting-checkbox'
-const selectedTextCheckboxId = 'chat-selected-text-checkbox'
 defineExpose({ textareaEl })
 </script>
