@@ -4,6 +4,7 @@
  * Includes per-session VFS (Virtual File System) persistence.
  */
 import type { DisplayMessage } from '@/types/chat'
+import type { LogEntry } from '@/utils/logger'
 import { snapshotVfs, restoreVfs } from '@/utils/vfs'
 import { randomUUID } from '@/utils/cryptoPolyfill'
 import { message as messageUtil } from '@/utils/message'
@@ -24,8 +25,9 @@ export interface ChatSession {
 }
 
 const DB_NAME = 'KickOfficeDB'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const SESSIONS_STORE = 'sessions'
+const LOGS_STORE = 'logs'
 
 let dbInstance: IDBDatabase | null = null
 
@@ -41,6 +43,11 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(SESSIONS_STORE, { keyPath: 'id' })
         store.createIndex('hostType', 'hostType', { unique: false })
         store.createIndex('updatedAt', 'updatedAt', { unique: false })
+      }
+      if (!db.objectStoreNames.contains(LOGS_STORE)) {
+        const logsStore = db.createObjectStore(LOGS_STORE, { keyPath: 'id', autoIncrement: true })
+        logsStore.createIndex('sessionId', 'sessionId', { unique: false })
+        logsStore.createIndex('timestamp', 'timestamp', { unique: false })
       }
     }
 
@@ -187,4 +194,37 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 export function getSessionMessageCount(session: ChatSession): number {
   return session.messages.filter(m => m.role === 'user' || m.role === 'assistant').length
+}
+
+export async function appendLogEntry(entry: LogEntry): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(LOGS_STORE, 'readwrite')
+  await idbAdd(tx.objectStore(LOGS_STORE), entry)
+}
+
+export async function getLogsForSession(sessionId: string): Promise<LogEntry[]> {
+  const db = await openDB()
+  const tx = db.transaction(LOGS_STORE, 'readonly')
+  return idbGetAllByIndex<LogEntry>(tx.objectStore(LOGS_STORE), 'sessionId', sessionId)
+}
+
+export async function pruneOldLogs(maxEntries: number = 1000): Promise<void> {
+  const db = await openDB()
+  const tx = db.transaction(LOGS_STORE, 'readwrite')
+  const store = tx.objectStore(LOGS_STORE)
+  const allEntries = await new Promise<Array<LogEntry & { id: number }>>((resolve, reject) => {
+    const index = store.index('timestamp')
+    const req = index.getAll()
+    req.onsuccess = () => resolve(req.result as Array<LogEntry & { id: number }>)
+    req.onerror = () => reject(req.error)
+  })
+  if (allEntries.length <= maxEntries) return
+  const toDelete = allEntries.slice(0, allEntries.length - maxEntries)
+  for (const entry of toDelete) {
+    await new Promise<void>((resolve, reject) => {
+      const req = store.delete(entry.id)
+      req.onsuccess = () => resolve()
+      req.onerror = () => reject(req.error)
+    })
+  }
 }

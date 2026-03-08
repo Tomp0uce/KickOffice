@@ -1,5 +1,6 @@
 import { detectOfficeHost } from './hostDetection'
 import { getUserEmail } from './credentialStorage'
+import { appendLogEntry } from '@/composables/useSessionDB'
 
 export interface LogEntry {
   timestamp: string
@@ -79,10 +80,12 @@ class LogService {
     }
     const sessionLogs = this.buffer.get(sessionId)!
     sessionLogs.push(entry)
-    
+
     if (sessionLogs.length > this.MAX_ENTRIES) {
       sessionLogs.shift()
     }
+
+    appendLogEntry(entry).catch(() => {})
   }
 
   error(message: string, error?: any, data?: any) {

@@ -24,6 +24,7 @@ import { imageRouter } from './routes/image.js'
 import { modelsRouter } from './routes/models.js'
 import { uploadRouter } from './routes/upload.js'
 import { feedbackRouter } from './routes/feedback.js'
+import { logsRouter } from './routes/logs.js'
 import { logAndRespond } from './utils/http.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -60,6 +61,15 @@ const infoLimiter = rateLimit({
   message: { error: 'Too many requests.' },
 })
 
+// Rate limiter for frontend log submission
+const logsLimiter = rateLimit({
+  windowMs: 60_000, // 1 minute
+  max: 20, // max 20 log batches per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many log requests. Please try again later.' },
+})
+
 // Rate limiter for file upload endpoint to prevent memory exhaustion
 const uploadLimiter = rateLimit({
   windowMs: 60_000, // 1 minute
@@ -78,6 +88,7 @@ app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Key', 'X-User-Email', 'x-csrf-token', 'X-Office-Host', 'X-Session-Id'],
+  exposedHeaders: ['X-Request-Id'],
   credentials: true,
 }))
 
@@ -112,7 +123,9 @@ app.use((req, res, next) => {
   res.locals.reqId = crypto.randomUUID()
   res.locals.userId = req.headers['x-user-email'] || 'anonymous'
   res.locals.host = req.headers['x-office-host'] || 'unknown'
-  
+
+  res.setHeader('X-Request-Id', res.locals.reqId)
+
   req.logger = logger.child({
     reqId: res.locals.reqId,
     userId: res.locals.userId,
@@ -207,6 +220,7 @@ app.use('/api/chat', ensureLlmApiKey, ensureUserCredentials, chatLimiter, chatRo
 app.use('/api/image', ensureLlmApiKey, ensureUserCredentials, imageLimiter, imageRouter)
 app.use('/api/upload', ensureUserCredentials, uploadLimiter, uploadRouter)
 app.use('/api/feedback', ensureUserCredentials, feedbackRouter)
+app.use('/api/logs', ensureUserCredentials, logsLimiter, logsRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

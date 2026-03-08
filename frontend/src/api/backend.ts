@@ -262,6 +262,9 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     throw new Error(`Chat API error ${res.status}: ${err}`)
   }
 
+  const chatReqId = res.headers.get('x-request-id')
+  if (chatReqId) logService.info(`Request correlated: ${chatReqId}`, 'system', { reqId: chatReqId })
+
   if (!res.body) throw new Error('Empty response body')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -357,6 +360,9 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
     throw new Error(`Image API error ${res.status}: ${err}`)
   }
 
+  const imageReqId = res.headers.get('x-request-id')
+  if (imageReqId) logService.info(`Request correlated: ${imageReqId}`, 'system', { reqId: imageReqId })
+
   const data = await res.json()
   const image = data.data?.[0]
 
@@ -387,7 +393,25 @@ export async function uploadFile(file: File): Promise<{ filename: string; extrac
     throw new Error(`File upload error ${res.status}: ${err}`)
   }
 
+  const uploadReqId = res.headers.get('x-request-id')
+  if (uploadReqId) logService.info(`Request correlated: ${uploadReqId}`, 'system', { reqId: uploadReqId })
+
   return res.json()
+}
+
+export async function submitLogs(entries: unknown[]): Promise<void> {
+  try {
+    const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
+      body: JSON.stringify({ entries }),
+    })
+    if (!res.ok) {
+      logService.originalConsole.warn('[KO] Failed to submit logs:', res.status)
+    }
+  } catch {
+    // Silent: log submission failure should never break the UI
+  }
 }
 
 export async function submitFeedback(sessionId: string, payload: { category: string; comment: string; logs: unknown[] }): Promise<{ success: boolean }> {
