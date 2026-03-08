@@ -1,173 +1,187 @@
-# DESIGN_REVIEW.md — Code Audit v6
+# DESIGN_REVIEW.md — Code Audit v7
 
-**Date**: 2026-03-07
-
-**Version**: 6.1
-**Scope**: Full project design review — Fonctionnalites, Code Quality, Architecture, UX/UI
+**Date**: 2026-03-08
+**Version**: 7.1
+**Scope**: Revue complete — Architecture, Fonctionnalites Add-in, Gestion d'erreurs, UX/UI, Code mort, Generalisation, Qualite de code
 
 ---
 
 ## Etat de sante global
 
+Le projet KickOffice est **mature et bien structure**. Les 5 critiques v7 sont tous resolus. 7 items DONE au total (5 critiques + 2 majeurs bonus).
 
-Le projet KickOffice est **solide architecturalement** avec une bonne separation frontend/backend, un sandbox SES pour l'execution de code, et une gestion correcte d'Office.onReady.
+**Verification :** `npx tsc --noEmit` → 0 erreur | `npx vitest run` → 76/76 tests ✅
 
-| Severite | Total | DONE | OPEN | N/A |
-| -------- | ----- | ---- | ---- | --- |
-| BLOQUANT/CRITIQUE | 5 | 4 | 0 | 1 |
-| MAJEUR/IMPORTANT | 14 | 14 | 0 | 0 |
-| MINEUR/AMELIORATION | 16 | 15 | 0 | 1 |
-| **Total** | **35** | **33** | **0** | **2** |
-
----
-
-## AXE 1 — REVUE DES FONCTIONNALITES
-
-### BLOQUANT/CRITIQUE
-
-- **F-C1** — Excel : `safeGetSheet()` avec `getItemOrNullObject` ✅ DONE (PR #167)
-- **F-C2** — PowerPoint : description de `proposeShapeTextRevision` corrigee ✅ DONE (PR #167)
-
-### MAJEUR/IMPORTANT
-
-- **F-M1** — Sanitisation prompt injection ✅ DONE (PR #169)
-  - `useAgentPrompts.ts` : `sanitize()` echappe newlines, tabs, chars markdown/HTML
-
-- **F-M2** — PowerPoint : outils speaker notes et images ✅ DONE (PR #169)
-  - `getSpeakerNotes`, `setSpeakerNotes`, `insertImageOnSlide` ajoutes dans `powerpointTools.ts`
-
-- **F-M3** — Excel : `sortRange` interface consistante ✅ DONE (PR #169)
-  - `address` optionnel ; si absent utilise `getSelectedRange()`
-
-- **F-M4** — Excel : `getAllObjects` scan actif par defaut ✅ DONE (PR #169)
-  - `allSheets` defaut `false` (etait `true`)
-
-- **F-M5** — Excel : `findData` limite 200 → 2000 avec indication ✅ DONE (PR #169)
-  - Quand tronque : retourne `{ matches, totalMatches, truncated: true }`
-
-### MINEUR/AMELIORATION
-
-- **F-L1** — Timeout Outlook 3s → 10s ✅ DONE (PR #169)
-- **F-L2** — PowerPoint `insertContent` fallback non silencieux ✅ DONE (PR #169)
-- **F-L3** — PowerPoint `hasNativeBullets` verifie tous les paragraphes ✅ DONE (PR #169)
-- **F-L4** — PowerPoint `getAllSlidesOverview` truncation 100 → 2000 chars ✅ DONE (PR #169)
-- **F-L5** — Excel `findData` validation regex avec try/catch ✅ DONE (PR #169)
+| Severite | Total | OPEN | DONE |
+| -------- | ----- | ---- | ---- |
+| CRITIQUE | 5 | 0 | 5 |
+| MAJEUR | 16 | 14 | 2 |
+| MINEUR | 13 | 13 | 0 |
+| **Total** | **34** | **27** | **7** |
 
 ---
 
-## AXE 2 — REVUE DE CODE
+## AXE 1 — ARCHITECTURE
 
-### BLOQUANT/CRITIQUE
+### CRITIQUE
 
+- **AR-C1** ✅ DONE — 3 suites Vitest creees (`common`, `tokenManager`, `officeCodeValidator`) — 76 tests passent. Pattern exclude e2e corrige dans `vitest.config.ts`.
+- **AR-C2** ✅ DONE — `POST /api/logs` cree (`backend/src/routes/logs.js`) : filtre warn/error, max 200 entrees, ecriture dans `logs/frontend/`. `logsLimiter` (20 req/min) + `submitLogs()` frontend.
 
-- **C-C1** — Upload route try/catch mammoth + code d'erreur structure ✅ DONE (PR #167)
+### MAJEUR
 
-### MAJEUR/IMPORTANT
+- **AR-M1** — `useAgentLoop.ts` : composable monolithique (1183 lignes)
+  - **Constat** : Boucle agent, streaming, execution des tools, detection de boucle et gestion d'etat concentres dans un seul fichier.
+  - **Action** : Extraire en sous-composables : `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`.
 
-- **C-M1** — DRY : factory generique `createOfficeTools<TName, TTemplate, TDef>()` ✅ DONE (PR #170)
-  - `common.ts` ; les 4 factories dupliquees supprimees des fichiers host
+- **AR-M2** ✅ DONE — Header `X-Request-Id` expose par le backend (`server.js`), capture dans `chatStream()`, `generateImage()`, `uploadFile()` via `res.headers.get('x-request-id')`. CORS mis a jour avec `exposedHeaders`.
 
-- **C-M2** — DRY : `LANGUAGE_MATCH_INSTRUCTION` constant ✅ DONE (PR #170)
-  - `constant.ts` ; interpole dans toutes les quick actions
+- **AR-M3** — Pas de health check periodique frontend
+  - **Constat** : `backendOnline` detecte ad-hoc (fetch models). Pas de polling.
+  - **Action** : Polling `/health` toutes les 30s avec indicateur visuel persistant.
 
-- **C-M3** — Double logging dans `chat.js` ✅ DONE (PR #167)
+### MINEUR
 
+- **AR-L1** — `noUnusedLocals` / `noUnusedParameters` desactives dans `tsconfig.json`
+  - **Action** : Activer ces flags et corriger les warnings resultants.
 
-- **C-M4** — DRY : `sanitizeHtml()` centralise ✅ DONE (PR #170)
-  - Export dans `markdown.ts` ; `DOMPurify` importe en un seul endroit
-
-- **C-M5** — Backend codes d'erreur structures ✅ DONE (PR #167)
-
-### MINEUR/AMELIORATION
-
-- **C-L1** — `sanitizeExecutionError` non exporte ✅ DONE (PR #170)
-- **C-L2** — `OFFICE_ACTION_TIMEOUT_MS` / `OFFICE_BUSY_TIMEOUT_MESSAGE` non exportes ✅ DONE (PR #170)
-- **C-L3** — `colToInt()` / `intToCol()` supprimes ✅ DONE (PR #170)
-- **C-L4** — `DiffMatchPatch` centralise via `computeTextDiffStats()` dans `common.ts` ✅ DONE (PR #170)
-- **C-L5** — Type aliases redondants supprimes (`WordToolDefinition` etc.) ✅ DONE (PR #170)
+- **AR-L2** — Pas de limite sur le nombre de messages dans `validateChatRequest()`
+  - **Action** : Ajouter une limite de 500 messages max.
 
 ---
 
-## AXE 3 — REVUE D'ARCHITECTURE
+## AXE 2 — FONCTIONNALITES ADD-IN (Excel / Word / Outlook / PowerPoint)
 
-### BLOQUANT/CRITIQUE
+### MAJEUR
 
-- **A-C1** — Registre `ErrorCodes` centralise + `ERROR_CODE_MAP` frontend ✅ DONE (PR #167)
+- **FN-M1** — Timeout unique de 10s dans `executeOfficeAction()` pour toutes les operations
+  - **Action** : Ajouter un parametre `timeoutMs` optionnel avec des valeurs par categorie (lecture 5s, ecriture 10s, operations lourdes 20s).
 
-### MAJEUR/IMPORTANT
+- **FN-M2** — Pas de retry sur les operations Office.js
+  - **Action** : Retry avec backoff (1s, 2s) sur les erreurs `GeneralException` (max 2 tentatives).
 
-- **A-M1** — Gestion d'etat sans documentation ✅ DONE (PR #171)
-  - `docs/STATE_MANAGEMENT.md` : 5 couches documentees avec diagrammes et regles
+- **FN-M3** — Pas d'AbortSignal pour les operations Office.js longues
+  - **Action** : Token d'annulation cooperatif verifie entre les etapes `sync()`.
 
+### MINEUR
 
-- **A-M2** — Credentials storage trop complexe ✅ DONE (PR #171)
-  - Chiffrement extrait dans `credentialCrypto.ts` ; `credentialStorage.ts` = routage uniquement
+- **FN-L1** — Timeout Outlook 10s insuffisant pour pieces jointes volumineuses
+  - **Action** : Augmenter a 20s pour les operations `getAttachmentsAsync`.
 
-### MINEUR/AMELIORATION
-
-
-- **A-L1** — Backend sans abstraction retry ✅ DONE (PR #171)
-  - `withRetry(fetchFn, maxAttempts=3)` dans `llmClient.js` : backoff 1s/2s/4s sur 429 et 5xx
-
-- **A-L2** — Sandbox sans audit trail ✅ DONE (PR #171)
-  - `sandboxedEval()` logge `[sandbox] host=X code=…` avant chaque execution
-
-- **A-L3** — MAX_MESSAGES 200 → 1000 ✅ DONE (PR #171)
-
-
-**Fix**: Aligner a 5-10 secondes.
-
-
-## AXE 4 — REVUE UX ET UI
-
-### BLOQUANT/CRITIQUE
-
-- **U-C1** — Streaming en boucle agent : **N/A** — `onStream` met bien a jour l'UI progressivement
-
-### MAJEUR/IMPORTANT
-
-- **U-M1** — Layout taskpane < 350px ✅ DONE (PR #172)
-  - `ChatInput` : `flex-wrap` sur checkboxes ; `ChatHeader` : dropdown `max-w-[calc(100vw-1rem)]` ; `QuickActionsBar` : `flex-wrap`
-
-- **U-M2** — Labels model tiers ✅ DONE (PR #172)
-  - Cles i18n `modelTier.{standard,reasoning,image}` (EN: Quality/Deep Thinking, FR: Qualite/Reflexion profonde)
-
-### MINEUR/AMELIORATION
-
-- **U-L1** — Boutons insertion trop visibles ✅ DONE (PR #172)
-  - `opacity-0` par defaut, `group-hover:opacity-100 focus-within:opacity-100` + transition 150ms
-
-- **U-L2** — Pas de bouton Regenerer/Editer ✅ DONE (PR #172)
-  - Regenerer (RotateCcw) sur dernier message assistant ; Modifier (Pencil) sur messages utilisateur
-
-- **U-L3** — "Thought process" en anglais ✅ DONE
-  - Deja correct : `t('thoughtProcess')` → FR: "Processus de reflexion"
+- **FN-L2** — Pas de tests E2E pour les operations Office.js
+  - **Action** : Tests E2E avec mocks Office.js pour les operations critiques.
 
 ---
 
-## Bugs corriges en cours d'implementation
+## AXE 3 — GESTION D'ERREURS ET DEBUGGING
 
-| Bug | Fichier | Correction |
-|-----|---------|-----------|
-| C-M2 : valeur constante auto-remplacee par replace_all | `constant.ts` | Restaure la chaine originale |
-| Exports `getExcelToolDefinitions` etc. manquants | 4 fichiers tools | Aliases `getXxxToolDefinitions = getToolDefinitions` ajoutes |
-| Cles i18n `modelTier.*` non resolues (format plat vs imbrique) | `en.json`, `fr.json` | Format plat → format imbrique (vue-i18n v9 traite les points comme chemin) |
+### CRITIQUE
+
+- **ER-C1** ✅ DONE — `useSessionDB.ts` : DB_VERSION 1→2, store `logs` ajoute (index sessionId + timestamp). `appendLogEntry()`, `getLogsForSession()`, `pruneOldLogs()` exportes. `logger.ts` : chaque entree persiste dans IndexedDB via `appendLogEntry(entry).catch(() => {})`.
+- **ER-C2** ✅ DONE — Voir AR-M2. Backend renvoie `X-Request-Id`, frontend le capture et le logge dans `logService.info()`.
+
+### MAJEUR
+
+- **ER-M1** — JSON malformed ignore silencieusement dans le stream SSE
+  - **Constat** : Dans `chatStream()`, les lignes JSON malformees sont skipees sans log.
+  - **Action** : Logger au niveau `warn` avec le contenu brut (tronque a 200 chars).
+
+- **ER-M2** ✅ DONE (bonus) — `feedback.js` : `await fs.promises.writeFile(...)` avant `res.json()`. Erreurs d'ecriture desormais capturees par le `try/catch` global.
+
+### MINEUR
+
+- **ER-L1** — Pas de `logLevel` configurable dans `LogService`
+  - **Action** : Ajouter un filtre configurable (defaut `warn` en prod, `debug` en dev).
 
 ---
 
-## RECAPITULATIF PAR PR
+## AXE 4 — UX ET UI
 
-| PR | Contenu |
-|----|---------|
-| #167 | F-C1, F-C2, C-C1, A-C1, C-M3, C-M5 (bloquants + premiers majeurs) |
-| #169 | F-M1..F-M5, F-L1..F-L5 (tous les findings fonctionnels) |
-| #170 | C-M1, C-M2, C-M4, C-L1..C-L5 (qualite de code) |
-| #171 | A-M1, A-M2, A-L1, A-L2, A-L3 (architecture) |
-| #172 | U-M1, U-M2, U-L1, U-L2, U-L3 (UX/UI) |
+### MAJEUR
+
+- **UX-M1** — Accessibilite insuffisante (score estime 66/100)
+  - **Constat** : Pas de focus trap dans les dialogues, boutons icones sans `aria-label`, pas de skip-to-content, `outline-hidden` sans alternative visible.
+  - **Action** : `aria-label` sur tous les boutons icones, focus trap dans les dialogues, style `focus-visible` coherent, lien skip-to-content.
+
+- **UX-M2** — Pas de skeleton loading ni indicateurs de progression
+  - **Action** : Skeleton loaders pour Settings et indicateur de progression pour l'upload.
+
+- **UX-M3** — Erreurs d'authentification affichees inline dans le chat
+  - **Action** : Bandeau d'erreur persistant en haut de page avec lien direct vers les settings.
+
+### MINEUR
+
+- **UX-L1** — 5 onglets Settings trop nombreux pour un taskpane 320px
+  - **Action** : Labels abreges ou icones avec tooltip sous 400px.
+
+- **UX-L2** — Raccourcis clavier non documentes
+  - **Action** : Hint `Shift+Enter for new line` sous le champ de saisie.
 
 ---
 
-## Deferred Items (carries forward from v1–v5)
+## AXE 5 — CODE MORT
+
+### MINEUR
+
+- **DC-L1** — 4 scripts Python legacy inutilises (`export_types.py`, `fix_casts.py`, `fix_record.py`, `fix_unknown.py`)
+  - **Action** : Supprimer ces 4 fichiers.
+
+- **DC-L2** — Imports inutilises dans `wordTools.ts` (`previewDiffStats`, `hasComplexContent`)
+  - **Action** : Supprimer ces imports.
+
+- **DC-L3** — Dependance `type` inutilisee dans `frontend/package.json`
+  - **Action** : Supprimer `"type": "^2.7.3"` des devDependencies.
+
+---
+
+## AXE 6 — GENERALISATION DES OUTILS / FONCTIONS
+
+### MAJEUR
+
+- **GN-M1** — Normalisation des fins de ligne dupliquee 5 fois
+  - **Constat** : `.replace(/\r\n/g, '\n').replace(/\r/g, '\n')` dans `wordApi.ts`, `wordFormatter.ts`, `useOfficeInsert.ts`, `powerpointTools.ts` (x2).
+  - **Action** : Extraire `normalizeLineEndings(text: string): string` dans `common.ts`.
+
+- **GN-M2** — Logique d'insertion Word dupliquee entre `wordApi.ts` et `WordFormatter`
+  - **Constat** : Meme switch case (`replace`/`append`/`newLine`) dans deux endroits (~32 lignes).
+  - **Action** : Consolider dans `WordFormatter.insertPlainResult()`, `wordApi.insertResult()` devient un wrapper.
+
+### MINEUR
+
+- **GN-L1** — Deux instances `MarkdownIt` avec configs de base dupliquees
+  - **Action** : Extraire `createBaseMarkdownParser()` dans `markdown.ts`.
+
+---
+
+## AXE 7 — QUALITE ET MAINTENABILITE DU CODE
+
+### CRITIQUE
+
+- **QC-C1** ✅ DONE — `SettingsPage.vue` decompose : `AccountTab.vue`, `GeneralTab.vue`, `PromptsTab.vue`, `BuiltinPromptsTab.vue`, `ToolsTab.vue` dans `frontend/src/components/settings/`. `SettingsPage.vue` reduit de 1045 a **142 lignes**.
+
+### MAJEUR
+
+- **QC-M1** — Magic numbers dissemines dans le code
+  - **Constat** : `120` (textarea), `5` (loop window), `10*1024*1024` (taille max upload), `30000` (timeout stream), `500` (ring buffer)...
+  - **Action** : Centraliser dans `frontend/src/constants/limits.ts` et `backend/src/config/limits.js`.
+
+- **QC-M2** — `HomePage.vue` (701 lignes) melange orchestration et logique metier
+  - **Action** : Extraire la logique dans un composable `useHomePage.ts`.
+
+- **QC-M3** — Nommage des booleens inconsistant (`loading` vs `showDeleteConfirm` vs `draftFocusGlow`)
+  - **Action** : Standardiser avec prefixe `is` ou `has`.
+
+### MINEUR
+
+- **QC-L1** — Tailles d'icones hardcodees (`:size="16"`, `:size="12"`, `:size="20"`)
+  - **Action** : Constantes `ICON_SIZE_SM/MD/LG`.
+
+- **QC-L2** — `getGlobalHeaders()` dans `backend.ts` relit les credentials a chaque requete
+  - **Action** : Cache avec invalidation sur changement de credentials.
+
+---
+
+## DEFERRED ITEMS (reconduits des versions precedentes)
 
 - **IC2** — Containers run as root (low priority, deployment simplicity)
 - **IH2** — Private IP in build arg (users override at build time)
@@ -176,24 +190,45 @@ Le projet KickOffice est **solide architecturalement** avec une bonne separation
 
 ---
 
+## MATRICE DE PRIORITE (items OPEN)
+
+| # | ID | Axe | Severite | Effort | Impact |
+|---|-----|------|----------|--------|--------|
+| 1 | AR-M1 | Architecture | MAJEUR | Eleve | Testabilite agent loop |
+| 2 | UX-M1 | UX/UI | MAJEUR | Moyen | Accessibilite |
+| 3 | GN-M1 | Generalisation | MAJEUR | Faible | DRY (5 instances) |
+| 4 | GN-M2 | Generalisation | MAJEUR | Faible | DRY (logique Word) |
+| 5 | QC-M1 | Qualite | MAJEUR | Faible | Lisibilite / constantes |
+| 6 | FN-M1 | Fonctionnalites | MAJEUR | Moyen | Robustesse Office.js |
+| 7 | FN-M2 | Fonctionnalites | MAJEUR | Moyen | Resilience Office busy |
+| 8 | QC-M2 | Qualite | MAJEUR | Moyen | HomePage maintenabilite |
+| 9 | ER-M1 | Erreurs | MAJEUR | Faible | Debugging SSE |
+| 10 | AR-M3 | Architecture | MAJEUR | Faible | Health check continu |
+
+---
+
 ## Verification Commands
 
 ```bash
-cd frontend && npx tsc --noEmit   # 0 erreurs sur chaque branche verifiee
-cd frontend && npm run build
-cd backend && npm start
+cd frontend && npx tsc --noEmit        # 0 erreurs ✅
+cd frontend && npx vitest run          # 76/76 tests ✅
+cd frontend && npm run build           # Build OK
+cd backend && npm start                # Server demarre
+cd frontend && npx playwright test     # Tests E2E navigation
 ```
 
 ---
 
 ## Changelog
 
-| Version | Date       | Changes                                                                        |
-| ------- | ---------- | ------------------------------------------------------------------------------ |
-| v6.1    | 2026-03-07 | Mise a jour statut : 33/35 findings resolus (2 N/A). PRs #167-#172             |
-| v6.0    | 2026-03-07 | Full 4-axis audit (35 findings). 6 resolus en PR #167                          |
-| v5.0    | 2026-03-07 | PR #158 review, audit pipeline Word/PPT, 3 corrections ciblees                |
-| v4.0    | 2026-03-03 | Audit complet, 50 problemes tous resolus                                       |
-| v3.0    | 2026-02-28 | 162 problemes identifies, 131 resolus                                          |
-| v2.0    | 2026-02-22 | 28 nouveaux problemes apres refactoring majeur                                 |
-| v1.0    | 2026-02-15 | Audit initial, 38 problemes (tous resolus)                                     |
+| Version | Date       | Changes |
+| ------- | ---------- | ------- |
+| v7.1    | 2026-03-08 | Resolution des 5 critiques (AR-C1, AR-C2, ER-C1, ER-C2, QC-C1) + 2 majeurs bonus (AR-M2, ER-M2). PR #176 |
+| v7.0    | 2026-03-08 | Nouvelle revue 7 axes (34 findings). Architecture, erreurs, UX, code mort, generalisation, qualite |
+| v6.1    | 2026-03-07 | Mise a jour statut : 33/35 findings resolus (2 N/A). PRs #167-#172 |
+| v6.0    | 2026-03-07 | Full 4-axis audit (35 findings). 6 resolus en PR #167 |
+| v5.0    | 2026-03-07 | PR #158 review, audit pipeline Word/PPT, 3 corrections ciblees |
+| v4.0    | 2026-03-03 | Audit complet, 50 problemes tous resolus |
+| v3.0    | 2026-02-28 | 162 problemes identifies, 131 resolus |
+| v2.0    | 2026-02-22 | 28 nouveaux problemes apres refactoring majeur |
+| v1.0    | 2026-02-15 | Audit initial, 38 problemes (tous resolus) |

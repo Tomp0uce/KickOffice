@@ -38,8 +38,7 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '10mb' }), async (req, 
     const filename = `feedback_${category}_${new Date().getTime()}.json`
     const filePath = path.join(FEEDBACK_DIR, filename)
 
-    fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))
-      .catch(err => req.logger.error('Failed to save feedback file', { error: err }))
+    await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))
 
     res.json({ success: true, message: 'Feedback submitted successfully' })
   } catch (error) {
