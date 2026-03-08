@@ -12,6 +12,7 @@ plotDigitizerRouter.post('/', async (req, res) => {
     xAxisRange,
     yAxisRange,
     targetColor,
+    plotAreaBox,
     chartType = 'line',
     colorTolerance = 120,
     numPoints = 40,
@@ -48,6 +49,29 @@ plotDigitizerRouter.post('/', async (req, res) => {
     }, 'POST /api/chart-extract')
   }
 
+  // --- plotAreaBox validation ---
+  if (!plotAreaBox || typeof plotAreaBox !== 'object' || Array.isArray(plotAreaBox)) {
+    return logAndRespond(res, 400, {
+      code: ErrorCodes.VALIDATION_ERROR,
+      error: 'plotAreaBox is required and must be an object with xMinPx, xMaxPx, yMinPx, yMaxPx.',
+    }, 'POST /api/chart-extract')
+  }
+
+  const { xMinPx, xMaxPx, yMinPx, yMaxPx } = plotAreaBox
+  if (![xMinPx, xMaxPx, yMinPx, yMaxPx].every(v => typeof v === 'number' && isFinite(v))) {
+    return logAndRespond(res, 400, {
+      code: ErrorCodes.VALIDATION_ERROR,
+      error: 'plotAreaBox must have finite numeric fields: xMinPx, xMaxPx, yMinPx, yMaxPx.',
+    }, 'POST /api/chart-extract')
+  }
+
+  if (xMinPx >= xMaxPx || yMinPx >= yMaxPx) {
+    return logAndRespond(res, 400, {
+      code: ErrorCodes.VALIDATION_ERROR,
+      error: 'plotAreaBox: xMinPx must be < xMaxPx and yMinPx must be < yMaxPx.',
+    }, 'POST /api/chart-extract')
+  }
+
   if (typeof colorTolerance !== 'number' || colorTolerance < 0 || colorTolerance > 441) {
     return logAndRespond(res, 400, {
       code: ErrorCodes.VALIDATION_ERROR,
@@ -77,6 +101,7 @@ plotDigitizerRouter.post('/', async (req, res) => {
     chartType,
     xAxisRange,
     yAxisRange,
+    plotAreaBox,
     colorTolerance,
     numPoints,
   })
@@ -87,6 +112,7 @@ plotDigitizerRouter.post('/', async (req, res) => {
       xAxisRange,
       yAxisRange,
       targetColor,
+      plotAreaBox,
       chartType,
       colorTolerance,
       numPoints,

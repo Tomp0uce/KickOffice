@@ -25,6 +25,7 @@ export interface ToolProperty {
   enum?: string[]
   items?: ToolProperty
   properties?: Record<string, ToolProperty>
+  required?: string[]
   default?: any
 }
 

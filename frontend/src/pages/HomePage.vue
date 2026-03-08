@@ -410,6 +410,8 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     icon: Zap,
     mode: 'immediate',
     tooltipKey: 'pptPunchify_tooltip',
+    executeWithAgent: true,
+    systemPrompt: "You are a presentation expert. Call `getCurrentSlideIndex` to find the active slide, then use `getShapes` on it. Rewrite the text of all text shapes on this slide to be more impactful, punchy, and concise (max 6-7 bullets, 8-10 words per bullet). Use `insertContent` or `proposeShapeTextRevision` with the shape IDs to apply your changes directly to the slide without asking.",
   },
   {
     key: 'visual',
@@ -474,6 +476,7 @@ const homePage = useHomePage({
   isNewChatConfirmVisible,
   sessionManager,
   resetSessionStats: () => resetSessionStats?.(),
+  rebuildSessionFiles: () => rebuildSessionFiles?.(),
   stopGeneration,
 })
 
@@ -496,7 +499,7 @@ const {
   loadSelectedPrompt,
 } = homePage
 
-const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats } =
+const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats, rebuildSessionFiles } =
   useAgentLoop({
     t,
     refs: {
@@ -566,6 +569,7 @@ onBeforeMount(async () => {
   insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace'
   loadSavedPrompts()
   await sessionManager.init()
+  rebuildSessionFiles()
 })
 
 onActivated(() => {

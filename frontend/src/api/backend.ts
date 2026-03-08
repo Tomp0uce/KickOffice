@@ -451,6 +451,30 @@ export async function uploadFile(file: File): Promise<{ filename: string; extrac
   return res.json()
 }
 
+/**
+ * Upload a file to the LLM provider via the backend proxy.
+ * Returns a file_id that can be referenced in subsequent LLM messages.
+ * May throw if the provider does not support the /v1/files API.
+ */
+export async function uploadFileToPlatform(file: File, purpose = 'assistants'): Promise<{ fileId: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('purpose', purpose)
+
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/files`, {
+    method: 'POST',
+    headers: { ...(await getGlobalHeaders()) },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`File platform upload error ${res.status}: ${err}`)
+  }
+
+  return res.json()
+}
+
 export async function submitLogs(entries: unknown[]): Promise<void> {
   try {
     const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/logs`, {
@@ -466,11 +490,23 @@ export async function submitLogs(entries: unknown[]): Promise<void> {
   }
 }
 
+export interface PlotAreaBox {
+  /** Left edge of the chart's plot area. Value in [0,1] = fraction of image width; value > 1 = raw pixels. */
+  xMinPx: number
+  /** Right edge of the chart's plot area. */
+  xMaxPx: number
+  /** Top edge of the chart's plot area (smaller pixel value = higher on screen). */
+  yMinPx: number
+  /** Bottom edge of the chart's plot area (larger pixel value = lower on screen, where X axis sits). */
+  yMaxPx: number
+}
+
 export interface ChartExtractParams {
   imageId: string
   xAxisRange: [number, number]
   yAxisRange: [number, number]
   targetColor: string
+  plotAreaBox: PlotAreaBox
   chartType?: string
   colorTolerance?: number
   numPoints?: number

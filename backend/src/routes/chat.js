@@ -3,7 +3,7 @@ import { Router } from 'express'
 import { buildChatBody } from '../config/models.js'
 import { ErrorCodes } from '../config/errorCodes.js'
 import { validateChatRequest } from '../middleware/validate.js'
-import { chatCompletion, handleErrorResponse } from '../services/llmClient.js'
+import { chatCompletion, handleErrorResponse, RateLimitError } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
 import logger from '../utils/logger.js'
 
@@ -90,8 +90,9 @@ chatRouter.post('/', async (req, res) => {
 
         // Add read timeout to prevent hanging requests
         const readPromise = reader.read()
+        let timeoutId
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Read timeout')), 30000) // 30s timeout
+          timeoutId = setTimeout(() => reject(new Error('Read timeout')), 30000) // 30s timeout
         })
 
         let readResult
@@ -100,6 +101,8 @@ chatRouter.post('/', async (req, res) => {
         } catch (readError) {
           if (clientDisconnected) break
           throw readError
+        } finally {
+          clearTimeout(timeoutId)
         }
 
         const { done, value } = readResult
@@ -172,6 +175,10 @@ chatRouter.post('/', async (req, res) => {
     if (error.name === 'AbortError') {
       req.logger.error('POST /api/chat LLM API request timeout', { traffic: 'system' })
       return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat')
+    }
+    if (error instanceof RateLimitError) {
+      req.logger.warn('POST /api/chat rate limited by upstream', { retryAfterMs: error.retryAfterMs, traffic: 'system' })
+      return logAndRespond(res, 429, { code: ErrorCodes.RATE_LIMITED, error: 'Rate limit exceeded. Please wait before retrying.' }, 'POST /api/chat')
     }
     req.logger.error('POST /api/chat Chat proxy error', { error, traffic: 'system' })
     return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat')
@@ -288,6 +295,10 @@ chatRouter.post('/sync', async (req, res) => {
     if (error.name === 'AbortError') {
       req.logger.error('POST /api/chat/sync LLM API request timeout', { traffic: 'system' })
       return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat/sync')
+    }
+    if (error instanceof RateLimitError) {
+      req.logger.warn('POST /api/chat/sync rate limited by upstream', { retryAfterMs: error.retryAfterMs, traffic: 'system' })
+      return logAndRespond(res, 429, { code: ErrorCodes.RATE_LIMITED, error: 'Rate limit exceeded. Please wait before retrying.' }, 'POST /api/chat/sync')
     }
     req.logger.error('POST /api/chat/sync Chat sync proxy error', { error, traffic: 'system' })
     return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat/sync')

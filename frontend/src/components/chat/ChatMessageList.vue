@@ -29,6 +29,7 @@
     <div
       v-for="item in historyWithSegments"
       :key="item.key"
+      v-show="hasContent(item)"
       data-message
       class="group flex items-end gap-4 [.user]:flex-row-reverse"
       :class="item.message.role === 'assistant' ? 'assistant' : 'user'"
@@ -93,6 +94,21 @@
               class="mt-2 max-w-full rounded-md"
               alt="Generated image"
             />
+            <!-- File attachment badges (Tâche 5) -->
+            <div
+              v-if="item.message.attachedFiles && item.message.attachedFiles.length > 0"
+              class="mt-1.5 flex flex-wrap gap-1"
+            >
+              <div
+                v-for="(f, i) in item.message.attachedFiles"
+                :key="i"
+                class="flex items-center gap-1 rounded-sm bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent font-medium"
+                :title="f.fileId ? `file_id: ${f.fileId}` : f.filename"
+              >
+                <Paperclip :size="9" />
+                <span class="max-w-[120px] truncate">{{ f.filename }}</span>
+              </div>
+            </div>
           </div>
           <div
             v-if="
@@ -108,7 +124,7 @@
         </div>
         <!-- Assistant action buttons: hidden until hover (U-L1) -->
         <div
-          v-if="item.message.role === 'assistant'"
+          v-if="item.message.role === 'assistant' && hasContent(item)"
           class="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
         >
           <CustomButton
@@ -152,7 +168,7 @@
         </div>
         <!-- User message edit button: hidden until hover (U-L2) -->
         <div
-          v-if="item.message.role === 'user'"
+          v-if="item.message.role === 'user' && hasContent(item)"
           class="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150"
         >
           <CustomButton
@@ -178,12 +194,12 @@
     >
       <div class="flex min-w-0 flex-1 flex-col gap-1 items-start text-left">
         <div
-          class="max-w-[95%] rounded-md border border-border-secondary px-3 py-2 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
+          class="max-w-[95%] rounded-md border border-border-secondary px-3 py-2 text-xs leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
         >
-          <div class="flex items-center gap-2 text-accent" role="status" aria-live="polite">
-            <span class="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent" />
-            <Terminal :size="ICON_SIZE_SM" v-if="currentAction" />
-            <span class="truncate" v-if="currentAction">{{ currentAction }}</span>
+          <div class="flex items-start gap-2 text-accent" role="status" aria-live="polite">
+            <span class="inline-flex mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" />
+            <Terminal class="shrink-0 mt-0.5" :size="ICON_SIZE_SM" v-if="currentAction" />
+            <span class="line-clamp-2 break-words" v-if="currentAction">{{ currentAction }}</span>
             <span v-else class="animate-pulse">▊</span>
           </div>
         </div>
@@ -199,6 +215,7 @@ import {
   ChevronRight,
   Copy,
   FileText,
+  Paperclip,
   Pencil,
   Plus,
   RotateCcw,
@@ -243,6 +260,14 @@ defineEmits<{
 }>()
 
 const containerEl = ref<HTMLElement>()
+
+function hasContent(item: { message: DisplayMessage; segments: RenderSegment[] }): boolean {
+  return (
+    item.segments.some(s => s.type !== 'text' || s.text.trim() !== '') ||
+    (item.message.toolCalls != null && item.message.toolCalls.length > 0) ||
+    !!item.message.imageSrc
+  )
+}
 
 const lastAssistantKey = computed(() => {
   const items = props.historyWithSegments.filter(item => item.message.role === 'assistant')

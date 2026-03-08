@@ -31,6 +31,7 @@ export function useHomePage(deps: {
   isNewChatConfirmVisible: Ref<boolean>
   sessionManager: SessionManager
   resetSessionStats: () => void
+  rebuildSessionFiles: () => void
   stopGeneration: () => void
 }) {
   const router = useRouter()
@@ -46,6 +47,7 @@ export function useHomePage(deps: {
     isNewChatConfirmVisible,
     sessionManager,
     resetSessionStats,
+    rebuildSessionFiles,
     stopGeneration,
   } = deps
 
@@ -143,6 +145,7 @@ export function useHomePage(deps: {
   async function handleSwitchSession(sessionId: string) {
     if (loading.value) return
     await sessionManager.switchSession(sessionId)
+    rebuildSessionFiles()
     resetSessionStats()
     await nextTick()
     scrollToVeryBottom()

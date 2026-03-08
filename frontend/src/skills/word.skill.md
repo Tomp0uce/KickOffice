@@ -29,6 +29,8 @@
 
 ### For FORMATTING:
 
+> ⚠️ **CRITICAL RULE ON SELECTION: The agent cannot select text on its own.** The tool `formatText` ONLY works on text manually highlighted by the user in the Word document at the time of the request. If you need to format specific text from the document (e.g., text extracted from a PDF, text identified by reading the document, or any specific words/phrases), you MUST use `searchAndFormat` to target those words — OR embed inline Markdown/color syntax directly in `insertContent`. **Never call `formatText` unless the user explicitly said "format my selection" or equivalent.**
+
 **UPDATED RULE**: After calling `insertContent`, the inserted text is **automatically selected**. You CAN immediately call `formatText` on it.
 
 However, for applying formatting to **specific words** within a longer document (not just-inserted text), use `searchAndFormat` instead.
@@ -133,7 +135,9 @@ You can pass any combination of: `color`, `bold`, `italic`, `underline`, `strike
 
 ```
 User wants to apply formatting to specific words (color, bold, highlight...)?
-  YES → Use `searchAndFormat` (Workflow C — one call per word/phrase)
+  YES → Is the text the user's ACTIVE MANUAL SELECTION right now?
+    YES (user said "format my selection / what I selected") → formatText
+    NO (any other case: PDF text, document text, identified words) → searchAndFormat (one call per word/phrase)
 
 User wants to modify existing TEXT content?
   YES: Is it a simple word/phrase replacement?
@@ -141,14 +145,15 @@ User wants to modify existing TEXT content?
     NO (rewriting paragraphs) → Use `proposeRevision`
 
 User wants to add NEW content?
-  YES → Use `insertContent` with Markdown syntax (Workflow A for formatting)
+  YES → Use `insertContent` with Markdown syntax (Workflow A for inline formatting)
 
 Other:
-  Formatting on user's active selection only → `formatText`
   Comments → `addComment`
   Tables → table tools
   None of above → `eval_wordjs`
 ```
+
+> ⚠️ **DEFAULT RULE**: When in doubt between `formatText` and `searchAndFormat`, always choose `searchAndFormat`. The agent has no ability to create a selection programmatically — `formatText` will silently fail or format the wrong text if nothing is selected.
 
 ## searchAndFormat vs proposeRevision vs insertContent
 

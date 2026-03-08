@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Large File Support**: LLM request timeout extended from 2 to 5 minutes for standard chat to support large document analysis without timeout errors.
+- **`/api/files` Proxy**: New backend route forwards file uploads to the LLM provider's `/v1/files` endpoint. Files with a `file_id` are referenced inline in the LLM message content array instead of re-sending raw text on every turn.
+- **File Attachment Badges**: User message bubbles now display the names of attached documents (PDF, DOCX, XLSX…) as small pill badges below the message content.
+- **Session File Context Persistence**: Uploaded file metadata (filename, extracted text, optional `file_id`) is stored in `DisplayMessage.attachedFiles` and persisted to IndexedDB. File context is fully reconstructed (`rebuildSessionFiles`) when switching sessions or reloading the add-in.
+- **`getCurrentSlideIndex` tool** (PowerPoint): New read tool returns the 1-based index of the currently active slide, enabling agent quick actions like Punchify to target the correct slide autonomously.
+- **Punchify Quick Action** (PowerPoint): New agent-driven quick action that reads the active slide, rewrites text shapes to be more impactful and concise, and applies changes directly.
+
+### Fixed
+
+- **Streaming Timer Leak**: `clearTimeout` now called in the `finally` block of the SSE streaming loop in `/api/chat`, preventing accumulating timer handles.
+- **Image Generation Framing**: Default image size changed to `1792x1024` (landscape). A framing instruction is prepended to every image prompt to prevent subjects from being cropped at the edges.
+- **LLM Context Pollution**: Document selection context (`<document_content>`) is now injected only into the LLM messages copy and never stored in the visible chat history, eliminating polluted message bubbles and accumulating context on repeated turns.
+- **Premature Action Buttons**: Chat message action buttons (copy, insert, edit) are now hidden until the message actually has content, preventing empty hover states during streaming.
+- **PowerPoint `insertImageOnSlide`**: Tool now accepts `base64Data` directly instead of a `filename` registry lookup, fixing image insertion failures when the registry was not populated.
+- **Excel Chart Label Column**: `manageObject` chart creation now correctly splits the label column from the data range when `hasHeaders: true`, preventing the category axis series from being plotted as an extra data series.
+- **Word Agent Tool Selection**: `formatText` description updated with a strict WARNING to prevent incorrect use. `searchAndFormat` promoted as the default formatting tool.
+- **Rate Limit Handling**: `withRetry` in `llmClient.js` now parses the `Retry-After` response header (seconds or HTTP-date) and uses it as the actual retry delay. When all retries are exhausted on a 429, a `RateLimitError` is thrown and the route returns `429 RATE_LIMITED` to the client.
+- **Status Bar Text**: Action indicator text reduced to `text-xs` with `line-clamp-2` to allow wrapping over two lines instead of truncating long status messages.
+
+### Removed
+
+- **WebPlotDigitizer dependency (AGPL)**: Removed all adapted WPD algorithm files (`wpd/` directory). Chart extraction engine rewritten from scratch as a pure-JS bucket-based algorithm using only Jimp, fully clearing the AGPL-3.0 license obligation.
+
 ## [1.0.113] - 2026-03-08
 
 ### Added

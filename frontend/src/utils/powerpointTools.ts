@@ -42,6 +42,7 @@ export type PowerPointToolName =
   | 'getSpeakerNotes'
   | 'setSpeakerNotes'
   | 'insertImageOnSlide'
+  | 'getCurrentSlideIndex'
   | 'eval_powerpointjs'
 
 /**
@@ -591,13 +592,13 @@ PARAMETERS:
       type: 'object',
       properties: {
         slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
-        filename: { type: 'string', description: 'The exact filename of the uploaded image to insert.' },
+        base64Data: { type: 'string', description: 'The base64-encoded image data (without data URI prefix, just the raw base64 string).' },
         left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
         top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
         width: { type: 'number', description: 'Width in points. Default: 400.' },
         height: { type: 'number', description: 'Height in points. Default: 300.' },
       },
-      required: ['slideNumber', 'filename'],
+      required: ['slideNumber', 'base64Data'],
     },
     executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
@@ -606,13 +607,8 @@ PARAMETERS:
       }
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
-      
-      const filename = String(args.filename)
-      const base64 = powerpointImageRegistry.get(filename)
-      
-      if (!base64) {
-        throw new Error(`Error: Could not find image data for filename "${filename}". Make sure the name matches exactly. Available in session: ${Array.from(powerpointImageRegistry.keys()).join(', ') || 'none'}`)
-      }
+
+      const base64 = String(args.base64Data).replace(/^data:[^;]+;base64,/, '')
 
       const slides = context.presentation.slides
       slides.load('items')
@@ -627,8 +623,23 @@ PARAMETERS:
       shape.width = typeof args.width === 'number' ? args.width : 400
       shape.height = typeof args.height === 'number' ? args.height : 300
       await context.sync()
-      
-      return `Successfully inserted image "${filename}" on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
+
+      return `Successfully inserted image on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
+    },
+  },
+
+  getCurrentSlideIndex: {
+    name: 'getCurrentSlideIndex',
+    category: 'read',
+    description: 'Get the 1-based index of the currently active slide viewed by the user.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    executeCommon: async () => {
+      const slideNumber = await getCurrentSlideNumber()
+      return String(slideNumber)
     },
   },
 
@@ -733,7 +744,7 @@ try {
   insertContent: {
     name: 'insertContent',
     category: 'write',
-    description: 'The PREFERRED tool for adding or replacing content in PowerPoint. Supports Markdown (bold, italic, bullets). Can target a specific shape by ID/Name or the current selection. Handles style inheritance automatically.',
+    description: 'The PREFERRED tool for adding or replacing content in PowerPoint. Supports Markdown (bold, italic, bullets). Can target a specific shape by ID/Name or the current selection. Handles style inheritance automatically.\n\nWARNING: If you want to add text to an existing empty slide, you MUST first use getShapes to find the IDs of the Title and Body placeholders, and pass them as shapeIdOrName. If you omit shapeIdOrName and nothing is selected, a new random text box will be created (which is bad).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -823,7 +834,7 @@ try {
       properties: {
         layout: {
           type: 'string',
-          description: 'Optional slide layout name supported by PowerPointApi (e.g., Blank, Title, TitleAndContent).',
+          description: "Required. Use 'TitleAndContent' for standard slides with bullet points, 'Title' for headers, or 'Blank'.",
         },
         title: {
           type: 'string',
@@ -834,7 +845,7 @@ try {
           description: 'Optional body/content text to insert into the main content placeholder. Use newlines for bullet points.',
         },
       },
-      required: [],
+      required: ['layout'],
     },
     executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()

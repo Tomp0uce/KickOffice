@@ -94,9 +94,9 @@ function validateTools(tools) {
  * @returns {{ value: { prompt: string, size: string, quality: string, n: number } }|{ error: string }}
  */
 function validateImagePayload(payload = {}) {
-  const { prompt, size = '1024x1024', quality = 'auto', n = 1 } = payload
+  const { prompt, size = '1792x1024', quality = 'auto', n = 1 } = payload
 
-  const allowedSizes = new Set(['1024x1024', '1024x1536', '1536x1024'])
+  const allowedSizes = new Set(['1024x1024', '1024x1536', '1536x1024', '1792x1024'])
   const allowedQualities = new Set(['low', 'medium', 'high', 'auto'])
   const maxPromptLength = 4000
 

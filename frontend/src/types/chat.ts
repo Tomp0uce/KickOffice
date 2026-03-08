@@ -17,6 +17,7 @@ export interface DisplayMessage {
   toolCalls?: ToolCallPart[]
   rawMessages?: any[]
   timestamp?: number
+  attachedFiles?: Array<{ filename: string; content: string; fileId?: string }>
 }
 
 export interface QuickAction {
@@ -35,6 +36,7 @@ export interface ExcelQuickAction extends QuickAction {
 
 export interface PowerPointQuickAction extends QuickAction {
   mode: 'immediate' | 'draft'
+  systemPrompt?: string
 }
 
 export interface OutlookQuickAction extends QuickAction {

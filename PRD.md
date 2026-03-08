@@ -56,7 +56,9 @@ All employees within the organization, specifically tailored to handle the diver
 - **File upload**: Up to 3 files per message
 - **Supported formats**: PDF, DOCX, XLSX, XLS, CSV, TXT, MD, PNG, JPEG, JPG, WEBP, GIF
 - **Size limit**: 10 MB per file
-- **Session Persistence**: Uploaded files (extracted text) and images stay available in the conversation context across multiple messages, preventing "amnesia" between user prompts.
+- **Session Persistence**: Uploaded files (extracted text) and images stay available across the entire conversation. File context is fully restored when switching to a previous session or reloading the add-in.
+- **File Attachment Badges**: Attached document names are displayed inline in the user's message bubble after sending, giving visual confirmation of what was uploaded.
+- **Large File Support**: Extended LLM processing timeout (5 minutes for standard requests) to handle large documents without timeout errors. Files can optionally be forwarded to the LLM provider's storage to avoid re-transmitting content on every message.
 - **Log Sanitization**: Automated protection against log file saturation by truncating large data payloads (e.g., Base64 images) before they reach server logs.
 - **Duplicate detection**: Prevents adding same file twice by name
 - **Error messages**: Specific notifications for oversized files, unsupported formats, or max files reached
@@ -80,7 +82,7 @@ Contextual buttons at the top of the interface for one-click actions:
 #### User Messages
 
 - Plain text display with timestamp
-- Indication of attached files
+- Attached document names displayed as pill badges below the message content (PDF, DOCX, XLSX…)
 
 #### Assistant Messages
 
@@ -108,10 +110,12 @@ Contextual buttons at the top of the interface for one-click actions:
 ### 3.4 Image Generation
 
 - **Dedicated model tier**: Uses specific image model (gpt-image-1)
-- **Size options**: 1024x1024, 1024x1536, 1536x1024
+- **Default size**: 1792x1024 (landscape, suited to slides and documents)
+- **Size options**: 1024x1024, 1024x1536, 1536x1024, 1792x1024
 - **Quality levels**: low, medium, high, auto
 - **Multiple images**: Can generate 1-4 images per request
 - **Prompt limit**: Maximum 4000 characters
+- **Framing**: A framing instruction is automatically prepended to every prompt to prevent subjects from being cropped at image edges
 - **Direct insertion**: Images inserted directly into document
 - **Clipboard fallback**: If insertion fails, image copied to clipboard with notification
 - **Extended timeout**: 3-minute timeout for generation
@@ -122,7 +126,7 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Iteration limit**: Configurable from 1 to 100 (default: 25)
 - **Loop detection**: Sliding window signature comparison prevents infinite repetitive calls
 - **User stop**: Button to stop agent at any time
-- **Status indicator**: Real-time display of current action with emojis (⏳ analyzing, 🛠️ tools, 📖 reading, 🎨 formatting)
+- **Status indicator**: Real-time display of current action. Long action labels wrap over up to 2 lines instead of being truncated.
 - **Tool selection**: Agent autonomously chooses appropriate tools for each task
 
 ### 3.6 Stats Bar Details
@@ -468,13 +472,14 @@ PowerPoint has NO native Track Changes. Two workarounds:
 
 ### 8.4 PowerPoint Quick Actions
 
-| Action    | Mode      | Description                            |
-| --------- | --------- | -------------------------------------- |
-| Proofread | Immediate | Grammar/spelling correction            |
-| Translate | Immediate | FR↔EN translation                      |
-| Notes     | Immediate | Generate speaker notes (<100 words)    |
-| Impact    | Immediate | Steve Jobs-style rewrite (punch, hook) |
-| Visual    | Immediate | Generate detailed AI image prompts     |
+| Action    | Mode          | Description                                                                                 |
+| --------- | ------------- | ------------------------------------------------------------------------------------------- |
+| Proofread | Immediate     | Grammar/spelling correction                                                                 |
+| Translate | Immediate     | FR↔EN translation                                                                           |
+| Notes     | Immediate     | Generate speaker notes (<100 words)                                                         |
+| Impact    | Immediate     | Steve Jobs-style rewrite (punch, hook)                                                      |
+| Punchify  | Agent (auto)  | Reads the active slide via agent tools, rewrites all text shapes to be punchy and concise   |
+| Visual    | Immediate     | Generate detailed AI image prompts                                                          |
 
 ### 8.5 Slide Style Rules
 
@@ -485,6 +490,7 @@ PowerPoint has NO native Track Changes. Two workarounds:
 ### 8.6 PowerPoint-Specific Rules
 
 - **Slide numbers**: 1-based in UI, 0-indexed in code arrays
+- **Active slide detection**: Agent can call `getCurrentSlideIndex` to identify which slide the user is currently viewing
 - **Shape discovery workflow**: getAllSlidesOverview → getShapes → insertContent
 - **No Track Changes**: Must use workarounds for modification visibility
 
@@ -738,6 +744,8 @@ When context limit is reached:
 | `/api/chat/sync` | POST   | Synchronous chat completion             |
 | `/api/image`     | POST   | Image generation                        |
 | `/api/upload`    | POST   | File upload and processing              |
+| `/api/files`     | POST   | Forward file to LLM provider, returns `file_id` |
+| `/api/chart-extract` | POST | Extract data points from chart image |
 | `/api/models`    | GET    | Get available models                    |
 | `/health`        | GET    | Health check with timestamp and version |
 
@@ -754,7 +762,7 @@ When context limit is reached:
 
 | Operation               | Duration   |
 | ----------------------- | ---------- |
-| Standard chat models    | 2 minutes  |
+| Standard chat models    | 5 minutes  |
 | Reasoning models        | 5 minutes  |
 | Image generation        | 3 minutes  |
 | Per-read operation      | 30 seconds |
@@ -773,9 +781,11 @@ When context limit is reached:
 
 **Limits:**
 
-- 10 MB per file
-- 100K characters after extraction (truncated with notification)
+- 10 MB per file (50 MB for `/api/files` provider upload)
+- 600K characters after extraction (truncated with notification if exceeded)
 - MIME type detection (not just declared type)
+
+**Rate limit resilience**: When the upstream LLM provider returns a 429, the backend respects the `Retry-After` response header for retry timing. If all retries are exhausted, the client receives a `RATE_LIMITED` error code with a user-friendly message.
 
 ### 13.5 Streaming (SSE)
 

@@ -15,8 +15,10 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Format Preservation** — Word-level diffing preserves formatting when editing text
 - **Multi-Host Support** — Word (41 tools), Excel (45 tools), PowerPoint (16 tools), Outlook (14 tools)
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
-- **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents
-- **Session Persistence** — Uploaded files and images stay in context during the whole conversation
+- **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents (up to 10 MB)
+- **Session Persistence** — Uploaded files and images stay in context across the entire conversation and are restored on session switch
+- **Large File Support** — Extended 5-minute LLM timeout for large document processing; uploaded files optionally forwarded to the LLM provider via `/v1/files` API to avoid re-sending content on every message
+- **File Attachment Badges** — Attached document names displayed inline in the chat message bubble
 - **Log Sanitization** — Automatic truncation of Base64 data to protect server logs and disk space
 - **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
 - **Reverse Proxy Support** — Compatible with Synology/nginx reverse proxies
@@ -53,7 +55,8 @@ Express.js proxy server. Holds all secrets (API keys), validates requests, rate-
 - `POST /api/chat/sync` — Synchronous chat for agent tool loops
 - `POST /api/image` — Image generation
 - `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV, images)
-- `POST /api/chart-extract` — Chart image data extraction (pixel analysis)
+- `POST /api/chart-extract` — Chart image data extraction (pixel color analysis)
+- `POST /api/files` — Proxy: upload file to LLM provider's `/v1/files` endpoint, returns `file_id`
 - `GET /api/models` — Available model tiers
 - `GET /health` — Health check
 
@@ -192,9 +195,8 @@ KickOffice/
 │       ├── server.js           # Entry point
 │       ├── config/             # env.js, models.js, limits.js (centralized)
 │       ├── middleware/         # auth.js, validate.js
-│       ├── routes/             # chat, image, upload, models, health, logs
-│       ├── services/           # llmClient.js, plotDigitizerService.js
-│       │   └── wpd/            # Adapted WebPlotDigitizer algorithms (AGPL-3.0)
+│       ├── routes/             # chat, image, upload, files, models, health, logs
+│       ├── services/           # llmClient.js, plotDigitizerService.js, imageStore.js
 │       └── utils/              # http.js, logger.js
 ├── frontend/                   # Vue 3 + TypeScript
 │   └── src/
@@ -318,18 +320,6 @@ Integrated as a local package for format-preserving text editing:
 - **Cascading strategies** — Token → Sentence → Block fallback
 - **diff-match-patch extension** — Google's algorithm with word-mode
 
-### [WebPlotDigitizer](https://github.com/ankitrohatgi/WebPlotDigitizer) (AGPL-3.0 License)
-
-Core algorithms adapted for chart image data extraction (`backend/src/services/wpd/`):
-
-- **Color detection** — Euclidean RGB distance (`dist3d`) for foreground pixel identification
-- **AveragingWindowCore** — Column-by-column blob detection with neighbor merging for line/scatter charts
-- **BarExtractionAlgo** — Top/bottom edge detection with proximity grouping for bar charts
-- **Cubic spline** — `cspline` / `csplineInterp` for smooth interpolation of extracted data points
-- **Dataset** — Minimal data point container compatible with WPD algorithms
-
-The adapted files preserve the original AGPL-3.0 copyright headers. Only structural changes were made (global `var wpd` namespace → ESM exports) to integrate with our Node.js backend.
-
 ### [Redink](https://github.com/LawDigital/redink) (MIT License)
 
 Conceptual inspiration for document comparison and revision workflows.
@@ -338,7 +328,7 @@ Conceptual inspiration for document comparison and revision workflows.
 
 ## License
 
-This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. The chart extraction algorithms in `backend/src/services/wpd/` are adapted from [WebPlotDigitizer](https://github.com/ankitrohatgi/WebPlotDigitizer) and licensed under AGPL-3.0. Third-party dependencies retain their original licenses.
+This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. Third-party dependencies retain their original licenses.
 
 ---
 
