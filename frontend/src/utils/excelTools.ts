@@ -393,11 +393,20 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           type: 'string',
           description: 'For chart create: cell address where the chart top-left corner will be placed (e.g. "F1"). Defaults to a position beside the source data.',
         },
+        hasHeaders: {
+          type: 'boolean',
+          description: 'For chart create: whether the first row or column of the source range contains headers/labels (not data). When true, labels are used as axis categories instead of being plotted as a data series. Default: true.',
+        },
+        seriesBy: {
+          type: 'string',
+          description: 'For chart create: how to interpret data series. "columns" means each column is a series, "rows" means each row is a series. Default: "columns".',
+          enum: ['columns', 'rows'],
+        },
       },
       required: ['operation', 'objectType'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
-      const { operation, objectType, sheetName, source, chartType, title, name, anchor } = args as Record<string, any>
+      const { operation, objectType, sheetName, source, chartType, title, name, anchor, seriesBy = 'columns' } = args as Record<string, any>
 
       const chartTypeMap: Record<string, any> = {
         ColumnClustered: Excel.ChartType.columnClustered,
@@ -426,7 +435,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
 
           const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered
-          const chart = sheet.charts.add(excelChartType, dataRange, Excel.ChartSeriesBy.auto)
+          // Use explicit seriesBy to avoid Excel misinterpreting the first row/column as a data series
+          const seriesByEnum = seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns
+          const chart = sheet.charts.add(excelChartType, dataRange, seriesByEnum)
 
           if (title) chart.title.text = title
           chart.width = 400
@@ -438,7 +449,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
 
           await context.sync()
-          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}.`
+          return `Successfully created ${chartType || 'ColumnClustered'} chart${title ? ` titled "${title}"` : ''} from range ${source}${sheetName ? ` on sheet "${sheetName}"` : ''}. Series interpreted by ${seriesBy}.`
         }
 
         if (objectType === 'pivotTable') {
@@ -459,7 +470,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           if (title) chart.title.text = title
           if (source) {
             const newDataRange = sheet.getRange(source)
-            chart.setData(newDataRange, Excel.ChartSeriesBy.auto)
+            const updateSeriesBy = seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns
+            chart.setData(newDataRange, updateSeriesBy)
           }
           await context.sync()
           return `Successfully updated chart "${name}".`
@@ -1097,11 +1109,11 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         formula1: {
           type: 'string',
-          description: 'First formula/value for cellValue or custom rule (examples: "100", "=A2>AVERAGE($A$2:$A$100)").',
+          description: 'First formula/value for cellValue or custom rule (examples: "100", "=A2>AVERAGE($A$2:$A$100)"). IMPORTANT: Always use English function names and comma separators here, regardless of the Excel formula language setting — the conditional formatting API does not support localized formulas.',
         },
         formula2: {
           type: 'string',
-          description: 'Second formula/value for between/notBetween operators.',
+          description: 'Second formula/value for between/notBetween operators. Always use English syntax.',
         },
         text: {
           type: 'string',
@@ -1492,7 +1504,8 @@ try {
 2. ALWAYS call \`await context.sync()\` after load and after modifications
 3. ALWAYS wrap in try/catch
 4. ONLY use Excel namespace (not Word, PowerPoint)
-5. Values MUST be 2D arrays: \`range.values = [[value]]\``,
+5. Values MUST be 2D arrays: \`range.values = [[value]]\`
+6. **Formula language**: Use \`range.formulasLocal\` (not \`range.formulas\`) when writing formulas if the user's Excel locale is French. Check the \`excelFormulaLanguage\` setting from the agent context. When in doubt, use English syntax and \`range.formulas\`.`,
     inputSchema: {
       type: 'object',
       properties: {

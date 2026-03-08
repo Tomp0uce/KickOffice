@@ -63,6 +63,28 @@ range.formulas = [['=RECHERCHEV(A1;B:C;2;FAUX)']]
 
 **IMPORTANT**: Check the `excelFormulaLanguage` setting in the agent context.
 
+### Rule 3b: Charts — always specify seriesBy and hasHeaders
+
+When calling `manageObject` to create a chart, **always** pass `seriesBy` and `hasHeaders` explicitly to avoid axis label being treated as a data series:
+
+```json
+{
+  "operation": "create",
+  "objectType": "chart",
+  "source": "A1:D10",
+  "chartType": "ColumnClustered",
+  "title": "Sales by Region",
+  "seriesBy": "columns",
+  "hasHeaders": true
+}
+```
+
+- `seriesBy: "columns"` — each column is a data series (most common)
+- `seriesBy: "rows"` — each row is a data series
+- `hasHeaders: true` — first row contains column headers (labels), not data values
+
+**NEVER use the default** — always specify both parameters.
+
 ### Rule 4: Use getUsedRange() to find data bounds
 
 **WRONG — May be slow or include empty cells:**

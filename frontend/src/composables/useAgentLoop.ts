@@ -7,7 +7,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes } from '@/utils/powerpointTools'
 import { prepareMessagesForContext } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
@@ -361,11 +361,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const toolResult = await executeAgentToolCall(toolCall, enabledToolDefs, currentAssistantMessage, currentAction, getActionLabelForCategory, scrollToBottom)
         const sig = toolResult.signature
 
-        // Sliding window loop detection (P6)
+        // Sliding window loop detection (P6) — same signature repeated
         if (sig && addSignatureAndCheckLoop(sig)) {
           toolResults.push({ tool_call_id: toolCall.id, content: 'Error: You have called this exact tool with the same arguments multiple times in a row. This is a loop. Stop repeating and try a different approach.' })
           continue
         }
+
 
         if (toolResult.success) toolsWereExecuted = true
         toolResults.push({ tool_call_id: toolResult.tool_call_id, content: toolResult.content })
@@ -579,7 +580,17 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     if (visionImages && visionImages.length > 0) {
       const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
       if (lastUserIdx !== -1) {
-        const textContent = messages[lastUserIdx].content || userMessage
+        // Build text prefix: inject base64 data so the agent can pass it to insertImageOnSlide
+        let textContent = messages[lastUserIdx].content || userMessage
+        const imageContextLines: string[] = []
+        for (const img of visionImages) {
+          // Strip the data URI prefix (data:image/png;base64,) to get raw base64
+          const base64 = img.dataUri.replace(/^data:[^;]+;base64,/, '')
+          imageContextLines.push(`[${img.filename}]: ${base64}`)
+        }
+        if (imageContextLines.length > 0) {
+          textContent += `\n\n<uploaded_images>\nThe following images are attached. To embed an image in a slide, use insertImageOnSlide with the base64 string below (already stripped of the data URI prefix):\n${imageContextLines.join('\n')}\n</uploaded_images>`
+        }
         const parts: any[] = [{ type: 'text', text: textContent }]
         for (const img of visionImages) {
           parts.push({ type: 'image_url', image_url: { url: img.dataUri } })
@@ -955,6 +966,15 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           if (!lastMessage?.content?.trim()) {
             lastMessage.content = t('noModelResponse')
           }
+
+          // PPT-M2: For speakerNotes action, directly insert the generated text into the slide notes
+          if (hostIsPowerPoint && actionKey === 'speakerNotes' && lastMessage?.content?.trim()) {
+            const inserted = await setCurrentSlideSpeakerNotes(lastMessage.content.trim())
+            if (inserted) {
+              lastMessage.content += '\n\n_✓ Notes insérées dans la diapositive._'
+            }
+          }
+
           // F1: Reassemble rich content with preserved fragments and inject native styles
           if (lastMessage?.content) {
             let finalHtml = ''

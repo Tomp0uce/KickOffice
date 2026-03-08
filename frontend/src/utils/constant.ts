@@ -277,17 +277,21 @@ export const powerPointBuiltInPrompt = {
 
   punchify: {
     system: (_language: string) =>
-      `You are a world-class copywriter and presentation coach (like Steve Jobs). Your goal is to rewrite text to be incredibly persuasive, memorable, and visually striking.`,
+      `You are a world-class presentation coach (like Steve Jobs). Your goal is to rewrite slide content to be incredibly persuasive, memorable, and visually striking — formatted for a PowerPoint slide.`,
     user: (text: string, _language: string) =>
-      `Task: Rewrite the following slide content to maximize impact.
+      `Task: Rewrite the following slide content to maximize impact. Output must be formatted as **bullet points suitable for a PowerPoint slide**.
+
       Techniques to use:
       - "Less is more": Cut fluff, use strong verbs.
-      - Make it headline-worthy: Use power words and active voice.
-      - Focus on benefits/outcomes rather than just features.
-      - Create a "hook" that grabs the audience's attention instantly.
+      - Each bullet: max 8-10 words. No full sentences — fragments are better.
+      - Max 6-7 bullets total.
+      - Use active voice, present tense.
+      - Focus on benefits/outcomes rather than features.
+      - Start each bullet with a power verb or strong noun.
+
       Constraints:
       1. ${LANGUAGE_MATCH_INSTRUCTION}
-      2. OUTPUT ONLY the rewritten text. No explanations.
+      2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
       3. Keep the meaning accurate but dramatically improved in style.
 
       Text: ${text}`,

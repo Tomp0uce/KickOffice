@@ -29,9 +29,11 @@
 
 ### For FORMATTING:
 
-**CRITICAL RULE**: The `formatText` tool ONLY works when text is already selected by the user. If you just inserted text via `insertContent`, it is NOT selected — you CANNOT color/bold it with `formatText` after the fact.
+**UPDATED RULE**: After calling `insertContent`, the inserted text is **automatically selected**. You CAN immediately call `formatText` on it.
 
-To apply formatting to specific words or to newly inserted text, use one of these three workflows (in priority order):
+However, for applying formatting to **specific words** within a longer document (not just-inserted text), use `searchAndFormat` instead.
+
+To apply formatting to specific words or to arbitrary ranges, use one of these workflows (in priority order):
 
 ---
 

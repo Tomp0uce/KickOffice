@@ -124,7 +124,8 @@
         }}</span>
         <CustomButton
           type="secondary"
-          :text="t('feedbackButtonText') || 'Send Feedback'"
+          class="max-w-[160px] shrink-0"
+          :text="t('feedbackButtonText')"
           @click="emit('open-feedback')"
         />
       </div>

@@ -228,7 +228,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
       const styledHtml = applyInheritedStyles(adjustedHtml, styles)
       
       const insertedRange = range.insertHtml(styledHtml, location as any)
-      
+
       if (savedFont && preserveFormatting) {
         insertedRange.font.name = savedFont.name
         insertedRange.font.size = savedFont.size
@@ -236,10 +236,14 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
       }
 
       await context.sync()
-      
+
       // Post-process headings
       await applyHeadingBuiltinStyles(context, insertedRange, html)
-      
+
+      // Auto-select the inserted range so formatText can be called immediately after
+      insertedRange.select()
+      await context.sync()
+
       return `Successfully inserted content at ${location} of ${target}`
     },
   },

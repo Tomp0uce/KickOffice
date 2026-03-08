@@ -41,6 +41,66 @@ export type PowerPointToolName =
   | 'eval_powerpointjs'
 
 /**
+ * Returns the 1-based slide number of the currently active/selected slide.
+ * Falls back to slide 1 if the API is unavailable.
+ */
+export async function getCurrentSlideNumber(): Promise<number> {
+  try {
+    return await executeOfficeAction(() =>
+      PowerPoint.run(async (context: any) => {
+        let activeSlideIndex = 0
+        try {
+          if (typeof context.presentation.getSelectedSlides === 'function') {
+            const selectedSlides = context.presentation.getSelectedSlides()
+            selectedSlides.load('items/id')
+            await context.sync()
+            if (selectedSlides.items.length > 0) {
+              const slides = context.presentation.slides
+              slides.load('items/id')
+              await context.sync()
+              const selectedId = selectedSlides.items[0].id
+              const idx = slides.items.findIndex((s: any) => s.id === selectedId)
+              if (idx !== -1) activeSlideIndex = idx
+            }
+          }
+        } catch {}
+        return activeSlideIndex + 1
+      })
+    )
+  } catch {
+    return 1
+  }
+}
+
+/**
+ * Set speaker notes for the currently selected slide directly (no agent loop).
+ * Returns true on success, false on failure.
+ */
+export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolean> {
+  try {
+    const slideNumber = await getCurrentSlideNumber()
+    await executeOfficeAction(() =>
+      PowerPoint.run(async (context: any) => {
+        const slides = context.presentation.slides
+        slides.load('items')
+        await context.sync()
+        const index = slideNumber - 1
+        if (index >= slides.items.length) return
+        const slide = slides.getItemAt(index)
+        const notesPage = slide.notesSlide
+        notesPage.load('notesTextFrame/textRange')
+        await context.sync()
+        notesPage.notesTextFrame.textRange.text = notes
+        await context.sync()
+      })
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * Read the currently selected text inside a PowerPoint shape / text box.
  * Returns an empty string when nothing is selected or the selection is
  * not a text range (e.g. an entire slide is selected).
@@ -758,7 +818,7 @@ try {
   addSlide: {
     name: 'addSlide',
     category: 'write',
-    description: 'Add a new slide to the presentation. Optionally pass a layout when supported.',
+    description: 'Add a new slide to the presentation. Pass title and body to automatically populate the template text boxes (recommended). If title/body are provided, the tool discovers the layout shapes and fills them in one step.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -766,28 +826,81 @@ try {
           type: 'string',
           description: 'Optional slide layout name supported by PowerPointApi (e.g., Blank, Title, TitleAndContent).',
         },
+        title: {
+          type: 'string',
+          description: 'Optional title text to insert into the title placeholder of the new slide.',
+        },
+        body: {
+          type: 'string',
+          description: 'Optional body/content text to insert into the main content placeholder. Use newlines for bullet points.',
+        },
       },
       required: [],
     },
     executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
-      
-        const slides = context.presentation.slides
-        const layout = typeof args.layout === 'string' && args.layout.trim().length > 0
-          ? args.layout.trim()
-          : undefined
 
-        if (layout) {
-          ;(slides as any).add({ layout })
-        } else {
-          slides.add()
+      const slides = context.presentation.slides
+      const layout = typeof args.layout === 'string' && args.layout.trim().length > 0
+        ? args.layout.trim()
+        : undefined
+      const titleText = typeof args.title === 'string' ? args.title.trim() : undefined
+      const bodyText = typeof args.body === 'string' ? args.body.trim() : undefined
+
+      if (layout) {
+        ;(slides as any).add({ layout })
+      } else {
+        slides.add()
+      }
+      await context.sync()
+
+      // If title or body provided, populate the template text boxes
+      if (titleText || bodyText) {
+        try {
+          slides.load('items')
+          await context.sync()
+          const newSlide = slides.items[slides.items.length - 1]
+          const shapes = newSlide.shapes
+          // Load name and placeholderFormat (correct PowerPoint.js API, not .placeholder)
+          shapes.load('items,items/name,items/placeholderFormat')
+          await context.sync()
+
+          let titleFilled = false
+          let bodyFilled = false
+
+          for (const shape of shapes.items) {
+            try {
+              // Use placeholderFormat.type when available (PowerPoint.js 1.3+)
+              let phType = ''
+              try { phType = String((shape as any).placeholderFormat?.type ?? '').toLowerCase() } catch {}
+              const nameLower = (shape.name as string ?? '').toLowerCase()
+
+              const isTitle = phType === 'title' || phType === 'centeredtitle' || phType === 'subtitle'
+                || nameLower.includes('title')
+              const isBody = phType === 'body'
+                || nameLower.includes('content') || nameLower.includes('body')
+                || (nameLower.includes('text') && !nameLower.includes('title'))
+
+              if (isTitle && titleText && !titleFilled) {
+                shape.textFrame.textRange.text = titleText
+                titleFilled = true
+              } else if (isBody && bodyText && !bodyFilled) {
+                shape.textFrame.textRange.text = bodyText
+                bodyFilled = true
+              }
+            } catch {}
+          }
+          await context.sync()
+        } catch (err: any) {
+          // Non-fatal: slide was created, just couldn't populate shapes
+          return `Successfully added a slide${layout ? ` with layout "${layout}"` : ''} but could not auto-fill shapes: ${err?.message ?? 'unknown error'}`
         }
-        await context.sync()
+      }
 
-        return layout
-          ? `Successfully added a slide with layout "${layout}".`
-          : 'Successfully added a slide.'
-      },
+      return layout
+        ? `Successfully added a slide with layout "${layout}"${titleText ? ` titled "${titleText}"` : ''}.`
+        : `Successfully added a slide${titleText ? ` titled "${titleText}"` : ''}.`
+    },
   },
 
 
@@ -889,20 +1002,30 @@ try {
         const slide = slides.items[i]
         slide.load(['id', 'layout'])
         const shapes = slide.shapes
-        shapes.load('items')
+        // Load shape type together with items to filter out non-text shapes (images, pictures)
+        shapes.load('items,items/type')
         await context.sync()
 
         for (let j = 0; j < shapes.items.length; j++) {
           const shape = shapes.items[j]
+          // Skip image/picture shapes — they have no textFrame and would cause silent errors
+          const shapeType = String(shape.type || '').toLowerCase()
+          if (shapeType.includes('picture') || shapeType === '13') continue
           try { shape.textFrame.textRange.load('text') } catch {}
         }
         await context.sync()
 
-        const lines = shapes.items.map((s: any) => {
-          let text = ''
-          try { text = s.textFrame.textRange.text } catch {}
-          return text.trim()
-        }).filter(Boolean)
+        const lines = shapes.items
+          .filter((s: any) => {
+            const t = String(s.type || '').toLowerCase()
+            return !t.includes('picture') && t !== '13'
+          })
+          .map((s: any) => {
+            let text = ''
+            try { text = s.textFrame.textRange.text } catch {}
+            return text.trim()
+          })
+          .filter(Boolean)
 
         let slideText = lines.join(' | ')
         if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...'
