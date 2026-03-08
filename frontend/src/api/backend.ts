@@ -26,6 +26,30 @@ function wait(ms: number): Promise<void> {
   })
 }
 
+/**
+ * Point 1 Fix: Prevents massive Base64 data from saturating backend/terminal logs.
+ * Truncates image_url data for logging purposes.
+ */
+function sanitizePayloadForLogs(payload: any) {
+  try {
+    const clone = JSON.parse(JSON.stringify(payload));
+    if (clone.messages) {
+      clone.messages.forEach((msg: any) => {
+        if (Array.isArray(msg.content)) {
+          msg.content.forEach((part: any) => {
+            if (part.type === 'image_url' && part.image_url?.url) {
+              part.image_url.url = '[BASE64_IMAGE_DATA_TRUNCATED_FOR_LOGS]';
+            }
+          });
+        }
+      });
+    }
+    return clone;
+  } catch {
+    return payload;
+  }
+}
+
 function isRetryableError(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
 }
@@ -230,7 +254,7 @@ export async function healthCheck(): Promise<boolean> {
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | any[]
   tool_calls?: Array<{
     id: string
     type: 'function'
@@ -278,7 +302,8 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   if (!res.ok) {
     const err = await res.text()
-    logService.error('Chat API error', undefined, { status: res.status, error: err })
+    const sanitizedBody = sanitizePayloadForLogs({ messages, modelTier, tools })
+    logService.error('Chat API error', undefined, { status: res.status, error: err, body: sanitizedBody })
     throw new Error(`Chat API error ${res.status}: ${err}`)
   }
 

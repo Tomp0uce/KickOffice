@@ -24,9 +24,11 @@ Tous les points critiques et majeurs identifiés dans la V9.0 ont été audités
 3. S'assurer que les objets de fichiers sont correctement convertis (Base64/File) et ajoutés au store (`Pinia`) ou à l'état global contrôlant les pièces jointes (`attachments`).
 4. Vérifier la console pour toute erreur de sécurité (CORS) ou limitation de taille qui bloquerait l'ajout.
 
-### PPT-C2 — Boucle infinie lors de la création d'une slide depuis une image [VÉRIFIÉ — OK]
+### PPT-C2 — Boucle infinie lors de la création d'une slide depuis une image [FIXÉ — ARCHITECTURE OK]
 
-**Statut :** Résolu. `getAllSlidesOverview` (`powerpointTools.ts`) inclut désormais les images. Des directives ont été ajoutées dans `useAgentPrompts.ts` pour éviter les vérifications redondantes après insertion d'image.
+**Criticité :** Critique
+**Statut :** [FIXÉ — ARCHITECTURE OK]
+**Fix :** Implémentation d'un registre d'images (`powerpointImageRegistry`) et d'une persistance de session (`sessionUploadedFiles/Images`). Le LLM ne manipule plus de Base64 mais des noms de fichiers. Le `tokenManager` a été corrigé pour ne plus compter le poids des images Base64 comme du texte. Les fichiers PDF/Docx sont persistés durant toute la session.
 
 **Stratégie d'implémentation :**
 

@@ -48,9 +48,20 @@ function getMessageContentLength(message: ChatRequestMessage): number {
   let length = 0
   if (typeof message.content === 'string') {
     length = message.content.length
+  } else if (Array.isArray(message.content)) {
+    // CORRECTION (Step 2): Avoid JSON.stringify massif on Base64 strings
+    for (const part of message.content) {
+      if (part.type === 'text' && part.text) {
+        length += part.text.length
+      } else if (part.type === 'image_url') {
+        // Images have a fixed token cost regardless of Base64 length
+        length += 1000 
+      }
+    }
   } else {
     length = JSON.stringify(message.content).length
   }
+
   if ('tool_calls' in message && message.tool_calls) {
     length += JSON.stringify(message.tool_calls).length
   }

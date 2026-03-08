@@ -17,6 +17,9 @@ import { message as messageUtil } from '@/utils/message'
 declare const Office: any
 declare const PowerPoint: any
 
+// Point 3 Fix: Memory registry to store images without crashing the LLM
+export const powerpointImageRegistry = new Map<string, string>()
+
 const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => PowerPoint.run(action) as Promise<T>)
 
@@ -566,43 +569,49 @@ PARAMETERS:
   insertImageOnSlide: {
     name: 'insertImageOnSlide',
     category: 'write',
-    description: 'Insert an image onto a specific slide from a base64-encoded string (without the data URI prefix). Requires PowerPointApi 1.4+. Position and size are in points (1 inch = 72 points). Default: centered at 400×300pt.',
+    description: 'Insert an image onto a specific slide. Position and size are in points (1 inch = 72 points). Default: centered at 400×300pt.',
     inputSchema: {
       type: 'object',
       properties: {
         slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
-        base64Image: { type: 'string', description: 'Base64-encoded image string WITHOUT the data URI prefix (e.g. just the raw base64 characters, no "data:image/png;base64,").' },
-        left: { type: 'number', description: 'Left position in points. Default: 300 (centered on 960pt slide).' },
-        top: { type: 'number', description: 'Top position in points. Default: 90 (centered on 540pt slide).' },
-        width: { type: 'number', description: 'Width in points. Default: 360.' },
-        height: { type: 'number', description: 'Height in points. Default: 360.' },
+        filename: { type: 'string', description: 'The exact filename of the uploaded image to insert.' },
+        left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
+        top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
+        width: { type: 'number', description: 'Width in points. Default: 400.' },
+        height: { type: 'number', description: 'Height in points. Default: 300.' },
       },
-      required: ['slideNumber', 'base64Image'],
+      required: ['slideNumber', 'filename'],
     },
     executePowerPoint: async (context: any, args: Record<string, any>) => {
       ensurePowerPointRunAvailable()
       if (!isPowerPointApiSupported('1.4')) {
-        return 'Error: insertImageOnSlide requires PowerPointApi 1.4 or later, which is not supported in this Office version.'
+        return 'Error: insertImageOnSlide requires PowerPointApi 1.4 or later.'
       }
       const slideNumber = Number(args.slideNumber)
       if (!Number.isFinite(slideNumber) || slideNumber < 1) throw new Error('Error: slideNumber must be a number >= 1.')
+      
+      const filename = String(args.filename)
+      const base64 = powerpointImageRegistry.get(filename)
+      
+      if (!base64) {
+        throw new Error(`Error: Could not find image data for filename "${filename}". Make sure the name matches exactly. Available in session: ${Array.from(powerpointImageRegistry.keys()).join(', ') || 'none'}`)
+      }
+
       const slides = context.presentation.slides
       slides.load('items')
       await context.sync()
       const index = Math.trunc(slideNumber) - 1
       if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
-      // Strip data URI prefix if accidentally included
-      const base64 = String(args.base64Image).replace(/^data:[^;]+;base64,/, '')
       const slide = slides.getItemAt(index)
       const shape = slide.shapes.addImage(base64)
-      // Default to square 360pt (1:1) centered on 960x540 slide
-      shape.left = typeof args.left === 'number' ? args.left : 300
-      shape.top = typeof args.top === 'number' ? args.top : 90
-      shape.width = typeof args.width === 'number' ? args.width : 360
-      shape.height = typeof args.height === 'number' ? args.height : 360
+      shape.left = typeof args.left === 'number' ? args.left : 100
+      shape.top = typeof args.top === 'number' ? args.top : 100
+      shape.width = typeof args.width === 'number' ? args.width : 400
+      shape.height = typeof args.height === 'number' ? args.height : 300
       await context.sync()
-      return `Successfully inserted image on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
+      
+      return `Successfully inserted image "${filename}" on slide ${slideNumber} at position (${shape.left}, ${shape.top}) with size ${shape.width}×${shape.height} points.`
     },
   },
 

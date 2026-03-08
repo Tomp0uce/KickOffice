@@ -16,6 +16,8 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Multi-Host Support** — Word (41 tools), Excel (45 tools), PowerPoint (16 tools), Outlook (14 tools)
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
 - **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents
+- **Session Persistence** — Uploaded files and images stay in context during the whole conversation
+- **Log Sanitization** — Automatic truncation of Base64 data to protect server logs and disk space
 - **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
 - **Reverse Proxy Support** — Compatible with Synology/nginx reverse proxies
 - **Message Timestamps** — Chat messages display creation time for better context

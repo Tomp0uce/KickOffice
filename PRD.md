@@ -56,9 +56,8 @@ All employees within the organization, specifically tailored to handle the diver
 - **File upload**: Up to 3 files per message
 - **Supported formats**: PDF, DOCX, XLSX, XLS, CSV, TXT, MD, PNG, JPEG, JPG, WEBP, GIF
 - **Size limit**: 10 MB per file
-- **Content limit**: 100K characters after text extraction
-- **Drag-and-drop**: Support with visual feedback (ring border on dragover)
-- **Preview**: Attached files shown as badges with X button for removal
+- **Session Persistence**: Uploaded files (extracted text) and images stay available in the conversation context across multiple messages, preventing "amnesia" between user prompts.
+- **Log Sanitization**: Automated protection against log file saturation by truncating large data payloads (e.g., Base64 images) before they reach server logs.
 - **Duplicate detection**: Prevents adding same file twice by name
 - **Error messages**: Specific notifications for oversized files, unsupported formats, or max files reached
 
