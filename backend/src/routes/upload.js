@@ -7,6 +7,7 @@ import * as xlsx from 'xlsx'
 import { ErrorCodes } from '../config/errorCodes.js'
 import { logAndRespond } from '../utils/http.js'
 import logger from '../utils/logger.js'
+import { storeImage } from '../services/imageStore.js'
 
 const uploadRouter = Router()
 
@@ -112,8 +113,9 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
     ) {
       const b64 = file.buffer.toString('base64')
       const imageBase64 = `data:${mimeType};base64,${b64}`
-      req.logger.info(`POST /api/upload completed image encoding`, { filename, bytes: file.size })
-      return res.json({ filename, imageBase64 })
+      const imageId = storeImage(file.buffer, mimeType)
+      req.logger.info(`POST /api/upload completed image encoding`, { filename, bytes: file.size, imageId })
+      return res.json({ filename, imageBase64, imageId })
     }
     else {
       return logAndRespond(res, 400, {

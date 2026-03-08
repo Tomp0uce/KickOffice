@@ -161,6 +161,12 @@ await context.sync();
 | `sortRange`                  | Sort data                          |
 | `applyConditionalFormatting` | Add conditional format rules       |
 
+### For CHART IMAGE EXTRACTION:
+
+| Tool                 | When to use                                                |
+| -------------------- | ---------------------------------------------------------- |
+| `extract_chart_data` | Extract data points from a chart/graph IMAGE via pixel analysis |
+
 ### ESCAPE HATCH:
 
 | Tool            | When to use                                       |
@@ -224,3 +230,65 @@ To create a pivot table, use the `manageObject` tool with `objectType: 'pivotTab
   "targetCell": "F1"
 }
 ```
+
+## WORKFLOW: Reproduce a chart from an image
+
+When the user uploads a chart/graph image and asks to reproduce it in Excel, follow this EXACT sequence. Do NOT skip steps or call extract_chart_data without first analyzing the image.
+
+### Step 1: Analyze the image (Vision)
+
+Use your vision capability to inspect the uploaded chart image and determine:
+- **Chart type**: line, scatter, bar, area, column, pie, etc.
+- **X axis range**: read the min and max labels on the horizontal axis (e.g., [0, 100], [2020, 2025])
+- **Y axis range**: read the min and max labels on the vertical axis (e.g., [0, 50000])
+- **Data series color**: identify the hex color of the line/bars/points (e.g., "#0070C0" for blue)
+- **Number of series**: if multiple, note each color separately
+- **Title and axis labels**: note any text for the chart title
+
+### Step 2: Extract data via pixel analysis
+
+Call `extract_chart_data` with the parameters you identified:
+```json
+{
+  "imageId": "<from uploaded_images context>",
+  "xAxisRange": [0, 100],
+  "yAxisRange": [0, 50000],
+  "targetColor": "#0070C0",
+  "chartType": "line",
+  "numPoints": 40
+}
+```
+
+If the tool returns few or zero points, increase `colorTolerance` (default 80, try 120-150).
+For multiple series, call `extract_chart_data` once per color.
+
+### Step 3: Write data to Excel
+
+Use `setCellRange` to write the extracted points:
+```json
+{
+  "address": "A1",
+  "values": [["X", "Y"], [0, 100], [2.5, 250], ...]
+}
+```
+
+### Step 4: Create the chart
+
+Use `manageObject` to create the chart matching the original type:
+```json
+{
+  "operation": "create",
+  "objectType": "chart",
+  "source": "A1:B41",
+  "chartType": "Line",
+  "title": "Original Chart Title",
+  "seriesBy": "columns",
+  "hasHeaders": true
+}
+```
+
+### Important notes:
+- **Always analyze the image FIRST** to extract semantic info (axis ranges, colors)
+- **imageId** is found in the `<uploaded_images>` context block — do NOT fabricate it
+- The pixel extraction works best on clean charts with distinct colors
+- For pie/donut charts, extract_chart_data is not suitable — use vision to read percentages and enter data manually

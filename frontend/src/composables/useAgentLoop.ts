@@ -98,7 +98,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   // Step 4: Persistent session memory for uploaded content (Point 2)
   const sessionUploadedFiles = ref<{ filename: string; content: string }[]>([])
-  const sessionUploadedImages = ref<{ filename: string; dataUri: string }[]>([])
+  const sessionUploadedImages = ref<{ filename: string; dataUri: string; imageId?: string }[]>([])
 
 
   // Destructure refs
@@ -521,7 +521,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     return localSelectedText
   }
 
-  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string }>, injectedContext?: string) {
+  async function processChat(userMessage: string, visionImages?: Array<{ filename: string; dataUri: string; imageId?: string }>, injectedContext?: string) {
     const modelConfig = availableModels.value[selectedModelTier.value]
     if (modelConfig?.type === 'image') {
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
@@ -584,10 +584,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
       if (lastUserIdx !== -1) {
         let textContent = messages[lastUserIdx].content || userMessage
-        const imageContextLines = sessionUploadedImages.value.map(img => `- ${img.filename}`)
-
+        const imageContextLines: string[] = []
+        for (const img of sessionUploadedImages.value) {
+          const idTag = img.imageId ? ` (imageId: ${img.imageId})` : ''
+          imageContextLines.push(`- [${img.filename}]${idTag}`)
+        }
         if (imageContextLines.length > 0) {
-          textContent += `\n\n<uploaded_images>\nLes images suivantes sont disponibles en mémoire :\n${imageContextLines.join('\n')}\nPour insérer une de ces images dans une slide, utilisez l'outil 'insertImageOnSlide' avec le 'filename' exact.\n</uploaded_images>`
+          textContent += `\n\n<uploaded_images>\nThe following images are available in session memory:\n${imageContextLines.join('\n')}\nTo embed an image in a slide, use insertImageOnSlide with the filename. To extract chart data into Excel, use extract_chart_data with the imageId.\n</uploaded_images>`
         }
         
         const parts: any[] = [{ type: 'text', text: String(textContent) }]
@@ -738,16 +741,16 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       let fullMessage = displayMessageText
-      
+
       if (files && files.length > 0) {
         currentAction.value = t('agentUploadingFiles') || 'Extraction des fichiers...'
         try {
            for (const file of files) {
              const result = await uploadFile(file)
              if (result.imageBase64) {
-               // Step 4: Store in session images
-               sessionUploadedImages.value.push({ filename: result.filename, dataUri: result.imageBase64 })
-               
+               // Step 4: Store in session images (with imageId for chart extraction)
+               sessionUploadedImages.value.push({ filename: result.filename, dataUri: result.imageBase64, imageId: result.imageId })
+
                // Point 3 Fix: Store in PPT registry for tool access
                if (hostIsPowerPoint) {
                  powerpointImageRegistry.set(result.filename, result.imageBase64.replace(/^data:[^;]+;base64,/, ''))
