@@ -106,6 +106,7 @@
   "agentActionReading": "📖 Lecture du document...",
   "agentActionFormatting": "🎨 Mise en forme du texte...",
   "agentUploadingFiles": "Extraction des fichiers...",
+  "warningFileFallbackInline": "Fichier envoyé en ligne (le fournisseur ne supporte pas /v1/files). Les fichiers volumineux peuvent ralentir les réponses.",
   "proofread": "Relecture",
   "proofread_tooltip": "Sélectionnez du texte. L'IA corrigera la grammaire, l'orthographe, les accords, le style, et fera des suggestions via des commentaires.",
   "translate_tooltip": "Sélectionnez du texte. L'IA traduira le texte dans la langue configurée.",

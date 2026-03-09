@@ -71,6 +71,19 @@ function getMessageContentLength(message: ChatRequestMessage): number {
   return length
 }
 
+/**
+ * Estimate context usage percentage for a given set of messages.
+ * Uses the same char-based heuristic as prepareMessagesForContext.
+ */
+export function estimateContextUsagePercent(allMessages: ChatRequestMessage[], systemPrompt: string): number {
+  let total = Math.min(systemPrompt.length, MAX_CONTEXT_CHARS)
+  const nonSystem = allMessages.filter(m => m.role !== 'system')
+  for (const msg of nonSystem) {
+    total += getMessageContentLength(msg)
+  }
+  return Math.min(100, Math.round((total / MAX_CONTEXT_CHARS) * 100))
+}
+
 export function prepareMessagesForContext(allMessages: ChatRequestMessage[], systemPrompt: string): ChatRequestMessage[] {
   const safeSystemPrompt = truncateToBudget(systemPrompt, MAX_CONTEXT_CHARS)
   const systemMessage: ChatRequestMessage = { role: 'system', content: safeSystemPrompt }

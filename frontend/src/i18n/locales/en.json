@@ -106,6 +106,7 @@
   "agentActionReading": "📖 Reading document...",
   "agentActionFormatting": "🎨 Formatting text...",
   "agentUploadingFiles": "Upload and extract files...",
+  "warningFileFallbackInline": "File sent inline (provider does not support /v1/files). Larger files may slow down responses.",
   "proofread": "Proofreading",
   "proofread_tooltip": "Select text first. The AI will proofread for grammar, spelling, agreements, structure, and provide suggestions via comments.",
   "translate_tooltip": "Select text first. The AI will translate the text into the configured language.",

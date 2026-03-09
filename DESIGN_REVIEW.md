@@ -10,8 +10,8 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 4 | TOOL-C1 (partial), TOOL-H1, USR-C1, USR-H1 |
-| 🟠 **PARTIALLY FIXED** (deferred actions) | 3 | TOOL-H2, USR-H2, TOOL-C1 remaining |
+| ✅ **FIXED** | 9 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator |
+| 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 5 | ERR-H1, ERR-H2, DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
@@ -884,11 +884,17 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 5. **TOOL-H2**: ~~Display screenshots in chat~~ — **PARTIALLY FIXED** ✅ (screenshots now visible; auto-verification → Phase 4)
 9. **TOOL-H1**: ~~Fix skill doc referencing non-existent tools~~ — **FIXED** ✅
 
+**Latest round (v10.2)** — FIXED:
+6. **TOOL-C1**: Images now try /v1/files + warning toast for both text and images
+7. **TOOL-H2**: Screenshot guidance added to Excel (Step 5) + PPT prompts; PPT verification rule clarified
+8. **USR-H1**: Prompt guidance: "no markdown bullets in body placeholders"
+9. **USR-H2**: Context % shown in LLM wait label when >50%
+
 **Still Active** (5 items):
-6. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
-7. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
-8. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
-10. **QUAL-H1**: Replace critical `any` types with proper Office.js types
+10. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
+11. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
+12. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
+13. **QUAL-H1**: Replace critical `any` types with proper Office.js types
 — **PROSP-H2**: Conversation history optimization (blocking 3 deferred items) → Phase 4
 
 ### Phase 2 — 🟡 MEDIUM (Maintainability & DX) — 9 Active
@@ -923,24 +929,24 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 
 **Part A: Deferred actions from partially-fixed Phase 0–1 items** (actionable, blocked on design decisions or dependencies):
 
-#### 🟠 TOOL-C1 Remaining Items (HIGH)
-- **Images never use /v1/files**: All uploaded images are always sent inline as base64, never as file references. Consider uploading images to `/v1/files` too.
-- **No UI indicator for /v1/files fallback**: When `/v1/files` upload fails and falls back to inline, user has no visual feedback. Add a warning toast.
-- **Full document re-sent on every iteration**: Files injected in iteration 1 are re-sent in full on iterations 2+. Blocked on PROSP-H2 (context optimization).
+#### 🟠 TOOL-C1 Remaining Items (HIGH — MOSTLY FIXED ✅)
+- ~~**Images never use /v1/files**~~: **FIXED ✅** — Images now attempt `/v1/files` upload with `purpose: 'vision'`. On success, the provider fileId is stored and used in subsequent iterations instead of re-sending base64 bytes.
+- ~~**No UI indicator for /v1/files fallback**~~: **FIXED ✅** — Warning toast shown (i18n key: `warningFileFallbackInline`) when upload fails for both text files and images.
+- **Full document re-sent on every iteration**: ⏳ Still blocked on PROSP-H2 (context optimization). Each iteration re-injects full text file content. Images now use fileId if available.
 
-#### 🟠 TOOL-H2 Remaining Items (HIGH)
-- **No auto-verification prompting**: Agent prompts do NOT instruct the LLM to screenshot after creating charts or modifying slides for self-verification. Add screenshot guidance to Excel and PowerPoint prompts.
-- **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` line 224 says "Do NOT call getAllSlidesOverview to verify" — defensive rule prevents legitimate verification workflows.
-- **No Word screenshot tool**: Word has no screenshot capability at all, preventing visual verification of formatting changes.
+#### 🟠 TOOL-H2 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- ~~**No auto-verification prompting**~~: **FIXED ✅** — Added Step 5 (screenshotRange verification) to Excel chart workflow in both `excel.skill.md` and `useAgentPrompts.ts`. Added `screenshotSlide` verification guidance to PowerPoint prompt and `powerpoint.skill.md`.
+- ~~**PowerPoint blocks verification via getAllSlidesOverview**~~: **FIXED ✅** — Rule now clarified: "Do NOT call getAllSlidesOverview to verify — use `screenshotSlide` instead." Defensive rule preserved for the correct tool, verification enabled via screenshot.
+- **No Word screenshot tool**: ⏳ Still deferred — No Office.js API for Word document screenshots exists. Cannot implement without a third-party capture solution.
 
-#### 🟠 USR-H1 Remaining Items (HIGH)
-- **Empty shapes with default bullets**: `hasNativeBullets()` only checks EXISTING paragraphs — empty shapes with bullet XML defaults still may double-bullet on first insert.
-- **Stronger prompt guidance needed**: Add explicit rule to Word agent prompt: "When inserting into PowerPoint body placeholders, NEVER use markdown bullet syntax (`- `). The shape already has native bullets."
+#### 🟠 USR-H1 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- **Empty shapes with default bullets**: ⏳ Still open — `hasNativeBullets()` only checks existing paragraphs. Empty shapes with XML bullet defaults still risk double-bullets. Low priority: body placeholders now covered by `placeholderFormat/type` fix.
+- ~~**Stronger prompt guidance needed**~~: **FIXED ✅** — Added Guideline 4 to PowerPoint agent prompt: "When inserting into body/content placeholder shapes, do NOT use markdown list syntax (`- item`). The shape already has native bullets — plain text lines are sufficient."
 
-#### 🟠 USR-H2 Remaining Items (HIGH)
-- **Context bloat structural issue**: Each iteration re-sends full message history (up to 1.2M chars / ~400k tokens) without summarization. Blocked on PROSP-H2.
-- **Tool result accumulation**: Tool results pushed to `currentMessages` never summarized. After 5–6 tool calls, context can exceed 500k chars.
-- **No context window % indicator**: Add visible indicator in status bar so users understand why LLM is slow.
+#### 🟠 USR-H2 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- **Context bloat structural issue**: ⏳ Still blocked on PROSP-H2. Each iteration re-sends full message history.
+- **Tool result accumulation**: ⏳ Still blocked on PROSP-H2. Tool results never summarized between iterations.
+- ~~**No context window % indicator**~~: **FIXED ✅** — Context usage % shown in `currentAction` label during LLM wait when above 50%: e.g., "Waiting for AI... (14s · ctx 73%)". Uses `estimateContextUsagePercent()` from `tokenManager.ts`.
 
 ---
 
