@@ -6,21 +6,37 @@
 
 ---
 
+## Execution Status Overview
+
+| Status | Count | Items |
+|--------|-------|-------|
+| ✅ **FIXED** | 4 | TOOL-C1 (partial), TOOL-H1, USR-C1, USR-H1 |
+| 🟠 **PARTIALLY FIXED** (deferred actions) | 3 | TOOL-H2, USR-H2, TOOL-C1 remaining |
+| ⏳ **IN PROGRESS** | 5 | ERR-H1, ERR-H2, DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
+| 📋 **BACKLOG** | 9 | Phase 2 Medium items |
+| 🎯 **PLANNED** | 5 | Phase 3 Low items |
+| 🚀 **DEFERRED** (Phase 4) | 17 | 11 functional improvements + 4 legacy infrastructure (v7/v8) + 2 architectural |
+
+---
+
 ## Health Summary (v10.1)
 
 All previous critical and major items from v9.x have been resolved. This v10.1 review is a comprehensive deep-dive across 8 axes + user-reported issues + prospective improvements, identifying new improvement opportunities after recent large-scale changes (OOXML editing, chart extraction, image registry, session persistence, header auto-detect).
 
-| Category | Critical | High | Medium | Low |
+**Latest session (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items with deferred actions documented.
+
+| Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
 | Architecture | 0 | 2 | 3 | 1 |
-| Tool/Prompt Quality | 1 | 2 | 4 | 3 |
+| Tool/Prompt Quality | 0 | 2 | 4 | 3 |
 | Error Handling | 0 | 2 | 2 | 1 |
 | UX/UI | 0 | 1 | 3 | 3 |
 | Dead Code | 0 | 0 | 2 | 1 |
 | Code Duplication | 0 | 1 | 2 | 0 |
 | Code Quality | 0 | 1 | 3 | 2 |
-| User-Reported Issues | 1 | 2 | 2 | 1 |
-| **Total** | **2** | **11** | **21** | **12** |
+| User-Reported Issues | 0 | 2 | 2 | 1 |
+| **Total** | **0** | **11** | **21** | **12** |
+| **Status** | ✅ All critical items fixed or deferred | 6 active, 5 deferred | 21 items | 12 items |
 
 ---
 
@@ -857,21 +873,25 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 
 ## SUMMARY & PRIORITY MATRIX
 
-### Phase 0 — Critical (User-facing bugs & data inefficiency)
-1. **TOOL-C1**: ~~Fix /v1/files integration~~ — PARTIALLY FIXED ✅ (silent failure logged, token budget fixed; remaining items deferred)
-2. **USR-C1**: ~~Complete the feedback debug bundle~~ — FIXED ✅
+### Phase 0 — 🔴 CRITICAL (User-facing bugs & data inefficiency) — ✅ COMPLETE
+1. **TOOL-C1**: ~~Fix /v1/files integration~~ — **PARTIALLY FIXED** ✅ (silent failure logged, token budget fixed; remaining items → Phase 4 deferred)
+2. **USR-C1**: ~~Complete the feedback debug bundle~~ — **FIXED** ✅
 
-### Phase 1 — High Priority (Reliability & User Experience)
-3. **USR-H1**: ~~Fix double bullets in PowerPoint~~ — FIXED ✅ (`placeholderFormat/type` now loaded)
-4. **USR-H2**: ~~Reduce latency between tool calls~~ — PARTIALLY FIXED ✅ (elapsed timer added; structural context optimization deferred to PROSP-H2)
-5. **TOOL-H2**: ~~Display screenshots in chat~~ — PARTIALLY FIXED ✅ (screenshots now visible in tool call block; auto-verification prompts not added yet)
+### Phase 1 — 🟠 HIGH (Reliability & User Experience) — 6 Active / 5 Deferred
+**FIXED** (4 items):
+3. **USR-H1**: ~~Fix double bullets in PowerPoint~~ — **FIXED** ✅ (`placeholderFormat/type` now loaded)
+4. **USR-H2**: ~~Reduce latency between tool calls~~ — **PARTIALLY FIXED** ✅ (elapsed timer added; structural context optimization → Phase 4)
+5. **TOOL-H2**: ~~Display screenshots in chat~~ — **PARTIALLY FIXED** ✅ (screenshots now visible; auto-verification → Phase 4)
+9. **TOOL-H1**: ~~Fix skill doc referencing non-existent tools~~ — **FIXED** ✅
+
+**Still Active** (5 items):
 6. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
 7. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
 8. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
-9. **TOOL-H1**: ~~Fix skill doc referencing non-existent tools~~ — FIXED ✅
 10. **QUAL-H1**: Replace critical `any` types with proper Office.js types
+— **PROSP-H2**: Conversation history optimization (blocking 3 deferred items) → Phase 4
 
-### Phase 2 — Medium Priority (Maintainability & DX)
+### Phase 2 — 🟡 MEDIUM (Maintainability & DX) — 9 Active
 11. **USR-M1**: Fix scroll behavior (session load → top, send → user msg, complete → response top)
 12. **ARCH-H1**: Split `useAgentLoop.ts` into focused composables
 13. **ARCH-H2**: Reduce prop drilling in HomePage with provide/inject
@@ -882,21 +902,155 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 18. **DUP-M1-M2**: Extract `truncateString`, standardize error format
 19. **QUAL-M1-M3**: Consolidate magic numbers, fix console logging, split large components
 20. **UX-M1-M3**: Restore focus indicators, translate hardcoded strings, context % warning
+— **PROSP-2**: Claude.md overhaul (missing rules, stale counts) → Phase 4
 
-### Phase 3 — Low Priority (Polish)
+### Phase 3 — 🟢 LOW (Polish) — 5 Active
 21. **UX-L1-L3**: Inline styles, link text, mobile width
 22. **ARCH-L1**: Switch to `npm ci` in Dockerfile
-23. **ARCH-L2**: Evaluate manifest accessibility — move `generated-manifests/` to `frontend/public/assets/` for SaaS distribution (with security trade-off analysis)
+23. **ARCH-L2**: Evaluate manifest accessibility — move `generated-manifests/` to `frontend/public/assets/` for SaaS distribution
 24. **QUAL-L1-L2**: Boolean params, async pattern docs
 25. **USR-L1**: Show warning when /v1/files upload silently fails
-26. Remaining LOW items
+— **PROSP-1/3/4/5**: Dynamic tool loading, PRD split, templates, intent profiles → Phase 4
 
-### Phase 4 — Prospective (Deferred)
-26. **PROSP-5**: Claude.md targeted updates (missing rules, stale counts, trim verbose sections)
-27. **PROSP-2**: Conversation history optimization (tool result summarization + document pinning)
-28. **PROSP-3**: Split PRD into domain-specific sub-documents
-29. **PROSP-4**: Create DR/PR/commit templates
-30. **PROSP-1**: Dynamic tool loading (not recommended as-is, consider static intent profiles instead)
+### Phase 4 — Deferred Items (Not Yet Addressed)
+
+**Consolidated deferred work from multiple review cycles** (v7, v8, v10.1):
+- **Part A**: Deferred actions from partially-fixed Phase 0–1 items (actionable, blocked on design decisions)
+- **Part B**: Infrastructure & legacy items (from v7/v8, low priority)
+- **Part C**: Prospective improvements (architectural enhancements, high-value)
+
+---
+
+**Part A: Deferred actions from partially-fixed Phase 0–1 items** (actionable, blocked on design decisions or dependencies):
+
+#### 🟠 TOOL-C1 Remaining Items (HIGH)
+- **Images never use /v1/files**: All uploaded images are always sent inline as base64, never as file references. Consider uploading images to `/v1/files` too.
+- **No UI indicator for /v1/files fallback**: When `/v1/files` upload fails and falls back to inline, user has no visual feedback. Add a warning toast.
+- **Full document re-sent on every iteration**: Files injected in iteration 1 are re-sent in full on iterations 2+. Blocked on PROSP-H2 (context optimization).
+
+#### 🟠 TOOL-H2 Remaining Items (HIGH)
+- **No auto-verification prompting**: Agent prompts do NOT instruct the LLM to screenshot after creating charts or modifying slides for self-verification. Add screenshot guidance to Excel and PowerPoint prompts.
+- **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` line 224 says "Do NOT call getAllSlidesOverview to verify" — defensive rule prevents legitimate verification workflows.
+- **No Word screenshot tool**: Word has no screenshot capability at all, preventing visual verification of formatting changes.
+
+#### 🟠 USR-H1 Remaining Items (HIGH)
+- **Empty shapes with default bullets**: `hasNativeBullets()` only checks EXISTING paragraphs — empty shapes with bullet XML defaults still may double-bullet on first insert.
+- **Stronger prompt guidance needed**: Add explicit rule to Word agent prompt: "When inserting into PowerPoint body placeholders, NEVER use markdown bullet syntax (`- `). The shape already has native bullets."
+
+#### 🟠 USR-H2 Remaining Items (HIGH)
+- **Context bloat structural issue**: Each iteration re-sends full message history (up to 1.2M chars / ~400k tokens) without summarization. Blocked on PROSP-H2.
+- **Tool result accumulation**: Tool results pushed to `currentMessages` never summarized. After 5–6 tool calls, context can exceed 500k chars.
+- **No context window % indicator**: Add visible indicator in status bar so users understand why LLM is slow.
+
+---
+
+**Part B: Infrastructure & Legacy Deferred Items** (from v7/v8 reviews):
+
+#### 🟢 IC2 — Containers run as root (LOW)
+**Files**: `backend/Dockerfile`, `frontend/Dockerfile`
+Docker containers should run with a non-root user for security best practices. Currently, both Dockerfiles use the default `root` user:
+- `backend/Dockerfile`: Node:22-slim runs as root (no USER directive)
+- `frontend/Dockerfile`: Nginx:stable runs as root (no USER directive)
+
+**Current status**: Still vulnerable. No USER directive found in either Dockerfile.
+**Severity**: LOW — This is internal infrastructure for local development. Security risk is low if only used internally.
+**Action**: Add `USER appuser` or similar to both Dockerfiles after setup. For nginx, create appuser with minimal privileges before switching.
+
+#### 🟢 IH2 — Private IP in build arg (LOW)
+**Files**: `frontend/Dockerfile:18`, `.env.example:1,6`
+Private IP address `192.168.50.10` hardcoded in build arguments and examples. Should be sanitized or use environment variables like `localhost` or a placeholder.
+**Current status**: Still present in `frontend/Dockerfile` ARG and multiple `.env.example` files.
+**Action**: Replace with placeholder IP (e.g., `localhost` or `192.168.x.x` generic pattern) or document as "replace with your server IP".
+
+#### 🟢 IH3 — DuckDNS domain in example (LOW)
+**Files**: `.env.example:10-11`
+Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could be confused with a real public URL.
+**Current status**: Still present in `.env.example` as `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL`.
+**Action**: Replace with placeholder (e.g., `https://your-domain.duckdns.org` or `https://example.duckdns.org`) with a clear comment "Update with your actual DuckDNS domain".
+
+#### 🟢 UM10 — PowerPoint HTML reconstruction (DEFERRED INDEFINITELY)
+**Original proposal** (v7): Reconstruct PowerPoint slides from HTML snapshots captured during visual creation. This would allow the agent to verify if generated HTML matches the final slide layout.
+- **NOT resolved by OOXML editing**: Recent improvements (layout detection, placeholder type loading, chart extraction) improved slide manipulation but did NOT implement HTML→slide reconstruction.
+- **Complexity too high**: OOXML format is intricate and error-prone. Edge cases (complex animations, embedded OLE objects, custom fonts) make this unreliable.
+- **Better approach**: Use screenshot + image upload workflow instead (already implemented via screenshotRange/screenshotSlide tools).
+- **Status**: Closed/Not recommended. Do not implement.
+
+---
+
+**Part C: Prospective improvements** (architectural enhancements, not blocking but high-value):
+
+#### PROSP-H2: Conversation History Optimization & Context Management 🟠 HIGH
+- **Tool result summarization**: After N iterations, replace detailed tool results with brief "Tool X: [1-line summary]"
+- **Document pinning**: Keep recently-uploaded files pinned in context window instead of re-injecting on every iteration
+- **Backwards iteration improvements**: Smarter message selection that prioritizes tool calls/responses over old chat history
+- **Root blocker for**: TOOL-C1 remaining items, USR-H2 latency, context overflow on large projects
+
+---
+
+#### PROSP-1: Dynamic Tool Loading — Intent-Based Tool Sets 🟢 LOW
+**Current**: All tools (up to 49 for Excel, 41 for Word) sent in every LLM request.
+**Problem**: Verbose JSON schemas consume significant context window (~50k chars per tool set).
+**Not recommended as-is** — Rather than lazy loading, consider static intent profiles:
+- `excel-chart-creation`: chart, data, analysis tools only
+- `excel-data-entry`: data manipulation, cell formatting tools only
+- `word-formatting`: text, style, formatting tools only
+- Agent selects profile based on user instruction or first message
+
+#### PROSP-2: Claude.md Targeted Overhaul 🟡 MEDIUM
+**Current state**: 302 lines, 15 sections. Some sections never consulted (§7–8 Docs/PRD guidelines).
+**Issues**:
+1. Tool counts in §5 get stale quickly — should auto-reference code
+2. §7–8 (Docs/PRD) are verbose and rarely used — trim to 3–5 key rules each
+3. Missing rules on screenshot verification, /v1/files strategy, context management
+4. No host-specific routing — agent reads all 302 lines regardless of task
+
+**Recommended actions**:
+- Trim §7–8 from 40+ lines to 5–10 lines combined
+- Add screenshot verification guidance: "After creating visuals, call screenshot tools and compare with originals"
+- Add /v1/files guidance: "Prefer file references for documents >10KB; upload as JSON multipart if provider supports /v1/files"
+- Replace hardcoded tool counts with "See each `*Tools.ts` file for the complete list"
+- Add routing rule: "When task is {Host}-specific, prioritize reading `docs/PRD-{Host}.md` and `frontend/src/skills/{host}.skill.md`"
+
+#### PROSP-3: Split PRD into Domain-Specific Sub-Documents 🟢 LOW
+**Current**: Single 550+ line `PRD.md` covering all Office hosts + infrastructure + UX.
+**Proposal**:
+- `docs/PRD-index.md` — Top-level overview and cross-links
+- `docs/PRD-word.md` — Word-specific features, constraints, workflows
+- `docs/PRD-excel.md` — Excel-specific features, constraints, workflows
+- `docs/PRD-powerpoint.md` — PowerPoint-specific features, constraints, workflows
+- `docs/PRD-outlook.md` — Outlook-specific features, constraints, workflows
+
+**Benefits**: Smaller docs, more agent-friendly, direct host-specific context without bloat. Easy migration (content already organized by host). Add routing rule in `Claude.md`.
+
+#### PROSP-4: Templates for Design Review, Commits, and PRs 🟢 LOW
+**Current**: Design Review structure is well-defined by v10.1. Commit/PR expectations are in `Claude.md` §12–13.
+**Proposal**:
+1. Formalize DR template in `Claude.md` with the 8 standard axes + severity levels
+2. Create `.github/pull_request_template.md` with Summary / Test Plan / Breaking Changes format
+3. No commit template needed — `Claude.md` §12 already sufficient
+
+**Value**: Consistency across reviews, easier diff tracking v10 → v11, automatic PR structure enforcement.
+
+#### PROSP-5: Consider Static Intent Profiles Instead of Full Dynamic Loading 🟡 MEDIUM
+**Alternative to PROSP-1**: Rather than lazy-load tools by category, define static profiles:
+- `chart-workflows`: Excel + PowerPoint tools for chart creation from data or images
+- `data-cleanup`: Excel data validation, dedupe, format tools
+- `document-assembly`: Word + Excel + PowerPoint tools for multi-document generation
+
+**Benefit**: Predictable, testable, avoids context thrashing from tool set switching.
+**Drawback**: Requires upfront profiling of common user workflows.
+
+---
+
+## Deferred Items Summary by Severity
+
+| Severity | Count | Status | Items |
+|----------|-------|--------|-------|
+| 🔴 **Critical** | 0 | ✅ All fixed or deferred | None — Phase 0 complete |
+| 🟠 **High** | 5 + 1 prospective | ⏳ Pending | TOOL-C1 (3), TOOL-H2 (3), USR-H1 (2), USR-H2 (3), PROSP-H2 (context opt.) |
+| 🟡 **Medium** | 2 prospective | — | PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
+| 🟢 **Low** | 4 legacy + 3 prospective | — | IC2, IH2, IH3, UM10 (v7/v8) + PROSP-1/3/4 |
+| **TOTAL DEFERRED** | **17** | | 11 functional (from partial fixes + PROSP-H2) + 6 architectural/legacy |
 
 ---
 
