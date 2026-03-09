@@ -11,11 +11,11 @@
 | Status | Count | Items |
 |--------|-------|-------|
 | ✅ **FIXED** | 4 | TOOL-C1 (partial), TOOL-H1, USR-C1, USR-H1 |
-| 🟠 **PARTIALLY FIXED** (deferred actions in Phase 4) | 3 | TOOL-H2, USR-H2, TOOL-C1 remaining |
-| ⏳ **IN PROGRESS** | 6 | ERR-H1, ERR-H2, DUP-H1, QUAL-H1, + 5 deferred High items |
+| 🟠 **PARTIALLY FIXED** (deferred actions) | 3 | TOOL-H2, USR-H2, TOOL-C1 remaining |
+| ⏳ **IN PROGRESS** | 5 | ERR-H1, ERR-H2, DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
-| 🚀 **DEFERRED IMPROVEMENTS** | 8 | Phase 4 Prospective (PROSP-1/2/3/4/5 + H2 context optimization) |
+| 🚀 **DEFERRED** (Phase 4) | 17 | 11 functional improvements + 4 legacy infrastructure (v7/v8) + 2 architectural |
 
 ---
 
@@ -914,7 +914,14 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 
 ### Phase 4 — Deferred Items (Not Yet Addressed)
 
-**Deferred actions from partially-fixed Phase 0–1 items** (actionable, blocked on design decisions or dependencies):
+**Consolidated deferred work from multiple review cycles** (v7, v8, v10.1):
+- **Part A**: Deferred actions from partially-fixed Phase 0–1 items (actionable, blocked on design decisions)
+- **Part B**: Infrastructure & legacy items (from v7/v8, low priority)
+- **Part C**: Prospective improvements (architectural enhancements, high-value)
+
+---
+
+**Part A: Deferred actions from partially-fixed Phase 0–1 items** (actionable, blocked on design decisions or dependencies):
 
 #### 🟠 TOOL-C1 Remaining Items (HIGH)
 - **Images never use /v1/files**: All uploaded images are always sent inline as base64, never as file references. Consider uploading images to `/v1/files` too.
@@ -935,7 +942,25 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 - **Tool result accumulation**: Tool results pushed to `currentMessages` never summarized. After 5–6 tool calls, context can exceed 500k chars.
 - **No context window % indicator**: Add visible indicator in status bar so users understand why LLM is slow.
 
-**Prospective improvements** (architectural enhancements, not blocking but high-value):
+---
+
+**Part B: Infrastructure & Legacy Deferred Items** (from v7/v8 reviews):
+
+#### 🟢 IC2 — Containers run as root (LOW)
+Docker containers should run with a non-root user for security. Backend/frontend Dockerfiles use default root. **Low priority** as this is internal-only infrastructure for local development. **Action**: Add `USER appuser` to Dockerfiles after setup.
+
+#### 🟢 IH2 — Private IP in build arg (LOW)
+Example `docker-compose.yml` may contain private IP addresses in build arguments. Should be sanitized or use environment variables. **Status**: Review examples and replace with placeholders.
+
+#### 🟢 IH3 — DuckDNS domain in example (LOW)
+Example configuration includes a real DuckDNS domain. Should use placeholder (e.g., `example.duckdns.org`) to avoid confusion. **Status**: Update docs and examples.
+
+#### 🟢 UM10 — PowerPoint HTML reconstruction (DEFERRED INDEFINITELY)
+Original proposal (v7) was to reconstruct PowerPoint slides from HTML snapshots. **Complexity too high**: OOXML format is intricate, error-prone, and not worth the effort. **Better approach**: Use screenshot + image upload workflow instead. **Status**: Closed (not recommended).
+
+---
+
+**Part C: Prospective improvements** (architectural enhancements, not blocking but high-value):
 
 #### PROSP-H2: Conversation History Optimization & Context Management 🟠 HIGH
 - **Tool result summarization**: After N iterations, replace detailed tool results with brief "Tool X: [1-line summary]"
@@ -1002,12 +1027,13 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 
 ## Deferred Items Summary by Severity
 
-| Severity | Count | Status | Action Required |
-|----------|-------|--------|-----------------|
+| Severity | Count | Status | Items |
+|----------|-------|--------|-------|
 | 🔴 **Critical** | 0 | ✅ All fixed or deferred | None — Phase 0 complete |
-| 🟠 **High** | 5 deferred | ⏳ Pending | 4 items from partial fixes; 1 prospective (PROSP-H2) |
-| 🟡 **Medium** | — | — | 1 prospective: Claude.md overhaul |
-| 🟢 **Low** | 3 | — | 3 prospective: tool loading, PRD split, templates |
+| 🟠 **High** | 5 + 1 prospective | ⏳ Pending | TOOL-C1 (3), TOOL-H2 (3), USR-H1 (2), USR-H2 (3), PROSP-H2 (context opt.) |
+| 🟡 **Medium** | 2 prospective | — | PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
+| 🟢 **Low** | 4 legacy + 3 prospective | — | IC2, IH2, IH3, UM10 (v7/v8) + PROSP-1/3/4 |
+| **TOTAL DEFERRED** | **17** | | 11 functional (from partial fixes + PROSP-H2) + 6 architectural/legacy |
 
 ---
 
