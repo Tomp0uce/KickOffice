@@ -29,6 +29,10 @@
           :class="props.toolCall.status === 'error' ? 'text-red-400 bg-red-50 dark:bg-red-950/20' : 'text-main/70 bg-bg-secondary'"
         >{{ props.toolCall.result }}</pre>
       </div>
+      <div v-if="props.toolCall.screenshotSrc" class="px-2 py-1.5 border-t border-border-secondary">
+        <div class="text-[10px] uppercase text-secondary mb-1">screenshot</div>
+        <img :src="props.toolCall.screenshotSrc" alt="screenshot" class="max-w-full rounded-sm" />
+      </div>
     </div>
   </div>
 </template>

@@ -98,7 +98,6 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
 - \`applyStyle\` — Apply Word named styles (Heading 1, Title, Quote...)
 
 **STRUCTURE & ANALYTICS:**
-- \`insertBookmark\` / \`goToBookmark\`
 - \`getTableInfo\` / \`modifyTableCell\` / \`addTableRow\` / \`addTableColumn\`
 - \`insertSectionBreak\` / \`insertHeaderFooter\`
 

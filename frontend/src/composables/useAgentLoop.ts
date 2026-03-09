@@ -270,11 +270,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
       
       // H11: Show "agentAnalyzing" initially, or "agentWaitingForLLM" if tools were just executed and we are generating a response
-      if (iteration === 1) {
-        currentAction.value = t('agentAnalyzing')
-      } else {
-        currentAction.value = t('agentWaitingForLLM')
-      }
+      const llmWaitLabel = iteration === 1 ? t('agentAnalyzing') : t('agentWaitingForLLM')
+      currentAction.value = llmWaitLabel
+      const llmWaitStart = Date.now()
+      const llmWaitTimer = setInterval(() => {
+        const elapsed = Math.round((Date.now() - llmWaitStart) / 1000)
+        currentAction.value = `${llmWaitLabel} (${elapsed}s)`
+      }, 1000)
 
       const currentSystemPrompt = messages[0]?.role === 'system' ? (typeof messages[0].content === 'string' ? messages[0].content : '') : ''
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt)
@@ -295,10 +297,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           accumulateUsage
         })
         
+        clearInterval(llmWaitTimer)
         response = streamResult.response
         truncatedByLength = streamResult.truncatedByLength
         logService.info('llm_response_complete', 'llm', { tokensUsed: sessionStats.value.totalTokens })
       } catch (err: unknown) {
+        clearInterval(llmWaitTimer)
         if ((err instanceof Error && err.name === 'AbortError') || abortController.value?.signal.aborted) {
           abortedByUser = true
           break

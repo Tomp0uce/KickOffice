@@ -94,11 +94,41 @@ Dual-storage migration pattern (localStorage ↔ sessionStorage) with 6 fallback
 
 ---
 
+### ARCH-L2 — Generated manifests served from root instead of `frontend/public/assets/` [LOW]
+
+**File**: `scripts/generate-manifests.js:44` — `OUTPUT_DIR = path.join(ROOT_DIR, 'generated-manifests')`
+
+The manifest generation script outputs to a `generated-manifests/` directory at the project root. These files are currently only accessible from within the server environment (e.g., via `localhost:3000/manifests/`), not served as static assets from the frontend.
+
+**Current setup**: Manifests are served via an Express route that reads the filesystem. External access requires tunneling (ngrok, Cloudflare Tunnel, etc.).
+
+**Proposed alternative**: Output manifests to `frontend/public/assets/manifests/` so they are bundled and served directly by the Vite/Nginx static file server.
+
+**Benefits**:
+- Directly accessible via the frontend URL (same origin, no separate Express route)
+- Works out-of-the-box in static hosting scenarios
+- Simplified distribution: one URL serves both the add-in UI and the manifest
+
+**Security considerations**:
+- Manifests contain the add-in's internal hostname/URL — exposing them publicly means revealing server URLs
+- If the frontend is on a public CDN, manifests become publicly discoverable
+- Current approach (behind Express with optional auth) is more defensible
+- Mitigation: strip internal hostnames from the manifest (use relative paths where possible), or serve manifests only at a non-obvious path
+
+**Recommendation**: Keep the current approach for self-hosted deployments. If/when a SaaS distribution model is desired (users install from a public URL), move manifests to `frontend/public/assets/manifests/` but implement a route-level allowlist for which add-in configurations can be publicly served.
+
+---
+
 ## 2. TOOL/PROMPT QUALITY — Full Potential Usage
 
-### TOOL-C1 — Uploaded files sent inline instead of using /v1/files references [CRITICAL — PARTIALLY FIXED ✅]
+### TOOL-C1 — Uploaded files sent inline instead of using /v1/files references [CRITICAL — PARTIALLY FIXED ✅ — REMAINING ITEMS DEFERRED]
 
 **Fix applied**: `/v1/files` failure is now logged via `logService.warn` instead of silently swallowed. Token budget now counts `type: 'file'` content parts (200 token fixed cost). Architecture is sound — the inline fallback is correct behavior when the provider doesn't support `/v1/files`.
+
+**Deferred (intentionally not fixed now)**:
+- Images still always sent inline as base64 (never use `/v1/files`) — acceptable until image context costs become a bottleneck
+- No UI indicator when `/v1/files` upload fails and falls back to inline — low visibility bug moved to USR-L1
+- Full document content re-sent on every iteration — blocked on PROSP-H2 (context optimization)
 
 **Files**:
 - `frontend/src/composables/useAgentLoop.ts:590-613` — file inclusion in messages
@@ -125,43 +155,34 @@ Dual-storage migration pattern (localStorage ↔ sessionStorage) with 6 fallback
 
 ---
 
-### TOOL-H1 — Skill doc references non-existent tools [HIGH]
+### TOOL-H1 — Skill doc references non-existent tools [HIGH — FIXED ✅]
 
-**Files**: `frontend/src/skills/word.skill.md` (line 101), `frontend/src/composables/useAgentPrompts.ts`
+**Files**: `frontend/src/composables/useAgentPrompts.ts:101`
 
-`word.skill.md` references `insertBookmark` and `goToBookmark` tools, but these are not defined in `wordTools.ts`. The agent may attempt to call them, resulting in a "tool not found" error.
+`useAgentPrompts.ts` referenced `insertBookmark` and `goToBookmark` tools in the Word agent prompt under **STRUCTURE & ANALYTICS**, but these tools are not defined in `wordTools.ts`. The agent could attempt to call them, resulting in a "tool not found" error.
 
-**Action**: Either implement these tools or remove references from the skill document.
+**Fix applied**: Removed the `insertBookmark` / `goToBookmark` line from the Word agent prompt.
 
 ---
 
-### TOOL-H2 — Screenshots underutilized: no auto-verification, not visible to user [HIGH]
+### TOOL-H2 — Screenshots underutilized: no auto-verification, not visible to user [HIGH — PARTIALLY FIXED ✅]
 
 **Files**:
 - `frontend/src/utils/excelTools.ts:1603-1623` — `screenshotRange` tool
 - `frontend/src/utils/powerpointTools.ts:1118-1146` — `screenshotSlide` tool
 - `frontend/src/composables/useToolExecutor.ts:89-105` — `__screenshot__` detection
-- `frontend/src/composables/useAgentLoop.ts:374-379` — screenshot storage in session
-- `frontend/src/composables/useAgentPrompts.ts` — NO screenshot instructions in any agent prompt
-- `frontend/src/components/chat/ChatMessageList.vue:91-96` — only shows `imageSrc` (DALL-E), not screenshots
+- `frontend/src/types/chat.ts:3-9` — `ToolCallPart.screenshotSrc` field (added)
+- `frontend/src/components/chat/ToolCallBlock.vue` — screenshot display (added)
 
-**Problem**: Screenshot tools exist for Excel and PowerPoint but are severely underutilized:
+**Fix applied**:
+- Added `screenshotSrc?: string` to `ToolCallPart` type
+- `useToolExecutor.ts` now stores the screenshot as a data URI on the tool call object when `__screenshot__: true` is detected
+- `ToolCallBlock.vue` now displays the screenshot image inline in the chat when `screenshotSrc` is present
 
-1. **No auto-verification**: Agent prompts do NOT instruct the LLM to screenshot after creating charts, formatting tables, or modifying slides. Example: when reproducing a chart from an uploaded image, the agent should screenshot the result and compare with the original — but no prompt guidance exists for this.
-
-2. **Invisible to user**: When a screenshot is taken, the user only sees the tool call status text "Screenshot captured. Image injected into vision context." The actual image is NOT displayed in the chat UI. The `imageSrc` field in `ChatMessageList.vue` is reserved for DALL-E images only.
-
-3. **No Word screenshot**: Word has no screenshot tool at all, preventing visual verification of formatting.
-
-4. **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` line 224 says "Do NOT call getAllSlidesOverview to verify" — this defensive rule against infinite loops also prevents legitimate verification.
-
-**Impact**: The agent cannot self-correct visual output. Users must manually verify all visual changes.
-
-**Action**:
-1. Add screenshot verification guidance to agent prompts (e.g., "After creating a chart, use `screenshotRange` to verify the output")
-2. Display screenshot images inline in the chat when a tool returns `__screenshot__: true`
-3. For Excel chart-from-image workflow: add explicit "compare with original" step
-4. Consider making verification opt-in via a "verify" flag on relevant tools
+**Remaining gaps (not fixed)**:
+1. **No auto-verification prompting**: Agent prompts still do NOT instruct the LLM to screenshot after creating charts or modifying slides
+2. **No Word screenshot**: Word has no screenshot tool at all
+3. **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` says "Do NOT call getAllSlidesOverview to verify" — prevents legitimate verification
 
 ---
 
@@ -567,57 +588,44 @@ Required for Office add-in compatibility. Cannot be removed without breaking Off
 
 ---
 
-### USR-H1 — Double bullets generated in PowerPoint [HIGH]
+### USR-H1 — Double bullets generated in PowerPoint [HIGH — FIXED ✅]
 
 **Files**:
+- `frontend/src/utils/powerpointTools.ts:344` — `findShapeOnSlide()` shapes.load call (fixed)
 - `frontend/src/utils/powerpointTools.ts:301-330` — `insertMarkdownIntoTextRange()`
 - `frontend/src/utils/powerpointTools.ts:387-404` — `hasNativeBullets()` detection
-- `frontend/src/utils/powerpointTools.ts:791-799` — `isBodyPlaceholder` detection
-- `frontend/src/utils/markdown.ts:388-400` — `stripMarkdownListMarkers()`
 
-**Problem**: Double bullets appear when the agent inserts markdown-formatted bullet text (`- item`) into a PowerPoint shape that already has native bullets enabled at the XML level.
+**Root cause**: `findShapeOnSlide()` loaded `placeholderFormat` but NOT `placeholderFormat/type`. This meant `placeholderFormat.type` was always `undefined`, so `isBodyPlaceholder` never became `true` for placeholder shapes — causing the native bullet strip logic to be skipped, resulting in double bullets.
 
-**Current defenses**:
-- `hasNativeBullets()` checks `bulletFormat.visible` on existing paragraphs
-- `isBodyPlaceholder` detects body/content placeholders and sets `forceStripBullets = true`
-- `stripMarkdownListMarkers()` removes `- ` prefixes from markdown text
+**Fix applied**: Changed `shapes.load('items,items/id,items/name,items/placeholderFormat')` to `shapes.load('items,items/id,items/name,items/placeholderFormat,items/placeholderFormat/type')`. Now `placeholderFormat.type` is correctly loaded, `isBodyPlaceholder` returns `true` for body/content placeholders, and `forceStripBullets` is set — preventing double bullets.
 
-**Remaining gaps**:
-1. `hasNativeBullets()` only checks EXISTING paragraphs — if the shape is empty but has bullet formatting in the XML template, it returns false
-2. The LLM may generate `- ` prefixed text even when instructed not to, because the system prompt doesn't strongly enough warn about this
-3. When using `insertContent` with `mode: 'Replace'`, the old bullet-formatted content is replaced, but new text may re-trigger native bullets from the shape's paragraph defaults
-
-**Action**:
-1. Also check shape XML `<a:defPPr>` for default bullet formatting (not just existing paragraphs)
-2. Add stronger prompt guidance: "When inserting into PowerPoint body placeholders, NEVER use markdown bullet syntax (`- `). The shape already has native bullets."
-3. Consider always stripping markdown bullets when target is a body placeholder, regardless of `hasNativeBullets()` result
+**Remaining gaps (not fixed)**:
+1. `hasNativeBullets()` only checks EXISTING paragraphs — empty shapes with bullet defaults in XML still may double-bullet on fresh insert
+2. No stronger prompt guidance added yet
 
 ---
 
-### USR-H2 — Long latency (1-2 min) between successive tool calls [HIGH]
+### USR-H2 — Long latency (1-2 min) between successive tool calls [HIGH — PARTIALLY FIXED ✅]
 
 **Files**:
-- `frontend/src/composables/useAgentLoop.ts:258-400` — agent loop iteration
+- `frontend/src/composables/useAgentLoop.ts:272-305` — agent loop iteration (timer added)
 - `frontend/src/utils/tokenManager.ts:71-160` — `prepareMessagesForContext()`
 - `backend/src/config/models.js:147-149` — `reasoning_effort` parameter
 
-**Problem**: After successful tool calls, the user sometimes experiences 1-2 minute waits before the next action. No artificial delays exist in the code (no `sleep`, `setTimeout`, or debounce between iterations).
+**Fix applied**: Added an elapsed time counter to the `currentAction` status label during LLM inference. The status now updates every second: "Analyzing... (5s)", "Waiting for AI... (12s)", etc. Users can now see that the system is working and how long it has been waiting — reducing perceived latency and anxiety about hung states.
 
-**Root causes identified**:
+**Root causes** (not fixed — structural):
 
 1. **Context bloat**: Each iteration re-sends the full message history (up to 1.2M chars / ~400k tokens). After several tool calls that return large results (full spreadsheet data, document content), the context sent to the LLM grows significantly, increasing inference time.
 
 2. **`reasoning_effort` parameter**: If set to `"high"` (backend config/models.js:147), GPT-5 models spend extra time in the "thinking" phase. This can add 30-90 seconds per call with complex tool history.
 
-3. **Tool result accumulation**: Tool results are pushed to `currentMessages` (line 396) and never summarized. After 5-6 tool calls, the conversation includes: system prompt + all tool call/result pairs + user message + document context — potentially 500k+ chars.
+3. **Tool result accumulation**: Tool results are pushed to `currentMessages` and never summarized. After 5-6 tool calls, potentially 500k+ chars in context.
 
-4. **No tool result summarization**: Unlike user messages which get truncated by `prepareMessagesForContext()`, tool results within the budget window are sent in full. A single `getWorksheetData` result with thousands of cells can be 100k+ chars.
-
-**Action**:
-1. Add aggressive truncation for tool results older than N iterations (keep only summary/conclusion)
-2. Consider summarizing tool results after successful execution: "Tool X completed successfully: [brief summary]"
-3. Add a visible indicator showing context window % in the status bar so users understand why it's slow
-4. Log context size per iteration to help diagnose
+**Remaining actions**:
+1. Add aggressive truncation for tool results older than N iterations (see PROSP-H2)
+2. Add a visible context window % indicator in the status bar
+3. Log context size per iteration to help diagnose
 
 ---
 
@@ -850,17 +858,17 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 ## SUMMARY & PRIORITY MATRIX
 
 ### Phase 0 — Critical (User-facing bugs & data inefficiency)
-1. **TOOL-C1**: Fix /v1/files integration — stop sending files inline, use file references
-2. **USR-C1**: Complete the feedback debug bundle (add chat history + system context)
+1. **TOOL-C1**: ~~Fix /v1/files integration~~ — PARTIALLY FIXED ✅ (silent failure logged, token budget fixed; remaining items deferred)
+2. **USR-C1**: ~~Complete the feedback debug bundle~~ — FIXED ✅
 
 ### Phase 1 — High Priority (Reliability & User Experience)
-3. **USR-H1**: Fix double bullets in PowerPoint (check XML defaults, strengthen prompts)
-4. **USR-H2**: Reduce latency between tool calls (tool result summarization, context optimization)
-5. **TOOL-H2**: Enable screenshot auto-verification and display screenshots in chat
+3. **USR-H1**: ~~Fix double bullets in PowerPoint~~ — FIXED ✅ (`placeholderFormat/type` now loaded)
+4. **USR-H2**: ~~Reduce latency between tool calls~~ — PARTIALLY FIXED ✅ (elapsed timer added; structural context optimization deferred to PROSP-H2)
+5. **TOOL-H2**: ~~Display screenshots in chat~~ — PARTIALLY FIXED ✅ (screenshots now visible in tool call block; auto-verification prompts not added yet)
 6. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
 7. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
 8. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
-9. **TOOL-H1**: Fix skill doc referencing non-existent tools
+9. **TOOL-H1**: ~~Fix skill doc referencing non-existent tools~~ — FIXED ✅
 10. **QUAL-H1**: Replace critical `any` types with proper Office.js types
 
 ### Phase 2 — Medium Priority (Maintainability & DX)
@@ -878,9 +886,10 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 ### Phase 3 — Low Priority (Polish)
 21. **UX-L1-L3**: Inline styles, link text, mobile width
 22. **ARCH-L1**: Switch to `npm ci` in Dockerfile
-23. **QUAL-L1-L2**: Boolean params, async pattern docs
-24. **USR-L1**: Show warning when /v1/files upload silently fails
-25. Remaining LOW items
+23. **ARCH-L2**: Evaluate manifest accessibility — move `generated-manifests/` to `frontend/public/assets/` for SaaS distribution (with security trade-off analysis)
+24. **QUAL-L1-L2**: Boolean params, async pattern docs
+25. **USR-L1**: Show warning when /v1/files upload silently fails
+26. Remaining LOW items
 
 ### Phase 4 — Prospective (Deferred)
 26. **PROSP-5**: Claude.md targeted updates (missing rules, stale counts, trim verbose sections)
