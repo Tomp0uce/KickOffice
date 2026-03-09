@@ -46,7 +46,7 @@ The frontend follows a composable-based architecture:
 - **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components (`CustomButton`, `CustomInput`, `Message`, `SettingCard`, `SingleSelect`) + Settings tabs (`AccountTab`, `GeneralTab`, etc.)
 - **Composables**: `useHomePage.ts` (orchestrates homepage state, session switching, scroll management), `useAgentLoop.ts` (modularized agent loop), `useAgentStream`, `useToolExecutor`, `useLoopDetection`, `useAgentPrompts.ts`, `useOfficeSelection.ts` (Office API text selection), `useImageActions.ts` (image processing), `useOfficeInsert.ts` (document insertion + clipboard), `useHealthCheck.ts`
 - **Constants**: `limits.ts` (centralized magic numbers: upload sizes, timeouts, buffer sizes, icon sizes)
-- **Utils**: `tokenManager.ts` (context pruning), `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordFormatter.ts`, `hostDetection.ts`, `message.ts`, `common.ts` (normalizeLineEndings), `enum.ts`, `officeCodeValidator.ts` (pre-execution safety), `markdown.ts` (deduplicated MarkdownIt config)
+- **Utils**: `tokenManager.ts` (context pruning), `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordFormatter.ts`, `hostDetection.ts`, `message.ts`, `common.ts` (normalizeLineEndings), `enum.ts`, `officeCodeValidator.ts` (pre-execution safety), `markdown.ts` (deduplicated MarkdownIt config), `pptxZipUtils.ts` (OOXML ZIP edit helpers: withSlideZip, escapeXml, sanitizeXmlAmpersands)
 
 ### Backend architecture (post-refactor)
 
@@ -66,6 +66,7 @@ backend/src/
 │   ├── models.js          # GET /api/models
 │   ├── upload.js          # POST /api/upload (file processing: PDF, DOCX, XLSX, CSV)
 │   ├── files.js           # POST /api/files (proxy to LLM provider /v1/files — returns file_id)
+│   ├── icons.js           # GET /api/icons/search, GET /api/icons/svg/:prefix/:name (Iconify proxy)
 │   └── plotDigitizer.js   # POST /api/chart-extract (chart pixel extraction)
 ├── services/
 │   ├── llmClient.js       # Centralized LLM API client (chatCompletion, imageGeneration, RateLimitError)
@@ -147,18 +148,18 @@ Any contract change should update both backend and frontend in the same change s
 Current host/tool landscape (keep in mind for tool/agent changes):
 
 - Word tools: 41 tools (includes `proposeRevision` for format-preserving edits, `eval_wordjs` via SES sandbox)
-- Excel tools: 45 tools (high-count set, including `eval_officejs` and OpenExcel ports)
-- PowerPoint tools: 16 tools (includes `proposeShapeTextRevision` for diff reporting, slides, shapes, notes, and `eval_powerpointjs`)
+- Excel tools: 49 tools (including `eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `modifyWorkbookStructure`, paginated `findData`, `detectDataHeaders`)
+- PowerPoint tools: 22 tools (includes `screenshotSlide`, `verifySlides`, `duplicateSlide`, `editSlideXml`, `searchIcons`, `insertIcon`, `eval_powerpointjs`)
 - Outlook tools: 14 tools (mail compose/read helpers and `eval_outlookjs`)
 - General tools: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
-- **Total**: 129 tools across all hosts
+- **Total**: 139 tools across all hosts
 
 **Agent Stability Features** (implemented):
 
 - **Skills System**: Office.js best practices auto-injected into agent prompts via `frontend/src/skills/` (5 markdown skill documents: common.skill.md + host-specific for Word/Excel/PowerPoint/Outlook)
 - **Code Validator**: Pre-execution validation for all `eval_*` tools via `officeCodeValidator.ts` (catches missing load/sync, wrong namespaces, infinite loops)
 - **Diffing Integration**: Format-preserving text editing via `wordDiffUtils.ts` (wraps `office-word-diff` local library — Token Map → Sentence Diff → Block Replace cascade). `proposeRevision` is the only Word tool that preserves formatting on unchanged text; agent is instructed to always call `getSelectedTextWithFormatting` first, and is explicitly forbidden from using `eval_wordjs` with `insertText(..., 'Replace')` which destroys formatting. `office-word-diff` is Word-only (PowerPoint/Outlook lack the Range API and Track Changes).
-- **Vision Image Handling**: `insertImageOnSlide` in `powerpointTools.ts` accepts a `base64Data` parameter directly (raw base64 string, no data URI prefix). The `powerpointImageRegistry` Map still holds images for other access patterns, but `insertImageOnSlide` no longer requires a registry lookup.
+- **Vision Image Handling**: `insertImageOnSlide` accepts `base64Data` as a raw base64 string, a data URI, or an imageId UUID (from the session context). The `powerpointImageRegistry` Map is indexed by both filename and imageId; the tool resolves imageId automatically.
 - **Session Persistence**: Uploaded files are persisted in `sessionUploadedFiles` ref in `useAgentLoop.ts`. Text files also store `fileId?` (from LLM provider `/v1/files` upload). Each user `DisplayMessage` stores `attachedFiles?: Array<{filename, content, fileId?}>` so context is rebuilt via `rebuildSessionFiles()` after session switch or init. Call `rebuildSessionFiles()` (returned from `useAgentLoop`) after any `history` replace from IndexedDB.
 - **Log Sanitization**: All payloads containing potential Base64 images MUST pass through `sanitizePayloadForLogs` in `backend.ts` before being logged to prevent disk saturation and terminal crashes.
 - **Token Manager**: Images in multi-part content MUST have a fixed token cost (default 1000) in `tokenManager.ts` to prevent the manager from truncating history due to Base64 length.
@@ -191,23 +192,39 @@ Current host/tool landscape (keep in mind for tool/agent changes):
 
 ## 8) Product Requirements Document (PRD.md) Guidelines
 
-**CRITICAL: Always update PRD.md when adding or modifying features.**
+**Update PRD.md when the change is significant enough that a product manager would want to know about it.**
 
-- **When to update**: Every time you add, modify, or remove a user-facing feature, update `PRD.md` to reflect the change.
-- **What to include**:
-  - Feature descriptions from a **user perspective**
-  - Business logic and acceptance criteria
-  - User personas and use cases
-  - Constraints and limitations
-- **What NOT to include**:
-  - Technical implementation details
-  - Code snippets or code examples
-  - Library names, framework names, or specific technologies
-  - File paths, function names, or class names
-  - Architecture diagrams or technical workflows
-- **Keep it high-level**: The PRD is a product document, not a technical specification. Focus on **what** the product does and **why**, not **how** it's implemented.
-- **Single source of truth**: The PRD should be the authoritative reference for product features. When implementing new features, read the PRD first to understand the requirements.
-- **Language**: PRD.md must be written in **English**.
+### When to update PRD.md ✅
+
+Update the PRD for changes that affect **what the product can do** or **how users interact with it**:
+
+- New tool categories or major new capabilities (e.g., adding icon insertion, screenshot analysis, OOXML editing)
+- New external integrations or services made available to users (e.g., icon library, web search, new upload formats)
+- New user-facing workflows or multi-step interaction patterns
+- Changes to supported formats, file size limits, or platform support
+- Changes to business logic or constraints (e.g., a previously out-of-scope feature becoming supported)
+- New quick actions or agent behaviors visible to the end user
+- Major enrichment of an existing tool that changes its user-facing behavior (e.g., adding pagination to search)
+
+### When NOT to update PRD.md ❌
+
+Do **not** update the PRD for:
+
+- Bug fixes, error handling improvements, or stability fixes
+- Performance optimizations with no user-facing behavior change
+- Internal refactoring, code cleanup, or architectural changes invisible to users
+- Adding optional parameters to existing tools without changing their core function
+- UI micro-adjustments (font size, icon color, spacing tweaks)
+- Documentation-only changes (README, CHANGELOG, Claude.md)
+- Changes that only affect developer experience (logging, build, test)
+
+### Content guidelines
+
+- **What to include**: Feature descriptions from a **user perspective**, business logic, acceptance criteria, constraints
+- **What NOT to include**: Technical implementation details, code snippets, library names, file paths, function names
+- **Keep it high-level**: Focus on **what** the product does and **why**, not **how** it's implemented
+- **Single source of truth**: The PRD is the authoritative reference for product features — read it before implementing new features
+- **Language**: PRD.md must be written in **English**
 
 ## 9) PowerPoint Agent
 

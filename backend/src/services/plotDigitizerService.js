@@ -152,21 +152,33 @@ export async function extractChartData({
   const [xMin, xMax] = xAxisRange
   const [yMin, yMax] = yAxisRange
 
+  // Strategy depends on chart type:
+  // - line / scatter: use the median Y pixel (centre of the drawn mark)
+  // - bar / area / column: use the minimum Y pixel (topmost = highest value = bar/area top)
+  const useTopPixel = chartType === 'bar' || chartType === 'area' || chartType === 'column'
+
   const points = []
   for (let i = 0; i < numPoints; i++) {
     if (buckets[i].length === 0) continue
 
-    // Average pixel Y for this bucket
-    const avgPy = buckets[i].reduce((sum, py) => sum + py, 0) / buckets[i].length
+    let representativePy
+    if (useTopPixel) {
+      // Min py = topmost matching pixel = top of bar/area = the data value
+      representativePy = Math.min(...buckets[i])
+    } else {
+      // Median py for line/scatter — more robust than mean against anti-aliasing noise
+      const sorted = [...buckets[i]].sort((a, b) => a - b)
+      representativePy = sorted[Math.floor(sorted.length / 2)]
+    }
 
     // Map bucket center → real X (linear interpolation within plot area)
     const relX = (i + 0.5) / numPoints
     const realX = xMin + relX * (xMax - xMin)
 
-    // Map average pixel Y → real Y
+    // Map representative pixel Y → real Y
     // Pixel Y=pyMin is the TOP of the plot area → yMax
     // Pixel Y=pyMax is the BOTTOM of the plot area → yMin
-    const relY = (avgPy - pyMin) / plotHeight
+    const relY = (representativePy - pyMin) / plotHeight
     const realY = yMax - relY * (yMax - yMin)
 
     points.push({ x: round(realX, 3), y: round(realY, 3) })

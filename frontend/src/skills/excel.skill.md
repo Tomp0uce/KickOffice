@@ -63,9 +63,15 @@ range.formulas = [['=RECHERCHEV(A1;B:C;2;FAUX)']]
 
 **IMPORTANT**: Check the `excelFormulaLanguage` setting in the agent context.
 
-### Rule 3b: Charts — always specify seriesBy and hasHeaders
+### Rule 3b: Charts — detect headers first, then always specify seriesBy and hasHeaders
 
-When calling `manageObject` to create a chart, **always** pass `seriesBy` and `hasHeaders` explicitly to avoid axis label being treated as a data series:
+Before creating a chart from user data, **always call `detectDataHeaders`** first to determine if the range has column/row headers:
+
+```json
+{ "address": "A1:D10" }
+```
+
+Then use the returned `suggestedHasHeaders` and `suggestedSeriesBy` values in `manageObject`:
 
 ```json
 {
@@ -79,11 +85,11 @@ When calling `manageObject` to create a chart, **always** pass `seriesBy` and `h
 }
 ```
 
-- `seriesBy: "columns"` — each column is a data series (most common)
-- `seriesBy: "rows"` — each row is a data series
-- `hasHeaders: true` — first row contains column headers (labels), not data values
+- `seriesBy: "columns"` — each column is a data series (most common, use when column headers exist)
+- `seriesBy: "rows"` — each row is a data series (use when only row headers exist)
+- `hasHeaders: true` — first row/column contains labels, not data values
 
-**NEVER use the default** — always specify both parameters.
+**NEVER skip `detectDataHeaders`** when working with user data — you cannot reliably guess whether headers exist.
 
 ### Rule 4: Use getUsedRange() to find data bounds
 
@@ -134,23 +140,27 @@ await context.sync();
 
 ### For READING:
 
-| Tool               | When to use                         |
-| ------------------ | ----------------------------------- |
-| `getSelectedCells` | Get values from current selection   |
-| `getWorksheetData` | Read used range from active sheet   |
-| `getDataFromSheet` | Read data from any sheet by name    |
-| `getWorksheetInfo` | Get workbook structure, sheet names |
-| `getAllObjects`    | List charts and pivot tables        |
-| `getNamedRanges`   | List named ranges                   |
-| `findData`         | Search for values workbook-wide     |
+| Tool                | When to use                                       |
+| ------------------- | ------------------------------------------------- |
+| `getSelectedCells`  | Get values from current selection                 |
+| `getWorksheetData`  | Read used range from active sheet                 |
+| `getDataFromSheet`  | Read data from any sheet by name                  |
+| `getWorksheetInfo`  | Get workbook structure, sheet names               |
+| `getAllObjects`     | List charts and pivot tables                      |
+| `getNamedRanges`    | List named ranges                                 |
+| `findData`          | Search for values workbook-wide (with pagination) |
+| `getRangeAsCsv`     | Read range as CSV (token-efficient for large data)|
+| `screenshotRange`   | Capture a range as PNG image for visual inspection|
+| `detectDataHeaders` | Detect column/row headers before chart creation   |
 
 ### For WRITING:
 
-| Tool              | When to use                                        |
-| ----------------- | -------------------------------------------------- |
-| `setCellRange`    | **PREFERRED** — Write values, formulas, formatting |
-| `clearRange`      | Clear contents or formatting                       |
-| `modifyStructure` | Insert/delete rows, columns, freeze panes          |
+| Tool                      | When to use                                        |
+| ------------------------- | -------------------------------------------------- |
+| `setCellRange`            | **PREFERRED** — Write values, formulas, formatting |
+| `clearRange`              | Clear contents or formatting                       |
+| `modifyStructure`         | Insert/delete rows, columns, freeze panes          |
+| `modifyWorkbookStructure` | Create, delete, rename, or duplicate a worksheet   |
 
 ### For ANALYSIS:
 
@@ -247,7 +257,8 @@ Use your vision capability to inspect the uploaded chart image and determine:
 
 ### Step 2: Extract data via pixel analysis
 
-Call `extract_chart_data` with the parameters you identified:
+Call `extract_chart_data` with the parameters you identified. The **`plotAreaBox`** is REQUIRED — estimate the four edges of the plot area (the rectangle between the axes) as fractions 0.0–1.0 of the image size:
+
 ```json
 {
   "imageId": "<from uploaded_images context>",
@@ -255,11 +266,28 @@ Call `extract_chart_data` with the parameters you identified:
   "yAxisRange": [0, 50000],
   "targetColor": "#0070C0",
   "chartType": "line",
-  "numPoints": 40
+  "numPoints": 40,
+  "plotAreaBox": {
+    "xMinPx": 0.12,
+    "xMaxPx": 0.95,
+    "yMinPx": 0.08,
+    "yMaxPx": 0.88
+  }
 }
 ```
 
-If the tool returns few or zero points, increase `colorTolerance` (default 80, try 120-150).
+- `xMinPx`: fraction from left where the Y-axis vertical line sits (e.g. 0.12)
+- `xMaxPx`: fraction from left where the last X tick/gridline is (e.g. 0.95)
+- `yMinPx`: fraction from top where the topmost gridline is (e.g. 0.08)
+- `yMaxPx`: fraction from top where the X-axis horizontal line sits (e.g. 0.88)
+
+**Chart type mapping** (important for correct Y-value extraction):
+- Use `"line"` for line charts → median pixel Y per bucket
+- Use `"scatter"` for scatter/XY plots → median pixel Y per bucket
+- Use `"bar"` for column charts (vertical bars) AND horizontal bar charts → min pixel Y per bucket (= top of bar)
+- Use `"area"` for area charts → min pixel Y per bucket (= top of filled area)
+
+If the tool returns few or zero points, increase `colorTolerance` (default 120, try 150–200).
 For multiple series, call `extract_chart_data` once per color.
 
 ### Step 3: Write data to Excel

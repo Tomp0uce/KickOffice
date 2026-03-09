@@ -27,6 +27,7 @@ import { feedbackRouter } from './routes/feedback.js'
 import { logsRouter } from './routes/logs.js'
 import { plotDigitizerRouter } from './routes/plotDigitizer.js'
 import { filesRouter } from './routes/files.js'
+import { iconsRouter } from './routes/icons.js'
 import { logAndRespond } from './utils/http.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -225,6 +226,7 @@ app.use('/api/feedback', ensureUserCredentials, feedbackRouter)
 app.use('/api/logs', ensureUserCredentials, logsLimiter, logsRouter)
 app.use('/api/chart-extract', ensureUserCredentials, uploadLimiter, plotDigitizerRouter)
 app.use('/api/files', ensureLlmApiKey, ensureUserCredentials, uploadLimiter, filesRouter)
+app.use('/api/icons', ensureUserCredentials, infoLimiter, iconsRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

@@ -539,6 +539,26 @@ export async function extractChartData(params: ChartExtractParams): Promise<Char
   return res.json()
 }
 
+export async function searchIconify(query: string, limit = 10, prefix?: string): Promise<any> {
+  const params = new URLSearchParams({ query, limit: String(limit) })
+  if (prefix) params.set('prefix', prefix)
+  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/icons/search?${params}`, {
+    headers: await getGlobalHeaders(),
+  })
+  if (!res.ok) throw new Error(`Icon search failed: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchIconSvg(prefix: string, name: string, color?: string): Promise<string> {
+  const params = color ? new URLSearchParams({ color }) : undefined
+  const url = `${BACKEND_URL}/api/icons/svg/${encodeURIComponent(prefix)}/${encodeURIComponent(name)}${params ? '?' + params : ''}`
+  const res = await fetchWithTimeoutAndRetry(url, {
+    headers: await getGlobalHeaders(),
+  })
+  if (!res.ok) throw new Error(`Icon SVG fetch failed: ${res.status}`)
+  return res.text()
+}
+
 export async function submitFeedback(sessionId: string, payload: { category: string; comment: string; logs: unknown[] }): Promise<{ success: boolean }> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/feedback/${sessionId}`, {
     method: 'POST',
