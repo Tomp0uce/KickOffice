@@ -1,25 +1,26 @@
-# DESIGN_REVIEW.md — Code Audit v10.0
+# DESIGN_REVIEW.md — Code Audit v10.1
 
 **Date**: 2026-03-09
-**Version**: 10.0
-**Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality & maintainability
+**Version**: 10.1
+**Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
 
-## Health Summary (v10.0)
+## Health Summary (v10.1)
 
-All previous critical and major items from v9.x have been resolved. This v10.0 review is a comprehensive deep-dive across 8 axes, identifying new improvement opportunities after recent large-scale changes (OOXML editing, chart extraction, image registry, session persistence, header auto-detect).
+All previous critical and major items from v9.x have been resolved. This v10.1 review is a comprehensive deep-dive across 8 axes + user-reported issues + prospective improvements, identifying new improvement opportunities after recent large-scale changes (OOXML editing, chart extraction, image registry, session persistence, header auto-detect).
 
 | Category | Critical | High | Medium | Low |
 |----------|----------|------|--------|-----|
 | Architecture | 0 | 2 | 3 | 1 |
-| Tool/Prompt Quality | 0 | 1 | 4 | 3 |
+| Tool/Prompt Quality | 1 | 2 | 4 | 3 |
 | Error Handling | 0 | 2 | 2 | 1 |
-| UX/UI | 0 | 0 | 2 | 3 |
+| UX/UI | 0 | 1 | 3 | 3 |
 | Dead Code | 0 | 0 | 2 | 1 |
 | Code Duplication | 0 | 1 | 2 | 0 |
 | Code Quality | 0 | 1 | 3 | 2 |
-| **Total** | **0** | **7** | **18** | **11** |
+| User-Reported Issues | 1 | 2 | 2 | 1 |
+| **Total** | **2** | **11** | **21** | **12** |
 
 ---
 
@@ -95,6 +96,33 @@ Dual-storage migration pattern (localStorage ↔ sessionStorage) with 6 fallback
 
 ## 2. TOOL/PROMPT QUALITY — Full Potential Usage
 
+### TOOL-C1 — Uploaded files sent inline instead of using /v1/files references [CRITICAL]
+
+**Files**:
+- `frontend/src/composables/useAgentLoop.ts:590-613` — file inclusion in messages
+- `frontend/src/composables/useAgentLoop.ts:817-822` — /v1/files upload attempt (silent fallback)
+- `frontend/src/composables/useAgentLoop.ts:628-647` — images always inline as base64
+- `frontend/src/utils/tokenManager.ts:56-59` — `type: 'file'` not counted in token budget
+
+**Problem**: While the `/api/files` proxy endpoint exists and `uploadFileToPlatform()` attempts to upload files to the LLM provider's `/v1/files` API, the integration has critical gaps:
+
+1. **Silent fallback**: If `/v1/files` upload fails (line 821-822), the error is silently caught and the file falls back to inline content — the user never knows
+2. **Images never use /v1/files**: All uploaded images (PNG, JPG) are ALWAYS sent as base64 data-URIs inline (lines 641-644), never as file references
+3. **Full content re-sent every iteration**: When the agent loop iterates (tool calls), the entire file content is re-sent in every LLM request as part of the last user message
+4. **Token budget blind spot**: `getMessageContentLength()` (tokenManager.ts:47-69) does not account for `type: 'file'` parts — only `text` and `image_url`
+5. **Bandwidth waste**: A 5MB PDF's extracted text (~50k chars) is sent inline on every agent iteration instead of being referenced by file_id once
+
+**Impact**: Increased latency, higher token costs, potential context overflow on large documents, unnecessary bandwidth consumption.
+
+**Action**:
+1. Make `/v1/files` upload failure visible to the user (warning toast)
+2. When `fileId` is available, use `{ type: 'file', file: { file_id: fileId } }` consistently
+3. Add `type: 'file'` handling in `getMessageContentLength()`
+4. Consider uploading images to `/v1/files` too, not just text files
+5. Only inject inline content as a last resort when `/v1/files` is unavailable
+
+---
+
 ### TOOL-H1 — Skill doc references non-existent tools [HIGH]
 
 **Files**: `frontend/src/skills/word.skill.md` (line 101), `frontend/src/composables/useAgentPrompts.ts`
@@ -102,6 +130,36 @@ Dual-storage migration pattern (localStorage ↔ sessionStorage) with 6 fallback
 `word.skill.md` references `insertBookmark` and `goToBookmark` tools, but these are not defined in `wordTools.ts`. The agent may attempt to call them, resulting in a "tool not found" error.
 
 **Action**: Either implement these tools or remove references from the skill document.
+
+---
+
+### TOOL-H2 — Screenshots underutilized: no auto-verification, not visible to user [HIGH]
+
+**Files**:
+- `frontend/src/utils/excelTools.ts:1603-1623` — `screenshotRange` tool
+- `frontend/src/utils/powerpointTools.ts:1118-1146` — `screenshotSlide` tool
+- `frontend/src/composables/useToolExecutor.ts:89-105` — `__screenshot__` detection
+- `frontend/src/composables/useAgentLoop.ts:374-379` — screenshot storage in session
+- `frontend/src/composables/useAgentPrompts.ts` — NO screenshot instructions in any agent prompt
+- `frontend/src/components/chat/ChatMessageList.vue:91-96` — only shows `imageSrc` (DALL-E), not screenshots
+
+**Problem**: Screenshot tools exist for Excel and PowerPoint but are severely underutilized:
+
+1. **No auto-verification**: Agent prompts do NOT instruct the LLM to screenshot after creating charts, formatting tables, or modifying slides. Example: when reproducing a chart from an uploaded image, the agent should screenshot the result and compare with the original — but no prompt guidance exists for this.
+
+2. **Invisible to user**: When a screenshot is taken, the user only sees the tool call status text "Screenshot captured. Image injected into vision context." The actual image is NOT displayed in the chat UI. The `imageSrc` field in `ChatMessageList.vue` is reserved for DALL-E images only.
+
+3. **No Word screenshot**: Word has no screenshot tool at all, preventing visual verification of formatting.
+
+4. **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` line 224 says "Do NOT call getAllSlidesOverview to verify" — this defensive rule against infinite loops also prevents legitimate verification.
+
+**Impact**: The agent cannot self-correct visual output. Users must manually verify all visual changes.
+
+**Action**:
+1. Add screenshot verification guidance to agent prompts (e.g., "After creating a chart, use `screenshotRange` to verify the output")
+2. Display screenshot images inline in the chat when a tool returns `__screenshot__: true`
+3. For Excel chart-from-image workflow: add explicit "compare with original" step
+4. Consider making verification opt-in via a "verify" flag on relevant tools
 
 ---
 
@@ -255,6 +313,16 @@ Raw `err.message` could contain internal paths, stack traces, or upstream provid
 `focus:outline-none` removes the visual focus indicator on the main textarea. Only 8 `focus:ring` instances exist across the entire frontend. Keyboard-only users cannot see which element is focused.
 
 **Action**: Add `focus:ring-2 focus:ring-primary/50` to all interactive elements (input, buttons, select).
+
+---
+
+### UX-H1 — Screenshot images not visible in chat [HIGH]
+
+**File**: `frontend/src/components/chat/ChatMessageList.vue:91-96`
+
+When a screenshot tool executes, the image is injected into the LLM's vision context but **never displayed** to the user. The `imageSrc` field on messages is only populated for DALL-E generated images. Screenshots are invisible — the user only sees "Screenshot captured."
+
+**Action**: When a tool result contains `__screenshot__: true`, render the base64 image inline in the tool call result block. This gives users visual feedback and helps them understand what the agent "sees."
 
 ---
 
@@ -468,6 +536,294 @@ Required for Office add-in compatibility. Cannot be removed without breaking Off
 
 ---
 
+## 9. USER-REPORTED ISSUES
+
+### USR-C1 — Feedback system does not save complete debug bundle [CRITICAL]
+
+**Files**:
+- `frontend/src/components/settings/FeedbackDialog.vue:89-116` — feedback submission UI
+- `frontend/src/api/backend.ts:562-578` — `submitFeedback()` API call
+- `backend/src/routes/feedback.js:17-48` — feedback storage
+- `frontend/src/utils/logger.ts:131-133` — `getSessionLogs()` only returns frontend buffer
+
+**Problem**: The feedback form collects a user comment, a category, and the current frontend log buffer — but does NOT create a complete debug bundle:
+
+1. **No chat history**: The full conversation (messages, tool calls, tool results) is NOT included in the feedback payload
+2. **No backend logs**: Only frontend `logService` buffer is sent — backend request logs (with correlation IDs) are not included
+3. **No system context**: Browser version, Office host version, add-in version, model used — none of this is captured
+4. **Frontend-only logs**: `logService.getSessionLogs(sessionId)` returns only what was logged via `logService.*()` — and since 27 console.warn/error calls bypass logService (see ERR-H2), many errors are missing
+
+**Impact**: When a user reports a bug, the developer has no way to reconstruct the session without asking the user for more details.
+
+**Action**:
+1. Include full chat `history` (messages array) in the feedback payload
+2. Add system context: `{ officeHost, officeVersion, browserUA, addinVersion, modelTier, sessionId }`
+3. Optionally correlate backend logs by `x-request-id` or `sessionId`
+4. Save the complete bundle as a structured JSON in `logs/feedback/`
+
+---
+
+### USR-H1 — Double bullets generated in PowerPoint [HIGH]
+
+**Files**:
+- `frontend/src/utils/powerpointTools.ts:301-330` — `insertMarkdownIntoTextRange()`
+- `frontend/src/utils/powerpointTools.ts:387-404` — `hasNativeBullets()` detection
+- `frontend/src/utils/powerpointTools.ts:791-799` — `isBodyPlaceholder` detection
+- `frontend/src/utils/markdown.ts:388-400` — `stripMarkdownListMarkers()`
+
+**Problem**: Double bullets appear when the agent inserts markdown-formatted bullet text (`- item`) into a PowerPoint shape that already has native bullets enabled at the XML level.
+
+**Current defenses**:
+- `hasNativeBullets()` checks `bulletFormat.visible` on existing paragraphs
+- `isBodyPlaceholder` detects body/content placeholders and sets `forceStripBullets = true`
+- `stripMarkdownListMarkers()` removes `- ` prefixes from markdown text
+
+**Remaining gaps**:
+1. `hasNativeBullets()` only checks EXISTING paragraphs — if the shape is empty but has bullet formatting in the XML template, it returns false
+2. The LLM may generate `- ` prefixed text even when instructed not to, because the system prompt doesn't strongly enough warn about this
+3. When using `insertContent` with `mode: 'Replace'`, the old bullet-formatted content is replaced, but new text may re-trigger native bullets from the shape's paragraph defaults
+
+**Action**:
+1. Also check shape XML `<a:defPPr>` for default bullet formatting (not just existing paragraphs)
+2. Add stronger prompt guidance: "When inserting into PowerPoint body placeholders, NEVER use markdown bullet syntax (`- `). The shape already has native bullets."
+3. Consider always stripping markdown bullets when target is a body placeholder, regardless of `hasNativeBullets()` result
+
+---
+
+### USR-H2 — Long latency (1-2 min) between successive tool calls [HIGH]
+
+**Files**:
+- `frontend/src/composables/useAgentLoop.ts:258-400` — agent loop iteration
+- `frontend/src/utils/tokenManager.ts:71-160` — `prepareMessagesForContext()`
+- `backend/src/config/models.js:147-149` — `reasoning_effort` parameter
+
+**Problem**: After successful tool calls, the user sometimes experiences 1-2 minute waits before the next action. No artificial delays exist in the code (no `sleep`, `setTimeout`, or debounce between iterations).
+
+**Root causes identified**:
+
+1. **Context bloat**: Each iteration re-sends the full message history (up to 1.2M chars / ~400k tokens). After several tool calls that return large results (full spreadsheet data, document content), the context sent to the LLM grows significantly, increasing inference time.
+
+2. **`reasoning_effort` parameter**: If set to `"high"` (backend config/models.js:147), GPT-5 models spend extra time in the "thinking" phase. This can add 30-90 seconds per call with complex tool history.
+
+3. **Tool result accumulation**: Tool results are pushed to `currentMessages` (line 396) and never summarized. After 5-6 tool calls, the conversation includes: system prompt + all tool call/result pairs + user message + document context — potentially 500k+ chars.
+
+4. **No tool result summarization**: Unlike user messages which get truncated by `prepareMessagesForContext()`, tool results within the budget window are sent in full. A single `getWorksheetData` result with thousands of cells can be 100k+ chars.
+
+**Action**:
+1. Add aggressive truncation for tool results older than N iterations (keep only summary/conclusion)
+2. Consider summarizing tool results after successful execution: "Tool X completed successfully: [brief summary]"
+3. Add a visible indicator showing context window % in the status bar so users understand why it's slow
+4. Log context size per iteration to help diagnose
+
+---
+
+### USR-M1 — Scroll behavior doesn't match user expectations [MEDIUM]
+
+**Files**:
+- `frontend/src/composables/useHomePage.ts:71-107` — scroll helpers
+- `frontend/src/composables/useAgentLoop.ts:254-255, 429-430` — scroll trigger points
+- `frontend/src/composables/useAgentStream.ts:51-56` — no auto-scroll during streaming
+
+**Current behavior**:
+- Session load: scrolls to **top of last message** (not top of conversation)
+- Message send: scrolls to **bottom** (shows user input at bottom)
+- During streaming: **no auto-scroll** (user can scroll freely) — correct
+- Response complete: scrolls to **bottom** of response
+
+**User expectations** (from feedback):
+1. On session load / app start: scroll to **top of conversation** (first message)
+2. On message send: scroll to **top of user's message** (to see their request)
+3. During LLM streaming: free scroll — correct, keep as-is
+4. On response complete: scroll to **top of assistant response** (to start reading)
+
+**Gaps**:
+- Point 1: Currently scrolls to last message, not conversation top. For old sessions with long history, user sees the end.
+- Point 2: Currently scrolls to bottom, pushing user message out of view on long contexts.
+- Point 4: Currently scrolls to bottom of response. If response is long, user sees the end first and must scroll up.
+
+**Action**:
+1. Session load: `container.scrollTo({ top: 0 })` to start at conversation top
+2. Message send: scroll to the newly created user message element (`scrollToMessageTop()` targeting user message, not assistant)
+3. Response complete: scroll to top of assistant response message element (current `scrollToMessageTop()` logic, but ensure it targets response start)
+
+---
+
+### USR-M2 — Context window percentage already visible but not prominent enough [MEDIUM]
+
+**File**: `frontend/src/components/chat/StatsBar.vue`
+
+The stats bar already shows context usage with color-coded warnings (green <70%, orange 70-89%, red >=90%), but users don't understand WHY the agent is slow. The context % is visible but not prominent enough during long agent sessions.
+
+**Action**: Consider adding a tooltip or notification when context exceeds 80%: "Response may be slower — large conversation context."
+
+---
+
+### USR-L1 — No visual feedback when /v1/files upload silently fails [LOW]
+
+**File**: `frontend/src/composables/useAgentLoop.ts:821-822`
+
+When `uploadFileToPlatform()` fails, the error is caught silently and the file falls back to inline content. The user has no idea their file was not uploaded efficiently.
+
+**Action**: Show a subtle warning: "File uploaded inline (provider file API unavailable)."
+
+---
+
+## 10. PROSPECTIVE IMPROVEMENTS (DEFERRED)
+
+### PROSP-1 — Dynamic tool loading: lazy tool categories instead of full tool set [DEFERRED]
+
+**Current state**: All tools for the active Office host (up to 49 for Excel, 41 for Word) are sent in every LLM request in the `tools` parameter. This consumes significant context window space (tool schemas are verbose JSON).
+
+**Proposal**: Instead of sending all tools upfront, the system prompt would list available tool categories (e.g., "Reading", "Writing", "Formatting", "Charts", "Tables") and the agent would request a specific category when needed. The frontend would then inject only those tools for the next iteration.
+
+**Analysis**:
+
+| Aspect | Assessment |
+|--------|-----------|
+| **Context savings** | HIGH — Tool schemas can consume 20-40k tokens. Loading only relevant categories could reduce this by 50-70%. |
+| **Latency improvement** | MEDIUM — Fewer tools = faster LLM inference per iteration. BUT adds 1 extra round-trip to "request" the category. |
+| **Accuracy impact** | MIXED — LLMs perform better with fewer, more focused tools. But the agent may not know which category it needs upfront, leading to wrong category requests and wasted iterations. |
+| **Quick action impact** | NEGATIVE — Quick actions need specific tools immediately (e.g., "Bullets" needs `insertContent`). Adding a category-request step would slow down quick actions significantly. Quick actions should bypass this mechanism and always include their required tools. |
+| **Implementation complexity** | HIGH — Requires: tool categorization metadata, category request/response protocol in agent loop, bypass for quick actions, prompt engineering for category selection. |
+
+**My recommendation**: **NOT recommended as described.** The category-request pattern adds latency (extra LLM round-trip) and uncertainty (wrong category). Better alternatives:
+
+1. **Static tool profiles per intent**: Detect user intent from the first message (e.g., "make a chart" → chart tools + write tools) and pre-select relevant tools. No extra round-trip needed.
+2. **Two-tier tools**: Always include a small "core" tool set (read, write, format) + dynamically add specialized tools (charts, conditional formatting, pivot tables) based on keywords in the user message.
+3. **Tool description compression**: Shorten tool descriptions in the JSON schema (move detailed guidance to skill docs which are in the system prompt). This reduces token cost without changing the protocol.
+
+**Criticality**: LOW — Current tool count (max 49) is within LLM comfort zone. GPT-5.2 handles 128+ tools. Optimize only if latency measurements confirm tools are the bottleneck.
+
+---
+
+### PROSP-2 — Conversation history optimization and document re-accessibility [DEFERRED]
+
+**Current state**: `prepareMessagesForContext()` in `tokenManager.ts` does backwards iteration, keeping recent messages within a 1.2M char budget. Document content injected via `<attached_files>` tags is only in the user message where it was attached. Tool results accumulate without summarization.
+
+**Questions raised**:
+
+1. **Can the LLM re-access an uploaded document in a later message?**
+   Answer: YES, if the message containing the document is still within the context window. But if truncated by `prepareMessagesForContext()`, it's lost. There is no persistent document store accessible by the LLM.
+
+2. **Is too much irrelevant history sent?**
+   Likely YES. Users often switch topics within a session (e.g., "format this table" then "write a formula" then "create a chart"). Old tool results from unrelated actions waste context space.
+
+3. **Are `<doc_context>` and `<attached_files>` tags optimal?**
+   The separation is good (document content vs. uploaded files), but both are injected into the last user message on every iteration, meaning the LLM re-processes them each time.
+
+**Analysis**:
+
+| Strategy | Pros | Cons |
+|----------|------|------|
+| **Current (full history, backward truncation)** | Simple, preserves recent context | Wastes tokens on old irrelevant tool results |
+| **Summarize old turns** | Reduces token usage, keeps key context | Requires an extra LLM call to summarize, adds latency |
+| **Sliding window (last N turns only)** | Predictable context size | Loses document context if attached early |
+| **Topic-based segmentation** | Only relevant history sent | Very hard to implement reliably |
+| **Document pinning** | Uploaded documents always in context | Uses tokens even when doc is irrelevant |
+
+**My recommendation**: Implement **aggressive tool result summarization** (replace old tool results with 1-line summaries after 3 iterations) + **document pinning** (uploaded files stay in context until explicitly dismissed). This is the best balance of simplicity and effectiveness.
+
+**Criticality**: MEDIUM — Directly impacts latency (USR-H2) and document accessibility. Should be implemented alongside tool result truncation.
+
+---
+
+### PROSP-3 — Split PRD into domain-specific sub-documents [DEFERRED]
+
+**Current state**: `PRD.md` is a single 550+ line document covering all features across all Office hosts + infrastructure + chat UX.
+
+**Proposal**: Split into:
+- `PRD.md` — Overview, deployment, cross-app features, links to sub-PRDs
+- `docs/PRD-infrastructure.md` — Backend, deployment, Docker, security
+- `docs/PRD-chat.md` — Chat UI, sessions, stats, general features
+- `docs/PRD-word.md` — Word-specific features
+- `docs/PRD-excel.md` — Excel-specific features
+- `docs/PRD-powerpoint.md` — PowerPoint-specific features
+- `docs/PRD-outlook.md` — Outlook-specific features
+
+**Analysis**:
+
+| Aspect | Assessment |
+|--------|-----------|
+| **Maintainability** | HIGH benefit — Each sub-PRD is focused and smaller, easier to update |
+| **Discoverability** | MEDIUM — Requires proper cross-linking; risk of stale links |
+| **Agent context** | HIGH benefit — Agent can load only the relevant sub-PRD for the current Office host instead of the entire 550-line document |
+| **Claude.md integration** | EASY — Add rule: "When working on {host}, read `docs/PRD-{host}.md` before implementing" |
+| **Migration effort** | LOW — Content already organized by host in current PRD, just needs extraction |
+
+**My recommendation**: **Recommended.** The current PRD is too large for efficient agent consumption. Split it and add a routing rule in `Claude.md`. Keep the root `PRD.md` as an index with links.
+
+**Criticality**: LOW — Nice to have for DX, not blocking.
+
+---
+
+### PROSP-4 — Templates for Design Review, Commits, and PRs [DEFERRED]
+
+**Proposal**: Create reusable templates in `docs/templates/` or directly in `Claude.md`:
+- **Design Review template**: Standard axes (Architecture, Tool/Prompt Quality, Error Handling, UX/UI, Dead Code, Code Duplication, Code Quality) with severity levels
+- **Commit message template**: Type prefix + scope + description format
+- **PR template**: Summary bullets + test plan + compatibility notes
+
+**Analysis**:
+
+The Design Review template is already effectively defined by this v10.1 document's structure. Formalizing it would:
+
+1. **Ensure consistency** across reviews — each review covers the same axes
+2. **Speed up reviews** — agent knows exactly what to analyze
+3. **Enable diff tracking** — compare v10 to v11 systematically
+
+For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `.github/pull_request_template.md` file would enforce PR structure automatically.
+
+**My recommendation**:
+1. Add a DR template section in `Claude.md` with the 8 standard axes
+2. Create `.github/pull_request_template.md` with the Summary/Test Plan/Compatibility format
+3. Commit templates are already well-defined in `Claude.md` section 12 — no change needed
+
+**Criticality**: LOW — Process improvement, not functional.
+
+---
+
+### PROSP-5 — Claude.md overhaul: is it actually used effectively? [DEFERRED]
+
+**Current state**: `Claude.md` is 302 lines covering 15 sections: scope, architecture, working principles, API contracts, frontend/backend guidelines, docs, PRD, PowerPoint agent, known issues, validation, commit/PR, strict agent rules, vibe coding rules.
+
+**Honest assessment**:
+
+| Section | Actually Used? | Value |
+|---------|---------------|-------|
+| §1 Scope + companion docs | YES — agents check this | HIGH |
+| §2 Architecture snapshot | YES — critical reference | HIGH |
+| §3 Working principles | PARTIALLY — too generic | MEDIUM |
+| §4 API contract rules | YES — prevents regressions | HIGH |
+| §5 Frontend guidelines | PARTIALLY — tool counts may be stale | MEDIUM |
+| §6 Backend guidelines | YES — actively used | HIGH |
+| §7 Docs guidelines | RARELY — agents often skip | LOW |
+| §8 PRD guidelines | RARELY — too detailed for daily use | LOW |
+| §9 PowerPoint agent | YES — used for prompt construction | HIGH |
+| §10 Known issues | REDIRECT only — good pattern | HIGH |
+| §11 Validation checklist | SOMETIMES — not enforced | MEDIUM |
+| §12-13 Commit/PR | YES — actively followed | HIGH |
+| §14 Strict agent rules | YES — security boundary | HIGH |
+| §15 Vibe coding rules | YES — prevents PowerShell errors | HIGH |
+
+**Issues identified**:
+1. **Tool counts in §5 (line 150-155) get stale quickly** — should be auto-generated or reference code, not hardcoded
+2. **§7-8 (Docs/PRD guidelines) are rarely consulted** — too verbose, could be simplified
+3. **No host-specific routing** — agent reads entire 302 lines regardless of whether task is Word, Excel, or Outlook
+4. **Missing rules**: No guidance on screenshot verification, file upload strategy, or context optimization
+5. **Language inconsistency**: Some sections reference French terms despite §7 requiring English docs
+
+**My recommendation**:
+1. **Trim §7-8** to 2-3 key rules each (currently 40+ lines combined)
+2. **Add missing rules**: screenshot verification after visual modifications, /v1/files usage preference, tool result size awareness
+3. **Make tool counts dynamic**: Replace hardcoded counts with "see each `*Tools.ts` file"
+4. **Add routing rule**: "When task involves a specific Office host, prioritize reading the corresponding skill doc"
+5. **Add DR/PR templates** as proposed in PROSP-4
+6. **Full rewrite is NOT recommended** — the structure is sound, just needs targeted updates
+
+**Criticality**: MEDIUM — An outdated Claude.md causes agent drift and inconsistency. Targeted updates would have high ROI.
+
+---
+
 ## PREVIOUSLY FIXED ITEMS (v9.x — All Verified OK)
 
 | ID | Description | Status |
@@ -489,30 +845,46 @@ Required for Office add-in compatibility. Cannot be removed without breaking Off
 
 ## SUMMARY & PRIORITY MATRIX
 
-### Phase 1 — High Priority (Reliability & Debuggability)
-1. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
-2. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
-3. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
-4. **TOOL-H1**: Fix skill doc referencing non-existent tools
-5. **QUAL-H1**: Replace critical `any` types with proper Office.js types
+### Phase 0 — Critical (User-facing bugs & data inefficiency)
+1. **TOOL-C1**: Fix /v1/files integration — stop sending files inline, use file references
+2. **USR-C1**: Complete the feedback debug bundle (add chat history + system context)
+
+### Phase 1 — High Priority (Reliability & User Experience)
+3. **USR-H1**: Fix double bullets in PowerPoint (check XML defaults, strengthen prompts)
+4. **USR-H2**: Reduce latency between tool calls (tool result summarization, context optimization)
+5. **TOOL-H2**: Enable screenshot auto-verification and display screenshots in chat
+6. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
+7. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
+8. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
+9. **TOOL-H1**: Fix skill doc referencing non-existent tools
+10. **QUAL-H1**: Replace critical `any` types with proper Office.js types
 
 ### Phase 2 — Medium Priority (Maintainability & DX)
-6. **ARCH-H1**: Split `useAgentLoop.ts` into focused composables
-7. **ARCH-H2**: Reduce prop drilling in HomePage with provide/inject
-8. **ERR-M1**: Extract shared chat error handler
-9. **ERR-M2**: Sanitize error message in files.js:79
-10. **TOOL-M1-M4**: Fix parameter docs, merge overlapping tools, extend locale support
-11. **DEAD-M1-M2**: Remove dead exports, deprecate redundant `formatRange`
-12. **DUP-M1-M2**: Extract `truncateString`, standardize error format
-13. **QUAL-M1-M3**: Consolidate magic numbers, fix console logging, split large components
+11. **USR-M1**: Fix scroll behavior (session load → top, send → user msg, complete → response top)
+12. **ARCH-H1**: Split `useAgentLoop.ts` into focused composables
+13. **ARCH-H2**: Reduce prop drilling in HomePage with provide/inject
+14. **ERR-M1**: Extract shared chat error handler
+15. **ERR-M2**: Sanitize error message in files.js:79
+16. **TOOL-M1-M4**: Fix parameter docs, merge overlapping tools, extend locale support
+17. **DEAD-M1-M2**: Remove dead exports, deprecate redundant `formatRange`
+18. **DUP-M1-M2**: Extract `truncateString`, standardize error format
+19. **QUAL-M1-M3**: Consolidate magic numbers, fix console logging, split large components
+20. **UX-M1-M3**: Restore focus indicators, translate hardcoded strings, context % warning
 
 ### Phase 3 — Low Priority (Polish)
-14. **UX-M1-M2**: Restore focus indicators, translate hardcoded strings
-15. **UX-L1-L3**: Inline styles, link text, mobile width
-16. **ARCH-L1**: Switch to `npm ci` in Dockerfile
-17. **QUAL-L1-L2**: Boolean params, async pattern docs
-18. Remaining LOW items
+21. **UX-L1-L3**: Inline styles, link text, mobile width
+22. **ARCH-L1**: Switch to `npm ci` in Dockerfile
+23. **QUAL-L1-L2**: Boolean params, async pattern docs
+24. **USR-L1**: Show warning when /v1/files upload silently fails
+25. Remaining LOW items
+
+### Phase 4 — Prospective (Deferred)
+26. **PROSP-5**: Claude.md targeted updates (missing rules, stale counts, trim verbose sections)
+27. **PROSP-2**: Conversation history optimization (tool result summarization + document pinning)
+28. **PROSP-3**: Split PRD into domain-specific sub-documents
+29. **PROSP-4**: Create DR/PR/commit templates
+30. **PROSP-1**: Dynamic tool loading (not recommended as-is, consider static intent profiles instead)
 
 ---
 
-*This review covers the full codebase as of 2026-03-09. Line numbers reference the current state of the repository on the `fix/speaker-notes-and-related-issues` branch.*
+*This review covers the full codebase as of 2026-03-09. Line numbers reference the current state of the repository on the `review/design-review-v10` branch.*
