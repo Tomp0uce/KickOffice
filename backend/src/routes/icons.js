@@ -3,6 +3,8 @@
  */
 import { Router } from 'express'
 import logger from '../utils/logger.js'
+import { ErrorCodes } from '../config/errorCodes.js'
+import { logAndRespond } from '../utils/http.js'
 
 const router = Router()
 
@@ -10,7 +12,7 @@ const router = Router()
 router.get('/search', async (req, res) => {
   try {
     const { query, limit = '10', prefix } = req.query
-    if (!query) return res.status(400).json({ error: 'query is required' })
+    if (!query) return logAndRespond(res, 400, { code: ErrorCodes.ICON_QUERY_REQUIRED, error: 'query is required' }, 'GET /api/icons/search')
 
     const params = new URLSearchParams({ query: String(query), limit: String(limit) })
     if (prefix) params.set('prefix', String(prefix))
@@ -22,7 +24,7 @@ router.get('/search', async (req, res) => {
     res.json(data)
   } catch (err) {
     logger.error('[icons] search failed', { error: err.message, traffic: 'user' })
-    res.status(502).json({ error: 'Icon search failed', details: err.message })
+    logAndRespond(res, 502, { code: ErrorCodes.ICON_FETCH_FAILED, error: 'Icon search failed', details: err.message }, 'GET /api/icons/search')
   }
 })
 
@@ -38,13 +40,13 @@ router.get('/svg/:prefix/:name', async (req, res) => {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'KickOffice/1.0' }
     })
-    if (!response.ok) return res.status(404).json({ error: 'Icon not found' })
+    if (!response.ok) return logAndRespond(res, 404, { code: ErrorCodes.ICON_NOT_FOUND, error: 'Icon not found' }, 'GET /api/icons/svg')
 
     const svg = await response.text()
     res.type('image/svg+xml').send(svg)
   } catch (err) {
     logger.error('[icons] svg fetch failed', { error: err.message, traffic: 'user' })
-    res.status(502).json({ error: 'SVG fetch failed', details: err.message })
+    logAndRespond(res, 502, { code: ErrorCodes.ICON_FETCH_FAILED, error: 'SVG fetch failed', details: err.message }, 'GET /api/icons/svg')
   }
 })
 

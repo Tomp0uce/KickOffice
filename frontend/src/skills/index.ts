@@ -5,6 +5,8 @@
  * Skills are defensive prompting guidelines that prevent common Office.js errors.
  */
 
+import { logService } from '@/utils/logger'
+
 // Import skill documents as raw strings
 // Note: Vite supports ?raw suffix for importing file contents
 import commonSkill from './common.skill.md?raw'
@@ -32,7 +34,7 @@ export function getSkillForHost(host: OfficeHost): string {
   const hostSkill = hostSkillMap[host]
 
   if (!hostSkill) {
-    console.warn(`[Skills] Unknown host: ${host}, using common skills only`)
+    logService.warn(`[Skills] Unknown host: ${host}, using common skills only`)
     return commonSkill
   }
 

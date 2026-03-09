@@ -152,7 +152,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     adjustTextareaHeight,
     scrollToBottom,
     scrollToMessageTop = scrollToBottom, // fallback to scrollToBottom if not provided
-    scrollToVeryBottom = scrollToBottom, // fallback to scrollToBottom if not provided
   } = helpers
 
   const currentAction = ref('')
@@ -433,7 +432,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     currentAction.value = ''
 
     await nextTick()
-    await scrollToVeryBottom()
+    await scrollToMessageTop() // Scroll to top of assistant response
   }
 
   async function handleSmartReply(userMessage: string) {
@@ -444,7 +443,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     try {
       emailBody = await getOfficeSelection({ actionKey: 'reply' })
     } catch (err) {
-      console.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
+      logService.warn('[AgentLoop] Failed to fetch email body for smart reply', err)
     }
     if (!emailBody) {
       messageUtil.error(t('selectEmailPrompt'))
@@ -482,7 +481,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return
-      console.error('[AgentLoop] Smart reply chatStream failed', err)
+      logService.error('[AgentLoop] Smart reply chatStream failed', err)
       const lastMessage = history.value[history.value.length - 1]
       const errInfo = categorizeError(err)
       if (errInfo.type === 'auth') {
@@ -526,7 +525,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         localSelectedText = await Promise.race([getOfficeSelection({ includeOutlookSelectedText: true }), timeoutPromise])
       }
     } catch (error) {
-      console.warn('[AgentLoop] Failed to fetch selection before sending message', error)
+      logService.warn('[AgentLoop] Failed to fetch selection before sending message', error)
     } finally {
       if (timeoutId) clearTimeout(timeoutId)
     }
@@ -550,7 +549,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         const message = history.value[history.value.length - 1]
         message.role = 'assistant'; message.content = ''; message.imageSrc = imageSrc
       } catch (err: unknown) {
-        console.error('[AgentLoop] image generation failed', err)
+        logService.error('[AgentLoop] image generation failed', err)
         const message = history.value[history.value.length - 1]
         const errInfo = categorizeError(err)
         const baseMsg = t(errInfo.i18nKey)
@@ -626,7 +625,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       }
     } catch (ctxErr) {
-      console.warn('[AgentLoop] Failed to fetch document context', ctxErr)
+      logService.warn('[AgentLoop] Failed to fetch document context', ctxErr)
     }
 
     // Inject vision images as multipart content into the last user message
@@ -711,7 +710,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       try {
         selectedText = await getOfficeSelection()
       } catch (err) {
-        console.warn('[AgentLoop] Failed to fetch selection for image generation', err)
+        logService.warn('[AgentLoop] Failed to fetch selection for image generation', err)
       }
       let wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
       
@@ -763,7 +762,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           })
           wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
         } catch (e) {
-          console.warn('[AgentLoop] Fallback to PowerPoint slide content failed', e)
+          logService.warn('[AgentLoop] Fallback to PowerPoint slide content failed', e)
         }
       }
 
@@ -780,7 +779,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const displayMessageText = isImageFromSelection ? selectedText : userMessage
     history.value.push(createDisplayMessage('user', displayMessageText))
     const userMsgIdx = history.value.length - 1
-    await scrollToVeryBottom() // Scroll to very bottom after user message
+    await scrollToMessageTop() // Scroll to top of user message just sent
 
     try {
       // Smart reply interception: when user sends after clicking "Reply" quick action
@@ -851,7 +850,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
              history.value[userMsgIdx].attachedFiles = newTextFiles
            }
         } catch (uploadObjErr: unknown) {
-           console.error('[AgentLoop] File upload failed', uploadObjErr)
+           logService.error('[AgentLoop] File upload failed', uploadObjErr)
            return messageUtil.error(t('somethingWentWrong'))
         }
       }
@@ -874,7 +873,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {
-        console.error('[AgentLoop] sendMessage failed', error)
+        logService.error('[AgentLoop] sendMessage failed', error)
         const errInfo = categorizeError(error)
         messageUtil.error(t(errInfo.i18nKey))
 
@@ -957,7 +956,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         await scrollToBottom()
       } catch (err: unknown) {
         if (!(err instanceof Error) || err.name !== 'AbortError') {
-          console.error('[AgentLoop] visual quick action failed', err)
+          logService.error('[AgentLoop] visual quick action failed', err)
           const errInfo = categorizeError(err)
           history.value[history.value.length - 1].content = t(errInfo.i18nKey)
         }
@@ -1033,7 +1032,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
             richContext = extractTextFromHtml(htmlContent)
           }
         } catch (err) {
-          console.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
+          logService.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
         }
       }
 
@@ -1125,7 +1124,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           }
         } catch (err: any) {
           if (err.name === 'AbortError') return
-          console.error('[AgentLoop] Quick action chatStream failed', err)
+          logService.error('[AgentLoop] Quick action chatStream failed', err)
           const lastMessage = history.value[history.value.length - 1]
           const errInfo = categorizeError(err)
           if (errInfo.type === 'auth') {

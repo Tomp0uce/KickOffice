@@ -9,7 +9,8 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { LLM_API_BASE_URL, LLM_API_KEY } from '../config/models.js'
-import { sanitizeErrorText } from '../utils/http.js'
+import { sanitizeErrorText, logAndRespond } from '../utils/http.js'
+import { ErrorCodes } from '../config/errorCodes.js'
 import logger from '../utils/logger.js'
 
 const filesRouter = Router()
@@ -28,7 +29,7 @@ const upload = multer({
  */
 filesRouter.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No file provided.' })
+    return logAndRespond(res, 400, { code: ErrorCodes.NO_FILE_UPLOADED, error: 'No file provided.' }, 'POST /api/files')
   }
 
   const purpose = req.body?.purpose || 'assistants'
@@ -61,7 +62,7 @@ filesRouter.post('/', upload.single('file'), async (req, res) => {
       const errorText = await response.text()
       const sanitized = sanitizeErrorText(errorText)
       logger.error('POST /api/files upstream error', { status: response.status, errorText: sanitized })
-      return res.status(response.status).json({ error: `File upload to LLM provider failed: ${sanitized}` })
+      return logAndRespond(res, response.status, { code: ErrorCodes.LLM_UPSTREAM_ERROR, error: `File upload to LLM provider failed: ${sanitized}` }, 'POST /api/files')
     }
 
     const data = await response.json()
@@ -69,14 +70,14 @@ filesRouter.post('/', upload.single('file'), async (req, res) => {
 
     if (!fileId) {
       logger.error('POST /api/files upstream returned no file id', { data })
-      return res.status(502).json({ error: 'LLM provider returned no file id.' })
+      return logAndRespond(res, 502, { code: ErrorCodes.FILE_NO_ID_RETURNED, error: 'LLM provider returned no file id.' }, 'POST /api/files')
     }
 
     req.logger.info('POST /api/files upload completed', { filename, fileId })
     return res.json({ fileId })
   } catch (err) {
     req.logger.error('POST /api/files error', { error: err })
-    return res.status(500).json({ error: `File upload failed: ${err.message}` })
+    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: `File upload failed: ${err.message}` }, 'POST /api/files')
   }
 })
 

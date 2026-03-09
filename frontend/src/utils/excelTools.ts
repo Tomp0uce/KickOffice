@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/types'
+import { logService } from '@/utils/logger'
 import { executeOfficeAction } from './officeAction'
 import { createOfficeTools } from './common'
 import { localStorageKey } from './enum'
@@ -463,7 +464,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             try {
               chart.axes.categoryAxis.setCategoryNames(categoryRange)
             } catch (e) {
-              console.warn('[ExcelTools] Failed to explicitly set category names', e)
+              logService.warn('[ExcelTools] Failed to explicitly set category names', e)
             }
           }
 
@@ -1568,7 +1569,7 @@ try {
 
       // Log warnings but proceed
       if (validation.warnings.length > 0) {
-        console.warn('[eval_officejs] Validation warnings:', validation.warnings)
+        logService.warn('[eval_officejs] Validation warnings:', validation.warnings)
       }
 
       try {

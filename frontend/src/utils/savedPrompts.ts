@@ -1,3 +1,5 @@
+import { logService } from '@/utils/logger'
+
 export interface SavedPrompt {
   id: string
   name: string
@@ -26,7 +28,7 @@ export function loadSavedPromptsFromStorage(fallback: SavedPrompt[] = []): Saved
   try {
     const parsed = JSON.parse(stored)
     if (!Array.isArray(parsed)) {
-      console.warn('[SavedPrompts] Invalid storage format: expected array')
+      logService.warn('[SavedPrompts] Invalid storage format: expected array')
       return fallback
     }
 
@@ -35,13 +37,13 @@ export function loadSavedPromptsFromStorage(fallback: SavedPrompt[] = []): Saved
       if (isValidSavedPrompt(item)) {
         return true
       }
-      console.warn(`[SavedPrompts] Invalid item at index ${index}, skipping`)
+      logService.warn(`[SavedPrompts] Invalid item at index ${index}, skipping`)
       return false
     })
 
     return validPrompts
   } catch (err) {
-    console.warn('[SavedPrompts] Failed to parse stored prompts:', err)
+    logService.warn('[SavedPrompts] Failed to parse stored prompts:', err)
     return fallback
   }
 }

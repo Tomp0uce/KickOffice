@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '@/types'
 
+import { logService } from '@/utils/logger'
 import { executeOfficeAction } from './officeAction'
 import { renderOfficeRichHtml, sanitizeHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
@@ -132,7 +133,7 @@ const outlookToolDefinitions = createOfficeTools<OutlookToolName, OutlookToolTem
           return richContext.cleanText || ''
         }
       } catch (err) {
-        console.warn('[getEmailBody] Failed to get HTML, falling back to text', err)
+        logService.warn('[getEmailBody] Failed to get HTML, falling back to text', err)
       }
 
       // Fallback to plain text
@@ -207,7 +208,7 @@ const outlookToolDefinitions = createOfficeTools<OutlookToolName, OutlookToolTem
                 existing.includes('<hr tabindex="-1"') ||
                 existing.includes('<hr ')
               ) {
-                console.warn('Thread history detected. Overriding "Replace" to "Insert" to protect email history.')
+                logService.warn('Thread history detected. Overriding "Replace" to "Insert" to protect email history.')
                 body.setSelectedDataAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
                   resolve(resolveAsyncResult(res, () => 'Replaced content at cursor (protected history).'))
                 })
@@ -466,7 +467,7 @@ try {
 
       // Log warnings but proceed
       if (validation.warnings.length > 0) {
-        console.warn('[eval_outlookjs] Validation warnings:', validation.warnings)
+        logService.warn('[eval_outlookjs] Validation warnings:', validation.warnings)
       }
 
       try {

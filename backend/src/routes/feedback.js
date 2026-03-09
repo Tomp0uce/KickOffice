@@ -2,6 +2,8 @@ import express from 'express'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { ErrorCodes } from '../config/errorCodes.js'
+import { logAndRespond } from '../utils/http.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -20,7 +22,7 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
     const { comment, category, logs, chatHistory, systemContext } = req.body
 
     if (!comment || !category) {
-      return res.status(400).json({ error: 'Comment and category are required' })
+      return logAndRespond(res, 400, { code: ErrorCodes.FEEDBACK_MISSING_FIELDS, error: 'Comment and category are required' }, 'POST /api/feedback')
     }
 
     req.logger.info('Feedback received from user', { traffic: 'system', category })
@@ -53,6 +55,6 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
     res.json({ success: true, message: 'Feedback submitted successfully' })
   } catch (error) {
     req.logger.error('Error handling feedback', { error })
-    res.status(500).json({ error: 'Internal server error processing feedback' })
+    logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error processing feedback' }, 'POST /api/feedback')
   }
 })

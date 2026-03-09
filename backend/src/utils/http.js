@@ -20,6 +20,8 @@ function sanitizeErrorText(errorText) {
   return errorText.replace(SENSITIVE_HEADER_REGEX, '$1[REDACTED]$3')
 }
 
+import logger from './logger.js'
+
 async function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController()
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs)
@@ -38,9 +40,9 @@ function logAndRespond(res, status, errorObj, context = 'API') {
     const message = typeof errorObj?.error === 'string' ? errorObj.error : 'Unhandled error'
     const logPrefix = `[${context}] ${status} ${message}`
     if (status >= 500) {
-      console.error(logPrefix)
+      logger.error(logPrefix)
     } else {
-      console.warn(logPrefix)
+      logger.warn(logPrefix)
     }
   }
   return res.status(status).json(errorObj)

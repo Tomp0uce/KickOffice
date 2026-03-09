@@ -21,6 +21,8 @@
  * @property {Array<object>|undefined} [tools]
  */
 
+import logger from '../utils/logger.js'
+
 const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://litellm.kickmaker.net/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
@@ -31,7 +33,7 @@ if (!LLM_API_KEY) {
   if (isProduction) {
     throw new Error('FATAL: LLM_API_KEY environment variable is required in production')
   } else {
-    console.warn('[Config] WARNING: LLM_API_KEY is not set. API requests will fail.')
+    logger.warn('[Config] WARNING: LLM_API_KEY is not set. API requests will fail.')
   }
 }
 

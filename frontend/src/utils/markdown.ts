@@ -1,3 +1,4 @@
+import { logService } from '@/utils/logger'
 import DOMPurify from 'dompurify'
 import type { Config as DOMPurifyConfig } from 'dompurify'
 import MarkdownIt from 'markdown-it'
@@ -75,7 +76,7 @@ export function htmlToMarkdown(html: string): string {
     
     return turndownService.turndown(doc.body.innerHTML)
   } catch (err) {
-    console.warn('[htmlToMarkdown] DOM parsing failed, falling back to raw html', err)
+    logService.warn('[htmlToMarkdown] DOM parsing failed, falling back to raw html', err)
     return turndownService.turndown(html)
   }
 }

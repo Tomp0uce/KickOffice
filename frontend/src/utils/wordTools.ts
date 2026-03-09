@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/types'
+import { logService } from '@/utils/logger'
 import { executeOfficeAction } from './officeAction'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
@@ -1514,7 +1515,7 @@ try {
 
       // Log warnings but proceed
       if (validation.warnings.length > 0) {
-        console.warn('[eval_wordjs] Validation warnings:', validation.warnings)
+        logService.warn('[eval_wordjs] Validation warnings:', validation.warnings)
       }
 
       try {

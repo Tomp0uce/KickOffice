@@ -1,6 +1,7 @@
 import type { ChatRequestMessage } from '@/api/backend'
 
 import { message as messageUtil } from '@/utils/message'
+import { logService } from '@/utils/logger'
 import { i18n } from '@/i18n'
 
 // GPT-5.2: 400k token context window × 3 chars/token ≈ 1.2M chars (conservative ratio)
@@ -31,12 +32,12 @@ function truncateToBudget(content: any, budget: number, direction: 'head' | 'tai
   const marker = direction === 'head' ? TRUNCATION_MARKER_HEAD : TRUNCATION_MARKER_TAIL
 
   if (budget <= marker.length) {
-    console.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
+    logService.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
     return marker.slice(0, budget)
   }
 
   const kept = budget - marker.length
-  console.warn(`[tokenManager] Message truncated (${direction}) by ${content.length - kept} chars`)
+  logService.warn(`[tokenManager] Message truncated (${direction}) by ${content.length - kept} chars`)
 
   if (direction === 'tail') {
     return `${marker}${content.slice(-kept)}`
