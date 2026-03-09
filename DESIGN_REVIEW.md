@@ -96,7 +96,9 @@ Dual-storage migration pattern (localStorage ↔ sessionStorage) with 6 fallback
 
 ## 2. TOOL/PROMPT QUALITY — Full Potential Usage
 
-### TOOL-C1 — Uploaded files sent inline instead of using /v1/files references [CRITICAL]
+### TOOL-C1 — Uploaded files sent inline instead of using /v1/files references [CRITICAL — PARTIALLY FIXED ✅]
+
+**Fix applied**: `/v1/files` failure is now logged via `logService.warn` instead of silently swallowed. Token budget now counts `type: 'file'` content parts (200 token fixed cost). Architecture is sound — the inline fallback is correct behavior when the provider doesn't support `/v1/files`.
 
 **Files**:
 - `frontend/src/composables/useAgentLoop.ts:590-613` — file inclusion in messages
@@ -538,7 +540,9 @@ Required for Office add-in compatibility. Cannot be removed without breaking Off
 
 ## 9. USER-REPORTED ISSUES
 
-### USR-C1 — Feedback system does not save complete debug bundle [CRITICAL]
+### USR-C1 — Feedback system does not save complete debug bundle [CRITICAL — FIXED ✅]
+
+**Fix applied**: `FeedbackDialog.vue` now includes: full chat history (stripped of base64 data) from IndexedDB, and `systemContext` (`host`, `appVersion`, `modelTier`, `userAgent`). Backend `feedback.js` now saves all fields and logs a summary (logCount, chatMessageCount, hasSystemContext). Payload limit raised to 20MB.
 
 **Files**:
 - `frontend/src/components/settings/FeedbackDialog.vue:89-116` — feedback submission UI

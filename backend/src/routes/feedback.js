@@ -14,10 +14,10 @@ if (!fs.existsSync(FEEDBACK_DIR)) {
   fs.mkdirSync(FEEDBACK_DIR, { recursive: true })
 }
 
-feedbackRouter.post('/:sessionId', express.json({ limit: '10mb' }), async (req, res) => {
+feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, res) => {
   try {
     const { sessionId } = req.params
-    const { comment, category, logs } = req.body
+    const { comment, category, logs, chatHistory, systemContext } = req.body
 
     if (!comment || !category) {
       return res.status(400).json({ error: 'Comment and category are required' })
@@ -32,13 +32,23 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '10mb' }), async (req, 
       host: req.logger.defaultMeta?.host || 'unknown',
       category,
       comment,
-      logs
+      systemContext: systemContext || null,
+      logs: logs || [],
+      chatHistory: chatHistory || [],
     }
 
     const filename = `feedback_${category}_${new Date().getTime()}.json`
     const filePath = path.join(FEEDBACK_DIR, filename)
 
     await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))
+
+    req.logger.info('Feedback saved', {
+      traffic: 'system',
+      category,
+      logCount: feedbackEntry.logs.length,
+      chatMessageCount: feedbackEntry.chatHistory.length,
+      hasSystemContext: !!systemContext,
+    })
 
     res.json({ success: true, message: 'Feedback submitted successfully' })
   } catch (error) {

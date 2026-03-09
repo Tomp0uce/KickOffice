@@ -820,6 +820,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                  }
                } catch {
                  // Provider doesn't support /v1/files or network error — fall back to inline content
+                 logService.warn('[AgentLoop] /v1/files upload failed — using inline content fallback', { filename: file.name })
                }
                sessionUploadedFiles.value.push(entry)
                newTextFiles.push({ filename: result.filename, content: result.extractedText, fileId: entry.fileId })
