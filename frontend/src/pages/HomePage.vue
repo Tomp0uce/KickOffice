@@ -581,10 +581,11 @@ onDeactivated(() => {
 })
 
 onMounted(() => {
-  // Scroll to bottom of history on initial load
+  // On initial load, scroll to the top of the last message so the user
+  // can read the most recent exchange from its beginning.
   if (history.value.length > 0) {
     nextTick(() => {
-      scrollToVeryBottom()
+      scrollToMessageTop()
     })
   }
 })

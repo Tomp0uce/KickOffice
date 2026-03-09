@@ -346,26 +346,29 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 7.1 Data Reading Tools
 
-| Tool             | Description                                  | Returns                                                     |
-| ---------------- | -------------------------------------------- | ----------------------------------------------------------- |
-| getSelectedCells | Get values, address, dimensions of selection | JSON with address, rowCount, columnCount, values (2D array) |
-| getWorksheetData | Get all data from used range                 | values, address, rowCount, columnCount                      |
-| getWorksheetInfo | Get workbook structure                       | activeName, position, usedRange, totalSheets, sheetNames    |
-| getDataFromSheet | Read from any sheet by name                  | data from specified sheet                                   |
-| getNamedRanges   | List all named ranges                        | names and formulas                                          |
-| findData         | Search values workbook-wide                  | matches with locations                                      |
-| getAllObjects    | List charts and pivot tables                 | object details                                              |
+| Tool                  | Description                                         | Returns                                                           |
+| --------------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
+| getSelectedCells      | Get values, address, dimensions of selection        | JSON with address, rowCount, columnCount, values (2D array)       |
+| getWorksheetData      | Get all data from used range                        | values, address, rowCount, columnCount                            |
+| getWorksheetInfo      | Get workbook structure                              | activeName, position, usedRange, totalSheets, sheetNames          |
+| getDataFromSheet      | Read from any sheet by name                         | data from specified sheet                                         |
+| getNamedRanges        | List all named ranges                               | names and formulas                                                |
+| findData              | Search values workbook-wide with optional pagination | matches, totalFound, offset, hasMore, nextOffset                  |
+| getAllObjects          | List charts and pivot tables                        | object details                                                    |
+| getRangeAsCsv         | Export a range as compact CSV text                  | CSV rows (2–3× fewer tokens than JSON), with truncation indicator |
+| screenshotRange       | Capture a range as a PNG image                      | Image injected into vision context for AI visual verification     |
+| detectDataHeaders     | Detect column/row headers in a range                | address, sheetName — returns hasColumnHeaders, hasRowHeaders, suggestedHasHeaders, suggestedSeriesBy, detected labels |
 
 ### 7.2 Writing and Editing Tools
 
-| Tool            | Description                                           | Key Parameters                                                                      |
-| --------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| setCellRange    | **PREFERRED** - Write values, formulas, or formatting | address, sheetName, values (2D array), formulas (2D array), formatting, copyToRange |
-| clearRange      | Clear contents or formatting                          | address, clearContents, clearFormatting                                             |
-| modifyStructure | Insert/delete rows/columns, freeze panes              | sheetName, operation, rowIndex, columnIndex                                         |
-| addWorksheet    | Create new worksheet                                  | sheetName                                                                           |
-| createTable     | Convert range to structured table                     | address, hasHeaders, tableName, style                                               |
-| sortRange       | Sort data by column                                   | columnIndex, ascending, hasHeaders                                                  |
+| Tool                    | Description                                             | Key Parameters                                                                      |
+| ----------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| setCellRange            | **PREFERRED** - Write values, formulas, or formatting   | address, sheetName, values (2D array), formulas (2D array), formatting, copyToRange |
+| clearRange              | Clear contents or formatting                            | address, clearContents, clearFormatting                                             |
+| modifyStructure         | Insert/delete/hide/unhide rows/columns, freeze panes    | sheetName, operation, dimension, reference, count                                   |
+| modifyWorkbookStructure | Create, delete, rename, or duplicate worksheets         | operation, sheetName, newName, tabColor                                             |
+| createTable             | Convert range to structured table                       | address, hasHeaders, tableName, style                                               |
+| sortRange               | Sort data by column                                     | columnIndex, ascending, hasHeaders                                                  |
 
 ### 7.3 Formatting Tools
 
@@ -404,6 +407,8 @@ Contextual buttons at the top of the interface for one-click actions:
 - Update type, source, or title
 - Delete existing charts
 
+**Header auto-detection**: Before creating a chart, the agent calls `detectDataHeaders` on the source range to determine whether the first row/column contains labels. The result drives `hasHeaders` and `seriesBy` parameters, ensuring axis labels are not plotted as data series.
+
 ### 7.6 Pivot Table Management
 
 - Create from data range
@@ -411,13 +416,19 @@ Contextual buttons at the top of the interface for one-click actions:
 - Controlled positioning
 - Delete existing pivot tables
 
-### 7.7 Modification History (Excel-specific)
+### 7.7 Large Workbook Handling
+
+- **Paginated search**: `findData` supports `maxResults` and `offset` parameters. On large workbooks, the agent can retrieve results page by page using `nextOffset`, avoiding context window overflow.
+- **CSV export**: `getRangeAsCsv` is preferred over JSON for data analysis tasks on large ranges (significant token savings).
+- **Visual verification**: `screenshotRange` allows the agent to visually inspect formatting and chart rendering without reading raw cell data.
+
+### 7.8 Modification History (Excel-specific)
 
 - **Comment-based tracking**: When modifying a cell, AI MUST insert a comment containing previous value
 - **Comment format**: "Modified by AI. Old value: [X]"
 - **Native undo**: Ctrl+Z works for AI modifications
 
-### 7.8 Excel Quick Actions
+### 7.9 Excel Quick Actions
 
 | Action            | Mode        | Description                                                                                                                                                                                                              |
 | ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -427,14 +438,14 @@ Contextual buttons at the top of the interface for one-click actions:
 | Formula Generator | Interactive | L'assistant création. Guide l'utilisateur dans l'écriture du prompt avec un prompt system adapté au lieu d'un système step-by-step bloquant.                                                                             |
 | Data Trend        | Draft       | Analyse les données pour en déduire des tendances et suggère des actions à faire avec pour mieux mettre en avant certaines tendances.                                                                                    |
 
-### 7.9 Formula Localization
+### 7.10 Formula Localization
 
 - **English**: Comma separators (e.g., `=SUM(A1,B1)`)
 - **French**: Semicolon separators (e.g., `=SOMME(A1;B1)`)
 - User preference in settings
 - Auto-conversion based on Excel locale
 
-### 7.10 Excel-Specific Rules
+### 7.11 Excel-Specific Rules
 
 - **2D arrays required**: Values and formulas MUST be 2D arrays
 - **Dimensions must match**: Array dimensions MUST match range dimensions
@@ -447,30 +458,56 @@ Contextual buttons at the top of the interface for one-click actions:
 
 ### 8.1 Presentation Reading Tools
 
-| Tool                 | Description                              | Parameters            |
-| -------------------- | ---------------------------------------- | --------------------- |
-| getSelectedText      | Get currently selected text              | none                  |
-| getSlideContent      | Get all text from a specific slide       | slideNumber (1-based) |
-| getShapes            | Get all shapes with properties           | slideNumber (1-based) |
-| getAllSlidesOverview | Get text overview of entire presentation | none                  |
+| Tool                 | Description                                        | Parameters                                      |
+| -------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| getSelectedText      | Get currently selected text                        | none                                            |
+| getSlideContent      | Get all text from a specific slide                 | slideNumber (1-based)                           |
+| getShapes            | Get all shapes with properties                     | slideNumber (1-based)                           |
+| getAllSlidesOverview  | Get text overview of entire presentation           | none                                            |
+| screenshotSlide      | Capture a slide as PNG for visual verification     | slideNumber (1-based, optional)                 |
+| verifySlides         | Detect shape overflows and overlaps on all slides  | none — returns a text report of issues          |
+| searchIcons          | Search the Iconify icon library by keyword         | query, limit, prefix (icon set filter)          |
 
-### 8.2 Content Insertion Tools
+### 8.2 Content Insertion and Modification Tools
 
-| Tool                     | Description                                       | Key Parameters                            |
-| ------------------------ | ------------------------------------------------- | ----------------------------------------- |
-| insertContent            | **PREFERRED** - Add/replace content with Markdown | content, slideNumber, shapeIdOrName       |
-| proposeShapeTextRevision | Modify shape text with diff tracking              | slideNumber, shapeIdOrName, revisedText   |
-| addSlide                 | Add new slide                                     | layout (Blank, Title, TitleAndContent...) |
-| deleteSlide              | Delete slide by number                            | slideNumber (1-based)                     |
+| Tool                     | Description                                             | Key Parameters                                    |
+| ------------------------ | ------------------------------------------------------- | ------------------------------------------------- |
+| insertContent            | **PREFERRED** - Add/replace content with Markdown       | content, slideNumber, shapeIdOrName               |
+| proposeShapeTextRevision | Modify shape text with diff tracking                    | slideNumber, shapeIdOrName, revisedText           |
+| addSlide                 | Add new slide — picks the best layout from the presentation's slide master by name | layout (Blank, Title, TitleAndContent...)         |
+| deleteSlide              | Delete slide by number                                  | slideNumber (1-based)                             |
+| duplicateSlide           | Copy a slide; insert duplicate after the original       | slideNumber (1-based)                             |
+| insertIcon               | Insert an Iconify icon as an image on a slide           | iconId ("prefix:name"), slideNumber, left, top, width, height, color |
+| editSlideXml             | Directly edit slide OOXML for operations beyond the API | slideNumber, code (JS with JSZip access), explanation |
 
-### 8.3 Modification History (PowerPoint-specific)
+### 8.3 Visual Verification Workflow
+
+After making visual changes (layout, images, icons, positioning), the agent should:
+1. Call `screenshotSlide` to capture the modified slide
+2. Analyze the screenshot image to verify the result visually
+3. Call `verifySlides` to programmatically check for overflows and overlaps
+4. Iterate if issues are detected
+
+### 8.4 Icon Library Integration
+
+The agent can insert professional icons from the Iconify library (200,000+ icons across 150+ open-source icon sets including Material Design, Fluent UI, Feather, Bootstrap, Heroicons):
+1. Call `searchIcons` with a keyword (and optionally a set prefix like `mdi`, `fluent`, `feather`) to discover available icons
+2. Call `insertIcon` with the chosen icon ID (format: `prefix:name`, e.g. `mdi:home`) to place it on the slide
+
+Icons are rendered as SVG images and can be positioned and sized freely. Color can be set at insertion time.
+
+### 8.5 OOXML Direct Editing
+
+`editSlideXml` provides an escape hatch for operations that the Office.js API cannot express (e.g., chart XML manipulation, SmartArt, complex animations). The agent receives access to the slide's ZIP archive and can modify the underlying XML directly. This is an advanced tool intended for cases where no dedicated tool covers the need.
+
+### 8.6 Modification History (PowerPoint-specific)
 
 PowerPoint has NO native Track Changes. Two workarounds:
 
 1. **Speaker Notes logging**: AI logs modifications in the Speaker Notes section at the bottom of the slide
-2. **Slide duplication**: For major structural changes, duplicate the original slide to allow before/after comparison
+2. **Slide duplication**: For major structural changes, duplicate the original slide (via `duplicateSlide`) to allow before/after comparison
 
-### 8.4 PowerPoint Quick Actions
+### 8.7 PowerPoint Quick Actions
 
 | Action    | Mode          | Description                                                                                 |
 | --------- | ------------- | ------------------------------------------------------------------------------------------- |
@@ -479,24 +516,24 @@ PowerPoint has NO native Track Changes. Two workarounds:
 | Notes     | Immediate     | Generate speaker notes (<100 words)                                                         |
 | Impact    | Immediate     | Steve Jobs-style rewrite (punch, hook)                                                      |
 | Punchify  | Agent (auto)  | Reads the active slide via agent tools, rewrites all text shapes to be punchy and concise   |
-| Visual    | Immediate     | Generate detailed AI image prompts                                                          |
+| Visual    | Immediate     | Generate an AI illustration that visually represents the slide content (two-step: LLM creates image description → image model renders) |
 
-### 8.5 Slide Style Rules
+### 8.8 Slide Style Rules
 
 - Maximum 8-10 words per bullet point
 - Maximum 6-7 bullets per slide
 - Active voice, present tense preferred
 
-### 8.6 PowerPoint-Specific Rules
+### 8.9 PowerPoint-Specific Rules
 
 - **Slide numbers**: 1-based in UI, 0-indexed in code arrays
 - **Active slide detection**: Agent can call `getCurrentSlideIndex` to identify which slide the user is currently viewing
 - **Shape discovery workflow**: getAllSlidesOverview → getShapes → insertContent
 - **No Track Changes**: Must use workarounds for modification visibility
 
-### 8.7 Constraints
+### 8.10 Constraints
 
-- **Out of scope**: No Slide Master modification
+- **Slide Master modification**: Limited via standard API; advanced modifications are possible via `editSlideXml` (OOXML) for expert use cases
 
 ---
 
@@ -853,7 +890,7 @@ When context limit is reached:
 | OneDrive/SharePoint special handling        | Treated as regular documents |
 | New LLM models                              | No additions planned         |
 | New Office apps (Teams, OneNote, Visio)     | No                           |
-| Extended agent mode (web search, databases) | Not planned for now          |
+| Extended agent mode (web search, databases) | Web search/fetch deferred — planned for future release |
 | Credential expiration/refresh               | No                           |
 | Audit trail                                 | No                           |
 | Sensitive data masking                      | No                           |
@@ -868,14 +905,14 @@ When context limit is reached:
 
 ### 16.1 Tool Count by Application
 
-| Application | Read   | Write  | Format | Eval  | Total                |
-| ----------- | ------ | ------ | ------ | ----- | -------------------- |
-| Word        | 8      | 13     | 5      | 1     | 27                   |
-| Excel       | 7      | 10     | 1      | 1     | 18 (with chart tool) |
-| PowerPoint  | 4      | 5      | 0      | 1     | 9                    |
-| Outlook     | 4      | 4      | 0      | 1     | 8                    |
-| General     | 3      | 3      | 0      | 0     | 6                    |
-| **Total**   | **26** | **35** | **6**  | **4** | **67**               |
+| Application    | Total   | Notable capabilities                                                        |
+| -------------- | ------- | --------------------------------------------------------------------------- |
+| **Word**       | 41      | Format-preserving edits, Track Changes, tables, comments, diff tracking     |
+| **Excel**      | 49      | Charts, formulas, screenshots, CSV export, workbook structure management, header detection |
+| **PowerPoint** | 22      | Slides, shapes, screenshots, layout verification, icon library, OOXML edit  |
+| **Outlook**    | 14      | Email compose/read, smart reply, email history protection                   |
+| **General**    | 6       | VFS, math, date, file operations                                            |
+| **Total**      | **139** |                                                                             |
 
 ### 16.2 General Tools (All Apps)
 
@@ -902,9 +939,13 @@ Adding new content → insertContent
 
 ```
 Write data → setCellRange (ALWAYS preferred)
+Read large data → getRangeAsCsv (token-efficient)
+Search paginated → findData with maxResults + offset
 Format data → formatRange
 Create table → createTable
 Charts/Pivots → manageObject
+Sheet management → modifyWorkbookStructure (create/delete/rename/duplicate)
+Visual check → screenshotRange (after formatting changes)
 Advanced → eval_officejs
 ```
 
@@ -913,7 +954,23 @@ Advanced → eval_officejs
 ```
 1. getAllSlidesOverview (understand structure)
 2. getShapes(slideNumber) (discover shape IDs)
-3. insertContent or proposeShapeTextRevision (modify)
+3. insertContent or proposeShapeTextRevision (modify text)
+4. screenshotSlide (verify visual result)
+5. verifySlides (check for overflows/overlaps)
+```
+
+**PowerPoint Icons:**
+
+```
+1. searchIcons (find icon by keyword, optionally filter by set)
+2. insertIcon (insert by "prefix:name" on target slide)
+```
+
+**PowerPoint Advanced (OOXML):**
+
+```
+editSlideXml → when no dedicated tool covers the operation
+(charts, SmartArt, animations, master layouts)
 ```
 
 **Outlook Email:**

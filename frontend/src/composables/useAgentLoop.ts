@@ -371,6 +371,12 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
 
         if (toolResult.success) toolsWereExecuted = true
+        if (toolResult.screenshotBase64) {
+          const mimeType = toolResult.screenshotMimeType || 'image/png'
+          const dataUri = `data:${mimeType};base64,${toolResult.screenshotBase64}`
+          const filename = `screenshot_${Date.now()}.png`
+          sessionUploadedImages.value.push({ filename, dataUri })
+        }
         toolResults.push({ tool_call_id: toolResult.tool_call_id, content: toolResult.content })
       }
 
@@ -455,11 +461,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       await chatStream({
         messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
         modelTier: resolveChatModelTier(),
-        onStream: async (text: string) => {
+        onStream: (text: string) => {
           const message = history.value[history.value.length - 1]
           message.role = 'assistant'
           message.content = text
-          await scrollToBottom()
+          // No auto-scroll during streaming: user can freely scroll.
         },
         onUsage: accumulateUsage,
         abortSignal: abortController.value?.signal,
@@ -792,9 +798,11 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                // Step 4: Store in session images (with imageId for chart extraction)
                sessionUploadedImages.value.push({ filename: result.filename, dataUri: result.imageBase64, imageId: result.imageId })
 
-               // Point 3 Fix: Store in PPT registry for tool access
+               // Point 3 Fix: Store in PPT registry for tool access (by filename AND imageId)
                if (hostIsPowerPoint) {
-                 powerpointImageRegistry.set(result.filename, result.imageBase64.replace(/^data:[^;]+;base64,/, ''))
+                 const rawBase64 = result.imageBase64.replace(/^data:[^;]+;base64,/, '')
+                 powerpointImageRegistry.set(result.filename, rawBase64)
+                 if (result.imageId) powerpointImageRegistry.set(result.imageId, rawBase64)
                }
                // Show a preview thumbnail in the user message bubble
                history.value[userMsgIdx].imageSrc = result.imageBase64
@@ -889,16 +897,53 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         return messageUtil.error(t('imageError') || 'No image model configured.')
       }
 
-      // Clear input so `sendMessage` detects `isImageFromSelection = true`
-      userInput.value = ''
-      adjustTextareaHeight()
+      // Get current slide text selection
+      const slideText = await getOfficeSelection({ actionKey })
 
-      const previousModelTier = selectedModelTier.value
-      selectedModelTier.value = imageModelTier
+      // Step 1: call standard LLM to generate a proper image description prompt
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
+      const visualPrompt = getPowerPointBuiltInPrompt().visual
+      const systemMsg = visualPrompt.system(lang)
+      const userMsg = visualPrompt.user(slideText || '', lang)
+
+      const actionLabel = selectedQuickAction?.label || t(actionKey)
+      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`))
+      history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
+      await scrollToMessageTop()
+
+      loading.value = true
+      abortController.value = new AbortController()
       try {
-        await sendMessage()
+        let imagePrompt = ''
+        await chatStream({
+          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+          modelTier: resolveChatModelTier(),
+          onStream: async (text: string) => { imagePrompt = text },
+          abortSignal: abortController.value?.signal,
+        })
+
+        if (!imagePrompt.trim()) {
+          history.value[history.value.length - 1].content = t('somethingWentWrong')
+          return
+        }
+
+        // Step 2: use the generated description to produce the image
+        history.value[history.value.length - 1].content = t('imageGenerating')
+        imageLoading.value = true
+        const imageSrc = await generateImage({ prompt: imagePrompt.trim() })
+        const message = history.value[history.value.length - 1]
+        message.role = 'assistant'; message.content = ''; message.imageSrc = imageSrc
+        await scrollToBottom()
+      } catch (err: unknown) {
+        if (!(err instanceof Error) || err.name !== 'AbortError') {
+          console.error('[AgentLoop] visual quick action failed', err)
+          const errInfo = categorizeError(err)
+          history.value[history.value.length - 1].content = t(errInfo.i18nKey)
+        }
       } finally {
-        selectedModelTier.value = previousModelTier
+        imageLoading.value = false
+        loading.value = false
+        abortController.value = null
       }
       return
     }

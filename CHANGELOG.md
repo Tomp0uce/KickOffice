@@ -6,15 +6,39 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **`screenshotSlide` tool** (PowerPoint): Captures a slide as a PNG image (960px wide) and injects it into the vision context for the next LLM turn. Requires PowerPointApi 1.5+. Enables the agent to visually verify layout changes.
+- **`screenshotRange` tool** (Excel): Captures a cell range as a PNG image via `range.getImage()` and injects it into the vision context. Requires ExcelApi 1.7+. Enables visual verification of charts and formatting.
+- **`duplicateSlide` tool** (PowerPoint): Copies a slide by 1-based index. The duplicate is inserted after the original.
+- **`verifySlides` tool** (PowerPoint): Scans all slides for shape overflows (out-of-bounds) and shape overlaps. Returns a human-readable issue report.
+- **`getRangeAsCsv` tool** (Excel): Returns a range as compact CSV text (2–3× fewer tokens than JSON), with configurable row limit and used-range fallback.
+- **`modifyWorkbookStructure` tool** (Excel): Create, delete, rename, or duplicate worksheets in a single tool. Replaces `addWorksheet` for all structural operations.
+- **`editSlideXml` tool** (PowerPoint): Atomically export a slide as base64 PPTX, edit its XML via JSZip, and reimport — enabling OOXML operations (charts, SmartArt, animations) that Office.js cannot express. Requires PowerPointApi 1.5+.
+- **`searchIcons` tool** (PowerPoint): Search the Iconify library (200,000+ icons across 150+ icon sets) by keyword, with optional prefix filter (e.g. `mdi`, `fluent`, `feather`).
+- **`insertIcon` tool** (PowerPoint): Fetch an SVG icon from Iconify and insert it as an image on a slide with configurable position, size, and color.
+- **`findData` pagination** (Excel): `findData` now supports `maxResults` and `offset` parameters for paginated search on large workbooks. Returns `{ matches, totalFound, returned, offset, hasMore, nextOffset }`.
+- **`/api/icons/search` route** (backend): Proxies icon search to the Iconify REST API, avoiding browser CORS restrictions.
+- **`/api/icons/svg/:prefix/:name` route** (backend): Proxies SVG icon fetches from Iconify with optional color parameter.
+- **`pptxZipUtils.ts`** (frontend): New utility module with `withSlideZip()` (atomic ZIP edit/reinsert workflow), `escapeXml()`, and `sanitizeXmlAmpersands()`.
+- **Screenshot vision injection** (agent loop): When a tool returns a `__screenshot__` marker, the base64 PNG is automatically added to `sessionUploadedImages` so the LLM can see it in the next turn via vision context.
+- **JSZip dependency** (frontend): Added `jszip ^3.10.1` (MIT) for OOXML slide editing.
+- **Iconify API attribution** (README): Credits and license notes added for Iconify (MIT) and JSZip (MIT) integrations.
+
 - **Large File Support**: LLM request timeout extended from 2 to 5 minutes for standard chat to support large document analysis without timeout errors.
 - **`/api/files` Proxy**: New backend route forwards file uploads to the LLM provider's `/v1/files` endpoint. Files with a `file_id` are referenced inline in the LLM message content array instead of re-sending raw text on every turn.
 - **File Attachment Badges**: User message bubbles now display the names of attached documents (PDF, DOCX, XLSX…) as small pill badges below the message content.
 - **Session File Context Persistence**: Uploaded file metadata (filename, extracted text, optional `file_id`) is stored in `DisplayMessage.attachedFiles` and persisted to IndexedDB. File context is fully reconstructed (`rebuildSessionFiles`) when switching sessions or reloading the add-in.
 - **`getCurrentSlideIndex` tool** (PowerPoint): New read tool returns the 1-based index of the currently active slide, enabling agent quick actions like Punchify to target the correct slide autonomously.
 - **Punchify Quick Action** (PowerPoint): New agent-driven quick action that reads the active slide, rewrites text shapes to be more impactful and concise, and applies changes directly.
+- **`detectDataHeaders` tool** (Excel): Analyzes a data range to detect whether it has column headers (first row = labels) and/or row headers (first column = labels). Returns suggested `hasHeaders` and `seriesBy` parameters for use with chart creation. The agent is now required to call this tool before creating any chart from user data.
 
 ### Fixed
 
+- **PowerPoint Visual quick action**: Fixed image generation for the "Visual" quick action — the agent now generates a proper image description via the LLM before calling the image model, instead of sending raw slide text which caused the image to literally render the text.
+- **PowerPoint `addSlide` layout selection**: The tool now discovers real slide layout IDs from the presentation's slide master and picks the best match (TitleAndContent, Title, or Blank) by name scoring. Slides are no longer created with the default title slide layout.
+- **PowerPoint double bullets**: `insertContent` now detects body/content placeholders and automatically strips markdown list markers, preventing double-bullet rendering when inserting into natively-bulleted placeholders.
+- **PowerPoint image insertion**: `insertImageOnSlide` now resolves the imageId (UUID) passed by the agent to the actual image data via the registry, fixing image insertion failures when the agent used the imageId from context.
+- **PowerPoint speaker notes**: Fixed API access pattern for `setCurrentSlideSpeakerNotes`; error handling simplified to always show the user-friendly fallback message.
+- **Excel chart pixel extraction** (`extract_chart_data`): For bar/column and area charts, the algorithm now uses the topmost matching pixel per column bucket (instead of the average pixel Y), correctly mapping to the bar/area data value. Line/scatter charts now use the median pixel Y for robustness. Previously, bar chart values were approximately 50% of the correct value.
 - **Streaming Timer Leak**: `clearTimeout` now called in the `finally` block of the SSE streaming loop in `/api/chat`, preventing accumulating timer handles.
 - **Image Generation Framing**: Default image size changed to `1792x1024` (landscape). A framing instruction is prepended to every image prompt to prevent subjects from being cropped at the edges.
 - **LLM Context Pollution**: Document selection context (`<document_content>`) is now injected only into the LLM messages copy and never stored in the visible chat history, eliminating polluted message bubbles and accumulating context on repeated turns.

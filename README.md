@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 129 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
+AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 139 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
 
 **Built for enterprise environments**: API keys never reach the client, all LLM traffic flows through a controlled backend, and no data is sent to third-party services.
 
@@ -9,11 +9,11 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 129 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 139 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Format Preservation** — Word-level diffing preserves formatting when editing text
-- **Multi-Host Support** — Word (41 tools), Excel (45 tools), PowerPoint (16 tools), Outlook (14 tools)
+- **Multi-Host Support** — Word (41 tools), Excel (49 tools), PowerPoint (22 tools), Outlook (14 tools)
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
 - **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents (up to 10 MB)
 - **Session Persistence** — Uploaded files and images stay in context across the entire conversation and are restored on session switch
@@ -57,6 +57,8 @@ Express.js proxy server. Holds all secrets (API keys), validates requests, rate-
 - `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV, images)
 - `POST /api/chart-extract` — Chart image data extraction (pixel color analysis)
 - `POST /api/files` — Proxy: upload file to LLM provider's `/v1/files` endpoint, returns `file_id`
+- `GET /api/icons/search` — Icon search proxy (Iconify API, thousands of icon sets)
+- `GET /api/icons/svg/:prefix/:name` — SVG icon fetch proxy with optional color parameter
 - `GET /api/models` — Available model tiers
 - `GET /health` — Health check
 
@@ -114,11 +116,11 @@ Word-level surgical editing via `office-word-diff` library (local package at `of
 | Host           | Tools   | Highlights                                                                                  |
 | -------------- | ------- | ------------------------------------------------------------------------------------------- |
 | **Word**       | 41      | `proposeRevision` (format-preserving edits), `eval_wordjs`, tables, comments, Track Changes |
-| **Excel**      | 45      | `eval_officejs`, formulas, charts, conditional formatting, data validation                  |
-| **PowerPoint** | 16      | `proposeShapeTextRevision`, slides, shapes, speaker notes, images                           |
+| **Excel**      | 49      | `eval_officejs`, formulas, charts, screenshots, CSV export, workbook structure management, header detection |
+| **PowerPoint** | 22      | `proposeShapeTextRevision`, slides, shapes, speaker notes, screenshots, OOXML, icon library |
 | **Outlook**    | 14      | `eval_outlookjs`, email body/subject, recipients, attachments                               |
 | **General**    | 6       | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                     |
-| **Total**      | **129** |                                                                                             |
+| **Total**      | **139** |                                                                                             |
 
 ---
 
@@ -132,9 +134,13 @@ Translate, Polish, Academic, Summary, Grammar Check
 
 Clean, Beautify, Formula, Transform, Highlight
 
+**Header Detection** — `detectDataHeaders` automatically detects column and row headers in a data range, providing correct `hasHeaders` and `seriesBy` parameters for chart creation.
+
 ### PowerPoint
 
 Bullets, Speaker Notes, Impact, Shrink, Visual
+
+**Slide Layout Selection** — `addSlide` discovers the presentation's actual slide master layouts and picks the best matching layout by name (no longer defaults to title layout).
 
 ### Outlook
 
@@ -195,7 +201,7 @@ KickOffice/
 │       ├── server.js           # Entry point
 │       ├── config/             # env.js, models.js, limits.js (centralized)
 │       ├── middleware/         # auth.js, validate.js
-│       ├── routes/             # chat, image, upload, files, models, health, logs
+│       ├── routes/             # chat, image, upload, files, icons, models, health, logs
 │       ├── services/           # llmClient.js, plotDigitizerService.js, imageStore.js
 │       └── utils/              # http.js, logger.js
 ├── frontend/                   # Vue 3 + TypeScript
@@ -323,6 +329,21 @@ Integrated as a local package for format-preserving text editing:
 ### [Redink](https://github.com/LawDigital/redink) (MIT License)
 
 Conceptual inspiration for document comparison and revision workflows.
+
+### [Iconify](https://iconify.design) (MIT License — API free to use)
+
+Icon search and SVG delivery for the `searchIcons` / `insertIcon` PowerPoint tools:
+
+- **Icon API** — Free REST API at `api.iconify.design` with 200,000+ icons across 150+ icon sets (Material Design, Fluent UI, Feather, Bootstrap, Heroicons, etc.)
+- **No attribution required** — Individual icons follow their respective icon set licenses (MIT, Apache 2.0, or similar open licenses)
+- **Proxied via backend** — All Iconify API calls go through `/api/icons/` to avoid CORS issues and stay consistent with the project's privacy-first architecture
+
+### [JSZip](https://stuk.github.io/jszip/) (MIT License)
+
+Used by the `editSlideXml` PowerPoint tool for OOXML editing:
+
+- **ZIP manipulation** — Load/modify/repack PPTX archives in the browser
+- **OOXML editing** — Directly edit slide XML when Office.js API is insufficient (charts, diagrams, SmartArt, animations)
 
 ---
 

@@ -46,6 +46,10 @@ export type ExcelToolName =
   | 'setNamedRange'
   | 'getConditionalFormattingRules'
   | 'eval_officejs'
+  | 'screenshotRange'
+  | 'getRangeAsCsv'
+  | 'modifyWorkbookStructure'
+  | 'detectDataHeaders'
 
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
@@ -1358,7 +1362,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
   findData: {
     name: 'findData',
     category: 'read',
-    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Returns up to 2000 results; when truncated, totalMatches indicates how many were found in total.',
+    description: 'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Supports pagination via maxResults and offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1366,12 +1370,13 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         matchCase: { type: 'boolean', description: 'Case sensitive. Default: false' },
         matchEntireCell: { type: 'boolean', description: 'Match entire cell content. Default: false' },
         useRegex: { type: 'boolean', description: 'Use regex pattern. Default: false' },
+        maxResults: { type: 'number', description: 'Max results to return. Default: 50.' },
+        offset: { type: 'number', description: 'Skip first N matches for pagination. Default: 0.' },
       },
       required: ['searchTerm'],
     },
     executeExcel: async (context, args: Record<string, any>) => {
       const { searchTerm, matchCase = false, matchEntireCell = false, useRegex = false } = args as Record<string, any>
-      const MAX_RESULTS = 2000
 
       let pattern: RegExp | null = null
       if (useRegex) {
@@ -1386,8 +1391,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       sheets.load('items')
       await context.sync()
 
-      const matches: any[] = []
-      let totalMatches = 0
+      const allMatches: any[] = []
 
       for (const sheet of sheets.items) {
         sheet.load('name')
@@ -1419,17 +1423,18 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
               isMatch = matchEntireCell ? compVal === compTerm : compVal.includes(compTerm)
             }
             if (isMatch) {
-              totalMatches++
-              if (matches.length < MAX_RESULTS) {
-                matches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
-              }
+              allMatches.push({ sheet: sheet.name, address: `${colLetter(startCol + c)}${startRow + r + 1}`, value: val })
             }
           }
         }
       }
 
-      const truncated = totalMatches > MAX_RESULTS
-      return JSON.stringify(truncated ? { matches, totalMatches, truncated: true } : matches, null, 2)
+      const offset = args.offset || 0
+      const maxResults = args.maxResults || 50
+      const page = allMatches.slice(offset, offset + maxResults)
+      const hasMore = offset + maxResults < allMatches.length
+
+      return JSON.stringify({ matches: page, totalFound: allMatches.length, returned: page.length, offset, hasMore, nextOffset: hasMore ? offset + maxResults : null }, null, 2)
     },
   },
 
@@ -1595,6 +1600,217 @@ try {
       }
     },
   },
+  screenshotRange: {
+    name: 'screenshotRange',
+    category: 'read',
+    description: 'Capture a visual screenshot of an Excel range as PNG image. Use this to verify visual formatting, chart rendering, or analyze existing content visually. Requires ExcelApi 1.7+.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sheetName: { type: 'string', description: 'Worksheet name. Uses active sheet if omitted.' },
+        range: { type: 'string', description: 'A1 notation range, e.g. "A1:F20". Uses used range if omitted.' }
+      },
+      required: [],
+    },
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      const sheet = await safeGetSheet(context, args.sheetName)
+      const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange()
+      const imageResult = (targetRange as any).getImage()
+      await context.sync()
+      const base64 = imageResult.value as string
+      return JSON.stringify({ __screenshot__: true, base64, mimeType: 'image/png', description: `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'}` })
+    },
+  },
+
+  getRangeAsCsv: {
+    name: 'getRangeAsCsv',
+    category: 'read',
+    description: 'Get a range of cells as CSV text. More token-efficient than JSON for large datasets. Use for data analysis when formatting details are not needed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sheetName: { type: 'string', description: 'Worksheet name. Uses active sheet if omitted.' },
+        range: { type: 'string', description: 'A1 notation range, e.g. "A1:F100". Uses used range if omitted.' },
+        maxRows: { type: 'number', description: 'Maximum rows to return. Default: 500.' },
+      },
+      required: [],
+    },
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      const sheet = await safeGetSheet(context, args.sheetName)
+      const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange()
+      targetRange.load('values,rowCount,columnCount')
+      await context.sync()
+
+      const maxRows = args.maxRows || 500
+      const values = targetRange.values
+      const rows = values.slice(0, maxRows)
+
+      const csv = rows.map((row: any[]) =>
+        row.map((cell: any) => {
+          const str = String(cell ?? '')
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return '"' + str.replace(/"/g, '""') + '"'
+          }
+          return str
+        }).join(',')
+      ).join('\n')
+
+      const hasMore = values.length > maxRows
+      return `Rows: ${rows.length}/${values.length}${hasMore ? ' (truncated, use offset parameter)' : ''}\n\n${csv}`
+    },
+  },
+
+  modifyWorkbookStructure: {
+    name: 'modifyWorkbookStructure',
+    category: 'write',
+    description: 'Create, delete, rename, or duplicate a worksheet. Use instead of addWorksheet for operations that need delete/rename/duplicate.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['create', 'delete', 'rename', 'duplicate'],
+          description: 'The operation to perform.',
+        },
+        sheetName: { type: 'string', description: 'Name of the target sheet (for delete/rename/duplicate).' },
+        newName: { type: 'string', description: 'New name for the sheet (for create/rename/duplicate).' },
+        tabColor: { type: 'string', description: 'Optional hex color for the sheet tab, e.g. "#FF0000".' },
+      },
+      required: ['operation'],
+    },
+    executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      const { operation, sheetName, newName, tabColor } = args
+      const sheets = context.workbook.worksheets
+
+      switch (operation) {
+        case 'create': {
+          const newSheet = sheets.add(newName || undefined)
+          if (tabColor) newSheet.tabColor = tabColor
+          newSheet.activate()
+          newSheet.load('name')
+          await context.sync()
+          return `Worksheet "${newSheet.name}" created.`
+        }
+        case 'delete': {
+          if (!sheetName) throw new Error('sheetName is required for delete operation.')
+          const sheet = sheets.getItemOrNullObject(sheetName)
+          await context.sync()
+          if (sheet.isNullObject) throw new Error(`Worksheet "${sheetName}" not found.`)
+          sheet.delete()
+          await context.sync()
+          return `Worksheet "${sheetName}" deleted.`
+        }
+        case 'rename': {
+          if (!sheetName) throw new Error('sheetName is required for rename operation.')
+          if (!newName) throw new Error('newName is required for rename operation.')
+          const sheet = await safeGetSheet(context, sheetName)
+          sheet.name = newName
+          await context.sync()
+          return `Worksheet "${sheetName}" renamed to "${newName}".`
+        }
+        case 'duplicate': {
+          if (!sheetName) throw new Error('sheetName is required for duplicate operation.')
+          const sheet = await safeGetSheet(context, sheetName)
+          const copy = (sheet as any).copy()
+          if (newName) copy.name = newName
+          await context.sync()
+          return `Worksheet "${sheetName}" duplicated${newName ? ` as "${newName}"` : ''}.`
+        }
+        default:
+          throw new Error(`Unknown operation: ${operation}`)
+      }
+    },
+  },
+
+  detectDataHeaders: {
+    name: 'detectDataHeaders',
+    category: 'read',
+    description: 'Analyze a range to detect whether it has column headers (first row = text labels) and/or row headers (first column = text labels). Returns detection results and the exact hasHeaders + seriesBy values to pass to manageObject when creating a chart. ALWAYS call this before creating a chart from user data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'Cell range to analyze (e.g. "A1:D20"). Uses current selection if omitted.',
+        },
+        sheetName: {
+          type: 'string',
+          description: 'Worksheet name. Uses active sheet if omitted.',
+        },
+      },
+      required: [],
+    },
+    executeExcel: async (context, args) => {
+      const sheet = await safeGetSheet(context, args.sheetName)
+      const range = args.address
+        ? sheet.getRange(args.address)
+        : context.workbook.getSelectedRange()
+      range.load(['values', 'rowCount', 'columnCount', 'address'])
+      await context.sync()
+
+      const values = range.values as any[][]
+      if (!values || values.length < 2 || values[0].length < 2) {
+        return JSON.stringify({ error: 'Range too small to detect headers (needs at least 2 rows and 2 columns).' })
+      }
+
+      const rows = values.length
+      const cols = values[0].length
+
+      const isText = (v: any) => typeof v === 'string' && v.trim().length > 0
+      const isNumeric = (v: any) =>
+        typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v.replace(/\s/g, '').replace(',', '.'))))
+
+      // Column headers: first row is mostly text (not numbers)
+      const firstRow = values[0]
+      const firstRowText = firstRow.filter(isText).length
+      const firstRowNum = firstRow.filter(isNumeric).length
+      const hasColumnHeaders = firstRowText > 0 && firstRowText >= firstRowNum
+
+      // Row headers: first column (excluding row 0) is mostly text
+      const firstColData = values.slice(1).map(r => r[0])
+      const firstColText = firstColData.filter(isText).length
+      const firstColNum = firstColData.filter(isNumeric).length
+      const hasRowHeaders = firstColText > 0 && firstColText >= firstColNum
+
+      // Verify data body is predominantly numeric
+      const dataRowStart = hasColumnHeaders ? 1 : 0
+      const dataColStart = hasRowHeaders ? 1 : 0
+      let total = 0, numeric = 0
+      for (let r = dataRowStart; r < rows; r++) {
+        for (let c = dataColStart; c < cols; c++) {
+          const v = values[r][c]
+          if (v !== '' && v !== null && v !== undefined) {
+            total++
+            if (isNumeric(v)) numeric++
+          }
+        }
+      }
+      const dataIsNumeric = total === 0 || numeric / total > 0.6
+
+      // Determine suggested parameters for chart creation
+      const suggestedHasHeaders = hasColumnHeaders || hasRowHeaders
+      // If headers are in the first column only → data series are in rows
+      const suggestedSeriesBy = hasRowHeaders && !hasColumnHeaders ? 'rows' : 'columns'
+
+      const columnLabels = hasColumnHeaders ? firstRow.filter(isText) : []
+      const rowLabels = hasRowHeaders ? firstColData.filter(isText) : []
+
+      return JSON.stringify({
+        rangeAddress: (range as any).address,
+        rowCount: rows,
+        columnCount: cols,
+        hasColumnHeaders,
+        hasRowHeaders,
+        dataIsNumeric,
+        columnLabels,
+        rowLabels,
+        suggestedHasHeaders,
+        suggestedSeriesBy,
+        recommendation: `Use hasHeaders: ${suggestedHasHeaders}, seriesBy: "${suggestedSeriesBy}" when creating a chart from this range.`,
+      }, null, 2)
+    },
+  },
+
 }, (def) => async (args = {}) => {
   try {
     return await runExcel(ctx => def.executeExcel(ctx, args))

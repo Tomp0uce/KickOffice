@@ -86,9 +86,22 @@ export async function executeAgentToolCall(
 
   currentActionRef.value = getActionLabelForCategory(toolDef.category)
   await scrollToBottomFn()
+  let screenshotBase64: string | undefined
+  let screenshotMimeType: string | undefined
   const executionStartTime = Date.now()
   try {
     result = await toolDef.execute(toolArgs)
+    // Detect screenshot results
+    try {
+      const parsed = JSON.parse(result)
+      if (parsed && parsed.__screenshot__ === true) {
+        screenshotBase64 = parsed.base64
+        screenshotMimeType = parsed.mimeType || 'image/png'
+        result = JSON.stringify({ success: true, message: parsed.description || 'Screenshot captured. Image injected into vision context for your next response.' })
+      }
+    } catch {
+      // Not JSON or not a screenshot — keep result as is
+    }
     success = true
     logService.info('[AgentLoop] tool execution succeeded', 'user', { toolName, duration: Date.now() - executionStartTime })
     if (assistantMessage?.toolCalls) {
@@ -125,5 +138,5 @@ export async function executeAgentToolCall(
     }
   }
 
-  return { tool_call_id: toolCall.id, content: safeContent, success, signature }
+  return { tool_call_id: toolCall.id, content: safeContent, success, signature, screenshotBase64, screenshotMimeType }
 }

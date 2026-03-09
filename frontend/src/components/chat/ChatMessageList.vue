@@ -194,7 +194,7 @@
     >
       <div class="flex min-w-0 flex-1 flex-col gap-1 items-start text-left">
         <div
-          class="max-w-[95%] rounded-md border border-border-secondary px-3 py-2 text-xs leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
+          class="max-w-[95%] rounded-md border border-border-secondary px-3 py-2 text-[10px] leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
         >
           <div class="flex items-start gap-2 text-accent" role="status" aria-live="polite">
             <span class="inline-flex mt-0.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" />

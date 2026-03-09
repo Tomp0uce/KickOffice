@@ -52,7 +52,8 @@ export function useAgentStream() {
         if (options.currentAction) options.currentAction.value = ''
         if (options.currentAssistantMessage) options.currentAssistantMessage.content = text
         response.choices[0].message.content = text
-        if (options.scrollToBottom) options.scrollToBottom().catch(console.error)
+        // No auto-scroll during streaming: user can freely scroll while the response is generating.
+        // The scroll to the start of the response is done once before streaming begins (scrollToMessageTop).
       },
       onToolCallDelta: (toolCallDeltas) => {
         if (options.currentAction) options.currentAction.value = ''

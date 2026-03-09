@@ -148,7 +148,7 @@ export function useHomePage(deps: {
     rebuildSessionFiles()
     resetSessionStats()
     await nextTick()
-    scrollToVeryBottom()
+    scrollToMessageTop()
   }
 
   function handleDeleteSession() {
@@ -160,7 +160,7 @@ export function useHomePage(deps: {
     isDeleteConfirmVisible.value = false
     await sessionManager.deleteCurrentSession()
     await nextTick()
-    scrollToVeryBottom()
+    scrollToMessageTop()
   }
 
   // ─── Message actions ───────────────────────────────────────────────────────

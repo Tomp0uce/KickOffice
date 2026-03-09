@@ -82,6 +82,9 @@ Office.context.document.getSelectedDataAsync(
 | `getSlideContent` | Read all text from specific slide |
 | `getShapes` | Discover shape IDs/names on a slide |
 | `getSelectedText` | Read current text selection |
+| `screenshotSlide` | Capture a slide as PNG image for visual verification |
+| `verifySlides` | Check all slides for shape overflows and overlaps |
+| `searchIcons` | Search Iconify library for icon IDs |
 
 ### For WRITING:
 | Tool | When to use |
@@ -90,6 +93,9 @@ Office.context.document.getSelectedDataAsync(
 | `proposeShapeTextRevision` | Edit shape text with diff tracking |
 | `addSlide` | Create new slide |
 | `deleteSlide` | Remove a slide |
+| `duplicateSlide` | Duplicate an existing slide |
+| `insertIcon` | Insert an Iconify icon as SVG image on a slide |
+| `editSlideXml` | Edit slide OOXML directly via JSZip (advanced) |
 
 ### ESCAPE HATCH:
 | Tool | When to use |
@@ -101,8 +107,10 @@ Office.context.document.getSelectedDataAsync(
 ```
 1. Call getAllSlidesOverview → understand presentation structure
 2. Call getShapes(slideNumber) → get shape IDs on target slide
-3. Call insertContent or proposeShapeTextRevision → modify specific shape
+3. Call insertContent with BOTH slideNumber AND shapeIdOrName → modify specific shape
 ```
+
+**CRITICAL**: NEVER call `insertContent` without `shapeIdOrName` on an existing slide. Always call `getShapes` first to discover shape IDs, then pass the correct `shapeIdOrName`. Omitting it will insert a floating text box instead of filling the existing placeholder.
 
 ## WORKFLOW: Adding a new slide with content
 
@@ -120,7 +128,7 @@ The tool will automatically find the title and body shapes of the layout and fil
 When the user provides an image and asks to create a slide:
 
 1. Call `addSlide` with an appropriate layout and a generated title/body based on what you can see in the image.
-2. Call `insertImageOnSlide` with `base64Data` (the raw base64 string of the image) to place the image on the new slide.
+2. Call `insertImageOnSlide` with `base64Data` set to the **imageId** shown in the session context (e.g. `(imageId: 4a54e1fc-...)`). Do NOT pass a raw filename or invent a base64 string — always use the imageId from the context. The tool resolves the actual image data from the registry automatically.
 3. **Do NOT call `getAllSlidesOverview` more than once** — it is only needed for initial discovery, not for image insertion.
 4. **Never loop on `getAllSlidesOverview`** — if a slide overview returns empty shapes, skip it and proceed with the image insertion directly.
 
