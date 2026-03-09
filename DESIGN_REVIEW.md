@@ -947,16 +947,33 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 **Part B: Infrastructure & Legacy Deferred Items** (from v7/v8 reviews):
 
 #### 🟢 IC2 — Containers run as root (LOW)
-Docker containers should run with a non-root user for security. Backend/frontend Dockerfiles use default root. **Low priority** as this is internal-only infrastructure for local development. **Action**: Add `USER appuser` to Dockerfiles after setup.
+**Files**: `backend/Dockerfile`, `frontend/Dockerfile`
+Docker containers should run with a non-root user for security best practices. Currently, both Dockerfiles use the default `root` user:
+- `backend/Dockerfile`: Node:22-slim runs as root (no USER directive)
+- `frontend/Dockerfile`: Nginx:stable runs as root (no USER directive)
+
+**Current status**: Still vulnerable. No USER directive found in either Dockerfile.
+**Severity**: LOW — This is internal infrastructure for local development. Security risk is low if only used internally.
+**Action**: Add `USER appuser` or similar to both Dockerfiles after setup. For nginx, create appuser with minimal privileges before switching.
 
 #### 🟢 IH2 — Private IP in build arg (LOW)
-Example `docker-compose.yml` may contain private IP addresses in build arguments. Should be sanitized or use environment variables. **Status**: Review examples and replace with placeholders.
+**Files**: `frontend/Dockerfile:18`, `.env.example:1,6`
+Private IP address `192.168.50.10` hardcoded in build arguments and examples. Should be sanitized or use environment variables like `localhost` or a placeholder.
+**Current status**: Still present in `frontend/Dockerfile` ARG and multiple `.env.example` files.
+**Action**: Replace with placeholder IP (e.g., `localhost` or `192.168.x.x` generic pattern) or document as "replace with your server IP".
 
 #### 🟢 IH3 — DuckDNS domain in example (LOW)
-Example configuration includes a real DuckDNS domain. Should use placeholder (e.g., `example.duckdns.org`) to avoid confusion. **Status**: Update docs and examples.
+**Files**: `.env.example:10-11`
+Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could be confused with a real public URL.
+**Current status**: Still present in `.env.example` as `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL`.
+**Action**: Replace with placeholder (e.g., `https://your-domain.duckdns.org` or `https://example.duckdns.org`) with a clear comment "Update with your actual DuckDNS domain".
 
 #### 🟢 UM10 — PowerPoint HTML reconstruction (DEFERRED INDEFINITELY)
-Original proposal (v7) was to reconstruct PowerPoint slides from HTML snapshots. **Complexity too high**: OOXML format is intricate, error-prone, and not worth the effort. **Better approach**: Use screenshot + image upload workflow instead. **Status**: Closed (not recommended).
+**Original proposal** (v7): Reconstruct PowerPoint slides from HTML snapshots captured during visual creation. This would allow the agent to verify if generated HTML matches the final slide layout.
+- **NOT resolved by OOXML editing**: Recent improvements (layout detection, placeholder type loading, chart extraction) improved slide manipulation but did NOT implement HTML→slide reconstruction.
+- **Complexity too high**: OOXML format is intricate and error-prone. Edge cases (complex animations, embedded OLE objects, custom fonts) make this unreliable.
+- **Better approach**: Use screenshot + image upload workflow instead (already implemented via screenshotRange/screenshotSlide tools).
+- **Status**: Closed/Not recommended. Do not implement.
 
 ---
 
