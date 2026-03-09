@@ -72,6 +72,7 @@ import { useFocusTrap } from '@vueuse/integrations/useFocusTrap'
 import CustomButton from '@/components/CustomButton.vue'
 import { logService } from '@/utils/logger'
 import { submitFeedback } from '@/api/backend'
+import { getSession } from '@/composables/useSessionDB'
 
 const { t } = useI18n()
 const emit = defineEmits(['close'])
@@ -97,10 +98,38 @@ async function handleSubmit() {
     const sessionId = ctx.sessionId || 'unknown'
     const logs = includeLogs.value ? logService.getSessionLogs(sessionId) : []
 
+    // Build complete debug bundle: chat history + system context
+    let chatHistory: unknown[] = []
+    try {
+      const session = await getSession(sessionId)
+      if (session?.messages) {
+        // Strip large base64 image data to keep payload manageable
+        chatHistory = session.messages.map(m => ({
+          role: m.role,
+          content: typeof m.content === 'string'
+            ? m.content
+            : '[multipart content]',
+          timestamp: m.timestamp,
+          toolCalls: m.toolCalls?.map(tc => ({ name: tc.function?.name, args: tc.function?.arguments })),
+        }))
+      }
+    } catch {
+      // Non-blocking — chat history is best-effort
+    }
+
+    const systemContext = {
+      host: ctx.host || 'unknown',
+      appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown',
+      modelTier: localStorage.getItem('modelTier') || 'standard',
+      userAgent: navigator.userAgent,
+    }
+
     await submitFeedback(sessionId, {
       category: category.value,
       comment: comment.value,
-      logs: logs,
+      logs,
+      chatHistory,
+      systemContext,
     })
 
     success.value = true

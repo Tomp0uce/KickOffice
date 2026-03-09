@@ -6,6 +6,7 @@ export interface ToolCallPart {
   args: Record<string, any>
   status: 'pending' | 'running' | 'complete' | 'error'
   result?: string
+  screenshotSrc?: string
 }
 
 export interface DisplayMessage {

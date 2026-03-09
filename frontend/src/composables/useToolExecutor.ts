@@ -98,6 +98,11 @@ export async function executeAgentToolCall(
         screenshotBase64 = parsed.base64
         screenshotMimeType = parsed.mimeType || 'image/png'
         result = JSON.stringify({ success: true, message: parsed.description || 'Screenshot captured. Image injected into vision context for your next response.' })
+        // Store dataUri on the tool call so it can be displayed in chat
+        if (assistantMessage?.toolCalls) {
+          const idx = assistantMessage.toolCalls.findIndex(t => t.id === toolCall.id)
+          if (idx !== -1) assistantMessage.toolCalls[idx].screenshotSrc = `data:${screenshotMimeType};base64,${screenshotBase64}`
+        }
       }
     } catch {
       // Not JSON or not a screenshot — keep result as is

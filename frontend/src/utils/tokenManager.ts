@@ -55,7 +55,10 @@ function getMessageContentLength(message: ChatRequestMessage): number {
         length += part.text.length
       } else if (part.type === 'image_url') {
         // Images have a fixed token cost regardless of Base64 length
-        length += 1000 
+        length += 1000
+      } else if (part.type === 'file') {
+        // File references (/v1/files) have a minimal fixed cost (just metadata, content stored server-side)
+        length += 200
       }
     }
   } else {

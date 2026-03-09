@@ -341,7 +341,7 @@ async function findShapeOnSlide(context: any, slideNumber: number, shapeIdOrName
 
   const slide = slides.items[idx]
   const shapes = slide.shapes
-  shapes.load('items,items/id,items/name,items/placeholderFormat')
+  shapes.load('items,items/id,items/name,items/placeholderFormat,items/placeholderFormat/type')
   await context.sync()
 
   for (const s of shapes.items) {

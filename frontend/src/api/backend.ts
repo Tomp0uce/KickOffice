@@ -559,7 +559,20 @@ export async function fetchIconSvg(prefix: string, name: string, color?: string)
   return res.text()
 }
 
-export async function submitFeedback(sessionId: string, payload: { category: string; comment: string; logs: unknown[] }): Promise<{ success: boolean }> {
+export interface FeedbackSystemContext {
+  host: string
+  appVersion: string
+  modelTier: string
+  userAgent: string
+}
+
+export async function submitFeedback(sessionId: string, payload: {
+  category: string
+  comment: string
+  logs: unknown[]
+  chatHistory?: unknown[]
+  systemContext?: FeedbackSystemContext
+}): Promise<{ success: boolean }> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/feedback/${sessionId}`, {
     method: 'POST',
     headers: {
