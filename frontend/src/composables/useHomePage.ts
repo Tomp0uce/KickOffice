@@ -106,6 +106,14 @@ export function useHomePage(deps: {
     await scrollToBottom('bottom')
   }
 
+  async function scrollToConversationTop() {
+    await nextTick()
+    const rawContainer = messageListRef.value?.containerEl
+    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
+    if (!container) return
+    container.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // ─── Navigation ────────────────────────────────────────────────────────────
 
   function goToSettings() {
@@ -148,7 +156,7 @@ export function useHomePage(deps: {
     rebuildSessionFiles()
     resetSessionStats()
     await nextTick()
-    scrollToMessageTop()
+    scrollToConversationTop()
   }
 
   function handleDeleteSession() {
@@ -160,7 +168,7 @@ export function useHomePage(deps: {
     isDeleteConfirmVisible.value = false
     await sessionManager.deleteCurrentSession()
     await nextTick()
-    scrollToMessageTop()
+    scrollToConversationTop()
   }
 
   // ─── Message actions ───────────────────────────────────────────────────────
@@ -208,6 +216,7 @@ export function useHomePage(deps: {
     scrollToBottom,
     scrollToMessageTop,
     scrollToVeryBottom,
+    scrollToConversationTop,
     goToSettings,
     executeNewChat,
     confirmNewChat,

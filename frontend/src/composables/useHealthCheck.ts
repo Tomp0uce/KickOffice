@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted, type Ref } from 'vue'
 import { healthCheck, fetchModels } from '@/api/backend'
+import { logService } from '@/utils/logger'
 import type { ModelTier, ModelInfo } from '@/types'
 import { HEALTH_CHECK_INTERVAL_MS } from '@/constants/limits'
 
@@ -21,7 +22,7 @@ export function useHealthCheck(
         if (firstTier) selectedModelTier.value = firstTier as ModelTier
       }
     } catch {
-      console.error('Failed to fetch models')
+      logService.error('Failed to fetch models')
     }
   }
 

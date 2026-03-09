@@ -2,6 +2,8 @@ import express from 'express'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { ErrorCodes } from '../config/errorCodes.js'
+import { logAndRespond } from '../utils/http.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -22,11 +24,11 @@ logsRouter.post('/', express.json({ limit: '10mb' }), async (req, res) => {
     const { entries } = req.body
 
     if (!Array.isArray(entries) || entries.length === 0) {
-      return res.status(400).json({ error: 'entries must be a non-empty array' })
+      return logAndRespond(res, 400, { code: ErrorCodes.LOGS_INVALID_ENTRIES, error: 'entries must be a non-empty array' }, 'POST /api/logs')
     }
 
     if (entries.length > MAX_ENTRIES) {
-      return res.status(400).json({ error: `entries array exceeds maximum of ${MAX_ENTRIES} items` })
+      return logAndRespond(res, 400, { code: ErrorCodes.LOGS_TOO_MANY_ENTRIES, error: `entries array exceeds maximum of ${MAX_ENTRIES} items` }, 'POST /api/logs')
     }
 
     // Validate required fields and filter by level
@@ -53,6 +55,6 @@ logsRouter.post('/', express.json({ limit: '10mb' }), async (req, res) => {
     res.json({ success: true, saved: filtered.length })
   } catch (error) {
     req.logger.error('Error handling frontend logs', { error })
-    res.status(500).json({ error: 'Internal server error processing logs' })
+    logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error processing logs' }, 'POST /api/logs')
   }
 })

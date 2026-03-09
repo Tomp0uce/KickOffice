@@ -14,6 +14,7 @@ import { validateOfficeCode } from './officeCodeValidator'
 import { computeTextDiffStats, createOfficeTools, normalizeLineEndings } from './common'
 import { message as messageUtil } from '@/utils/message'
 import { withSlideZip, escapeXml } from './pptxZipUtils'
+import { logService } from '@/utils/logger'
 
 declare const Office: any
 declare const PowerPoint: any
@@ -128,7 +129,7 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
     )
     return true
   } catch (err) {
-    console.error('[PowerPointTools] Failed to set speaker notes:', err)
+    logService.error('[PowerPointTools] Failed to set speaker notes:', err)
     // Always show the friendly fallback message — notes can always be inserted manually
     messageUtil.error(
       "Impossible d'insérer les notes automatiquement. Cliquez dans la zone de notes de la diapositive, puis utilisez le bouton « Remplacer » sur la réponse générée.",
@@ -153,13 +154,13 @@ export function getPowerPointSelection(): Promise<string> {
           if (result.status === Office.AsyncResultStatus.Succeeded) {
             resolve((result.value as string) || '')
           } else {
-            console.warn('PowerPoint selection error:', result.error?.message)
+            logService.warn('PowerPoint selection error:', result.error?.message)
             resolve('')
           }
         },
       )
     } catch (err) {
-      console.warn('PowerPoint getSelectedDataAsync unavailable:', err)
+      logService.warn('PowerPoint getSelectedDataAsync unavailable:', err)
       resolve('')
     }
   })
@@ -243,7 +244,7 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
 
     return htmlOut || getPowerPointSelection()
   } catch (err) {
-    console.warn('Failed to extract PowerPoint HTML selection (paragraph mode):', err)
+    logService.warn('Failed to extract PowerPoint HTML selection (paragraph mode):', err)
     return getPowerPointSelection()
   }
 }
@@ -268,7 +269,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       })
       return
     } catch (e: any) {
-      console.warn('Modern PowerPoint Html insertion failed, falling back:', e)
+      logService.warn('Modern PowerPoint Html insertion failed, falling back:', e)
     }
   }
 
@@ -284,7 +285,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
             if (result.status === Office.AsyncResultStatus.Succeeded) {
               resolve()
             } else {
-              console.warn('setSelectedDataAsync Html failed, falling back to raw Text')
+              logService.warn('setSelectedDataAsync Html failed, falling back to raw Text')
               fallbackToText(normalizedNewlines, resolve, reject)
             }
           },
@@ -720,7 +721,7 @@ try {
 
       // Log warnings but proceed
       if (validation.warnings.length > 0) {
-        console.warn('[eval_powerpointjs] Validation warnings:', validation.warnings)
+        logService.warn('[eval_powerpointjs] Validation warnings:', validation.warnings)
       }
 
       try {
@@ -804,7 +805,7 @@ try {
             const normalizedNewlines = normalizeLineEndings(content)
             await insertMarkdownIntoTextRange(context, textRange, normalizedNewlines, isBodyPlaceholder)
           } catch (e) {
-            console.warn('insertMarkdownIntoTextRange failed, falling back to text modification', e)
+            logService.warn('insertMarkdownIntoTextRange failed, falling back to text modification', e)
             textRange.text = stripRichFormattingSyntax(content)
             await context.sync()
             return `Content set on shape '${shapeIdOrName}' on slide ${slideNumber} (plain text fallback — markdown formatting was not applied because the rich text API failed).`
@@ -929,7 +930,7 @@ try {
         }
       } catch (err) {
         // Could not discover layouts — fall back to default slide add
-        console.warn('[addSlide] Layout discovery failed:', err)
+        logService.warn('[addSlide] Layout discovery failed:', err)
       }
 
       slides.add(addOptions)

@@ -1,4 +1,5 @@
 import type { IStringKeyMap } from '@/types'
+import { logService } from '@/utils/logger'
 export const languageMap: IStringKeyMap = {
   en: 'English',
   es: 'Espa\u00f1ol',
@@ -358,7 +359,7 @@ export const getPowerPointBuiltInPrompt = () => {
 
     return result
   } catch (error) {
-    console.error('Error loading custom PowerPoint built-in prompts:', error)
+    logService.error('Error loading custom PowerPoint built-in prompts:', error)
     return powerPointBuiltInPrompt
   }
 }
@@ -513,7 +514,7 @@ export const getOutlookBuiltInPrompt = () => {
 
     return result
   } catch (error) {
-    console.error('Error loading custom Outlook built-in prompts:', error)
+    logService.error('Error loading custom Outlook built-in prompts:', error)
     return outlookBuiltInPrompt
   }
 }
@@ -541,7 +542,7 @@ export const getExcelBuiltInPrompt = () => {
 
     return result
   } catch (error) {
-    console.error('Error loading custom Excel built-in prompts:', error)
+    logService.error('Error loading custom Excel built-in prompts:', error)
     return excelBuiltInPrompt
   }
 }
@@ -569,7 +570,7 @@ export const getBuiltInPrompt = () => {
 
     return result
   } catch (error) {
-    console.error('Error loading custom built-in prompts:', error)
+    logService.error('Error loading custom built-in prompts:', error)
     return builtInPrompt
   }
 }

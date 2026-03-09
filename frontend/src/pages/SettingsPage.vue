@@ -86,6 +86,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import { fetchModels, healthCheck } from '@/api/backend'
+import { logService } from '@/utils/logger'
 import CustomButton from '@/components/CustomButton.vue'
 import AccountTab from '@/components/settings/AccountTab.vue'
 import BuiltinPromptsTab from '@/components/settings/BuiltinPromptsTab.vue'
@@ -131,7 +132,7 @@ async function checkBackend() {
       loadingModels.value = true
       availableModels.value = await fetchModels()
     } catch {
-      console.error('Failed to fetch models')
+      logService.error('Failed to fetch models')
     } finally {
       loadingModels.value = false
     }

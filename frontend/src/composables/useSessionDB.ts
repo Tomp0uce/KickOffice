@@ -5,6 +5,7 @@
  */
 import type { DisplayMessage } from '@/types/chat'
 import type { LogEntry } from '@/utils/logger'
+import { logService } from '@/utils/logger'
 import { snapshotVfs, restoreVfs } from '@/utils/vfs'
 import { randomUUID } from '@/utils/cryptoPolyfill'
 import { message as messageUtil } from '@/utils/message'
@@ -148,7 +149,7 @@ export async function getSession(sessionId: string): Promise<ChatSession | undef
     try {
       await restoreVfs(session.vfsFiles || [])
     } catch (e) {
-      console.warn('[SessionDB] Failed to restore VFS for session', sessionId, e)
+      logService.warn('[SessionDB] Failed to restore VFS for session', { sessionId, error: e })
     }
   }
   return session
@@ -175,14 +176,14 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
   try {
     vfsFiles = await snapshotVfs()
   } catch (e) {
-    console.warn('[SessionDB] Failed to snapshot VFS', e)
+    logService.warn('[SessionDB] Failed to snapshot VFS', e)
   }
 
   // H2 Fix: Catch IndexedDB QuotaExceeded errors
   try {
     await idbPut(store, { ...session, messages: plainMessages, vfsFiles, name: newName, updatedAt: Date.now() })
   } catch (putErr) {
-    console.error('[SessionDB] Failed to save session:', putErr)
+    logService.error('[SessionDB] Failed to save session:', putErr)
     messageUtil.error((i18n.global.t as any)('failedToSaveChatData'))
   }
 }

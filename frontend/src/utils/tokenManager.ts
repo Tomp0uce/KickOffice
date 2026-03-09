@@ -1,6 +1,7 @@
 import type { ChatRequestMessage } from '@/api/backend'
 
 import { message as messageUtil } from '@/utils/message'
+import { logService } from '@/utils/logger'
 import { i18n } from '@/i18n'
 
 // GPT-5.2: 400k token context window × 3 chars/token ≈ 1.2M chars (conservative ratio)
@@ -31,12 +32,12 @@ function truncateToBudget(content: any, budget: number, direction: 'head' | 'tai
   const marker = direction === 'head' ? TRUNCATION_MARKER_HEAD : TRUNCATION_MARKER_TAIL
 
   if (budget <= marker.length) {
-    console.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
+    logService.warn(`[tokenManager] Message truncated entirely (budget: ${budget})`)
     return marker.slice(0, budget)
   }
 
   const kept = budget - marker.length
-  console.warn(`[tokenManager] Message truncated (${direction}) by ${content.length - kept} chars`)
+  logService.warn(`[tokenManager] Message truncated (${direction}) by ${content.length - kept} chars`)
 
   if (direction === 'tail') {
     return `${marker}${content.slice(-kept)}`
@@ -69,6 +70,19 @@ function getMessageContentLength(message: ChatRequestMessage): number {
     length += JSON.stringify(message.tool_calls).length
   }
   return length
+}
+
+/**
+ * Estimate context usage percentage for a given set of messages.
+ * Uses the same char-based heuristic as prepareMessagesForContext.
+ */
+export function estimateContextUsagePercent(allMessages: ChatRequestMessage[], systemPrompt: string): number {
+  let total = Math.min(systemPrompt.length, MAX_CONTEXT_CHARS)
+  const nonSystem = allMessages.filter(m => m.role !== 'system')
+  for (const msg of nonSystem) {
+    total += getMessageContentLength(msg)
+  }
+  return Math.min(100, Math.round((total / MAX_CONTEXT_CHARS) * 100))
 }
 
 export function prepareMessagesForContext(allMessages: ChatRequestMessage[], systemPrompt: string): ChatRequestMessage[] {

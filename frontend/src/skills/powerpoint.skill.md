@@ -176,9 +176,30 @@ slide.notesPage.textBody.text = 'Speaker notes go here...';
 await context.sync();
 ```
 
+## WORKFLOW: Visual Verification
+
+After creating or significantly modifying a slide (adding images, heavy text edits, inserting shapes), use `screenshotSlide` to visually verify the result:
+
+```json
+{ "slideNumber": 1 }
+```
+
+Use your vision capability to inspect the screenshot:
+- Text overflowing shape boundaries → adjust content or use a shorter text
+- Image misaligned or wrong size → call `insertImageOnSlide` again with corrected parameters
+- Missing elements → check shape IDs with `getShapes` and retry
+
+**When to screenshot**:
+- After `insertImageOnSlide` (verify image placement)
+- After creating a slide from an image (verify content matches original)
+- When the user asks "does it look right?"
+
+**When NOT to use `getAllSlidesOverview` for verification** — It reads text only, cannot detect visual issues, and risks loop behavior. Use `screenshotSlide` instead.
+
 ## LIMITATIONS
 
 - **No Track Changes** — PowerPoint has no equivalent to Word's Track Changes
 - **Limited formatting API** — Some rich text operations require workarounds
 - **Shape positioning** — Coordinates are in points, not pixels
 - **Animation API** — Very limited in Office.js
+- **No Word screenshot equivalent** — Word has no screenshot tool; PowerPoint and Excel do

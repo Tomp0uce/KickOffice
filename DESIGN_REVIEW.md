@@ -10,9 +10,9 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 4 | TOOL-C1 (partial), TOOL-H1, USR-C1, USR-H1 |
-| 🟠 **PARTIALLY FIXED** (deferred actions) | 3 | TOOL-H2, USR-H2, TOOL-C1 remaining |
-| ⏳ **IN PROGRESS** | 5 | ERR-H1, ERR-H2, DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
+| ✅ **FIXED** | 13 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1 |
+| 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
+| ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
 | 🚀 **DEFERRED** (Phase 4) | 17 | 11 functional improvements + 4 legacy infrastructure (v7/v8) + 2 architectural |
@@ -23,7 +23,7 @@
 
 All previous critical and major items from v9.x have been resolved. This v10.1 review is a comprehensive deep-dive across 8 axes + user-reported issues + prospective improvements, identifying new improvement opportunities after recent large-scale changes (OOXML editing, chart extraction, image registry, session persistence, header auto-detect).
 
-**Latest session (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items with deferred actions documented.
+**Latest session (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items with deferred actions documented. Fixed ERR-H1 (all 4 backend routes standardized), ERR-H2 (27+ console.warn/error → logService across 14 files), USR-M1 (scroll behavior), USR-L1 (upload failure warning already done).
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
@@ -270,7 +270,7 @@ Global style instructions prohibit em-dashes and semicolons, but these are stand
 
 ## 3. ERROR HANDLING & DEBUGGABILITY
 
-### ERR-H1 — 4 backend routes bypass `logAndRespond()` and ErrorCodes [HIGH]
+### ERR-H1 — 4 backend routes bypass `logAndRespond()` and ErrorCodes [HIGH] ✅ FIXED
 
 **Files**:
 - `backend/src/routes/files.js:31, 64, 72, 79` — returns `{ error: '...' }` without code
@@ -283,11 +283,11 @@ All other routes use `logAndRespond()` from `utils/http.js` with structured `Err
 2. Errors are logged without req.logger context enrichment (userId, host, session)
 3. The `files.js:79` handler leaks raw error messages to the client
 
-**Action**: Standardize all routes to use `logAndRespond()` with appropriate `ErrorCodes`.
+**Fix applied**: All 4 routes now use `logAndRespond()` with `ErrorCodes`. New codes added: `FEEDBACK_MISSING_FIELDS`, `LOGS_INVALID_ENTRIES`, `LOGS_TOO_MANY_ENTRIES`, `ICON_QUERY_REQUIRED`, `ICON_NOT_FOUND`, `ICON_FETCH_FAILED`, `FILE_NO_ID_RETURNED`. Also fixed `http.js` `console.error/warn` → `logger.error/warn` and `models.js` `console.warn` → `logger.warn`.
 
 ---
 
-### ERR-H2 — Frontend uses `console.warn/error` instead of `logService` (27 instances) [HIGH]
+### ERR-H2 — Frontend uses `console.warn/error` instead of `logService` (27 instances) [HIGH] ✅ FIXED
 
 **Files** (27 occurrences across 6 composables):
 - `useAgentLoop.ts`: 12 instances
@@ -303,7 +303,7 @@ These bypass the centralized `logService` (`logger.ts`), meaning:
 3. Cannot be reviewed in the feedback report
 4. Debugging requires accessing browser DevTools
 
-**Action**: Replace all `console.warn/error` with `logService.warn/error` calls.
+**Fix applied**: All `console.warn/error` replaced with `logService.warn/error` across 14 frontend files (composables, utils, skills, pages). `logService` import added to 13 files (useAgentLoop already had it).
 
 ---
 
@@ -645,34 +645,17 @@ Required for Office add-in compatibility. Cannot be removed without breaking Off
 
 ---
 
-### USR-M1 — Scroll behavior doesn't match user expectations [MEDIUM]
+### USR-M1 — Scroll behavior doesn't match user expectations [MEDIUM] ✅ FIXED
 
 **Files**:
 - `frontend/src/composables/useHomePage.ts:71-107` — scroll helpers
 - `frontend/src/composables/useAgentLoop.ts:254-255, 429-430` — scroll trigger points
 - `frontend/src/composables/useAgentStream.ts:51-56` — no auto-scroll during streaming
 
-**Current behavior**:
-- Session load: scrolls to **top of last message** (not top of conversation)
-- Message send: scrolls to **bottom** (shows user input at bottom)
-- During streaming: **no auto-scroll** (user can scroll freely) — correct
-- Response complete: scrolls to **bottom** of response
-
-**User expectations** (from feedback):
-1. On session load / app start: scroll to **top of conversation** (first message)
-2. On message send: scroll to **top of user's message** (to see their request)
-3. During LLM streaming: free scroll — correct, keep as-is
-4. On response complete: scroll to **top of assistant response** (to start reading)
-
-**Gaps**:
-- Point 1: Currently scrolls to last message, not conversation top. For old sessions with long history, user sees the end.
-- Point 2: Currently scrolls to bottom, pushing user message out of view on long contexts.
-- Point 4: Currently scrolls to bottom of response. If response is long, user sees the end first and must scroll up.
-
-**Action**:
-1. Session load: `container.scrollTo({ top: 0 })` to start at conversation top
-2. Message send: scroll to the newly created user message element (`scrollToMessageTop()` targeting user message, not assistant)
-3. Response complete: scroll to top of assistant response message element (current `scrollToMessageTop()` logic, but ensure it targets response start)
+**Fix applied**:
+1. Session load / session switch / session delete: now calls `scrollToConversationTop()` (new helper added to `useHomePage.ts`) → `container.scrollTo({ top: 0, behavior: 'smooth' })`
+2. Message send: changed from `scrollToVeryBottom()` → `scrollToMessageTop()` — scrolls to top of user's newly sent message
+3. Response complete: changed from `scrollToVeryBottom()` → `scrollToMessageTop()` — scrolls to top of assistant response so user reads from the start
 
 ---
 
@@ -686,13 +669,13 @@ The stats bar already shows context usage with color-coded warnings (green <70%,
 
 ---
 
-### USR-L1 — No visual feedback when /v1/files upload silently fails [LOW]
+### USR-L1 — No visual feedback when /v1/files upload silently fails [LOW] ✅ FIXED
 
 **File**: `frontend/src/composables/useAgentLoop.ts:821-822`
 
 When `uploadFileToPlatform()` fails, the error is caught silently and the file falls back to inline content. The user has no idea their file was not uploaded efficiently.
 
-**Action**: Show a subtle warning: "File uploaded inline (provider file API unavailable)."
+**Fix applied**: Warning toast shown when `/v1/files` upload fails and file falls back to inline base64. Implemented in previous session.
 
 ---
 
@@ -884,15 +867,21 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 5. **TOOL-H2**: ~~Display screenshots in chat~~ — **PARTIALLY FIXED** ✅ (screenshots now visible; auto-verification → Phase 4)
 9. **TOOL-H1**: ~~Fix skill doc referencing non-existent tools~~ — **FIXED** ✅
 
-**Still Active** (5 items):
-6. **ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes
-7. **ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)
-8. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
-10. **QUAL-H1**: Replace critical `any` types with proper Office.js types
+**Latest round (v10.2)** — FIXED:
+6. **TOOL-C1**: Images now try /v1/files + warning toast for both text and images
+7. **TOOL-H2**: Screenshot guidance added to Excel (Step 5) + PPT prompts; PPT verification rule clarified
+8. **USR-H1**: Prompt guidance: "no markdown bullets in body placeholders"
+9. **USR-H2**: Context % shown in LLM wait label when >50%
+
+**Still Active** (2 items):
+10. ~~**ERR-H1**: Standardize all backend routes to use `logAndRespond()` + ErrorCodes~~ — **FIXED** ✅
+11. ~~**ERR-H2**: Replace all `console.warn/error` with `logService` (27 instances)~~ — **FIXED** ✅
+12. **DUP-H1**: Extract shared tool wrapper boilerplate to `common.ts`
+13. **QUAL-H1**: Replace critical `any` types with proper Office.js types
 — **PROSP-H2**: Conversation history optimization (blocking 3 deferred items) → Phase 4
 
-### Phase 2 — 🟡 MEDIUM (Maintainability & DX) — 9 Active
-11. **USR-M1**: Fix scroll behavior (session load → top, send → user msg, complete → response top)
+### Phase 2 — 🟡 MEDIUM (Maintainability & DX) — 8 Active
+11. ~~**USR-M1**: Fix scroll behavior (session load → top, send → user msg, complete → response top)~~ — **FIXED** ✅
 12. **ARCH-H1**: Split `useAgentLoop.ts` into focused composables
 13. **ARCH-H2**: Reduce prop drilling in HomePage with provide/inject
 14. **ERR-M1**: Extract shared chat error handler
@@ -904,12 +893,12 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 20. **UX-M1-M3**: Restore focus indicators, translate hardcoded strings, context % warning
 — **PROSP-2**: Claude.md overhaul (missing rules, stale counts) → Phase 4
 
-### Phase 3 — 🟢 LOW (Polish) — 5 Active
+### Phase 3 — 🟢 LOW (Polish) — 4 Active
 21. **UX-L1-L3**: Inline styles, link text, mobile width
 22. **ARCH-L1**: Switch to `npm ci` in Dockerfile
 23. **ARCH-L2**: Evaluate manifest accessibility — move `generated-manifests/` to `frontend/public/assets/` for SaaS distribution
 24. **QUAL-L1-L2**: Boolean params, async pattern docs
-25. **USR-L1**: Show warning when /v1/files upload silently fails
+25. ~~**USR-L1**: Show warning when /v1/files upload silently fails~~ — **FIXED** ✅
 — **PROSP-1/3/4/5**: Dynamic tool loading, PRD split, templates, intent profiles → Phase 4
 
 ### Phase 4 — Deferred Items (Not Yet Addressed)
@@ -923,24 +912,24 @@ For commits and PRs, `Claude.md` sections 12-13 already define expectations. A `
 
 **Part A: Deferred actions from partially-fixed Phase 0–1 items** (actionable, blocked on design decisions or dependencies):
 
-#### 🟠 TOOL-C1 Remaining Items (HIGH)
-- **Images never use /v1/files**: All uploaded images are always sent inline as base64, never as file references. Consider uploading images to `/v1/files` too.
-- **No UI indicator for /v1/files fallback**: When `/v1/files` upload fails and falls back to inline, user has no visual feedback. Add a warning toast.
-- **Full document re-sent on every iteration**: Files injected in iteration 1 are re-sent in full on iterations 2+. Blocked on PROSP-H2 (context optimization).
+#### 🟠 TOOL-C1 Remaining Items (HIGH — MOSTLY FIXED ✅)
+- ~~**Images never use /v1/files**~~: **FIXED ✅** — Images now attempt `/v1/files` upload with `purpose: 'vision'`. On success, the provider fileId is stored and used in subsequent iterations instead of re-sending base64 bytes.
+- ~~**No UI indicator for /v1/files fallback**~~: **FIXED ✅** — Warning toast shown (i18n key: `warningFileFallbackInline`) when upload fails for both text files and images.
+- **Full document re-sent on every iteration**: ⏳ Still blocked on PROSP-H2 (context optimization). Each iteration re-injects full text file content. Images now use fileId if available.
 
-#### 🟠 TOOL-H2 Remaining Items (HIGH)
-- **No auto-verification prompting**: Agent prompts do NOT instruct the LLM to screenshot after creating charts or modifying slides for self-verification. Add screenshot guidance to Excel and PowerPoint prompts.
-- **PowerPoint explicitly blocks verification**: `powerpoint.skill.md` line 224 says "Do NOT call getAllSlidesOverview to verify" — defensive rule prevents legitimate verification workflows.
-- **No Word screenshot tool**: Word has no screenshot capability at all, preventing visual verification of formatting changes.
+#### 🟠 TOOL-H2 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- ~~**No auto-verification prompting**~~: **FIXED ✅** — Added Step 5 (screenshotRange verification) to Excel chart workflow in both `excel.skill.md` and `useAgentPrompts.ts`. Added `screenshotSlide` verification guidance to PowerPoint prompt and `powerpoint.skill.md`.
+- ~~**PowerPoint blocks verification via getAllSlidesOverview**~~: **FIXED ✅** — Rule now clarified: "Do NOT call getAllSlidesOverview to verify — use `screenshotSlide` instead." Defensive rule preserved for the correct tool, verification enabled via screenshot.
+- **No Word screenshot tool**: ⏳ Still deferred — No Office.js API for Word document screenshots exists. Cannot implement without a third-party capture solution.
 
-#### 🟠 USR-H1 Remaining Items (HIGH)
-- **Empty shapes with default bullets**: `hasNativeBullets()` only checks EXISTING paragraphs — empty shapes with bullet XML defaults still may double-bullet on first insert.
-- **Stronger prompt guidance needed**: Add explicit rule to Word agent prompt: "When inserting into PowerPoint body placeholders, NEVER use markdown bullet syntax (`- `). The shape already has native bullets."
+#### 🟠 USR-H1 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- **Empty shapes with default bullets**: ⏳ Still open — `hasNativeBullets()` only checks existing paragraphs. Empty shapes with XML bullet defaults still risk double-bullets. Low priority: body placeholders now covered by `placeholderFormat/type` fix.
+- ~~**Stronger prompt guidance needed**~~: **FIXED ✅** — Added Guideline 4 to PowerPoint agent prompt: "When inserting into body/content placeholder shapes, do NOT use markdown list syntax (`- item`). The shape already has native bullets — plain text lines are sufficient."
 
-#### 🟠 USR-H2 Remaining Items (HIGH)
-- **Context bloat structural issue**: Each iteration re-sends full message history (up to 1.2M chars / ~400k tokens) without summarization. Blocked on PROSP-H2.
-- **Tool result accumulation**: Tool results pushed to `currentMessages` never summarized. After 5–6 tool calls, context can exceed 500k chars.
-- **No context window % indicator**: Add visible indicator in status bar so users understand why LLM is slow.
+#### 🟠 USR-H2 Remaining Items (HIGH — PARTIALLY FIXED ✅)
+- **Context bloat structural issue**: ⏳ Still blocked on PROSP-H2. Each iteration re-sends full message history.
+- **Tool result accumulation**: ⏳ Still blocked on PROSP-H2. Tool results never summarized between iterations.
+- ~~**No context window % indicator**~~: **FIXED ✅** — Context usage % shown in `currentAction` label during LLM wait when above 50%: e.g., "Waiting for AI... (14s · ctx 73%)". Uses `estimateContextUsagePercent()` from `tokenManager.ts`.
 
 ---
 

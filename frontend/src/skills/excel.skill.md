@@ -315,6 +315,20 @@ Use `manageObject` to create the chart matching the original type:
 }
 ```
 
+### Step 5: Visual verification
+
+After creating the chart, call `screenshotRange` on the data range to capture the result as an image:
+```json
+{ "address": "A1:B41" }
+```
+
+Use your vision capability to compare the screenshot with the original uploaded chart image:
+- Are the axis ranges consistent?
+- Do data points trend similarly?
+- Are labels and title matching?
+
+If significant discrepancies exist (wrong trend, missing data), adjust the data or chart parameters and re-verify.
+
 ### Important notes:
 - **Always analyze the image FIRST** to extract semantic info (axis ranges, colors)
 - **imageId** is found in the `<uploaded_images>` context block — do NOT fabricate it
