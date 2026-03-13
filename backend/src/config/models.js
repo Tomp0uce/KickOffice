@@ -143,7 +143,10 @@ function buildChatBody({ modelTier, modelConfig, messages, temperature, maxToken
 
   if (tools && tools.length > 0) {
     body.tools = tools
-    body.tool_choice = 'auto'
+    // Le modèle gpt-5.2 sur Azure ne supporte pas l'envoi explicite de 'tool_choice'
+    if (!modelId.toLowerCase().startsWith('gpt-5.2')) {
+      body.tool_choice = 'auto'
+    }
   }
 
   if (modelTier !== 'image' && isGpt5Model(modelId) && reasoningEffort) {
