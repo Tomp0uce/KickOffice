@@ -26,7 +26,6 @@ import {
 import { message as messageUtil } from '@/utils/message';
 import { withSlideZip, escapeXml } from './pptxZipUtils';
 import { logService } from '@/utils/logger';
-import { searchIconify, fetchIconSvg } from '@/api/backend';
 
 declare const Office: any;
 declare const PowerPoint: any;
@@ -1522,6 +1521,7 @@ ALWAYS call markDirty() after modifying the zip.`,
         required: ['query'],
       },
       executeCommon: async (args: Record<string, any>) => {
+        const { searchIconify } = await import('@/api/backend');
         const results = await searchIconify(args.query, args.limit || 10, args.prefix);
         return JSON.stringify(results);
       },
@@ -1564,6 +1564,7 @@ ALWAYS call markDirty() after modifying the zip.`,
           throw new Error('iconId must be in format "prefix:name", e.g. "mdi:home".');
         const [prefix, name] = parts;
 
+        const { fetchIconSvg } = await import('@/api/backend');
         const svgText = await fetchIconSvg(prefix, name, args.color);
         const base64 = btoa(unescape(encodeURIComponent(svgText)));
 
