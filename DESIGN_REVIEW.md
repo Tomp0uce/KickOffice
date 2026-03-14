@@ -1857,9 +1857,11 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 |------|-------------|----------|
 | PROSP-H2 | Optimisation de l'historique de conversation et gestion du contexte | 🟠 High |
 
+**Décision utilisateur (v11.22)** : Approche **heuristique rapide** retenue — tronquer les résultats d'outils > X chars après N itérations avec un résumé template. Pas de latence ajoutée, pas d'appel LLM supplémentaire.
+
 **Sous-tâches** :
-1. Implémenter la summarisation des résultats d'outils après N itérations
-2. Ajouter un mécanisme de "pinning" de documents (éviter la ré-injection)
+1. Implémenter la troncation heuristique des résultats d'outils après N itérations (résumé template)
+2. Ajouter un mécanisme de "pinning" de documents (éviter la ré-injection) — déféré, moins prioritaire
 3. Améliorer la sélection des messages lors de l'itération arrière
 4. Ajouter la détection de pression sur la fenêtre de contexte
 
@@ -1878,13 +1880,13 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 |------|-------------|--------|
 | TOOL-C1 | Document complet renvoyé à chaque itération | ⏳ Bloqué par 7A |
 | USR-H2 | Gonflement du contexte et accumulation des résultats d'outils | ⏳ Bloqué par 7A |
-| TOOL-H2 | Pas d'outil de screenshot Word | ⏳ Décision requise |
+| TOOL-H2 | Pas d'outil de screenshot Word | ❌ Won't Fix (v11.22) |
 | USR-H1 | Formes vides avec puces par défaut | ⏳ Basse priorité |
 
 **Sous-tâches** :
 1. **TOOL-C1** : Supprimer la ré-injection de documents (dépend du pinning de 7A)
 2. **USR-H2** : Vérifier que le gonflement du contexte est résolu (après 7A)
-3. **TOOL-H2** : Évaluer une solution de screenshot tierce OU marquer comme Won't Fix
+3. **TOOL-H2** : ❌ **Won't Fix** (décision v11.22) — pas d'API Office.js, alternatives impossibles dans add-in sandboxé
 4. **USR-H1** : Décider de la gestion des formes vides (peut être déféré)
 
 **Dépendances** : Phase 7A doit être complète pour TOOL-C1 et USR-H2
@@ -1893,22 +1895,24 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 7C — 📊 Gestion des Tokens & Analyse de Données
+### Phase 7C — 📊 Gestion des Tokens & Analyse de Données ⏸️ BLOQUÉE
 **Fichiers clés** : `backend/src/config/models.js`, `backend/src/middleware/validate.js`, `frontend/src/utils/tokenManager.ts`, `frontend/src/components/chat/StatsBar.vue`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | TOKEN-M1 | Cohérence tokens affiché vs réel + augmenter limite max | 🟡 Medium |
 
+**Statut (v11.22)** : ⏸️ **BLOQUÉE** — LOG-H1 n'est **pas encore déployé** en production. Aucune donnée d'usage des outils n'est collectée. Cette phase et la Phase 7F ne peuvent pas commencer tant que LOG-H1 n'est pas déployé et n'a pas collecté 2+ semaines de données.
+
 **Sous-tâches** :
-1. Analyser les données LOG-H1 pour vérifier la cohérence des tokens
-2. Augmenter MODEL_STANDARD_MAX_TOKENS de 32k → 64k
+1. ⏸️ Analyser les données LOG-H1 pour vérifier la cohérence des tokens — **bloqué, pas de données**
+2. Augmenter MODEL_STANDARD_MAX_TOKENS de 32k → 64k — peut être fait indépendamment
 3. Ajouter les tokens confirmés réels à la barre de stats
 4. Documenter la précision de l'estimation des tokens
 
 **Dépendances** :
 - PROSP-H2 (Phase 7A) doit être complète
-- LOG-H1 doit avoir collecté 2+ semaines de données
+- LOG-H1 doit être **déployé en production** puis avoir collecté 2+ semaines de données
 
 **Contexte à lire** : `models.js`, `validate.js`, `tokenManager.ts`, `StatsBar.vue`
 
@@ -2055,8 +2059,8 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 | **6B** ✅ | `StatsBar.vue` + `ToolCallBlock.vue` + `AccountTab.vue` + `ChatMessageList.vue` | UX-M2 ✅, UX-M3 ✅, UX-L2 ✅, UX-L3 ✅ | 🟡 Medium |
 | **6C** ✅ | `Dockerfile` × 2 + `.env.example` + `generate-manifests.js` + `docker-compose.yml` + `nginx.conf` | ARCH-L1 ✅, ARCH-L2 ✅, IC2 ✅, IH2 ✅, IH3 ✅ | 🟢 Low |
 | **7A** ⏳ | `useAgentLoop.ts` + `useMessageOrchestration.ts` + `tokenManager.ts` | PROSP-H2 ⏳ | 🟠 High (CRITICAL PATH) |
-| **7B** ⏳ | `useAgentLoop.ts` + `backend.ts` | TOOL-C1 ⏳, USR-H2 ⏳, TOOL-H2 ⏳, USR-H1 ⏳ | 🟠 High (dépend de 7A) |
-| **7C** ⏳ | `models.js` + `validate.js` + `tokenManager.ts` + `StatsBar.vue` | TOKEN-M1 ⏳ | 🟡 Medium (dépend de 7A + données) |
+| **7B** ⏳ | `useAgentLoop.ts` + `backend.ts` | TOOL-C1 ⏳, USR-H2 ⏳, TOOL-H2 ❌, USR-H1 ⏳ | 🟠 High (dépend de 7A) |
+| **7C** ⏸️ | `models.js` + `validate.js` + `tokenManager.ts` + `StatsBar.vue` | TOKEN-M1 ⏸️ | 🟡 Medium (⏸️ LOG-H1 pas déployé) |
 | **7D** ✅ | `composables/*.ts` (tous) | ARCH-H1 ✅ | ✅ COMPLÈTE (vérifié v11.22) |
 | **7E** ⏸️ | `Claude.md` + `PRD.md` + `.github/` | PROSP-2 ⏸️, PROSP-3 ⏸️, PROSP-4 ⏸️ | 🟢 Low |
 | **7F** 🚀 | `tool-usage.jsonl` + tous `*Tools.ts` | DYNTOOL-D1 🚀, PROSP-1 🚀, PROSP-5 🚀 | 🚀 Déféré (besoin 2+ semaines données) |
@@ -2257,16 +2261,23 @@ ARCH-H1 est marqué ⏸️ "vérification requise" mais il a été **complété 
 
 #### Opportunités d'amélioration OXML non exploitées :
 
-##### OXML-IMP1 — Track Changes au niveau paragraphe (pas seulement sélection) [HIGH] 🟠
+##### OXML-IMP1 — Track Changes au niveau paragraphe (pas seulement sélection) [HIGH] 🟠 — ✅ APPROUVÉ (v11.22)
+
+**Décision utilisateur** : Approuvé pour implémentation. Attention à bien définir quand le tool s'active vs `proposeRevision` existant.
 
 **Problème actuel** : `proposeRevision` opère uniquement sur la **sélection courante**. Si l'utilisateur demande "réécris tout le document", l'agent doit soit sélectionner tout manuellement, soit traiter paragraphe par paragraphe (lent).
 
+**Clarification sur la valeur ajoutée** : La chirurgicalité est **identique** à `proposeRevision` (même `applyRedlineToOxml()`). La différence est la **portée** :
+- `proposeRevision` : l'utilisateur sélectionne un passage → TC sur ce passage
+- `proposeDocumentRevision` : le LLM envoie la version révisée du document → le tool compare paragraphe par paragraphe automatiquement et n'applique les TC que sur les paragraphes modifiés
+
+**Cas d'usage principal** : "réécris/traduis/reformule tout le document" — le tool fait le diff paragraphe par paragraphe et n'applique les Track Changes que là où il y a des différences.
+
 **Amélioration possible** : Créer un tool `proposeDocumentRevision` qui :
 1. Itère sur `context.document.body.paragraphs`
-2. Pour chaque paragraphe modifié, applique `applyRedlineToOxml()` individuellement
-3. Batch les `insertOoxml()` dans un seul `context.sync()`
-
-**Avantage** : Track Changes chirurgical sur tout le document, pas seulement la sélection. Plus proche du workflow "suggérer des modifications" de Google Docs.
+2. Compare chaque paragraphe avec la version révisée correspondante
+3. Pour chaque paragraphe modifié, applique `applyRedlineToOxml()` individuellement
+4. Batch les `insertOoxml()` dans un seul `context.sync()`
 
 **Complexité** : MEDIUM — nécessite une comparaison texte original vs texte révisé par paragraphe (diff au niveau paragraphe).
 
