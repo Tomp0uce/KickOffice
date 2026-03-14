@@ -93,24 +93,39 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
     name: 'getWorksheetData',
     category: 'read',
     description:
-      'Get all data from the used range of the active worksheet. Returns the values, address, row count, and column count.',
+      'Get data from a worksheet. By default, reads all data from the used range of the active worksheet. Optionally specify a worksheet name and/or a specific range address. Returns the values, address, row count, and column count.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        sheetName: {
+          type: 'string',
+          description: 'Optional worksheet name. Uses active sheet if omitted.',
+        },
+        address: {
+          type: 'string',
+          description: 'Optional range address (e.g., "A1:D10"). Uses used range if omitted.',
+        },
+      },
       required: [],
     },
-    executeExcel: async (context) => {
-      
-        const sheet = context.workbook.worksheets.getActiveWorksheet()
-        const usedRange = sheet.getUsedRange()
-        usedRange.load('values, address, rowCount, columnCount')
+    executeExcel: async (context, args: Record<string, any>) => {
+      const { sheetName, address } = args || {}
+
+        const sheet = sheetName
+          ? await safeGetSheet(context, sheetName)
+          : context.workbook.worksheets.getActiveWorksheet()
+
+        const range = address ? sheet.getRange(address) : sheet.getUsedRange()
+        range.load('values, address, rowCount, columnCount')
         await context.sync()
+
         return JSON.stringify(
           {
-            address: usedRange.address,
-            rowCount: usedRange.rowCount,
-            columnCount: usedRange.columnCount,
-            values: usedRange.values,
+            worksheet: sheetName || '(active)',
+            address: range.address,
+            rowCount: range.rowCount,
+            columnCount: range.columnCount,
+            values: range.values,
           },
           null,
           2,
@@ -179,8 +194,18 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         values: {
           type: 'array',
-          description: 'A 2D array of values to write, e.g. [["Name","Score"],["Alice",95]]. Use null to skip a cell. Mutually exclusive with `formulas`.',
-          items: { type: 'array', items: { type: 'string' } },
+          description: 'A 2D array of values to write, e.g. [["Name","Score"],["Alice",95],["Bob",true],[null,3.14]]. Each cell value can be: string, number, boolean, null, or Date object. Use null to skip/clear a cell. Mutually exclusive with `formulas`.',
+          items: {
+            type: 'array',
+            items: {
+              anyOf: [
+                { type: 'string' },
+                { type: 'number' },
+                { type: 'boolean' },
+                { type: 'null' },
+              ],
+            },
+          },
         },
         formulas: {
           type: 'array',
@@ -824,46 +849,6 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
                 },
             totalSheets: sheetNames.length,
             sheetNames,
-          },
-          null,
-          2,
-        )
-      },
-  },
-
-  getDataFromSheet: {
-    name: 'getDataFromSheet',
-    category: 'read',
-    description: 'Read data from another worksheet without activating it.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Worksheet name to read from.',
-        },
-        address: {
-          type: 'string',
-          description: 'Optional range address. Uses used range if omitted.',
-        },
-      },
-      required: ['name'],
-    },
-    executeExcel: async (context, args: Record<string, any>) => {
-      const { name, address } = args as Record<string, any>
-
-        const sheet = await safeGetSheet(context, name)
-        const range = address ? sheet.getRange(address) : sheet.getUsedRange()
-        range.load('address, values, rowCount, columnCount')
-        await context.sync()
-
-        return JSON.stringify(
-          {
-            worksheet: name,
-            address: range.address,
-            rowCount: range.rowCount,
-            columnCount: range.columnCount,
-            values: range.values,
           },
           null,
           2,
@@ -1832,13 +1817,18 @@ const extractChartDataTool: ToolDefinition = {
   description:
     'Extract numerical data points from a chart/graph image using pixel color analysis. ' +
     'You MUST first analyze the image yourself (via vision) to determine: (1) the axis ranges, ' +
-    '(2) the dominant color of the data series, (3) the chart type, AND (4) the bounding box of the plot area ' +
+    '(2) the color(s) of the data series, (3) the chart type, AND (4) the bounding box of the plot area ' +
     '(the rectangle delimited by the X and Y axes, excluding titles, legends and labels). ' +
     'Estimate plotAreaBox as fractions of the image (0.0–1.0): xMinPx = where the Y-axis line sits (left edge), ' +
     'xMaxPx = rightmost gridline/tick (right edge), yMinPx = topmost gridline (top edge), ' +
     'yMaxPx = where the X-axis line sits (bottom edge). ' +
     'Returns a JSON array of {x, y} points that you can write into Excel with setCellRange and chart with manageObject. ' +
-    'The imageId is provided in the <uploaded_images> context block when the user uploads a chart image.',
+    'The imageId is provided in the <uploaded_images> context block when the user uploads a chart image. ' +
+    '**MULTI-CURVE CHARTS**: If the chart contains multiple data series (e.g., 3 different colored lines), ' +
+    'call this tool ONCE PER SERIES with the specific targetColor for each series. ' +
+    'First identify all series colors (e.g., red="#FF0000", blue="#0000FF", green="#00FF00"), ' +
+    'then call extract_chart_data for each color separately. ' +
+    'Write each series to adjacent Excel columns (e.g., columns A-B for series 1, C-D for series 2, etc.).',
   inputSchema: {
     type: 'object',
     properties: {

@@ -143,8 +143,7 @@ await context.sync();
 | Tool                | When to use                                       |
 | ------------------- | ------------------------------------------------- |
 | `getSelectedCells`  | Get values from current selection                 |
-| `getWorksheetData`  | Read used range from active sheet                 |
-| `getDataFromSheet`  | Read data from any sheet by name                  |
+| `getWorksheetData`  | Read data from any worksheet (active or by name) with optional range address |
 | `getWorksheetInfo`  | Get workbook structure, sheet names               |
 | `getAllObjects`     | List charts and pivot tables                      |
 | `getNamedRanges`    | List named ranges                                 |
@@ -251,8 +250,10 @@ Use your vision capability to inspect the uploaded chart image and determine:
 - **Chart type**: line, scatter, bar, area, column, pie, etc.
 - **X axis range**: read the min and max labels on the horizontal axis (e.g., [0, 100], [2020, 2025])
 - **Y axis range**: read the min and max labels on the vertical axis (e.g., [0, 50000])
-- **Data series color**: identify the hex color of the line/bars/points (e.g., "#0070C0" for blue)
-- **Number of series**: if multiple, note each color separately
+- **Data series colors**: identify the hex color of EACH line/bars/points series
+  - For single-series charts: one color (e.g., "#0070C0" for blue)
+  - **For multi-series charts**: CRITICAL — identify ALL series colors from the chart (e.g., red="#FF0000", blue="#0000FF", green="#00FF00"). Check the legend if present.
+- **Number of series**: count how many distinct data series exist (e.g., 3 lines with different colors = 3 series)
 - **Title and axis labels**: note any text for the chart title
 
 ### Step 2: Extract data via pixel analysis
@@ -288,17 +289,41 @@ Call `extract_chart_data` with the parameters you identified. The **`plotAreaBox
 - Use `"area"` for area charts → min pixel Y per bucket (= top of filled area)
 
 If the tool returns few or zero points, increase `colorTolerance` (default 120, try 150–200).
-For multiple series, call `extract_chart_data` once per color.
+
+**MULTI-SERIES CHARTS**: For charts with multiple data series (e.g., 3 different colored lines):
+1. Call `extract_chart_data` ONCE PER SERIES with the specific `targetColor` for each
+2. Use the SAME `plotAreaBox`, `xAxisRange`, `yAxisRange`, `chartType` for all calls — only change `targetColor`
+3. Example for a 3-series chart:
+   - Call 1: `targetColor: "#FF0000"` (red series)
+   - Call 2: `targetColor: "#0000FF"` (blue series)
+   - Call 3: `targetColor: "#00FF00"` (green series)
 
 ### Step 3: Write data to Excel
 
-Use `setCellRange` to write the extracted points:
+Use `setCellRange` to write the extracted points.
+
+**Single-series chart**:
 ```json
 {
   "address": "A1",
   "values": [["X", "Y"], [0, 100], [2.5, 250], ...]
 }
 ```
+
+**Multi-series chart** (write each series to adjacent columns):
+```json
+{
+  "address": "A1",
+  "values": [
+    ["X", "Series 1", "Series 2", "Series 3"],
+    [0, 100, 120, 95],
+    [2.5, 250, 280, 240],
+    ...
+  ]
+}
+```
+
+For multi-series, extract the X values from the first series call, then align subsequent series by X coordinate. If X values don't align perfectly, use the first series' X values as canonical and interpolate Y values for other series.
 
 ### Step 4: Create the chart
 

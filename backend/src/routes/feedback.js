@@ -4,6 +4,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { ErrorCodes } from '../config/errorCodes.js'
 import { logAndRespond } from '../utils/http.js'
+import { getRecentRequests, getRecentToolUsage, logFeedbackSubmission } from '../utils/toolUsageLogger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -27,16 +28,25 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
 
     req.logger.info('Feedback received from user', { traffic: 'system', category })
 
+    const userId = req.logger.defaultMeta?.userId || 'anonymous'
+    const host = req.logger.defaultMeta?.host || 'unknown'
+
+    // FB-M1: Include recent requests and tool usage
+    const recentRequests = getRecentRequests(userId, 4)
+    const toolUsageSnapshot = getRecentToolUsage(userId, 50)
+
     const feedbackEntry = {
       timestamp: new Date().toISOString(),
       sessionId,
-      userId: req.logger.defaultMeta?.userId || 'anonymous',
-      host: req.logger.defaultMeta?.host || 'unknown',
+      userId,
+      host,
       category,
       comment,
       systemContext: systemContext || null,
       logs: logs || [],
       chatHistory: chatHistory || [],
+      recentRequests, // FB-M1: Last 4 backend requests
+      toolUsageSnapshot, // FB-M1: Recent tool usage at feedback time
     }
 
     const filename = `feedback_${category}_${new Date().getTime()}.json`
@@ -44,12 +54,21 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
 
     await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))
 
+    // FB-M1: Log feedback submission to index
+    try {
+      logFeedbackSubmission(userId, host, category, sessionId, filename)
+    } catch (indexError) {
+      req.logger.warn('Failed to log feedback to index', { error: indexError, traffic: 'system' })
+    }
+
     req.logger.info('Feedback saved', {
       traffic: 'system',
       category,
       logCount: feedbackEntry.logs.length,
       chatMessageCount: feedbackEntry.chatHistory.length,
       hasSystemContext: !!systemContext,
+      recentRequestsCount: feedbackEntry.recentRequests.length,
+      toolUsageSnapshotCount: feedbackEntry.toolUsageSnapshot.length,
     })
 
     res.json({ success: true, message: 'Feedback submitted successfully' })

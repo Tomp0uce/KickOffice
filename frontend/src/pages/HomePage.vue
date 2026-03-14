@@ -100,37 +100,8 @@
         @load-prompt="loadSelectedPrompt"
       />
 
-      <ChatMessageList
-        ref="messageListRef"
-        :history="history"
-        :history-with-segments="historyWithSegments"
-        :current-action="currentAction"
-        :loading="loading"
-        :backend-online="backendOnline"
-        :empty-title="t('emptyTitle')"
-        :empty-subtitle="
-          t(
-            forHost({
-              outlook: 'emptySubtitleOutlook',
-              powerpoint: 'emptySubtitlePowerPoint',
-              excel: 'emptySubtitleExcel',
-              word: 'emptySubtitle',
-            }) || 'emptySubtitle',
-          )
-        "
-        :backend-online-label="t('backendOnline')"
-        :backend-offline-label="t('backendOffline')"
-        :replace-selected-text="t('replaceSelectedText')"
-        :append-to-selection="t('appendToSelection')"
-        :copy-to-clipboard="t('copyToClipboard')"
-        :thought-process-label="t('thoughtProcess')"
-        :regenerate-label="t('regenerate')"
-        :edit-message-label="t('editMessage')"
-        @insert-message="insertMessageToDocument"
-        @copy-message="copyMessageToClipboard"
-        @regenerate="handleRegenerate"
-        @edit-message="handleEditMessage"
-      />
+      <!-- ARCH-H2 — Props removed, uses context via provide/inject -->
+      <ChatMessageList ref="messageListRef" />
 
       <ChatInput
         ref="chatInputRef"
@@ -196,6 +167,7 @@ import {
 import { useI18n } from 'vue-i18n'
 
 import { useHealthCheck } from '@/composables/useHealthCheck'
+import { provideHomePageContext } from '@/composables/useHomePageContext' // ARCH-H2
 import ChatHeader from '@/components/chat/ChatHeader.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessageList from '@/components/chat/ChatMessageList.vue'
@@ -216,6 +188,7 @@ import { localStorageKey } from '@/utils/enum'
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection'
 import { type SavedPrompt } from '@/utils/savedPrompts'
 import { useHomePage } from '@/composables/useHomePage'
+import type { ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
 
 const { t } = useI18n()
 
@@ -260,7 +233,7 @@ const agentMaxIterations = computed(() => {
 const userGender = useStorage(localStorageKey.userGender, 'unspecified')
 const userFirstName = useStorage(localStorageKey.userFirstName, '')
 const userLastName = useStorage(localStorageKey.userLastName, '')
-const excelFormulaLanguage = useStorage<'en' | 'fr'>(localStorageKey.excelFormulaLanguage, 'en')
+const excelFormulaLanguage = useStorage<ExcelFormulaLanguage>(localStorageKey.excelFormulaLanguage, 'en') // TOOL-M4
 const insertType = ref<InsertType>('replace')
 
 const chatInputRef = ref<InstanceType<typeof ChatInput>>()
@@ -499,6 +472,8 @@ const {
   confirmDeleteSession,
   loadSavedPrompts,
   loadSelectedPrompt,
+  handleScroll, // UX-H1 — Smart scroll handler
+  isAutoScrollEnabled, // UX-H1 — Auto-scroll state
 } = homePage
 
 const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats, rebuildSessionFiles } =
@@ -559,6 +534,51 @@ function handleEditMessage(message: DisplayMessage) {
 }
 
 const { insertMessageToDocument, copyMessageToClipboard } = officeInsert
+
+// ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
+provideHomePageContext({
+  // State
+  history,
+  historyWithSegments,
+  loading,
+  imageLoading,
+  backendOnline,
+  currentAction,
+  userInput,
+  customSystemPrompt,
+  selectedPromptId,
+  savedPrompts,
+  isDraftFocusGlowing,
+  isAutoScrollEnabled,
+  // Models
+  availableModels,
+  selectedModelTier,
+  selectedModelInfo,
+  // Quick Actions
+  quickActions,
+  // Session
+  sessionManager,
+  sessionStats,
+  // Translations
+  t,
+  // Handlers
+  sendMessage,
+  applyQuickAction,
+  stopGeneration,
+  handleScroll,
+  handleRegenerate,
+  handleEditMessage,
+  insertMessageToDocument,
+  copyMessageToClipboard,
+  goToSettings,
+  executeNewChat,
+  handleSwitchSession,
+  handleDeleteSession,
+  loadSelectedPrompt,
+  adjustTextareaHeight,
+  // Computed
+  inputPlaceholder,
+})
 
 // Persist session after each agent turn completes
 watch(loading, async (isLoading, wasLoading) => {

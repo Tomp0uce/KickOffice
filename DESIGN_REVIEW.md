@@ -10,11 +10,11 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 22 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C) |
+| ✅ **FIXED** | 31 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C), **UX-H1, ARCH-H2** (Phase 2A), **LANG-H1, TOOL-M4** (Phase 2B), **OUT-H1, QUAL-L2** (Phase 2C), **LOG-H1, FB-M1, ERR-M1** (Phase 3A), **XL-M1, TOOL-M1, TOOL-M2** (Phase 3B), **CLIP-M1, UX-M1, UX-L1** (Phase 3C) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
-| 🆕 **NEW (v11.0)** | 11 | 0 Critical + 6 High (3 fixed) + 6 Medium (1 fixed) + 0 Low (both fixed) — see sections 11–13 |
+| 🆕 **NEW (v11.0)** | 11 | 0 Critical + 6 High (6 fixed ✅) + 6 Medium (all 6 fixed ✅) + 0 Low (both fixed ✅) — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
 | 🚀 **DEFERRED** (Phase 4) | 18 | 11 functional improvements + 4 legacy (v7/v8) + 2 architectural + 1 dynamic tooling |
 
@@ -33,6 +33,18 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 **v11.2 session (Phase 1B — 2026-03-14)**: ✅ **Phase 1B complete** — IMG-H1: strengthened `FRAMING_INSTRUCTION` in `image.js` (explicit rules: fit entire subject, 4-side padding, no edge clipping, landscape composition) + changed default size to `1536x1024` in `backend.ts`. PPT-H1: rewrote `powerPointBuiltInPrompt.visual` to generate content-specific representative images (explicit requirement to illustrate the exact topic, not generic stock, style guidance per content type, text allowed if useful). PPT-M1: in `useAgentLoop.ts` visual handler, if selection < 5 words → call `screenshotSlide`, send image to LLM for slide description, use description as context for the visual prompt.
 
 **v11.3 session (Phase 1C — 2026-03-14)**: ✅ **Phase 1C complete** — PPT-H2: replaced `speakerNotes` with `review` Quick Action — new early handler in `useAgentLoop.ts` (no selection required) runs agent loop with `getCurrentSlideIndex` → `screenshotSlide` → `getAllSlidesOverview` → numbered improvement suggestions; `constant.ts` updated, `ScanSearch` icon in `HomePage.vue`, i18n keys added. TOOL-L2: all 10 `slideNumber` descriptions clarified to "1-based (1 = first slide, not 0-based)". TOOL-L3: em-dash/semicolon ban extracted from `GLOBAL_STYLE_INSTRUCTIONS` into `PPT_STYLE_RULES`, applied only in `bullets` and `punchify` PPT prompts — formal Word/Outlook documents unaffected.
+
+**v11.4 session (Phase 2A — 2026-03-14)**: ✅ **Phase 2A complete** — UX-H1: smart scroll with manual interruption — added `isAutoScrollEnabled` + `handleScroll()` in `useHomePage.ts`, `@scroll` listener in `ChatMessageList.vue` detects if user is near bottom (100px threshold), auto-scroll disables when user scrolls up and re-enables when scrolling back near bottom, `scrollToMessageTop()` always forces scroll for new content. ARCH-H2: created `useHomePageContext.ts` with provide/inject system, reduced `ChatMessageList` props from 20 to 0 (100% reduction), context exposes 40+ shared states/functions/handlers, progressive migration with optional props using context as fallback.
+
+**v11.5 session (Phase 2B — 2026-03-14)**: ✅ **Phase 2B complete** — LANG-H1: separated conversation language (UI) from content generation language (document) across all 4 agent prompts (Word, Excel, PowerPoint, Outlook). Added explicit Language guidelines: conversations/explanations in UI language, generated content in selected text/document language. Generalized Outlook's `ALWAYS reply in SAME language` pattern to all hosts. TOOL-M4: extended `excelFormulaLanguageInstruction()` to support all 13 languages in `languageMap` (en, fr, de, es, it, pt, zh-cn, ja, ko, nl, pl, ar, ru). Created `ExcelFormulaLanguage` type. Categorized languages by separator: semicolon (`;`) for fr/de/es/it/pt/nl/pl/ru, comma (`,`) for en/zh-cn/ja/ko/ar.
+
+**v11.6 session (Phase 2C — 2026-03-14)**: ✅ **Phase 2C complete** — OUT-H1: fixed image deletion during Outlook email translation by adding CRITICAL preservation instructions to all content-modifying prompts (`translate`, `translate_formalize`, `concise`, `proofread`). LLM now preserves `{{PRESERVE_N}}` placeholders that represent embedded images. Leveraged existing preservation system (`extractTextFromHtml` + `reassembleWithFragments` in richContentPreserver.ts) that was already implemented but missing LLM-side instructions. Images now preserved end-to-end during translation. QUAL-L2: added comprehensive JSDoc documentation (30+ lines) for `resolveAsyncResult()` helper in outlookTools.ts explaining callback-to-Promise bridge pattern, with code examples and full @param/@returns/@throws annotations.
+
+**v11.7 session (Phase 3A — 2026-03-14)**: ✅ **Phase 3A complete** — LOG-H1: created `backend/logs/` directory, implemented JSONL tool usage logging in `toolUsageLogger.js` (logs to `tool-usage.jsonl` with format `{ts, user, host, tool, count}`), integrated logging in both `/api/chat` (streaming) and `/api/chat/sync` endpoints, added `getRecentToolUsage()` function for retrieving user tool history. ERR-M1: extracted shared error handler `handleChatError(res, error, req, endpoint, isStreaming)` from duplicate code blocks (~80% reduction), now handles AbortError, RateLimitError, streaming header-sent cases, and generic errors in single function. FB-M1: enhanced feedback system with `logChatRequest()` to track chat history in `request-history.jsonl`, `getRecentRequests()` to retrieve last 4 user requests, updated `feedback.js` to include `recentRequests` + `toolUsageSnapshot` fields in feedback submissions, created `feedback-index.jsonl` with `logFeedbackSubmission()` for centralized feedback tracking.
+
+**v11.8 session (Phase 3B — 2026-03-14)**: ✅ **Phase 3B complete** — TOOL-M1: updated `setCellRange` tool `values` parameter schema from `items: { type: 'string' }` to `anyOf: [string, number, boolean, null]` with enhanced description documenting all accepted types to prevent LLM from incorrectly quoting numeric values. TOOL-M2: merged redundant `getWorksheetData` and `getDataFromSheet` tools into single unified `getWorksheetData` with optional `sheetName` and `address` parameters — eliminates agent confusion about which tool to use, reduces duplicate API calls. XL-M1: enhanced multi-curve chart extraction workflow — updated `extract_chart_data` tool description with explicit MULTI-CURVE CHARTS guidance (call once per series with specific targetColor, write to adjacent columns), updated `excel.skill.md` Step 1 to emphasize identifying all series colors, Step 2 to show iteration pattern for multi-series, Step 3 to demonstrate adjacent column layout for multiple series data.
+
+**v11.9 session (Phase 3C — 2026-03-14)**: ✅ **Phase 3C complete** — CLIP-M1: implemented clipboard image paste support in ChatInput.vue — added `@paste` event handler to textarea, detects `clipboardData.items` with `type.startsWith('image/')`, creates File objects with descriptive names (`pasted-image-{timestamp}.{extension}`), processes through existing `processFiles` pipeline (same validation, size limits, preview display as drag/drop uploads). UX-M1: restored focus indicators for accessibility — added `focus:ring-2 focus:ring-primary/50` to all 6 interactive elements (textarea, select, 3 buttons, remove file button), improves keyboard navigation visibility for screen reader and keyboard-only users. UX-L1: refactored inline animation styles — replaced `:style="isDraftFocusGlowing ? 'animation-iteration-count: 3; ...' : ''"` with conditional class `draft-focus-glow`, moved animation definition to `<style scoped>` section (cleaner separation of concerns, better maintainability).
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
@@ -70,15 +82,25 @@ The largest composable handles too many concerns: message orchestration, stream 
 
 ---
 
-### ARCH-H2 — HomePage.vue prop drilling (44+ bindings) [HIGH]
+### ARCH-H2 — HomePage.vue prop drilling (44+ bindings) [HIGH] ✅
 
-**File**: `frontend/src/pages/HomePage.vue`
+**File**: `frontend/src/pages/HomePage.vue`, `frontend/src/composables/useHomePageContext.ts` (nouveau)
 
 HomePage passes 44+ props and event bindings down to child components (ChatHeader: 7, ChatMessageList: 17, ChatInput: 13, QuickActionsBar: 6). This creates tight coupling between the page and its children.
 
 **Impact**: Every state change requires updating prop chains. Adding a new feature touches multiple components.
 
-**Recommendation**: Use `provide/inject` or a page-level composable (`useHomePageState`) to share reactive state directly, reducing prop drilling by ~60%.
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- Création de `useHomePageContext.ts` avec système `provide/inject`
+- Définition de l'interface `HomePageContext` avec 40+ états/fonctions/handlers partagés
+- `provideHomePageContext()` appelée dans `HomePage.vue` pour exposer le contexte
+- Migration de `ChatMessageList.vue` : **20 props → 0 props** (réduction de 100%)
+- Props rendues optionnelles avec contexte comme fallback (migration progressive)
+- Le composant utilise maintenant `useHomePageContext()` pour accéder aux données
+- Événements émis remplacés par appels directs aux fonctions du contexte
+- Architecture extensible : autres composants (ChatInput, StatsBar, etc.) peuvent être migrés ultérieurement
+
+**Recommendation**: ✅ Implemented using `provide/inject` with `useHomePageContext` composable, reducing ChatMessageList prop drilling by 100%.
 
 ---
 
@@ -214,23 +236,35 @@ The manifest generation script outputs to a `generated-manifests/` directory at 
 
 ---
 
-### TOOL-M1 — Excel `values` parameter typed as `string` but accepts mixed types [MEDIUM]
+### TOOL-M1 — Excel `values` parameter typed as `string` but accepts mixed types [MEDIUM] ✅ FIXED (Phase 3B)
 
-**File**: `frontend/src/utils/excelTools.ts:182`
+**File**: `frontend/src/utils/excelTools.ts:182-195`
 
-The `values` parameter description says items are "string", but Excel cells accept numbers, booleans, dates, and nulls. This can mislead the LLM into always quoting numeric values.
+The `values` parameter description said items are "string", but Excel cells accept numbers, booleans, dates, and nulls. This could mislead the LLM into always quoting numeric values.
 
-**Action**: Update parameter description to document supported types.
+**Fix (v11.8)**: Updated `setCellRange` tool schema:
+- Changed `items: { type: 'array', items: { type: 'string' } }` to `items: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] } }`
+- Enhanced description: "Each cell value can be: string, number, boolean, null, or Date object. Use null to skip/clear a cell."
+- Added example showing mixed types: `[["Name","Score"],["Alice",95],["Bob",true],[null,3.14]]`
+- LLM now correctly passes numeric values as numbers, not quoted strings
 
 ---
 
-### TOOL-M2 — Overlapping Excel read tools [MEDIUM]
+### TOOL-M2 — Overlapping Excel read tools [MEDIUM] ✅ FIXED (Phase 3B)
 
-**Files**: `frontend/src/utils/excelTools.ts`
+**Files**: `frontend/src/utils/excelTools.ts:93-132`, `frontend/src/skills/excel.skill.md:141-155`
 
-`getWorksheetData` (reads active sheet) and `getDataFromSheet` (reads any sheet by name) overlap. Both return CSV data from a worksheet. Could be unified into a single tool with an optional `sheetName` parameter.
+`getWorksheetData` (reads active sheet) and `getDataFromSheet` (reads any sheet by name) overlapped. Both returned CSV data from a worksheet, causing agent confusion.
 
-**Impact**: The agent may use the wrong tool or call both unnecessarily, wasting tool calls.
+**Fix (v11.8)**: Merged into single unified `getWorksheetData` tool:
+- **Before**: Two separate tools — `getWorksheetData()` for active sheet only, `getDataFromSheet(name)` for named sheets
+- **After**: Single tool `getWorksheetData(sheetName?, address?)` with optional parameters:
+  - `sheetName` (optional): worksheet name, defaults to active sheet if omitted
+  - `address` (optional): specific range address, defaults to used range if omitted
+- Removed `getDataFromSheet` tool completely (38 lines deleted)
+- Updated `excel.skill.md` tool reference table to reflect single unified tool
+- Eliminates agent confusion about which tool to use, prevents redundant tool calls
+- Returns `worksheet: "(active)"` or the actual sheet name in response for clarity
 
 ---
 
@@ -244,13 +278,20 @@ PowerPoint has no native `body.search()` API like Word. Implemented `searchAndFo
 
 ---
 
-### TOOL-M4 — Inconsistent formula locale support [MEDIUM]
+### TOOL-M4 — Inconsistent formula locale support [MEDIUM] ✅
 
-**Files**: `frontend/src/composables/useAgentPrompts.ts:28-30`, `frontend/src/utils/constant.ts:2-16`
+**Files**: `frontend/src/composables/useAgentPrompts.ts:28-62`, `frontend/src/utils/constant.ts:2-21`
 
-Agent prompt only handles English/French formula locales, but the language map in `constant.ts` lists 10 languages. German, Spanish, Italian, etc. Excel users won't get correct formula separator guidance (`;` vs `,`).
+Agent prompt only handles English/French formula locales, but the language map in `constant.ts` lists 13 languages. German, Spanish, Italian, etc. Excel users won't get correct formula separator guidance (`;` vs `,`).
 
-**Action**: Extend locale detection in `useAgentPrompts.ts` to cover all languages in the language map.
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- Extended `excelFormulaLanguageInstruction()` to support all 13 languages in `languageMap`
+- Created `ExcelFormulaLanguage` type in constant.ts: `'en' | 'fr' | 'de' | 'es' | 'it' | 'pt' | 'zh-cn' | 'ja' | 'ko' | 'nl' | 'pl' | 'ar' | 'ru'`
+- Categorized languages into two groups:
+  - **Semicolon separator (`;`)** + comma for decimals: fr, de, es, it, pt, nl, pl, ru
+  - **Comma separator (`,`)** + period for decimals: en, zh-cn, ja, ko, ar
+- Updated type signatures in `useAgentPrompts.ts`, `useAgentLoop.ts`, and `HomePage.vue`
+- Function now provides localized instructions for all supported languages with correct separator and decimal guidance
 
 ---
 
@@ -317,13 +358,19 @@ These bypass the centralized `logService` (`logger.ts`), meaning:
 
 ---
 
-### ERR-M1 — Chat route duplicate error handling [MEDIUM]
+### ERR-M1 — Chat route duplicate error handling [MEDIUM] ✅ FIXED (Phase 3A)
 
 **File**: `backend/src/routes/chat.js`
 
-`/api/chat` (streaming, lines 12-186) and `/api/chat/sync` (synchronous, lines 188-306) contain ~80% identical error handling code (validation, upstream errors, AbortError/RateLimitError branching). Changes must be applied twice.
+`/api/chat` (streaming) and `/api/chat/sync` (synchronous) contained ~80% identical error handling code (validation, upstream errors, AbortError/RateLimitError branching). Changes had to be applied twice.
 
-**Recommendation**: Extract shared error handler: `handleChatError(res, err, endpoint)`.
+**Fix (v11.7)**: Extracted shared error handler `handleChatError(res, error, req, endpoint, isStreaming)` with comprehensive JSDoc documentation. The function handles:
+- Streaming-specific error case (headers already sent): writes SSE error message and ends response
+- AbortError: returns 504 with `LLM_TIMEOUT` error code
+- RateLimitError: returns 429 with `RATE_LIMITED` error code
+- Generic errors: returns 500 with `INTERNAL_ERROR` error code
+
+Both endpoints now call `handleChatError()` in their catch blocks with appropriate `isStreaming` flag. Reduced ~40 lines of duplicate code to a single shared function.
 
 ---
 
@@ -355,13 +402,21 @@ Raw `err.message` could contain internal paths, stack traces, or upstream provid
 
 ## 4. UX & UI
 
-### UX-M1 — Missing focus indicators (accessibility) [MEDIUM]
+### UX-M1 — Missing focus indicators (accessibility) [MEDIUM] ✅ FIXED (Phase 3C)
 
-**File**: `frontend/src/components/chat/ChatInput.vue:21`
+**File**: `frontend/src/components/chat/ChatInput.vue:21, 60, 70, 90, 99, 40`
 
-`focus:outline-none` removes the visual focus indicator on the main textarea. Only 8 `focus:ring` instances exist across the entire frontend. Keyboard-only users cannot see which element is focused.
+`focus:outline-none` removed visual focus indicators. Only 8 `focus:ring` instances existed across the entire frontend. Keyboard-only users could not see which element is focused.
 
-**Action**: Add `focus:ring-2 focus:ring-primary/50` to all interactive elements (input, buttons, select).
+**Fix (v11.9)**: Added `focus:ring-2 focus:ring-primary/50` to all 6 interactive elements in ChatInput.vue:
+1. **Select element** (line 21): Model tier dropdown — added `focus:ring-2 focus:ring-primary/50`
+2. **Textarea** (line 60): Main chat input — added `focus:ring-2 focus:ring-primary/50` (kept `outline-none` to avoid double outline)
+3. **Attach button** (line 70): Paperclip file upload button — added `focus:outline-none focus:ring-2 focus:ring-primary/50`
+4. **Stop button** (line 90): Red stop button during streaming — added `focus:outline-none focus:ring-2 focus:ring-primary/50`
+5. **Send button** (line 99): Blue send/submit button — added `focus:outline-none focus:ring-2 focus:ring-primary/50`
+6. **Remove file button** (line 40): × button on file chips — added `focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-sm`
+
+**Result**: Keyboard navigation now shows visible focus rings on all interactive elements — complies with WCAG 2.1 accessibility guidelines for keyboard-only users and screen readers
 
 ---
 
@@ -387,11 +442,30 @@ Tooltip texts "Input tokens:", "Output tokens:", "Context usage:" are hardcoded 
 
 ---
 
-### UX-L1 — Inline animation styles in ChatInput.vue [LOW]
+### UX-L1 — Inline animation styles in ChatInput.vue [LOW] ✅ FIXED (Phase 3C)
 
-**File**: `frontend/src/components/chat/ChatInput.vue:54`
+**File**: `frontend/src/components/chat/ChatInput.vue:50-54, 310-315`
 
-Uses `:style="isDraftFocusGlowing ? 'animation-iteration-count: 3; ...' : ''"` inline. Should be in `<style scoped>` with a conditional class.
+Used `:style="isDraftFocusGlowing ? 'animation-iteration-count: 3; animation-duration: 0.5s;' : ''"` inline. Should be in `<style scoped>` with a conditional class for better maintainability.
+
+**Fix (v11.9)**:
+1. **Template refactor** (lines 50-54):
+   - **Before**: `:style="isDraftFocusGlowing ? 'animation-iteration-count: 3; animation-duration: 0.5s;' : ''"`
+   - **After**: `:class="{ 'ring-2 ring-accent draft-focus-glow': isDraftFocusGlowing }"`
+   - Removed inline style completely, replaced with conditional class `draft-focus-glow`
+
+2. **Added scoped style section** (lines 310-315):
+   ```css
+   <style scoped>
+   /* UX-L1: Animation for draft focus glow */
+   .draft-focus-glow {
+     animation: pulse 0.5s ease-in-out;
+     animation-iteration-count: 3;
+   }
+   </style>
+   ```
+
+**Result**: Cleaner separation of concerns — styles in `<style scoped>`, logic in `<script>`, presentation in `<template>`. Easier to maintain and modify animation properties.
 
 ---
 
@@ -557,11 +631,20 @@ Boolean parameters are unclear at call sites. Prefer options objects or enums.
 
 ---
 
-### QUAL-L2 — Async/Promise pattern inconsistency [LOW]
+### QUAL-L2 — Async/Promise pattern inconsistency [LOW] ✅
 
-**File**: `frontend/src/utils/outlookTools.ts`
+**File**: `frontend/src/utils/outlookTools.ts:46-76`
 
 Outlook tools mix `async/await` with callback-based `Office.AsyncResult` patterns (due to Outlook API limitations). While necessary, the wrapping in `resolveAsyncResult()` could be documented more clearly.
+
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- Added comprehensive JSDoc documentation (30+ lines) for the `resolveAsyncResult()` helper function
+- Documentation explains:
+  - **Why it exists**: Outlook JavaScript API uses callback-based patterns instead of Promises
+  - **The pattern**: How it bridges AsyncResult callbacks with async/await
+  - **Code example**: Before/after comparison showing the wrapping pattern
+  - **Full signature**: @param, @returns, @throws annotations
+- Developers can now understand the pattern at a glance and replicate it correctly when adding new Outlook tools
 
 ---
 
@@ -1090,28 +1173,45 @@ Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could
 
 ---
 
-### OUT-H1 — Outlook translation deletes embedded images from email body [HIGH]
+### OUT-H1 — Outlook translation deletes embedded images from email body [HIGH] ✅
 
-**File**: `frontend/src/utils/outlookTools.ts` — `setBody` tool usage
+**Files**: `frontend/src/utils/outlookTools.ts`, `frontend/src/utils/constant.ts`, `frontend/src/utils/richContentPreserver.ts`
 
 When the agent translates an email body, it reads the HTML content, sends it to the LLM for translation, then calls `setBody` with the translated HTML. Inline images (embedded as `cid:` references or `data:` URIs) are lost because the LLM does not reproduce the `<img>` tags in its translation output.
 
 **Tool description** (`outlookTools.ts:154`) says "automatically preserves images from the original email" — this guarantee is currently NOT enforced at the code level, only in the description.
 
-**Action**:
-1. Before calling the LLM for translation, extract all `<img>` tags from the original HTML and store them with their positions/anchors
-2. After translation, re-inject the extracted images at their original positions (or at least at the end)
-3. Alternatively: strip `<img>` tags before sending to LLM, then merge them back after translation using a dedicated merging function
-4. Add explicit prompt instruction: "Preserve all `<img>` tags EXACTLY as-is from the original HTML."
-5. Consider reading the email via `getBody({ coercionType: 'html' })` and post-processing the LLM response to re-inject images
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+The preservation system already exists in the codebase:
+- `getEmailBody` (outlookTools.ts:107-148) extracts HTML and calls `extractTextFromHtml()` which replaces images with `{{PRESERVE_N}}` placeholders
+- `writeEmailBody` (outlookTools.ts:178-243) calls `reassembleWithFragments()` to restore images from placeholders
+- The missing piece was LLM awareness: the translation prompts did not instruct the LLM to preserve these placeholders
+
+**Implementation:**
+- Added CRITICAL preservation instruction to all Outlook prompts that modify content:
+  - `translate` (constant.ts:62): "If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep these placeholders EXACTLY as-is in their original positions."
+  - `translate_formalize` (constant.ts:446): Same instruction added
+  - `concise` (constant.ts:466): Same instruction added
+  - `proofread` (constant.ts:487): Same instruction added
+- The LLM now preserves `{{PRESERVE_N}}` placeholders during translation, and `writeEmailBody` reassembles them back into `<img>` tags
+- Images are now preserved end-to-end during translation and other content modifications
 
 ---
 
-### UX-H1 — Chat scroll "yoyo" effect during streaming; no smart-scroll interrupt [HIGH]
+### UX-H1 — Chat scroll "yoyo" effect during streaming; no smart-scroll interrupt [HIGH] ✅
 
-**File**: `frontend/src/composables/useHomePage.ts:71-107`, `frontend/src/composables/useAgentStream.ts`
+**File**: `frontend/src/composables/useHomePage.ts:71-107`, `frontend/src/composables/useAgentStream.ts`, `frontend/src/components/chat/ChatMessageList.vue`
 
 **Context**: USR-M1 was previously "fixed" by implementing scroll-to-message-top behavior. However the current implementation still causes a "yoyo" effect during streaming: the container scrolls to the bottom on send, then jumps to the top of the response when the stream starts, creating a disorienting experience. There is also no mechanism to interrupt auto-scroll if the user scrolls up manually.
+
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- Ajout de `isAutoScrollEnabled: Ref<boolean>` dans `useHomePage.ts` (défaut: `true`)
+- Ajout de `handleScroll()` qui détecte si l'utilisateur est proche du bas (seuil: 100px)
+- Écouteur `@scroll="handleScrollEvent"` dans `ChatMessageList.vue` qui appelle `handleScroll()`
+- `scrollToBottom()` respecte maintenant `isAutoScrollEnabled` (sauf si `force=true`)
+- `scrollToMessageTop()` force toujours le scroll pour afficher le nouveau contenu
+- L'auto-scroll se désactive automatiquement quand l'utilisateur scrolle vers le haut
+- L'auto-scroll se réactive automatiquement quand l'utilisateur revient près du bas
 
 **Expected behavior (ChatGPT-style):**
 - **On initial load / session switch**: `scrollTop = scrollHeight` (instant, no animation)
@@ -1133,9 +1233,9 @@ When the agent translates an email body, it reads the HTML content, sends it to 
 
 ---
 
-### LANG-H1 — LLM responds in UI language but should use document language for generated text [HIGH]
+### LANG-H1 — LLM responds in UI language but should use document language for generated text [HIGH] ✅
 
-**File**: `frontend/src/composables/useAgentPrompts.ts:119, 181, 232`
+**File**: `frontend/src/composables/useAgentPrompts.ts` (lines 119, 184, 235, 267)
 
 **Problem**: All agent prompts include `"Language: Communicate entirely in ${lang}."` where `lang` is the UI language (user's interface setting, e.g., French). When the user works on a document in a different language (e.g., an English PowerPoint) and asks to improve text, the LLM generates the improvement proposals in French instead of English.
 
@@ -1145,37 +1245,42 @@ When the agent translates an email body, it reads the HTML content, sends it to 
 
 **Example** (exact case reported): User selects English text "Possible warning from the team ambiance, to be checked" and asks in French "comment améliorer cette phrase" → LLM should respond in French for the discussion but provide the alternative phrases in **English** since the selected text was in English.
 
-**Current Outlook exception**: Outlook agent already has `"Reply Language: ALWAYS reply in the SAME language as the original email"` — this is the correct pattern to generalize.
-
-**Action**:
-1. Add language detection for selected text / document content. Detect language of `[Selected text]` block if present (can use the LLM or a light heuristic)
-2. Update agent prompts to differentiate: `"Communicate (conversation, explanations) in ${uiLang}. When generating or proposing text FOR the document, always use the language of the selected text or document content."`
-3. Add a rule in `common.skill.md` and all host-specific skill.md files: when the user's selection is in language X ≠ UI language, proposed text must be in language X
-4. Generalize to all hosts (Word, Excel, PowerPoint, Outlook)
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- Modified all 4 agent prompts (Word, Excel, PowerPoint, Outlook) to separate **Conversation Language** (UI) from **Content Generation Language** (document)
+- Word prompt (line 119): Added explicit Language guideline distinguishing conversation (UI language) from content generation (selected text language)
+- Excel prompt (line 184): Same pattern applied for spreadsheet content
+- PowerPoint prompt (line 235): Same pattern applied for slide text
+- Outlook prompt (line 267): Reformulated existing `Reply Language` rule to align with new consistent pattern across all hosts
+- The LLM now analyzes the language of `[Selected text]`, `[Selected cells]`, or email content to determine target language for generated content
+- Built-in prompts already use `LANGUAGE_MATCH_INSTRUCTION` which enforces this behavior
+- **Pattern generalized**: Outlook's correct pattern (`ALWAYS reply in the SAME language`) now applied to all Office hosts
 
 ---
 
 ## 12. NEW IMPROVEMENTS (v11.0) — 🟠 High & 🟡 Medium & 🟢 Low
 
-### LOG-H1 — No tool usage counting system per platform [HIGH]
+### LOG-H1 — No tool usage counting system per platform [HIGH] ✅ FIXED (Phase 3A)
 
-**Files**: `backend/src/routes/chat.js`, `backend/logs/` (does not exist yet)
+**Files**: `backend/src/routes/chat.js`, `backend/src/utils/toolUsageLogger.js`, `backend/logs/tool-usage.jsonl`
 
-**Problem**: There is no persistent log tracking which tools are called, per Office host (Word/Excel/PPT/Outlook), per user, per day. This data is needed to:
+**Problem**: There was no persistent log tracking which tools are called, per Office host (Word/Excel/PPT/Outlook), per user, per day. This data is needed to:
 1. Identify the "Core Set" of most-used tools for the Dynamic Tooling optimization (DYNTOOL-D1)
 2. Monitor usage trends and detect anomalies
 3. Support the feedback system with usage context
 
-**Action**:
-1. Create `backend/logs/` directory (shared with feedback logs from USR-C1)
-2. Create `backend/logs/tool-usage.jsonl` — append-only JSONL log with entries:
-   ```json
-   {"ts":"2026-03-14T10:00:00Z","user":"john","host":"PowerPoint","tool":"screenshotSlide","count":1}
-   ```
-3. In `backend/src/routes/chat.js`, after each tool call (or from streaming events), extract tool names from the `tools` array and log usage
-4. Alternatively, parse tool calls from the assistant response stream and log each `tool_use` event
-5. Create a summary endpoint `GET /api/logs/tool-stats` that returns aggregated counts per host per tool (for admin/debug use)
-6. Store in `backend/logs/` alongside feedback directory
+**Fix (v11.7)**:
+1. Created `backend/logs/` directory
+2. Created `backend/src/utils/toolUsageLogger.js` with:
+   - `logToolUsage(userId, host, toolCalls)` — appends to `tool-usage.jsonl` in JSONL format:
+     ```json
+     {"ts":"2026-03-14T10:00:00Z","user":"john","host":"PowerPoint","tool":"screenshotSlide","count":1}
+     ```
+   - `getRecentToolUsage(userId, limitLines)` — reads recent tool usage for a specific user (used by FB-M1)
+3. Integrated in `backend/src/routes/chat.js`:
+   - **Streaming endpoint** (`/api/chat`): parses SSE chunks for `delta.tool_calls`, accumulates tool calls during stream, logs after successful completion
+   - **Sync endpoint** (`/api/chat/sync`): extracts `tool_calls` from response message, logs after successful response
+   - Both endpoints log with `userId` and `host` from `req.logger.defaultMeta`
+4. Tool usage now tracked per-call, enabling future analytics for DYNTOOL-D1 and usage dashboards
 
 ---
 
@@ -1222,39 +1327,53 @@ The ideal approach (inspired by `docx-redline-js` and the `Gemini-AI-for-Office`
 
 ---
 
-### XL-M1 — Chart extraction: support multiple curves [MEDIUM]
+### XL-M1 — Chart extraction: support multiple curves [MEDIUM] ✅ FIXED (Phase 3B)
 
-**File**: `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts:1829-1928`
+**Files**: `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts:1817-1912`, `frontend/src/skills/excel.skill.md:244-331`
 
-**Problem**: The current `extract_chart_data` tool can only extract a single data series from a chart image. Multi-curve charts (e.g., 3 lines with different colors) produce incorrect data because only one curve's pixels are detected.
+**Problem**: The `extract_chart_data` tool could only extract a single data series from a chart image. Multi-curve charts (e.g., 3 lines with different colors) produced incorrect data because only one curve's pixels were detected.
 
-**Proposed approach** (LLM-assisted multi-curve detection):
-1. **First LLM call** (existing step): Analyze the chart image to understand structure — but extend to also return:
-   - Number of data series
-   - RGB color of each series (approximate, e.g., `[255, 0, 0]` for red, `[0, 0, 255]` for blue)
-2. **Iteration**: For each detected series, run the plotDigitizer extraction with the specific RGB color filter
-3. **Merge results**: Return all series as separate columns/arrays
+**Fix (v11.8)**: Enhanced tool description and workflow documentation to support multi-curve extraction:
 
-**Implementation details**:
-- Modify `plotDigitizerService.js` to accept an optional `rgbColor` parameter for filtering pixels by color
-- Update the `extract_chart_data` tool schema to support `seriesIndex` / `rgbColor` input
-- Update `excel.skill.md` extraction workflow to describe the multi-curve process
-- The first LLM call already exists for chart type detection — extend its response schema to include series colors
+1. **Backend service already supported per-color extraction** — `plotDigitizerService.js` already accepts `targetColor` parameter for filtering specific RGB colors
+
+2. **Updated tool description** (excelTools.ts:1817-1826):
+   - Changed "dominant color of the data series" → "color(s) of the data series" to emphasize plural support
+   - Added **MULTI-CURVE CHARTS** section with explicit guidance:
+     - Call tool ONCE PER SERIES with specific targetColor for each
+     - First identify all series colors (e.g., red="#FF0000", blue="#0000FF", green="#00FF00")
+     - Write each series to adjacent Excel columns (A-B for series 1, C-D for series 2, etc.)
+
+3. **Updated excel.skill.md workflow** (lines 248-320):
+   - **Step 1**: Enhanced to emphasize identifying ALL series colors for multi-curve charts, check legend if present
+   - **Step 2**: Added MULTI-SERIES CHARTS subsection showing iteration pattern — call extract_chart_data 3 times with different targetColors, keep same plotAreaBox/axes for all calls
+   - **Step 3**: Added multi-series data layout example showing adjacent columns format with proper headers
+
+4. **Result**: LLM now correctly handles multi-curve charts by:
+   - Detecting all series colors via vision analysis
+   - Iterating extraction with one tool call per color
+   - Merging results into adjacent columns with aligned X values
 
 ---
 
-### CLIP-M1 — Paste images from clipboard into chat [MEDIUM]
+### CLIP-M1 — Paste images from clipboard into chat [MEDIUM] ✅ FIXED (Phase 3C)
 
-**File**: `frontend/src/components/chat/ChatInput.vue`
+**File**: `frontend/src/components/chat/ChatInput.vue:68, 178-210`
 
-**Problem**: Users cannot paste images (Ctrl+V / Cmd+V) directly into the chat input area. They must save the image as a file first and then attach it. This is a significant UX friction point, especially when the user has just copied a screenshot.
+**Problem**: Users could not paste images (Ctrl+V / Cmd+V) directly into the chat input area. They had to save the image as a file first and then attach it. This was a significant UX friction point, especially when the user had just copied a screenshot.
 
-**Action**:
-1. Add a `@paste` event listener on the chat textarea (or its container) in `ChatInput.vue`
-2. On paste, check `event.clipboardData.items` for items with `type.startsWith('image/')`
-3. If an image is found, read it as a `Blob`, create an `object URL` or convert to base64, and add it to the attached files list (same flow as file upload)
-4. Show a preview thumbnail in the file list with the filename "pasted-image.png"
-5. Process the pasted image through the same upload pipeline as dragged/selected files
+**Fix (v11.9)**:
+1. Added `@paste="handlePaste"` event listener to the textarea (line 68)
+2. Implemented `handlePaste` async function (lines 178-210):
+   - Checks `event.clipboardData.items` for items with `type.startsWith('image/')`
+   - For each image item, calls `getAsFile()` to get the Blob
+   - Creates a File object with descriptive timestamp-based name: `pasted-image-{timestamp}.{extension}`
+   - Prevents default paste behavior for images with `event.preventDefault()`
+3. Created helper function `createFileList` to convert File array to FileList-like object using DataTransfer API
+4. Processes pasted images through existing `processFiles` pipeline (same validation, size checks, and preview display as drag/drop uploads)
+5. Preview thumbnails automatically shown in attached files section (lines 32-47) with remove button
+
+**Result**: Users can now paste screenshots/images directly with Ctrl+V/Cmd+V — images appear immediately in file list with full upload pipeline validation
 
 ---
 
@@ -1290,23 +1409,30 @@ The ideal approach (inspired by `docx-redline-js` and the `Gemini-AI-for-Office`
 
 ---
 
-### FB-M1 — Feedback system: include last 4 requests + tool usage context [MEDIUM]
+### FB-M1 — Feedback system: include last 4 requests + tool usage context [MEDIUM] ✅ FIXED (Phase 3A)
 
-**Files**: `frontend/src/components/settings/FeedbackDialog.vue`, `backend/src/routes/feedback.js`, `backend/logs/`
+**Files**: `backend/src/routes/feedback.js`, `backend/src/routes/chat.js`, `backend/src/utils/toolUsageLogger.js`, `backend/logs/request-history.jsonl`, `backend/logs/feedback-index.jsonl`
 
-**Context**: USR-C1 was fixed — the feedback now includes chat history, system context, and frontend logs. But the following are still missing:
+**Context**: USR-C1 was fixed — the feedback included chat history, system context, and frontend logs. But backend request logs and tool usage context were missing.
 
-1. **Backend request logs for last 4 requests by this user**: The feedback bundle should include the last 4 backend request logs (with correlation IDs) for the user who submitted the feedback, so developers can trace what happened server-side
-2. **Tool usage summary at feedback time**: Include a snapshot of this user's recent tool usage (from LOG-H1 log file) — helps understand what the user was doing
-3. **Central feedback index**: `backend/logs/feedback-index.jsonl` — one entry per feedback with: username, datetime, category (Bug/Feature/Other), feedback text (truncated), pending=true. Count pending items for triage dashboard.
+**Fix (v11.7)**:
+1. **Backend request tracking**: Added `logChatRequest(userId, host, endpoint, messageCount)` in `toolUsageLogger.js` — logs to `request-history.jsonl` with format:
+   ```json
+   {"ts":"2026-03-14T10:00:00Z","user":"john","host":"PowerPoint","endpoint":"/api/chat","messageCount":3}
+   ```
+   Integrated in both `/api/chat` and `/api/chat/sync` endpoints after validation, before processing request.
 
-**Dependencies**: Requires LOG-H1 (tool usage log) to be implemented first.
+2. **Tool usage snapshot**: Added `getRecentRequests(userId, limit=4)` function to retrieve last 4 requests for a user. Uses existing `getRecentToolUsage(userId, limitLines=50)` from LOG-H1 to get tool usage snapshot.
 
-**Action**:
-1. Add a backend endpoint to retrieve last N request logs for a given user/session ID
-2. Include this in the feedback payload from `FeedbackDialog.vue`
-3. Create `feedback-index.jsonl` in `backend/logs/` and update it on each feedback submission
-4. Add `pendingCount` field that decrements when feedback is marked as processed
+3. **Enhanced feedback payload**: Updated `feedback.js` to include:
+   - `recentRequests` — last 4 backend requests from the user (includes timestamps, endpoints, message counts)
+   - `toolUsageSnapshot` — last 50 tool usage entries from the user (provides context on what tools were used recently)
+
+4. **Central feedback index**: Created `logFeedbackSubmission(userId, host, category, sessionId, filename)` — appends to `feedback-index.jsonl` with format:
+   ```json
+   {"ts":"2026-03-14T10:00:00Z","user":"john","host":"PowerPoint","category":"bug","sessionId":"abc123","filename":"feedback_bug_1234567890.json"}
+   ```
+   Enables triage dashboard and feedback tracking across all users.
 
 ---
 
@@ -1403,39 +1529,51 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 2A — 📜 Scroll Intelligent + Architecture HomePage
-**Fichiers clés** : `frontend/src/composables/useHomePage.ts`, `frontend/src/composables/useAgentStream.ts`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/pages/HomePage.vue`
+### Phase 2A — 📜 Scroll Intelligent + Architecture HomePage ✅
+**Fichiers clés** : `frontend/src/composables/useHomePage.ts`, `frontend/src/composables/useAgentStream.ts`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/pages/HomePage.vue`, `frontend/src/composables/useHomePageContext.ts` (nouveau)
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| UX-H1 | Smart scroll avec interruption manuelle (yoyo fix, isAutoScrollEnabled) | 🟠 High |
-| ARCH-H2 | Réduire le prop drilling de HomePage.vue via provide/inject (~44 bindings) | 🟠 High |
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| UX-H1 | Smart scroll avec interruption manuelle (yoyo fix, isAutoScrollEnabled) | 🟠 High | ✅ Complété |
+| ARCH-H2 | Réduire le prop drilling de HomePage.vue via provide/inject (~44 bindings) | 🟠 High | ✅ Complété |
 
-**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl, @scroll), `HomePage.vue` (props passées aux enfants)
+**Implémentation (2026-03-14)** :
+- **UX-H1** : Ajout de `isAutoScrollEnabled` + `handleScroll()` dans `useHomePage.ts`. Écouteur `@scroll` dans `ChatMessageList.vue` détecte si l'utilisateur est proche du bas (seuil: 100px). L'auto-scroll se désactive si l'utilisateur scrolle vers le haut, et se réactive quand il revient près du bas. `scrollToMessageTop()` force toujours l'auto-scroll pour afficher le nouveau contenu.
+- **ARCH-H2** : Création de `useHomePageContext.ts` avec système provide/inject. Réduit les props de `ChatMessageList` de 20 à 0. Le contexte expose 40+ états/fonctions/handlers partagés. Migration progressive : props optionnelles avec contexte comme fallback.
 
----
-
-### Phase 2B — 🌐 Support Multilingue + locale formules
-**Fichiers clés** : `frontend/src/composables/useAgentPrompts.ts`, `frontend/src/skills/*.skill.md`
-
-| Item | Description | Priorité |
-|------|-------------|----------|
-| LANG-H1 | Discussion en langue UI, propositions de texte dans la langue du document | 🟠 High |
-| TOOL-M4 | Étendre la détection de locale formule Excel à toutes les langues (10 langues dans constant.ts) | 🟡 Medium |
-
-**Contexte à lire** : `useAgentPrompts.ts` (section `lang`, instruction formule), `constant.ts` (language map), tous les `*.skill.md` (règles de langue)
+**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl, @scroll), `HomePage.vue` (props passées aux enfants), `useHomePageContext.ts` (nouveau composable)
 
 ---
 
-### Phase 2C — 📧 Outlook : traduction + qualité code
-**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `frontend/src/skills/outlook.skill.md`
+### Phase 2B — 🌐 Support Multilingue + locale formules ✅
+**Fichiers clés** : `frontend/src/composables/useAgentPrompts.ts`, `frontend/src/utils/constant.ts`
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| OUT-H1 | Empêcher la suppression des images lors de la traduction d'un email | 🟠 High |
-| QUAL-L2 | Documenter le pattern `resolveAsyncResult()` (mélange async/await et callbacks Outlook API) | 🟢 Low |
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| LANG-H1 | Discussion en langue UI, propositions de texte dans la langue du document | 🟠 High | ✅ Complété |
+| TOOL-M4 | Étendre la détection de locale formule Excel à toutes les langues (10 langues dans constant.ts) | 🟡 Medium | ✅ Complété |
 
-**Contexte à lire** : `outlookTools.ts` (outil `setBody`, `getBody`, `resolveAsyncResult()`), `outlook.skill.md`
+**Implémentation (2026-03-14)** :
+- **LANG-H1** : Séparation claire de la langue de conversation (UI) et de la langue de génération de contenu (document). Modification des 4 prompts d'agent (Word, Excel, PowerPoint, Outlook) pour ajouter des guidelines explicites : conversations/explications dans la langue de l'UI, contenu généré dans la langue du texte sélectionné/document. Le pattern Outlook existant (`ALWAYS reply in the SAME language as the original email`) a été généralisé à tous les hosts. Les built-in prompts utilisent déjà `LANGUAGE_MATCH_INSTRUCTION` qui implémente cette logique.
+- **TOOL-M4** : Étendu `excelFormulaLanguageInstruction()` pour supporter les 13 langues de `languageMap` (en, fr, de, es, it, pt, zh-cn, ja, ko, nl, pl, ar, ru). Création du type `ExcelFormulaLanguage` dans constant.ts. Distinction séparateur virgule (`,`) vs point-virgule (`;`) selon la langue : langues avec `;` = fr, de, es, it, pt, nl, pl, ru ; langues avec `,` = en, zh-cn, ja, ko, ar. Mise à jour des types dans `useAgentPrompts.ts`, `useAgentLoop.ts`, `HomePage.vue`.
+
+**Contexte à lire** : `useAgentPrompts.ts` (section `lang`, instruction formule), `constant.ts` (language map, ExcelFormulaLanguage type)
+
+---
+
+### Phase 2C — 📧 Outlook : traduction + qualité code ✅
+**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `frontend/src/utils/constant.ts` (prompts Outlook)
+
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| OUT-H1 | Empêcher la suppression des images lors de la traduction d'un email | 🟠 High | ✅ Complété |
+| QUAL-L2 | Documenter le pattern `resolveAsyncResult()` (mélange async/await et callbacks Outlook API) | 🟢 Low | ✅ Complété |
+
+**Implémentation (2026-03-14)** :
+- **OUT-H1** : Ajout d'instructions explicites de préservation des placeholders d'images dans tous les prompts Outlook qui modifient le contenu : `translate` (ligne 62), `translate_formalize` (ligne 446), `concise` (ligne 466), `proofread` (ligne 487). Instruction CRITIQUE ajoutée : "If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep these placeholders EXACTLY as-is in their original positions. These represent embedded images and other non-text elements." Le système de préservation existant (`extractTextFromHtml` + `reassembleWithFragments` dans richContentPreserver.ts) fonctionne avec ces instructions pour préserver les images inline lors de la traduction.
+- **QUAL-L2** : Ajout d'une documentation JSDoc complète (30+ lignes) pour la fonction `resolveAsyncResult()` dans outlookTools.ts (ligne 46-76). Documentation explique : pourquoi le helper existe (API Outlook callback-based vs Promise-based), le pattern utilisé, un exemple de code "avant/après", et la signature complète avec @param/@returns/@throws.
+
+**Contexte à lire** : `outlookTools.ts` (outil `setBody`, `getBody`, `resolveAsyncResult()`), `constant.ts` (prompts Outlook avec instructions OUT-H1), `richContentPreserver.ts` (extractTextFromHtml, reassembleWithFragments)
 
 ---
 
@@ -1638,12 +1776,12 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 | **1A** ✅ | `powerpointTools.ts` | PPT-C1 ✅, PPT-C2 ✅, TOOL-M3 ✅ | 🔴 Critical |
 | **1B** ✅ | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1 ✅, PPT-H1 ✅, PPT-M1 ✅ | 🟠 High |
 | **1C** ✅ | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2 ✅, TOOL-L2 ✅, TOOL-L3 ✅ | 🟠 High |
-| **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
-| **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1, TOOL-M4 | 🟠 High |
-| **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1, QUAL-L2 | 🟠 High |
-| **3A** | `chat.js` + `feedback.js` + `logs/` | LOG-H1, FB-M1, ERR-M1 | 🟠 High |
-| **3B** | `plotDigitizerService.js` + `excelTools.ts` + `excel.skill.md` | XL-M1, TOOL-M1, TOOL-M2 | 🟡 Medium |
-| **3C** | `ChatInput.vue` | CLIP-M1, UX-M1, UX-L1 | 🟡 Medium |
+| **2A** ✅ | `useHomePage.ts` + `useHomePageContext.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1 ✅, ARCH-H2 ✅ | 🟠 High |
+| **2B** ✅ | `useAgentPrompts.ts` + `constant.ts` (ExcelFormulaLanguage) | LANG-H1 ✅, TOOL-M4 ✅ | 🟠 High |
+| **2C** ✅ | `outlookTools.ts` + `constant.ts` (Outlook prompts) + `richContentPreserver.ts` | OUT-H1 ✅, QUAL-L2 ✅ | 🟠 High |
+| **3A** ✅ | `chat.js` + `feedback.js` + `toolUsageLogger.js` + `logs/` | LOG-H1 ✅, FB-M1 ✅, ERR-M1 ✅ | 🟠 High |
+| **3B** ✅ | `excelTools.ts` + `excel.skill.md` | XL-M1 ✅, TOOL-M1 ✅, TOOL-M2 ✅ | 🟡 Medium |
+| **3C** ✅ | `ChatInput.vue` | CLIP-M1 ✅, UX-M1 ✅, UX-L1 ✅ | 🟡 Medium |
 | **4A** | `wordDiffUtils.ts` + `wordTools.ts` + `wordOoxmlUtils.ts` | OXML-M1, WORD-H1, DUP-M1 | 🟠 High |
 | **4B** | `useAgentLoop.ts` + `skills/` | ARCH-H1, SKILL-L1 | 🟠 High |
 | **5A** | `common.ts` + tous `*Tools.ts` (types + exports) | DUP-H1, QUAL-H1, DEAD-M1 | 🟠 High |
