@@ -50,17 +50,9 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Vendor chunks - split large dependencies
-          'vendor-vue': ['vue', 'vue-router', 'vue-i18n'],
-          'vendor-ui': ['lucide-vue-next'],
-          'vendor-utils': ['@vueuse/core', 'dompurify', 'markdown-it'],
-          'vendor-math': ['mathjs'],
-        },
-      },
-    },
+    // Let Vite/Rollup handle code splitting automatically
+    // Manual chunking was breaking module initialization order
+    rollupOptions: {},
   },
   server: {
     port: 3002,
