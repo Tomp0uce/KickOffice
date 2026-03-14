@@ -16,6 +16,44 @@
           {{ t(toolDescriptionKey) }}
         </p>
       </div>
+
+      <!-- Word-specific settings -->
+      <div v-if="isWord" class="flex flex-col gap-2 rounded-md border border-border-secondary p-2 shadow-sm">
+        <h4 class="text-xs font-semibold text-accent/70">Word Track Changes Settings</h4>
+
+        <!-- Enable Track Changes toggle -->
+        <div class="card-base flex items-center gap-2">
+          <input
+            id="redline-enabled"
+            v-model="redlineEnabled"
+            type="checkbox"
+            class="h-4 w-4 cursor-pointer"
+            @change="saveRedlineSettings"
+          />
+          <label for="redline-enabled" class="text-xs font-medium text-secondary cursor-pointer">
+            Enable Track Changes by default
+          </label>
+        </div>
+
+        <!-- Redline Author input -->
+        <div class="card-base flex flex-col gap-1">
+          <label for="redline-author" class="text-xs font-semibold text-secondary">
+            Track Changes Author Name
+          </label>
+          <input
+            id="redline-author"
+            v-model="redlineAuthor"
+            type="text"
+            placeholder="KickOffice AI"
+            class="rounded border border-border-secondary bg-surface px-2 py-1 text-xs text-main focus:border-accent focus:outline-none"
+            @blur="saveRedlineSettings"
+          />
+          <span class="text-xs text-secondary/70">
+            This name appears in Word's Track Changes panel for AI-generated revisions.
+          </span>
+        </div>
+      </div>
+
       <div class="flex flex-col gap-2">
         <div
           v-for="tool in allToolsList"
@@ -44,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { forHost } from '@/utils/hostDetection'
@@ -66,6 +104,11 @@ const appToolsList =
   }) || []
 const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
 const enabledTools = ref<Set<string>>(new Set())
+
+// Word-specific settings
+const isWord = Office?.context?.host === Office.HostType.Word
+const redlineEnabled = ref(true)
+const redlineAuthor = ref('KickOffice AI')
 
 const toolDescriptionKey = forHost({
   outlook: 'outlookToolsDescription',
@@ -97,6 +140,28 @@ function toggleTool(toolName: string) {
   )
 }
 
+function loadRedlineSettings() {
+  const storedEnabled = localStorage.getItem('redlineEnabled')
+  if (storedEnabled !== null) {
+    redlineEnabled.value = storedEnabled === 'true'
+  }
+
+  const storedAuthor = localStorage.getItem('redlineAuthor')
+  if (storedAuthor && storedAuthor.trim() !== '') {
+    redlineAuthor.value = storedAuthor
+  }
+}
+
+function saveRedlineSettings() {
+  localStorage.setItem('redlineEnabled', String(redlineEnabled.value))
+  localStorage.setItem('redlineAuthor', redlineAuthor.value.trim() || 'KickOffice AI')
+}
+
 // Initial load
 loadToolPreferences()
+onMounted(() => {
+  if (isWord) {
+    loadRedlineSettings()
+  }
+})
 </script>

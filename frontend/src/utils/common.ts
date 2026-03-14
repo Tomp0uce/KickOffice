@@ -41,6 +41,15 @@ export function computeTextDiffStats(originalText: string, revisedText: string):
 }
 
 /**
+ * Truncate a string to maxLen characters, appending '...' if truncated.
+ * Used by wordTools and outlookTools for error message truncation.
+ */
+export function truncateString(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str
+  return str.slice(0, maxLen) + '...'
+}
+
+/**
  * Generic factory that wraps host-specific tool templates with a uniform `execute` method.
  * Each tool file passes a `buildExecute` callback that closes over its host runner
  * (runWord, runExcel, runPowerPoint, runOutlook).

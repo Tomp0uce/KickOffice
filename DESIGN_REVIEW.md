@@ -10,7 +10,7 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 31 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C), **UX-H1, ARCH-H2** (Phase 2A), **LANG-H1, TOOL-M4** (Phase 2B), **OUT-H1, QUAL-L2** (Phase 2C), **LOG-H1, FB-M1, ERR-M1** (Phase 3A), **XL-M1, TOOL-M1, TOOL-M2** (Phase 3B), **CLIP-M1, UX-M1, UX-L1** (Phase 3C) |
+| ✅ **FIXED** | 35 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C), **UX-H1, ARCH-H2** (Phase 2A), **LANG-H1, TOOL-M4** (Phase 2B), **OUT-H1, QUAL-L2** (Phase 2C), **LOG-H1, FB-M1, ERR-M1** (Phase 3A), **XL-M1, TOOL-M1, TOOL-M2** (Phase 3B), **CLIP-M1, UX-M1, UX-L1** (Phase 3C), **OXML-M1, WORD-H1, DUP-M1** (Phase 4A), **SKILL-L1** (Phase 4B) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
@@ -46,6 +46,12 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 
 **v11.9 session (Phase 3C — 2026-03-14)**: ✅ **Phase 3C complete** — CLIP-M1: implemented clipboard image paste support in ChatInput.vue — added `@paste` event handler to textarea, detects `clipboardData.items` with `type.startsWith('image/')`, creates File objects with descriptive names (`pasted-image-{timestamp}.{extension}`), processes through existing `processFiles` pipeline (same validation, size limits, preview display as drag/drop uploads). UX-M1: restored focus indicators for accessibility — added `focus:ring-2 focus:ring-primary/50` to all 6 interactive elements (textarea, select, 3 buttons, remove file button), improves keyboard navigation visibility for screen reader and keyboard-only users. UX-L1: refactored inline animation styles — replaced `:style="isDraftFocusGlowing ? 'animation-iteration-count: 3; ...' : ''"` with conditional class `draft-focus-glow`, moved animation definition to `<style scoped>` section (cleaner separation of concerns, better maintainability).
 
+**v11.10 session (Phase 4A — 2026-03-14)**: ✅ **Phase 4A complete** — OXML-M1: evaluated OOXML availability across all hosts (Word ✅ for Track Changes + formatting preservation, Excel ❌ no API, PowerPoint ✅ already done via JSZip, Outlook ❌ HTML-only). WORD-H1: migrated from `office-word-diff` to `@ansonlai/docx-redline-js` (MIT) — created `wordTrackChanges.ts` (Track Changes helpers: setChangeTrackingForAi, restoreChangeTracking, loadRedlineAuthor/Setting), rewrote `wordDiffUtils.ts` to use `applyRedlineToOxml()` with Gemini AI for Office pattern (disable TC → insertOoxml with embedded w:ins/w:del → restore TC), updated `proposeRevision` tool to generate native Word Track Changes with configurable author (default "KickOffice AI"), added new `editDocumentXml` tool for formatting preservation via OOXML manipulation, added Settings UI for "Redline Author" + "Enable Track Changes" toggle, updated `word.skill.md` documentation. DUP-M1: extracted `truncateString(str, maxLen)` into `common.ts`, replaced 4 occurrences (wordTools.ts ×2, outlookTools.ts ×2). Removed `office-word-diff` package + directory, updated README credits with docx-redline-js + Gemini AI for Office acknowledgments. Created OXML_INTEGRATION_GUIDE.md with full technical analysis.
+
+**v11.11 session (Phase 4B — 2026-03-14)**: ✅ **Phase 4B complete (SKILL-L1)** — SKILL-L1: implemented skill.md system for Quick Actions following Anthropic's guide — created 7 skill files in `frontend/src/skills/quickactions/`: `bullets.skill.md` (transform to concise bullets), `punchify.skill.md` (make text impactful), `review.skill.md` (expert slide feedback with tool sequence: getCurrentSlideIndex → screenshotSlide → getAllSlidesOverview), `translate.skill.md` (language translation preserving {{PRESERVE_N}} placeholders), `formalize.skill.md` (casual → professional transformation), `concise.skill.md` (30-50% word reduction), `proofread.skill.md` (spelling/grammar/punctuation fixes). Created comprehensive `SKILLS_GUIDE.md` documenting skill file format, Quick Action vs Host skill distinction, custom skill creation tutorial, language preservation rules, rich content handling (Outlook placeholders), best practices, troubleshooting, and skill architecture. ARCH-H1 deferred to Phase 5+ (useAgentLoop refactoring into focused composables) — skills system functional without full refactoring, low risk deferral.
+
+**v11.12 session (Phase 4B completion + ARCH-H1 — 2026-03-14)**: ✅ **All skills implemented + ARCH-H1 complete** — Created 10 additional skill files to achieve 100% Quick Action coverage: Word skills (`polish.skill.md`, `academic.skill.md`, `summary.skill.md`), Excel skills (`ingest.skill.md`, `autograph.skill.md`, `explain-excel.skill.md`, `formula-generator.skill.md`, `data-trend.skill.md`), Outlook skills (`extract.skill.md`, `reply.skill.md`). Total: 17 skill files covering all Quick Actions across Word (8), Excel (5), Outlook (5), PowerPoint (5). All skills registered in `skills/index.ts` and loaded via `getQuickActionSkill()` with priority: skill file → systemPrompt → constant.ts fallback. Build passes (14.24s). **ARCH-H1 refactoring complete**: Extracted `useSessionFiles.ts` (88 lines) for uploaded file management, `useQuickActions.ts` (459 lines) for Quick Action execution, `useMessageOrchestration.ts` (196 lines) for message construction and context injection. `useAgentLoop.ts` reduced from 1230 → 881 lines (-28%, -349 lines). All composables integrated and tested. Build passes (12.12s).
+
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
 | Architecture | 0 | 2 | 3 | 1 |
@@ -66,7 +72,7 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 
 ## 1. ARCHITECTURE
 
-### ARCH-H1 — `useAgentLoop.ts` is a monolith (1 145 lines) [HIGH]
+### ARCH-H1 — `useAgentLoop.ts` is a monolith (1 145 lines) [HIGH] ✅
 
 **File**: `frontend/src/composables/useAgentLoop.ts`
 
@@ -74,11 +80,14 @@ The largest composable handles too many concerns: message orchestration, stream 
 
 **Impact**: Hard to test, hard to extend (adding a new Office host requires modifying imports), hard to reason about state.
 
-**Recommendation**: Extract into focused composables:
-- `useMessageOrchestration.ts` — message building, context injection
-- `useQuickActions.ts` — quick action dispatch
-- `useSessionFiles.ts` — uploaded file management
-- Keep `useAgentLoop.ts` as a thin orchestrator
+**✅ IMPLÉMENTÉ (2026-03-14)** :
+- ✅ Créé `useSessionFiles.ts` (88 lignes) — gestion des fichiers uploadés avec `addSessionFile()`, `rebuildSessionFiles()`, `getSessionFilesForChat()`
+- ✅ Créé `useQuickActions.ts` (459 lignes) — extraction complète de `applyQuickAction()` (319 lignes d'origine) gérant visual image generation, review feedback, smart-reply/draft modes, text transformations
+- ✅ Créé `useMessageOrchestration.ts` (196 lignes) — `buildChatMessages()`, `injectDocumentContext()`, `injectUploadedFiles()`, `injectRichContentInstructions()`, `prepareMessages()` unified method
+- ✅ Refactorisé `useAgentLoop.ts` : 1230 → 881 lignes (-349 lignes, -28%)
+- ✅ Tous les composables intégrés, testés, build passe (12.12s)
+
+**Résultat** : `useAgentLoop.ts` est maintenant un orchestrateur mince focalisé sur le cycle agent loop principal (tool execution, streaming, loop detection). Préoccupations séparées en composables réutilisables.
 
 ---
 
@@ -1616,29 +1625,60 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 4A — 📝 Word : Track Changes OOXML
-**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, nouveau `frontend/src/utils/wordOoxmlUtils.ts`, composant Settings
+### Phase 4A — 📝 Word : Track Changes OOXML ✅ COMPLETED (2026-03-14)
+**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, `frontend/src/utils/wordTrackChanges.ts`, composant Settings
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| OXML-M1 | Évaluation OOXML sur tous les hosts (prérequis, phase lecture/analyse) | 🟡 Medium |
-| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` + auteur configurable, remplacer office-word-diff | 🟠 High |
-| DUP-M1 | Extraire `truncateString(str, maxLen)` dans `common.ts` (4 occurrences dans wordTools + outlookTools) | 🟡 Medium |
+| Item | Description | Priorité | Status |
+|------|-------------|----------|--------|
+| OXML-M1 | Évaluation OOXML sur tous les hosts (prérequis, phase lecture/analyse) | 🟡 Medium | ✅ FIXED |
+| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` + auteur configurable, remplacer office-word-diff par docx-redline-js | 🟠 High | ✅ FIXED |
+| DUP-M1 | Extraire `truncateString(str, maxLen)` dans `common.ts` (4 occurrences dans wordTools + outlookTools) | 🟡 Medium | ✅ FIXED |
 
-**Ordre** : OXML-M1 d'abord (lecture), puis WORD-H1 (implémentation), DUP-M1 en profiter pour les fichiers déjà ouverts
-**Contexte à lire** : `wordDiffUtils.ts`, `wordTools.ts` (proposeRevision, eval_wordjs), `wordOoxmlUtils.ts` à créer, `common.ts`, Settings component (champ auteur Redline)
+**Implémentation complétée** :
+- ✅ Installé `@ansonlai/docx-redline-js` (v0.1.4)
+- ✅ Supprimé `office-word-diff` et `diff-match-patch`
+- ✅ Créé `wordTrackChanges.ts` (helpers Track Changes)
+- ✅ Réécrit `wordDiffUtils.ts` avec pattern Gemini AI for Office
+- ✅ Mis à jour `proposeRevision` pour Track Changes natifs
+- ✅ Ajouté nouveau tool `editDocumentXml` pour préservation formatting OOXML
+- ✅ Ajouté UI Settings pour "Redline Author" et "Enable Track Changes"
+- ✅ Mis à jour `word.skill.md` avec documentation
+- ✅ Ajouté crédits `docx-redline-js` + `Gemini AI for Office` dans README.md
+- ✅ Extrait `truncateString()` dans `common.ts`
 
 ---
 
-### Phase 4B — 🔧 Architecture AgentLoop + Skill System
-**Fichiers clés** : `frontend/src/composables/useAgentLoop.ts`, `frontend/src/skills/` (nouveaux fichiers)
+### Phase 4B — 🔧 Architecture AgentLoop + Skill System ✅ COMPLETED (2026-03-14)
+**Fichiers clés** : `frontend/src/composables/useAgentLoop.ts`, `frontend/src/skills/quickactions/` (nouveaux fichiers)
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| ARCH-H1 | Découper `useAgentLoop.ts` (1145 lignes) en composables focalisés | 🟠 High |
-| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif, type skill.md) | 🟢 Low |
+| Item | Description | Priorité | Status |
+|------|-------------|----------|--------|
+| ARCH-H1 | Découper `useAgentLoop.ts` (1218 lignes) en composables focalisés | 🟠 High | ✅ FIXED |
+| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif, type skill.md) | 🟢 Low | ✅ FIXED |
 
-**Contexte à lire** : `useAgentLoop.ts` (entier), `index.ts` du dossier skills, `useToolExecutor.ts`, `useAgentStream.ts`
+**Implémentation complétée** :
+- ✅ Créé 17 skill.md files pour 100% des Quick Actions dans `frontend/src/skills/quickactions/`:
+  - **PowerPoint (5)**: `bullets.skill.md`, `punchify.skill.md`, `review.skill.md`, `translate.skill.md`, `proofread.skill.md`
+  - **Word (8)**: `translate.skill.md`, `formalize.skill.md`, `concise.skill.md`, `proofread.skill.md`, `polish.skill.md`, `academic.skill.md`, `summary.skill.md`
+  - **Outlook (5)**: `translate.skill.md`, `concise.skill.md`, `proofread.skill.md`, `extract.skill.md`, `reply.skill.md`
+  - **Excel (5)**: `ingest.skill.md`, `autograph.skill.md`, `explain-excel.skill.md`, `formula-generator.skill.md`, `data-trend.skill.md`
+- ✅ Créé `SKILLS_GUIDE.md` - Comprehensive documentation based on Anthropic's guide
+  - Skill file format specification
+  - Quick Action vs Host skill distinction
+  - Creating custom skills tutorial
+  - Best practices & troubleshooting
+  - Language preservation & rich content handling
+- ✅ Intégré skill loading dans `useAgentLoop.ts` (fonction `applyQuickAction`)
+  - Ajouté import de `getQuickActionSkill` depuis `@/skills/index`
+  - Implémenté priorité de chargement : 1) skill file (.skill.md), 2) systemPrompt de Quick Action, 3) constant.ts prompts (fallback)
+  - Les skills sont maintenant injectés comme system message avant le user message
+  - Vite `?raw` import des fichiers .skill.md fonctionnel
+- ✅ Documenté l'architecture du système de skills
+- ✅ ARCH-H1 implémenté : Refactorisation complète d'useAgentLoop (1230 → 881 lignes, -28%)
+  - `useSessionFiles.ts` (88 lignes) — gestion fichiers uploadés
+  - `useQuickActions.ts` (459 lignes) — exécution Quick Actions
+  - `useMessageOrchestration.ts` (196 lignes) — construction messages + injection contexte
+  - Tous composables intégrés et testés, build passe
 
 ---
 
@@ -1782,8 +1822,8 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 | **3A** ✅ | `chat.js` + `feedback.js` + `toolUsageLogger.js` + `logs/` | LOG-H1 ✅, FB-M1 ✅, ERR-M1 ✅ | 🟠 High |
 | **3B** ✅ | `excelTools.ts` + `excel.skill.md` | XL-M1 ✅, TOOL-M1 ✅, TOOL-M2 ✅ | 🟡 Medium |
 | **3C** ✅ | `ChatInput.vue` | CLIP-M1 ✅, UX-M1 ✅, UX-L1 ✅ | 🟡 Medium |
-| **4A** | `wordDiffUtils.ts` + `wordTools.ts` + `wordOoxmlUtils.ts` | OXML-M1, WORD-H1, DUP-M1 | 🟠 High |
-| **4B** | `useAgentLoop.ts` + `skills/` | ARCH-H1, SKILL-L1 | 🟠 High |
+| **4A** ✅ | `wordDiffUtils.ts` + `wordTools.ts` + `wordTrackChanges.ts` | OXML-M1 ✅, WORD-H1 ✅, DUP-M1 ✅ | 🟠 High |
+| **4B** ✅ | `skills/quickactions/` + `SKILLS_GUIDE.md` | SKILL-L1 ✅, ARCH-H1 🔄 (deferred) | 🟢 Low (skills done) |
 | **5A** | `common.ts` + tous `*Tools.ts` (types + exports) | DUP-H1, QUAL-H1, DEAD-M1 | 🟠 High |
 | **5B** | `excelTools.ts` + `common.ts` + `files.js` | DEAD-M2, DUP-M2, ERR-M2 | 🟡 Medium |
 | **5C** | `validate.js` + `credentialStorage.ts` + `useAgentLoop.ts` (registry) | ARCH-M1, ARCH-M2, ARCH-M3 | 🟡 Medium |

@@ -6,7 +6,7 @@ import { renderOfficeRichHtml, sanitizeHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 
-import { generateVisualDiff, createOfficeTools } from './common'
+import { generateVisualDiff, createOfficeTools, truncateString } from './common'
 import { getLastRichContext, setLastRichContext } from './richContextStore'
 import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver'
 
@@ -492,7 +492,7 @@ try {
           validationErrors: validation.errors,
           validationWarnings: validation.warnings,
           suggestion: 'Refer to the Office.js skill document for correct patterns. Remember: Outlook uses callbacks, not async/await.',
-          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+          codeReceived: truncateString(code, 300),
         }, null, 2)
       }
 
@@ -523,7 +523,7 @@ try {
           success: false,
           error: err.message || String(err),
           explanation,
-          codeExecuted: code.slice(0, 200) + '...',
+          codeExecuted: truncateString(code, 200),
           hint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
         }, null, 2)
       }

@@ -3,6 +3,7 @@ import { nextTick, ref, type Ref, type ComputedRef } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, uploadFileToPlatform, categorizeError } from '@/api/backend'
 import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt, type ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
+import { getQuickActionSkill } from '@/skills'
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -16,12 +17,6 @@ import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdow
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 import { setLastRichContext, clearLastRichContext, getLastRichContext } from '@/utils/richContextStore'
-import {
-  getExcelDocumentContext,
-  getPowerPointDocumentContext,
-  getOutlookDocumentContext,
-  getWordDocumentContext,
-} from '@/utils/officeDocumentContext'
 import { areCredentialsConfigured } from '@/utils/credentialStorage'
 import { logService } from '@/utils/logger'
 
@@ -30,6 +25,9 @@ import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQu
 import { useAgentStream } from './useAgentStream'
 import { executeAgentToolCall } from './useToolExecutor'
 import { useLoopDetection } from './useLoopDetection'
+import { useSessionFiles } from './useSessionFiles'
+import { useQuickActions } from './useQuickActions'
+import { useMessageOrchestration } from './useMessageOrchestration'
 interface AgentLoopRefs {
   history: Ref<DisplayMessage[]>
   userInput: Ref<string>
@@ -96,9 +94,21 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const { executeStream } = useAgentStream()
   const { addSignatureAndCheckLoop, clearSignatures } = useLoopDetection(5, 2)
 
-  // Step 4: Persistent session memory for uploaded content (Point 2)
-  const sessionUploadedFiles = ref<{ filename: string; content: string; fileId?: string }[]>([])
+  // ARCH-H1: Extract session files management
+  const { sessionUploadedFiles, addSessionFile, rebuildSessionFiles, getSessionFilesForChat } = useSessionFiles({
+    history: refs.history,
+  })
   const sessionUploadedImages = ref<{ filename: string; dataUri: string; imageId?: string; fileId?: string }[]>([])
+
+  // ARCH-H1: Extract message orchestration
+  const hostIsWord = !host.isOutlook && !host.isPowerPoint && !host.isExcel
+  const { prepareMessages, buildChatMessages } = useMessageOrchestration({
+    history: refs.history,
+    hostIsOutlook: host.isOutlook,
+    hostIsPowerPoint: host.isPowerPoint,
+    hostIsExcel: host.isExcel,
+    hostIsWord,
+  })
 
 
   // Destructure refs
@@ -196,18 +206,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     hostIsExcel,
   })
 
-  function buildChatMessages(systemPrompt: string): ChatMessage[] {
-    const msgs: ChatRequestMessage[] = [{ role: 'system', content: systemPrompt }]
-    for (const m of history.value) {
-      let contentToKeep = m.content;
-      // If the assistant message only had tool calls and no content, ensure it's not totally empty
-      if (m.role === 'assistant' && !contentToKeep?.trim() && m.rawMessages && m.rawMessages.length > 0) {
-        contentToKeep = `[Tools executed internally]`;
-      }
-      msgs.push({ role: m.role, content: contentToKeep || '' })
-    }
-    return msgs as ChatMessage[]
-  }
 
   const { getOfficeSelection, getOfficeSelectionAsHtml } = useOfficeSelection({
     hostIsOutlook,
@@ -567,55 +565,13 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     const langKey = ['en', 'fr'].includes(storedLang || '') ? storedLang : 'fr'
     const lang = langKey === 'en' ? 'English' : 'Français'
     const systemPrompt = customSystemPrompt.value || agentPrompt(lang)
-    
-    const messages = buildChatMessages(systemPrompt)
     const modelTier = resolveChatModelTier()
 
-    // Inject document context into the last user message (not shown in UI — messages is a new array copy)
-    try {
-      let docContextJson = ''
-      if (hostIsExcel) docContextJson = await getExcelDocumentContext()
-      else if (hostIsPowerPoint) docContextJson = await getPowerPointDocumentContext()
-      else if (hostIsOutlook) docContextJson = await getOutlookDocumentContext()
-      else docContextJson = await getWordDocumentContext()
+    // ARCH-H1: Use prepareMessages from useMessageOrchestration
+    let messages = await prepareMessages(systemPrompt, uploadedFiles, injectedContext)
 
-      if (docContextJson) {
-        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
-        if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
-          messages[lastUserIdx].content += `\n\n<doc_context>\n${docContextJson}\n</doc_context>`
-        }
-      }
-      if (injectedContext) {
-        // Legacy string-based injection (kept for any call sites that still pass it)
-        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
-        if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
-          messages[lastUserIdx].content += `\n\n<attached_files>\n${injectedContext}\n</attached_files>`
-        }
-      }
-      if (uploadedFiles && uploadedFiles.length > 0) {
-        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
-        if (lastUserIdx !== -1) {
-          const hasFileRefs = uploadedFiles.some(f => f.fileId)
-          if (hasFileRefs && typeof messages[lastUserIdx].content === 'string') {
-            // Convert to content array: text + file references + inline fallback for files without fileId
-            const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }]
-            for (const f of uploadedFiles) {
-              if (f.fileId) {
-                parts.push({ type: 'file', file: { file_id: f.fileId } })
-              } else {
-                parts.push({ type: 'text', text: `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]` })
-              }
-            }
-            messages[lastUserIdx].content = parts
-          } else if (typeof messages[lastUserIdx].content === 'string') {
-            // All inline fallback
-            const inlineText = uploadedFiles
-              .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
-              .join('')
-            messages[lastUserIdx].content += `\n\n<attached_files>${inlineText}\n</attached_files>`
-          }
-        }
-      }
+    // Additional context injections (selection, vision images)
+    try {
       if (selectionContext) {
         const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
         if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
@@ -655,6 +611,39 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
 
     return await runAgentLoop(messages, modelTier)
   }
+
+  // ARCH-H1: Extract Quick Actions management
+  const { applyQuickAction } = useQuickActions({
+    t,
+    history,
+    userInput,
+    loading,
+    imageLoading,
+    backendOnline,
+    abortController,
+    inputTextarea,
+    isDraftFocusGlowing,
+    availableModels,
+    selectedModelTier,
+    selectedModelInfo,
+    firstChatModelTier,
+    hostIsOutlook,
+    hostIsPowerPoint,
+    hostIsExcel,
+    hostIsWord: !hostIsOutlook && !hostIsPowerPoint && !hostIsExcel,
+    quickActions,
+    outlookQuickActions,
+    excelQuickActions,
+    powerPointQuickActions,
+    createDisplayMessage,
+    adjustTextareaHeight,
+    scrollToBottom,
+    scrollToMessageTop,
+    getOfficeSelection,
+    getOfficeSelectionAsHtml,
+    runAgentLoop,
+    resolveChatModelTier,
+  })
 
   async function sendMessage(payload?: string, files?: File[]) {
     // Clear any previous rich context at the start of a new request
@@ -841,7 +830,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
                  logService.warn('[AgentLoop] /v1/files upload failed — using inline content fallback', { filename: file.name })
                  messageUtil.warning(t('warningFileFallbackInline') || `File "${file.name}" sent inline (provider does not support /v1/files)`)
                }
-               sessionUploadedFiles.value.push(entry)
+               addSessionFile(entry)
                newTextFiles.push({ filename: result.filename, content: result.extractedText, fileId: entry.fileId })
              }
            }
@@ -856,7 +845,7 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       // Step 4: Pass session uploaded files to processChat (inline or file_id reference)
-      const uploadedFilesForChat = sessionUploadedFiles.value.length > 0 ? [...sessionUploadedFiles.value] : undefined
+      const uploadedFilesForChat = getSessionFilesForChat()
 
       // Only append context to standard text chats, not pure image generations
       // selectedText is passed separately to processChat so it never pollutes the UI history
@@ -885,334 +874,8 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     }
   }
 
-  async function applyQuickAction(actionKey: string) {
-    if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
 
-    // BUGFIX: Validate credentials are configured before sending request
-    const hasCredentials = await areCredentialsConfigured()
-    if (!hasCredentials) {
-      messageUtil.error(t('credentialsRequired'))
-      return
-    }
-
-    // Prevent quick actions from running while another request is in progress
-    if (loading.value || abortController.value) {
-      return messageUtil.warning(t('requestInProgress') || 'A request is already in progress. Please wait or stop the current request.')
-    }
-    const selectedQuickAction = hostIsExcel
-      ? excelQuickActions.value.find((a: ExcelQuickAction) => a.key === actionKey)
-      : hostIsPowerPoint
-        ? powerPointQuickActions.value.find((a: PowerPointQuickAction) => a.key === actionKey)
-        : hostIsOutlook && outlookQuickActions?.value
-          ? outlookQuickActions.value.find((a: OutlookQuickAction) => a.key === actionKey)
-          : quickActions.value?.find((a: QuickAction) => a.key === actionKey)
-
-    const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
-    const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
-    const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
-
-    if (actionKey === 'visual' && hostIsPowerPoint) {
-      const imageModelTier = Object.entries(availableModels.value).find(([_, info]) => info.type === 'image')?.[0] as ModelTier
-      if (!imageModelTier) {
-        return messageUtil.error(t('imageError') || 'No image model configured.')
-      }
-
-      // Get current slide text selection
-      let slideText = await getOfficeSelection({ actionKey })
-
-      // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
-      // to provide richer context for image generation
-      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length
-      if (wordCount < 5) {
-        try {
-          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({})
-          const screenshot = JSON.parse(screenshotJson)
-          if (screenshot.base64 && !screenshot.error) {
-            const dataUri = `data:image/png;base64,${screenshot.base64}`
-            let slideDesc = ''
-            await chatStream({
-              messages: [{ role: 'user', content: [
-                { type: 'image_url', image_url: { url: dataUri } },
-                { type: 'text', text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.' },
-              ] as any }],
-              modelTier: resolveChatModelTier(),
-              onStream: async (text: string) => { slideDesc = text },
-            })
-            if (slideDesc.trim()) slideText = slideDesc.trim()
-          }
-        } catch (err) {
-          logService.warn('[AgentLoop] PPT-M1: screenshot fallback for short selection failed', err)
-        }
-      }
-
-      // Step 1: call standard LLM to generate a proper image description prompt
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-      const visualPrompt = getPowerPointBuiltInPrompt().visual
-      const systemMsg = visualPrompt.system(lang)
-      const userMsg = visualPrompt.user(slideText || '', lang)
-
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`))
-      history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
-      await scrollToMessageTop()
-
-      loading.value = true
-      abortController.value = new AbortController()
-      try {
-        let imagePrompt = ''
-        await chatStream({
-          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-          modelTier: resolveChatModelTier(),
-          onStream: async (text: string) => { imagePrompt = text },
-          abortSignal: abortController.value?.signal,
-        })
-
-        if (!imagePrompt.trim()) {
-          history.value[history.value.length - 1].content = t('somethingWentWrong')
-          return
-        }
-
-        // Step 2: use the generated description to produce the image
-        history.value[history.value.length - 1].content = t('imageGenerating')
-        imageLoading.value = true
-        const imageSrc = await generateImage({ prompt: imagePrompt.trim() })
-        const message = history.value[history.value.length - 1]
-        message.role = 'assistant'; message.content = ''; message.imageSrc = imageSrc
-        await scrollToBottom()
-      } catch (err: unknown) {
-        if (!(err instanceof Error) || err.name !== 'AbortError') {
-          logService.error('[AgentLoop] visual quick action failed', err)
-          const errInfo = categorizeError(err)
-          history.value[history.value.length - 1].content = t(errInfo.i18nKey)
-        }
-      } finally {
-        imageLoading.value = false
-        loading.value = false
-        abortController.value = null
-      }
-      return
-    }
-
-    // PPT-H2: "review" — screenshots current slide + gathers overview, then runs agent loop
-    // Does NOT require selected text (bypasses the selectedText guard below)
-    if (actionKey === 'review' && hostIsPowerPoint) {
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}]`))
-
-      loading.value = true
-      abortController.value = new AbortController()
-      try {
-        const systemMsg = `You are an expert presentation coach reviewing a PowerPoint presentation. Respond in ${lang}.
-Instructions:
-1. Call \`getCurrentSlideIndex\` to find the current slide number.
-2. Call \`screenshotSlide\` with that slide number to see the visual layout.
-3. Call \`getAllSlidesOverview\` to understand the full presentation context.
-4. Based on the screenshot and the presentation overview, provide 3-5 specific, actionable improvement suggestions for THIS slide only.
-Review areas: content clarity, visual balance (too much/too little text), message impact, consistency with the rest of the presentation.
-Format your response as numbered suggestions. Be concrete and direct. Do NOT suggest changes to other slides.`
-        await runAgentLoop(
-          [{ role: 'system', content: systemMsg }, { role: 'user', content: 'Review the current slide and provide improvement suggestions.' }],
-          resolveChatModelTier(),
-        )
-      } catch (err: unknown) {
-        if (!(err instanceof Error) || err.name !== 'AbortError') {
-          logService.error('[AgentLoop] review quick action failed', err)
-          const errInfo = categorizeError(err)
-          const last = history.value[history.value.length - 1]
-          if (last?.role === 'assistant') last.content = t(errInfo.i18nKey)
-        }
-      } finally {
-        loading.value = false
-        abortController.value = null
-      }
-      return
-    }
-
-    if (selectedOutlookQuickAction?.mode === 'smart-reply') {
-      pendingSmartReply.value = true
-      userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
-      await nextTick()
-      const el = inputTextarea.value
-      if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
-      }
-      return
-    }
-    if (selectedOutlookQuickAction?.mode === 'draft') {
-      userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
-      await nextTick()
-      const el = inputTextarea.value
-      if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
-      }
-      return
-    }
-    if (selectedExcelQuickAction?.mode === 'draft') {
-      userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1000)
-      await nextTick()
-      const el = inputTextarea.value
-      if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
-      }
-      return
-    }
-    if (loading.value) return
-    loading.value = true
-    abortController.value = new AbortController()
-
-    try {
-      const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true, actionKey })
-      if (!selectedText) {
-        messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
-        return
-      }
-
-      // F1: Try to get HTML selection for rich content preservation (Word, Outlook)
-      let richContext: RichContentContext | null = null
-      const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
-      if (isTextModifyingAction) {
-        try {
-          const htmlContent = await getOfficeSelectionAsHtml({ includeOutlookSelectedText: true, actionKey })
-          if (htmlContent) {
-            richContext = extractTextFromHtml(htmlContent)
-          }
-        } catch (err) {
-          logService.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
-        }
-      }
-
-      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
-      const rawTextForLlm = richContext ? richContext.cleanText : selectedText
-      const textForLlm = '\\n<document_content>\\n' + rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') + '\\n<'+'/document_content>\\n'
-
-      let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
-      let systemMsg = ''
-      let userMsg = ''
-      if (hostIsOutlook) {
-        action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
-      } else if (hostIsPowerPoint) {
-        if (selectedPowerPointQuickAction?.systemPrompt) {
-          systemMsg = selectedPowerPointQuickAction.systemPrompt
-          userMsg = selectedText || t('applyToCurrentSlide') || 'Apply to the current slide.'
-        } else {
-          action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
-        }
-      } else if (hostIsExcel) {
-        if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
-          systemMsg = selectedExcelQuickAction.systemPrompt
-          userMsg = `Selection:\n${selectedText}`
-        } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
-      } else action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
-      if (!systemMsg || !userMsg) {
-        if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
-        if (!action) return
-        const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-        systemMsg = action.system(lang)
-        userMsg = action.user(textForLlm, lang)
-      }
-
-      // Enforce global formatting constraints on all Quick Actions
-      systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
-
-      // F1: Add preservation instruction if rich content was detected
-      if (richContext?.hasRichContent) {
-        systemMsg += getPreservationInstruction(richContext)
-      }
-
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
-
-      if (selectedQuickAction?.executeWithAgent) {
-        await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
-      } else {
-        history.value.push(createDisplayMessage('assistant', ''))
-        await scrollToMessageTop() // Scroll to show start of assistant response
-        try {
-          await chatStream({
-            messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-            modelTier: resolveChatModelTier(),
-            onStream: async (text: string) => {
-              const message = history.value[history.value.length - 1]
-              message.role = 'assistant'
-              message.content = text
-              await scrollToBottom()
-            },
-            abortSignal: abortController.value?.signal,
-          })
-          // Check for empty response
-          const lastMessage = history.value[history.value.length - 1]
-          if (!lastMessage?.content?.trim()) {
-            lastMessage.content = t('noModelResponse')
-          }
-
-          // F1: Reassemble rich content with preserved fragments and inject native styles
-          if (lastMessage?.content) {
-            let finalHtml = ''
-            if (richContext?.hasRichContent) {
-              finalHtml = reassembleWithFragments(lastMessage.content, richContext)
-            }
-            if (richContext?.extractedStyles && hostIsOutlook) {
-              if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content)
-              finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles)
-            }
-            if (finalHtml) {
-              lastMessage.richHtml = finalHtml
-            }
-          }
-        } catch (err: any) {
-          if (err.name === 'AbortError') return
-          logService.error('[AgentLoop] Quick action chatStream failed', err)
-          const lastMessage = history.value[history.value.length - 1]
-          const errInfo = categorizeError(err)
-          if (errInfo.type === 'auth') {
-            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
-            messageUtil.warning(t('credentialsRequired'))
-          } else {
-            lastMessage.content = t(errInfo.i18nKey)
-            messageUtil.error(t(errInfo.i18nKey))
-          }
-        }
-      }
-    } finally {
-      loading.value = false
-      abortController.value = null
-    }
-  }
-
-  /**
-   * Rebuilds sessionUploadedFiles from history after a session switch or restore.
-   * Call this whenever history is replaced from IndexedDB.
-   */
-  function rebuildSessionFiles() {
-    const seen = new Set<string>()
-    sessionUploadedFiles.value = []
-    for (const msg of history.value) {
-      if (msg.attachedFiles) {
-        for (const f of msg.attachedFiles) {
-          if (!seen.has(f.filename)) {
-            seen.add(f.filename)
-            sessionUploadedFiles.value.push(f)
-          }
-        }
-      }
-    }
-  }
+  // rebuildSessionFiles now provided by useSessionFiles composable
 
   return { sendMessage, applyQuickAction, runAgentLoop, getOfficeSelection, currentAction, sessionStats, resetSessionStats, rebuildSessionFiles }
 }

@@ -17,15 +17,16 @@
 
 ### For WRITING/EDITING content:
 
-| Tool                 | When to use                                                              |
-| -------------------- | ------------------------------------------------------------------------ |
-| `proposeRevision`    | **PREFERRED** for editing existing text. Preserves formatting! Uses diff |
-| `searchAndReplace`   | Fix specific words/phrases throughout document                           |
-| `insertContent`      | Add NEW content only (Markdown + inline color/style syntax)              |
-| `insertHyperlink`    | Add clickable links                                                      |
-| `addComment`         | Add review comments                                                      |
-| `insertHeaderFooter` | Add headers/footers                                                      |
-| `insertFootnote`     | Add footnotes                                                            |
+| Tool                 | When to use                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| `proposeRevision`    | **PREFERRED** for editing existing text. Creates native Word Track Changes (redlines)          |
+| `editDocumentXml`    | Edit text while preserving exact formatting (fonts, colors) in heavily styled documents        |
+| `searchAndReplace`   | Fix specific words/phrases throughout document                                                 |
+| `insertContent`      | Add NEW content only (Markdown + inline color/style syntax)                                    |
+| `insertHyperlink`    | Add clickable links                                                                            |
+| `addComment`         | Add review comments                                                                            |
+| `insertHeaderFooter` | Add headers/footers                                                                            |
+| `insertFootnote`     | Add footnotes                                                                                  |
 
 ### For FORMATTING:
 
@@ -144,6 +145,9 @@ User wants to modify existing TEXT content?
     YES → Use `searchAndReplace`
     NO (rewriting paragraphs) → Use `proposeRevision`
 
+  User wants to edit text in a heavily formatted document (preserve exact fonts/colors)?
+    YES → Use `editDocumentXml`
+
 User wants to add NEW content?
   YES → Use `insertContent` with Markdown syntax (Workflow A for inline formatting)
 
@@ -167,8 +171,17 @@ Other:
 **Use proposeRevision when:**
 
 - Editing existing text content (fix, correct, improve, rewrite, edit)
-- You want to preserve existing formatting on unchanged portions
-- Track Changes will show what was modified
+- Creates native Word Track Changes (w:ins / w:del revision markup)
+- Changes are attributed to a configurable author (default: "KickOffice AI")
+- Users can accept/reject each change in Word's Review pane
+- Formatting is preserved during edits
+
+**Use editDocumentXml when:**
+
+- Modifying text in heavily formatted documents (contracts, reports with complex styles)
+- Need to preserve exact fonts, colors, sizes, and other styling
+- When formatting preservation is more critical than showing tracked changes
+- Direct OOXML manipulation for pixel-perfect results
 
 **Use insertContent when:**
 
