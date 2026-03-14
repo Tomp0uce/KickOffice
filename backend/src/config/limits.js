@@ -10,6 +10,4 @@ const FILE_LIMITS = {
   MAX_FILE_SIZE: 50 * 1024 * 1024,
 }
 
-module.exports = {
-  FILE_LIMITS,
-}
+export { FILE_LIMITS }
