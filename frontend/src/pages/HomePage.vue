@@ -185,6 +185,7 @@ import {
   ListTodo,
   Mail,
   MessageSquare,
+  ScanSearch,
   Scissors,
   Sparkle,
   Table,
@@ -398,11 +399,12 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     tooltipKey: 'translate_tooltip',
   },
   {
-    key: 'speakerNotes',
-    label: t('pptSpeakerNotes'),
-    icon: MessageSquare,
+    // PPT-H2: replaced speakerNotes with review — no text selection required
+    key: 'review',
+    label: t('pptReview'),
+    icon: ScanSearch,
     mode: 'immediate',
-    tooltipKey: 'pptSpeakerNotes_tooltip',
+    tooltipKey: 'pptReview_tooltip',
   },
   {
     key: 'punchify',

@@ -1,7 +1,7 @@
-# DESIGN_REVIEW.md — Code Audit v11.2
+# DESIGN_REVIEW.md — Code Audit v11.3
 
 **Date**: 2026-03-14
-**Version**: 11.2
+**Version**: 11.3
 **Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
@@ -10,11 +10,11 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 19 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B) |
+| ✅ **FIXED** | 22 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
-| 🆕 **NEW (v11.0)** | 14 | 0 Critical + 7 High (2 fixed) + 6 Medium (1 fixed) + 2 Low — see sections 11–13 |
+| 🆕 **NEW (v11.0)** | 11 | 0 Critical + 6 High (3 fixed) + 6 Medium (1 fixed) + 0 Low (both fixed) — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
 | 🚀 **DEFERRED** (Phase 4) | 18 | 11 functional improvements + 4 legacy (v7/v8) + 2 architectural + 1 dynamic tooling |
 
@@ -31,6 +31,8 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 **v11.1 session (Phase 1A — 2026-03-14)**: ✅ **Phase 1A complete** — Fixed PPT-C1 (`getAllSlidesOverview`: per-slide try/catch + textSyncOk flag to isolate OLE/chart shape failures), fixed PPT-C2 (`insertImageOnSlide` + `insertIcon`: `slides.getItemAt(index)` → `slides.items[index]` to avoid post-sync proxy issue), implemented TOOL-M3 (`searchAndFormatInPresentation` tool: manual slide→shape→paragraph→textRun iteration with 4-sync batch pattern, supports bold/italic/underline/fontColor/fontSize/fontName).
 
 **v11.2 session (Phase 1B — 2026-03-14)**: ✅ **Phase 1B complete** — IMG-H1: strengthened `FRAMING_INSTRUCTION` in `image.js` (explicit rules: fit entire subject, 4-side padding, no edge clipping, landscape composition) + changed default size to `1536x1024` in `backend.ts`. PPT-H1: rewrote `powerPointBuiltInPrompt.visual` to generate content-specific representative images (explicit requirement to illustrate the exact topic, not generic stock, style guidance per content type, text allowed if useful). PPT-M1: in `useAgentLoop.ts` visual handler, if selection < 5 words → call `screenshotSlide`, send image to LLM for slide description, use description as context for the visual prompt.
+
+**v11.3 session (Phase 1C — 2026-03-14)**: ✅ **Phase 1C complete** — PPT-H2: replaced `speakerNotes` with `review` Quick Action — new early handler in `useAgentLoop.ts` (no selection required) runs agent loop with `getCurrentSlideIndex` → `screenshotSlide` → `getAllSlidesOverview` → numbered improvement suggestions; `constant.ts` updated, `ScanSearch` icon in `HomePage.vue`, i18n keys added. TOOL-L2: all 10 `slideNumber` descriptions clarified to "1-based (1 = first slide, not 0-based)". TOOL-L3: em-dash/semicolon ban extracted from `GLOBAL_STYLE_INSTRUCTIONS` into `PPT_STYLE_RULES`, applied only in `bullets` and `punchify` PPT prompts — formal Word/Outlook documents unaffected.
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
@@ -260,21 +262,19 @@ No description of the CSV format returned (delimiter, quoting, header handling).
 
 ---
 
-### TOOL-L2 — PowerPoint `slideNumber` should clarify 1-based indexing [LOW]
+### TOOL-L2 — PowerPoint `slideNumber` should clarify 1-based indexing [LOW] ✅ FIXED (Phase 1C)
 
-**File**: `frontend/src/utils/powerpointTools.ts:769-770`
+**File**: `frontend/src/utils/powerpointTools.ts`
 
-Parameter says "1 = first slide" but could be clearer: "1-based index (1 = first slide, not 0-based)."
+**Fix**: Updated all 10 `slideNumber` parameter descriptions from `"1 = first slide"` to `"1-based (1 = first slide, not 0-based)"` using a targeted sed replacement across the file.
 
 ---
 
-### TOOL-L3 — Style rules ban em-dashes globally [LOW]
+### TOOL-L3 — Style rules ban em-dashes globally [LOW] ✅ FIXED (Phase 1C)
 
-**File**: `frontend/src/utils/constant.ts:20-22`
+**File**: `frontend/src/utils/constant.ts`
 
-Global style instructions prohibit em-dashes and semicolons, but these are standard in professional English typography. This may produce unnatural output in formal documents.
-
-**Recommendation**: Restrict this rule to PowerPoint/bullet contexts only, not all content generation.
+**Fix**: Extracted em-dash/semicolon ban into a new `PPT_STYLE_RULES` constant. Removed these rules from `GLOBAL_STYLE_INSTRUCTIONS` (which applies to all hosts). Added `PPT_STYLE_RULES` directly to the `bullets` and `punchify` prompt constraints in `powerPointBuiltInPrompt` only — formal Word/Outlook documents can now use em-dashes normally.
 
 ---
 
@@ -1179,24 +1179,15 @@ When the agent translates an email body, it reads the HTML content, sends it to 
 
 ---
 
-### PPT-H2 — New Quick Action "Review": replace Speaker Notes action [HIGH]
+### PPT-H2 — New Quick Action "Review": replace Speaker Notes action [HIGH] ✅ FIXED (Phase 1C)
 
-**Files**: `frontend/src/utils/constant.ts:262-278`, `frontend/src/composables/useAgentLoop.ts:1103-1108`, `frontend/src/components/chat/QuickActionsBar.vue`
+**Files**: `frontend/src/utils/constant.ts`, `frontend/src/composables/useAgentLoop.ts`, `frontend/src/pages/HomePage.vue`, `frontend/src/i18n/locales/*.json`
 
-**Problem**: The "Speaker Notes" quick action is less useful in day-to-day usage. A more valuable action would be a slide review: take a screenshot of the current slide + read all slide text, then ask the LLM to provide specific improvement suggestions for the **current slide only**.
-
-**Proposed new Quick Action: "Review"**
-- Screenshots the current slide (`screenshotSlide`)
-- Gets the full slides overview (`getAllSlidesOverview`) for context
-- Asks: "You are reviewing slide {N}. Based on the screenshot and the overall presentation context, suggest specific improvements for THIS slide only (content clarity, visual balance, message impact). Do NOT suggest changes to other slides."
-
-**Implementation**:
-1. Remove `speakerNotes` quick action from `powerPointBuiltInPrompt` in `constant.ts`
-2. Add `review` quick action with new system/user prompts
-3. Update `useAgentLoop.ts`: remove the `speakerNotes` post-processing (lines 1103-1108 that auto-insert notes)
-4. Update icon and tooltip in `QuickActionsBar.vue`
-5. Remove all references to `speakerNotes` quick action (do NOT remove the `getSpeakerNotes`/`setSpeakerNotes` tools — they remain available for the agent)
-6. Update `BuiltinPromptsTab.vue` type definition (`PowerPointBuiltinPromptKey`) and storage key
+**Fix**:
+1. `constant.ts`: Replaced `speakerNotes` with `review` in `powerPointBuiltInPrompt`. The `review` prompt instructs the LLM to provide 3-5 numbered improvement suggestions for the current slide only.
+2. `useAgentLoop.ts`: Added a special `review` early handler (like `visual`) that bypasses the `selectedText` guard — no selection required. The handler runs `runAgentLoop` with a system prompt instructing the agent to call `getCurrentSlideIndex` → `screenshotSlide` → `getAllSlidesOverview`, then provide slide-specific review. Removed the `speakerNotes` post-processing block. Removed unused `setCurrentSlideSpeakerNotes` import.
+3. `HomePage.vue`: Replaced `speakerNotes` quick action with `review` using `ScanSearch` icon. Added `ScanSearch` to lucide imports.
+4. `i18n/locales/en.json` + `fr.json`: Added `pptReview` and `pptReview_tooltip` keys. `getSpeakerNotes`/`setSpeakerNotes` tools remain available to the agent.
 
 ---
 
@@ -1399,14 +1390,14 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 1C — 🎯 Nouvelle Quick Action "Review" PPT + nettoyage prompts
+### Phase 1C — 🎯 Nouvelle Quick Action "Review" PPT + nettoyage prompts ✅ DONE
 **Fichiers clés** : `frontend/src/utils/constant.ts` (section PPT), `frontend/src/composables/useAgentLoop.ts` (applyQuickAction), `frontend/src/components/chat/QuickActionsBar.vue`, `frontend/src/components/settings/BuiltinPromptsTab.vue`
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| PPT-H2 | Nouvelle Quick Action "Review" qui remplace "Speaker Notes" | 🟠 High |
-| TOOL-L2 | Clarifier l'indexation 1-based du paramètre `slideNumber` dans les descriptions | 🟢 Low |
-| TOOL-L3 | Restreindre la règle anti em-dash/point-virgule aux contextes PPT/bullets uniquement | 🟢 Low |
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| PPT-H2 | Nouvelle Quick Action "Review" qui remplace "Speaker Notes" | 🟠 High | ✅ DONE |
+| TOOL-L2 | Clarifier l'indexation 1-based du paramètre `slideNumber` dans les descriptions | 🟢 Low | ✅ DONE |
+| TOOL-L3 | Restreindre la règle anti em-dash/point-virgule aux contextes PPT/bullets uniquement | 🟢 Low | ✅ DONE |
 
 **Contexte à lire** : `constant.ts` (sections `speakerNotes`, `visual`, `punchify`), `useAgentLoop.ts` (lignes 888–1110), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
 
@@ -1646,7 +1637,7 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 |-------|------------------------|-------------|-------------|
 | **1A** ✅ | `powerpointTools.ts` | PPT-C1 ✅, PPT-C2 ✅, TOOL-M3 ✅ | 🔴 Critical |
 | **1B** ✅ | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1 ✅, PPT-H1 ✅, PPT-M1 ✅ | 🟠 High |
-| **1C** | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2, TOOL-L2, TOOL-L3 | 🟠 High |
+| **1C** ✅ | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2 ✅, TOOL-L2 ✅, TOOL-L3 ✅ | 🟠 High |
 | **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
 | **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1, TOOL-M4 | 🟠 High |
 | **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1, QUAL-L2 | 🟠 High |

@@ -531,7 +531,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -563,7 +563,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         notes: { type: 'string', description: 'The new speaker notes text (plain text).' },
       },
       required: ['slideNumber', 'notes'],
@@ -597,7 +597,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         base64Data: { type: 'string', description: 'The base64-encoded image data, a data URI (data:image/...;base64,...), OR the image ID returned when the user uploaded a file (UUID format). The tool resolves registry IDs automatically.' },
         left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
         top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
@@ -770,7 +770,7 @@ try {
         },
         slideNumber: {
           type: 'number',
-          description: 'Target slide number (1 = first slide). Required when shapeIdOrName is provided.',
+          description: 'Target slide number, 1-based (1 = first slide, not 0-based). Required when shapeIdOrName is provided.',
         },
         shapeIdOrName: {
           type: 'string',
@@ -997,7 +997,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -1023,7 +1023,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -1135,7 +1135,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide). Defaults to current slide.' }
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based). Defaults to current slide.' }
       },
       required: [],
     },
@@ -1165,7 +1165,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Source slide number (1 = first slide).' }
+        slideNumber: { type: 'number', description: 'Source slide number, 1-based (1 = first slide, not 0-based).' }
       },
       required: ['slideNumber'],
     },
@@ -1251,7 +1251,7 @@ ALWAYS call markDirty() after modifying the zip.`,
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         code: { type: 'string', description: 'Async JS code with access to: zip, markDirty, escapeXml, DOMParser, XMLSerializer.' },
         explanation: { type: 'string', description: 'What this code does (required for audit trail).' },
       },
@@ -1310,7 +1310,7 @@ ALWAYS call markDirty() after modifying the zip.`,
       type: 'object',
       properties: {
         iconId: { type: 'string', description: 'Icon identifier in format "prefix:name", e.g. "mdi:home".' },
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         left: { type: 'number', description: 'Left position in points. Default: 100.' },
         top: { type: 'number', description: 'Top position in points. Default: 100.' },
         width: { type: 'number', description: 'Width in points. Default: 72 (1 inch).' },

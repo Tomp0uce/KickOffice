@@ -16,10 +16,12 @@ export const languageMap: IStringKeyMap = {
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
 }
 
+/// TOOL-L3: em-dash/semicolon ban is PPT/bullet-only — applied per-prompt, not globally
+export const PPT_STYLE_RULES = `- NEVER use em-dashes (—).
+- NEVER use semicolons (;).`
+
 export const GLOBAL_STYLE_INSTRUCTIONS = `
 CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
-- NEVER use em-dashes (—).
-- NEVER use semicolons (;).
 - Keep the sentence structure natural and highly human-like.
 - When creating bullet lists, use standard Markdown syntax:
   - Use "-" for unordered lists (not "*" or "+")
@@ -255,23 +257,26 @@ export const powerPointBuiltInPrompt = {
       Constraints:
       1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
+      3. ${PPT_STYLE_RULES}
 
       Text: ${text}`,
   },
 
-  speakerNotes: {
-    system: (_language: string) =>
-      `You are an expert presenter. Your task is to write engaging, strictly-concise speaker notes that can be instantly read while glancing at a screen during a presentation.`,
-    user: (text: string, _language: string) =>
-      `Task: Generate highly concise speaker notes based on the following slide content.
-      Requirements:
-      - Write in a natural, conversational tone.
-      - Expand briefly on the points with context or transitions.
-      - Keep the notes extremely short (under 100 words total).
-      - Use short, punch-able sentences and visual cues.
+  // PPT-H2: replaced speakerNotes with review — takes screenshot + overview, reviews current slide only
+  review: {
+    system: (language: string) =>
+      `You are an expert presentation coach reviewing a PowerPoint presentation. Your task is to analyze the CURRENT slide only and provide specific, actionable improvement suggestions in ${language}.`,
+    user: (text: string, language: string) =>
+      `Based on the following slide content, provide 3-5 specific improvement suggestions for THIS slide only.
+      Review areas:
+      - Content clarity: Is the message clear and concise?
+      - Visual balance: Too much/too little text? Is the layout effective?
+      - Message impact: Does the slide communicate its key point effectively?
+      - Consistency: Does it align with the overall presentation tone?
       Constraints:
-      1. ${LANGUAGE_MATCH_INSTRUCTION}
-      2. OUTPUT ONLY the speaker notes. No meta-commentary.
+      1. Respond in ${language}.
+      2. Be specific and actionable. Format as numbered suggestions.
+      3. Do NOT suggest changes to other slides.
 
       Slide content: ${text}`,
   },
@@ -295,6 +300,7 @@ export const powerPointBuiltInPrompt = {
       1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
       3. Keep the meaning accurate but dramatically improved in style.
+      4. ${PPT_STYLE_RULES}
 
       Text: ${text}`,
   },

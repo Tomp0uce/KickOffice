@@ -7,7 +7,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes, powerpointImageRegistry, powerpointToolDefinitions } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions, powerpointImageRegistry, powerpointToolDefinitions } from '@/utils/powerpointTools'
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
@@ -993,6 +993,42 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       return
     }
 
+    // PPT-H2: "review" — screenshots current slide + gathers overview, then runs agent loop
+    // Does NOT require selected text (bypasses the selectedText guard below)
+    if (actionKey === 'review' && hostIsPowerPoint) {
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
+      const actionLabel = selectedQuickAction?.label || t(actionKey)
+      history.value.push(createDisplayMessage('user', `[${actionLabel}]`))
+
+      loading.value = true
+      abortController.value = new AbortController()
+      try {
+        const systemMsg = `You are an expert presentation coach reviewing a PowerPoint presentation. Respond in ${lang}.
+Instructions:
+1. Call \`getCurrentSlideIndex\` to find the current slide number.
+2. Call \`screenshotSlide\` with that slide number to see the visual layout.
+3. Call \`getAllSlidesOverview\` to understand the full presentation context.
+4. Based on the screenshot and the presentation overview, provide 3-5 specific, actionable improvement suggestions for THIS slide only.
+Review areas: content clarity, visual balance (too much/too little text), message impact, consistency with the rest of the presentation.
+Format your response as numbered suggestions. Be concrete and direct. Do NOT suggest changes to other slides.`
+        await runAgentLoop(
+          [{ role: 'system', content: systemMsg }, { role: 'user', content: 'Review the current slide and provide improvement suggestions.' }],
+          resolveChatModelTier(),
+        )
+      } catch (err: unknown) {
+        if (!(err instanceof Error) || err.name !== 'AbortError') {
+          logService.error('[AgentLoop] review quick action failed', err)
+          const errInfo = categorizeError(err)
+          const last = history.value[history.value.length - 1]
+          if (last?.role === 'assistant') last.content = t(errInfo.i18nKey)
+        }
+      } finally {
+        loading.value = false
+        abortController.value = null
+      }
+      return
+    }
+
     if (selectedOutlookQuickAction?.mode === 'smart-reply') {
       pendingSmartReply.value = true
       userInput.value = selectedOutlookQuickAction.prefix || ''
@@ -1123,14 +1159,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           const lastMessage = history.value[history.value.length - 1]
           if (!lastMessage?.content?.trim()) {
             lastMessage.content = t('noModelResponse')
-          }
-
-          // PPT-M2: For speakerNotes action, directly insert the generated text into the slide notes
-          if (hostIsPowerPoint && actionKey === 'speakerNotes' && lastMessage?.content?.trim()) {
-            const inserted = await setCurrentSlideSpeakerNotes(lastMessage.content.trim())
-            if (inserted) {
-              lastMessage.content += '\n\n_✓ Notes insérées dans la diapositive._'
-            }
           }
 
           // F1: Reassemble rich content with preserved fragments and inject native styles
