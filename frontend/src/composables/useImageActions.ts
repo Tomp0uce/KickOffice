@@ -2,6 +2,7 @@ import type { InsertType } from '@/types';
 import type { Ref } from 'vue';
 
 import { message as messageUtil } from '@/utils/message';
+import { logService } from '@/utils/logger';
 
 import type { DisplayMessage, RenderSegment } from '@/types/chat';
 
@@ -78,7 +79,7 @@ export function useImageActions(t: (key: string) => string) {
         }
       }
     } catch (err) {
-      console.error('Invalid imageSrc URL:', err);
+      logService.error('Invalid imageSrc URL:', err);
       messageUtil.error(t('invalidImageUrl'));
       return;
     }
@@ -92,7 +93,7 @@ export function useImageActions(t: (key: string) => string) {
         return;
       }
     } catch (err) {
-      console.warn('Image clipboard write failed:', err);
+      logService.warn('Image clipboard write failed:', err);
     }
 
     // Fallback using execCommand for environments lacking ClipboardItem support (e.g. Office Webview)
@@ -122,7 +123,7 @@ export function useImageActions(t: (key: string) => string) {
         return;
       }
     } catch (err) {
-      console.warn('Image clipboard execCommand fallback failed:', err);
+      logService.warn('Image clipboard execCommand fallback failed:', err);
     }
 
     messageUtil.error(t('imageClipboardNotSupported'));
@@ -157,7 +158,7 @@ export function useImageActions(t: (key: string) => string) {
           );
         });
       } catch (err) {
-        console.warn('Failed to clear selection for replace', err);
+        logService.warn('Failed to clear selection for replace', err);
       }
     }
 
@@ -178,7 +179,7 @@ export function useImageActions(t: (key: string) => string) {
         insertionSuccess = true;
       }
     } catch (err) {
-      console.warn('PowerPoint.run addImage failed, falling back to Common API', err);
+      logService.warn('PowerPoint.run addImage failed, falling back to Common API', err);
     }
 
     if (!insertionSuccess) {

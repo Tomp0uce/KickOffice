@@ -26,6 +26,7 @@ import {
 import { message as messageUtil } from '@/utils/message';
 import { withSlideZip, escapeXml } from './pptxZipUtils';
 import { logService } from '@/utils/logger';
+import { searchIconify, fetchIconSvg } from '@/api/backend';
 
 declare const Office: any;
 declare const PowerPoint: any;
@@ -275,8 +276,8 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
         });
       });
       return;
-    } catch (e: any) {
-      logService.warn('Modern PowerPoint Html insertion failed, falling back:', e);
+    } catch (e: unknown) {
+      logService.warn('Modern PowerPoint Html insertion failed, falling back:', e instanceof Error ? e : new Error(String(e)));
     }
   }
 
@@ -1521,7 +1522,6 @@ ALWAYS call markDirty() after modifying the zip.`,
         required: ['query'],
       },
       executeCommon: async (args: Record<string, any>) => {
-        const { searchIconify } = await import('@/api/backend');
         const results = await searchIconify(args.query, args.limit || 10, args.prefix);
         return JSON.stringify(results);
       },
@@ -1559,8 +1559,6 @@ ALWAYS call markDirty() after modifying the zip.`,
         if (!isPowerPointApiSupported('1.4')) {
           return 'Error: insertIcon requires PowerPointApi 1.4 or later.';
         }
-        const { fetchIconSvg } = await import('@/api/backend');
-
         const parts = String(args.iconId).split(':');
         if (parts.length !== 2)
           throw new Error('iconId must be in format "prefix:name", e.g. "mdi:home".');

@@ -520,8 +520,8 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
               lastMessage.richHtml = finalHtml;
             }
           }
-        } catch (err: any) {
-          if (err.name === 'AbortError') return;
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') return;
           logService.error('[AgentLoop] Quick action chatStream failed', err);
           const lastMessage = history.value[history.value.length - 1];
           const errInfo = categorizeError(err);

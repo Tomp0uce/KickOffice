@@ -11,11 +11,29 @@
 
 import { applyRedlineToOxml, setDefaultAuthor } from '@ansonlai/docx-redline-js';
 
+import { logService } from './logger';
+import { getErrorMessage } from './common';
 import {
   setChangeTrackingForAi,
   restoreChangeTracking,
   loadRedlineAuthor,
 } from './wordTrackChanges';
+
+export interface DocumentRevisionEntry {
+  /** Text of the paragraph to revise (used to locate it in the document). */
+  originalText: string;
+  /** Full revised version of the paragraph text. */
+  revisedText: string;
+}
+
+export interface DocumentRevisionResult {
+  success: boolean;
+  applied: number;
+  failed: number;
+  skipped: number;
+  author?: string;
+  details: string[];
+}
 
 export interface RevisionResult {
   success: boolean;
@@ -79,12 +97,12 @@ export async function applyRevisionToSelection(
       generateRedlines: enableTrackChanges,
     });
     resultOoxml = redlineResult.oxml;
-  } catch (error: any) {
-    console.error('[WordDiff] docx-redline-js error:', error);
+  } catch (error: unknown) {
+    logService.error('[WordDiff] docx-redline-js error:', error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       strategy: 'none',
-      message: `Error generating revision markup: ${error.message || String(error)}`,
+      message: `Error generating revision markup: ${getErrorMessage(error)}`,
     };
   }
 
@@ -100,17 +118,17 @@ export async function applyRevisionToSelection(
     // w:ins/w:del survive because native tracking is OFF
     selection.insertOoxml(resultOoxml, 'Replace');
     await context.sync();
-  } catch (insertError: any) {
+  } catch (insertError: unknown) {
     // Fallback: if insertOoxml fails (Word Online), use direct text replacement
-    console.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError);
+    logService.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError instanceof Error ? insertError : new Error(String(insertError)));
     try {
       selection.insertText(revisedText, 'Replace');
       await context.sync();
-    } catch (fallbackError: any) {
+    } catch (fallbackError: unknown) {
       return {
         success: false,
         strategy: 'none',
-        message: `Error applying revision: ${fallbackError.message || String(fallbackError)}`,
+        message: `Error applying revision: ${getErrorMessage(fallbackError)}`,
       };
     }
     return {
@@ -130,5 +148,115 @@ export async function applyRevisionToSelection(
     message: enableTrackChanges
       ? `Revision applied with Track Changes (author: "${redlineAuthor}").`
       : 'Revision applied with direct replacement (no Track Changes).',
+  };
+}
+
+/**
+ * Apply multiple paragraph-level revisions to the entire document using docx-redline-js.
+ *
+ * Each entry identifies a paragraph by its current text (originalText) and provides
+ * the full revised version (revisedText). The function locates the first matching
+ * paragraph, generates Track Changes OOXML via applyRedlineToOxml(), and inserts it.
+ *
+ * Track Changes is disabled once for the entire batch (same pattern as applyRevisionToSelection)
+ * so native tracking doesn't double-record the injected w:ins/w:del markup.
+ *
+ * IMPORTANT: Must be called within Word.run() context.
+ */
+export async function applyRevisionToDocument(
+  context: Word.RequestContext,
+  revisions: DocumentRevisionEntry[],
+  enableTrackChanges: boolean = true,
+): Promise<DocumentRevisionResult> {
+  const redlineAuthor = loadRedlineAuthor();
+
+  // Load all paragraphs once
+  const paragraphs = context.document.body.paragraphs;
+  paragraphs.load('items');
+  await context.sync();
+
+  const items = paragraphs.items;
+  items.forEach(p => p.load('text'));
+  await context.sync();
+
+  const details: string[] = [];
+  let applied = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  const trackingState = await setChangeTrackingForAi(
+    context,
+    enableTrackChanges,
+    'proposeDocumentRevision',
+  );
+
+  try {
+    for (const { originalText, revisedText } of revisions) {
+      // Find the first paragraph whose trimmed text matches
+      const paraIndex = items.findIndex(p => p.text.trim() === originalText.trim());
+      if (paraIndex === -1) {
+        details.push(
+          `[NOT FOUND] "${originalText.slice(0, 60)}${originalText.length > 60 ? '…' : ''}"`,
+        );
+        failed++;
+        continue;
+      }
+
+      if (originalText.trim() === revisedText.trim()) {
+        details.push(`[${paraIndex}] SKIPPED: text identical`);
+        skipped++;
+        continue;
+      }
+
+      const para = items[paraIndex];
+      const ooxmlResult = para.getOoxml();
+      await context.sync();
+      const ooxml = ooxmlResult.value;
+
+      setDefaultAuthor(redlineAuthor);
+      let resultOoxml: string;
+      try {
+        const redlineResult = await applyRedlineToOxml(ooxml, para.text, revisedText, {
+          author: enableTrackChanges ? redlineAuthor : undefined,
+          generateRedlines: enableTrackChanges,
+        });
+        resultOoxml = redlineResult.oxml;
+      } catch (err: any) {
+        details.push(
+          `[${paraIndex}] ERROR (redline): ${err.message || String(err)}`,
+        );
+        failed++;
+        continue;
+      }
+
+      try {
+        para.insertOoxml(resultOoxml, 'Replace');
+        await context.sync();
+        details.push(`[${paraIndex}] OK`);
+        applied++;
+      } catch (insertError: unknown) {
+        // Fallback: direct text replacement (Word Online may not support insertOoxml on paragraphs)
+        try {
+          para.insertText(revisedText, 'Replace');
+          await context.sync();
+          details.push(`[${paraIndex}] OK (direct-replace fallback)`);
+          applied++;
+        } catch (fallbackError: unknown) {
+          details.push(`[${paraIndex}] ERROR (insert): ${getErrorMessage(fallbackError)}`);
+          failed++;
+        }
+      }
+    }
+  } finally {
+    await restoreChangeTracking(context, trackingState, 'proposeDocumentRevision');
+  }
+
+  return {
+    success: failed === 0,
+    applied,
+    failed,
+    skipped,
+    author: enableTrackChanges ? redlineAuthor : undefined,
+    details,
   };
 }

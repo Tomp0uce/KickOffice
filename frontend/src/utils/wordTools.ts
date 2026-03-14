@@ -3,7 +3,7 @@ import { logService } from '@/utils/logger';
 import { executeOfficeAction } from './officeAction';
 import { sandboxedEval } from './sandbox';
 import { validateOfficeCode } from './officeCodeValidator';
-import { applyRevisionToSelection } from './wordDiffUtils';
+import { applyRevisionToSelection, applyRevisionToDocument } from './wordDiffUtils';
 
 import {
   applyInheritedStyles,
@@ -57,6 +57,7 @@ export type WordToolName =
   | 'setPageSetup'
   | 'insertSectionBreak'
   | 'proposeRevision'
+  | 'proposeDocumentRevision'
   | 'editDocumentXml'
   | 'eval_wordjs';
 
@@ -1485,6 +1486,80 @@ visible in the Track Changes panel, distinguishable from human edits.
             strategy: result.strategy,
             author: result.author,
             message: result.message,
+          },
+          null,
+          2,
+        );
+      },
+    },
+
+    proposeDocumentRevision: {
+      name: 'proposeDocumentRevision',
+      category: 'write',
+      description: `Apply paragraph-level Track Changes revisions across the **entire document**.
+
+Use when you need to revise multiple paragraphs throughout the document with native Word
+Track Changes (redlines) — the user can then accept/reject each change individually.
+
+**Workflow**:
+1. Call \`getDocumentContent\` to read the full document text.
+2. Identify which paragraphs need revision.
+3. Call this tool with an array of \`{ originalText, revisedText }\` pairs.
+
+Each entry is matched to the first paragraph whose text equals \`originalText\` (trimmed).
+Provide the **complete** revised paragraph text in \`revisedText\`, not just the diff.
+
+**vs proposeRevision**: \`proposeRevision\` requires a selection; this tool operates on
+the full document without requiring the user to select anything.
+
+**Track Changes**: Enabled by default. Set \`enableTrackChanges=false\` for silent replacement.`,
+
+      inputSchema: {
+        type: 'object',
+        properties: {
+          revisions: {
+            type: 'array',
+            description: 'List of paragraph revisions to apply.',
+            items: {
+              type: 'object',
+              properties: {
+                originalText: {
+                  type: 'string',
+                  description:
+                    'The exact current text of the paragraph to revise (used to locate it).',
+                },
+                revisedText: {
+                  type: 'string',
+                  description:
+                    'The complete revised version of the paragraph. Must contain ALL text, not just changes.',
+                },
+              },
+              required: ['originalText', 'revisedText'],
+            },
+            minItems: 1,
+          },
+          enableTrackChanges: {
+            type: 'boolean',
+            description:
+              'Show changes in Word Track Changes panel (default: true). Set false for silent replacement.',
+          },
+        },
+        required: ['revisions'],
+      },
+
+      executeWord: async (context, args: Record<string, any>) => {
+        const { revisions, enableTrackChanges = true } = args;
+
+        const result = await applyRevisionToDocument(context, revisions, enableTrackChanges);
+
+        return JSON.stringify(
+          {
+            success: result.success,
+            applied: result.applied,
+            failed: result.failed,
+            skipped: result.skipped,
+            author: result.author,
+            details: result.details,
           },
           null,
           2,

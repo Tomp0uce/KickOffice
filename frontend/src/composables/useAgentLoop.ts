@@ -288,11 +288,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       const llmWaitLabel = iteration === 1 ? t('agentAnalyzing') : t('agentWaitingForLLM');
       currentAction.value = llmWaitLabel;
       const llmWaitStart = Date.now();
-      const llmWaitTimer = setInterval(() => {
-        const elapsed = Math.round((Date.now() - llmWaitStart) / 1000);
-        const ctxSuffix = contextPct >= 50 ? ` · ctx ${contextPct}%` : '';
-        currentAction.value = `${llmWaitLabel} (${elapsed}s${ctxSuffix})`;
-      }, 1000);
 
       const currentSystemPrompt =
         messages[0]?.role === 'system'
@@ -301,6 +296,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
             : ''
           : '';
       const contextPct = estimateContextUsagePercent(currentMessages, currentSystemPrompt);
+
+      const llmWaitTimer = setInterval(() => {
+        const elapsed = Math.round((Date.now() - llmWaitStart) / 1000);
+        const ctxSuffix = contextPct >= 50 ? ` · ctx ${contextPct}%` : '';
+        currentAction.value = `${llmWaitLabel} (${elapsed}s${ctxSuffix})`;
+      }, 1000);
       const contextSafeMessages = prepareMessagesForContext(currentMessages, currentSystemPrompt);
       logService.info('llm_request', 'llm', {
         model: modelTier,

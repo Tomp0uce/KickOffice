@@ -1,4 +1,9 @@
 import type { ToolDefinition } from '@/types';
+import { logService } from '@/utils/logger';
+import { getWordToolDefinitions } from '@/utils/wordTools';
+import { getExcelToolDefinitions } from '@/utils/excelTools';
+import { getPowerPointToolDefinitions } from '@/utils/powerpointTools';
+import { getOutlookToolDefinitions } from '@/utils/outlookTools';
 
 /**
  * ARCH-M1: ToolProviderRegistry
@@ -33,7 +38,7 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
   register(hostName: string, provider: ToolProvider): void {
     const normalizedName = hostName.toLowerCase();
     if (this.providers.has(normalizedName)) {
-      console.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`);
+      logService.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`);
     }
     this.providers.set(normalizedName, provider);
   }
@@ -48,7 +53,7 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
     const provider = this.providers.get(normalizedName);
 
     if (!provider) {
-      console.warn(
+      logService.warn(
         `[ToolProviderRegistry] No provider registered for host: ${hostName}. Available hosts: ${this.getRegisteredHosts().join(', ')}`,
       );
       return [];
@@ -75,28 +80,17 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
 // Singleton instance
 const registry = new ToolProviderRegistryImpl();
 
+// Register all providers at module initialization using static ES imports
+registry.register('Word', getWordToolDefinitions);
+registry.register('Excel', getExcelToolDefinitions);
+registry.register('PowerPoint', getPowerPointToolDefinitions);
+registry.register('Outlook', getOutlookToolDefinitions);
+
 /**
  * Get the global tool provider registry
  */
 export function getToolProviderRegistry(): ToolProviderRegistry {
   return registry;
-}
-
-/**
- * Initialize tool providers
- * Called once at app startup to register all Office host tool providers
- */
-export function initializeToolProviders(): void {
-  // Direct imports (not lazy) - these are already loaded by the app
-  const { getWordToolDefinitions } = require('@/utils/wordTools');
-  const { getExcelToolDefinitions } = require('@/utils/excelTools');
-  const { getPowerPointToolDefinitions } = require('@/utils/powerpointTools');
-  const { getOutlookToolDefinitions } = require('@/utils/outlookTools');
-
-  registry.register('Word', getWordToolDefinitions);
-  registry.register('Excel', getExcelToolDefinitions);
-  registry.register('PowerPoint', getPowerPointToolDefinitions);
-  registry.register('Outlook', getOutlookToolDefinitions);
 }
 
 /**
@@ -118,6 +112,3 @@ export function getToolsForHost(hostFlags: {
 
   return registry.getTools(hostName);
 }
-
-// Auto-initialize on module load
-initializeToolProviders();

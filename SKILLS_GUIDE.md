@@ -68,6 +68,16 @@ These skills define specific, user-triggered workflows. When a user clicks a Qui
 | `formalize.skill.md` | Formalize | Word, Outlook | Transform casual text to professional |
 | `concise.skill.md` | Concise | Word, Outlook | Condense wordy text (30-50% reduction) |
 | `proofread.skill.md` | Proofread | Word | Fix spelling, grammar, punctuation errors |
+| `polish.skill.md` | Polish | Word | General text quality improvement |
+| `academic.skill.md` | Academic | Word | Academic/formal writing style |
+| `summary.skill.md` | Summary | Word | Summarize document content |
+| `ingest.skill.md` | Clean (Ingest) | Excel | Normalize and clean imported data |
+| `autograph.skill.md` | Beautify (Autograph) | Excel | Format spreadsheet for presentation |
+| `explain-excel.skill.md` | Explain Excel | Excel | Explain formulas and worksheet structure |
+| `formula-generator.skill.md` | Formula Generator | Excel | Generate Excel formulas from description |
+| `data-trend.skill.md` | Data Trend | Excel | Analyze trends in data |
+| `extract.skill.md` | Extract Tasks | Outlook | Extract action items from email |
+| `reply.skill.md` | Smart Reply | Outlook | Generate contextual email reply |
 
 ---
 
@@ -485,20 +495,30 @@ bullets-v2.skill.md  ← Aggressive (3-5 bullets)
 ### File Structure
 ```
 frontend/src/skills/
-├── common.skill.md            # Universal guidelines
+├── common.skill.md            # Universal guidelines (all hosts)
 ├── word.skill.md              # Word host guidelines
 ├── excel.skill.md             # Excel host guidelines
 ├── powerpoint.skill.md        # PowerPoint host guidelines
 ├── outlook.skill.md           # Outlook host guidelines
 ├── index.ts                   # Skill loader/registry
-└── quickactions/              # Quick Action skills
-    ├── bullets.skill.md
-    ├── punchify.skill.md
-    ├── review.skill.md
-    ├── translate.skill.md
-    ├── formalize.skill.md
-    ├── concise.skill.md
-    └── proofread.skill.md
+└── quickactions/              # Quick Action skills (17 files)
+    ├── bullets.skill.md       # PowerPoint — concise bullets
+    ├── punchify.skill.md      # PowerPoint — make text impactful
+    ├── review.skill.md        # PowerPoint — slide feedback
+    ├── translate.skill.md     # Word, Outlook — language translation
+    ├── formalize.skill.md     # Word, Outlook — casual → professional
+    ├── concise.skill.md       # Word, Outlook — word reduction
+    ├── proofread.skill.md     # Word — spelling/grammar
+    ├── polish.skill.md        # Word — quality improvement
+    ├── academic.skill.md      # Word — academic style
+    ├── summary.skill.md       # Word — summarization
+    ├── ingest.skill.md        # Excel — data cleaning
+    ├── autograph.skill.md     # Excel — formatting
+    ├── explain-excel.skill.md # Excel — formula explanation
+    ├── formula-generator.skill.md  # Excel — formula generation
+    ├── data-trend.skill.md    # Excel — trend analysis
+    ├── extract.skill.md       # Outlook — task extraction
+    └── reply.skill.md         # Outlook — smart reply
 ```
 
 ### Skill Loading Flow

@@ -7,9 +7,49 @@ import { i18n } from '@/i18n';
 // GPT-5.2: 400k token context window × 3 chars/token ≈ 1.2M chars (conservative ratio)
 export const MAX_CONTEXT_CHARS = 1_200_000;
 
+// Phase 7A: Tool result summarization — heuristic approach
+// Tool results older than TOOL_RESULT_KEEP_FULL_COUNT iterations get compressed
+const TOOL_RESULT_KEEP_FULL_COUNT = 3; // Keep last 3 tool result groups in full
+const TOOL_RESULT_MAX_CHARS = 800; // Compress results longer than 800 chars
+
 const TRUNCATION_MARKER_HEAD = '\n\n[... Truncated]';
 const TRUNCATION_MARKER_TAIL = '[Truncated ...]\n\n';
 let hasWarnedTruncation = false;
+
+/**
+ * Phase 7A: Heuristic tool result summarization.
+ * Groups messages by tool-call iteration (assistant w/ tool_calls + its tool responses).
+ * Keeps the last TOOL_RESULT_KEEP_FULL_COUNT iterations intact.
+ * Compresses older tool results to TOOL_RESULT_MAX_CHARS chars.
+ */
+function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMessage[] {
+  // Find iteration boundaries: assistant messages that issued tool calls
+  const iterationStartIndices: number[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' && 'tool_calls' in msg && msg.tool_calls && msg.tool_calls.length > 0) {
+      iterationStartIndices.push(i);
+    }
+  }
+
+  if (iterationStartIndices.length <= TOOL_RESULT_KEEP_FULL_COUNT) return messages;
+
+  // First index of the Nth-from-last iteration — everything before it gets compressed
+  const keepFromIndex =
+    iterationStartIndices[iterationStartIndices.length - TOOL_RESULT_KEEP_FULL_COUNT];
+
+  return messages.map((msg, i) => {
+    if (msg.role !== 'tool' || i >= keepFromIndex) return msg;
+    if (typeof msg.content !== 'string' || msg.content.length <= TOOL_RESULT_MAX_CHARS) return msg;
+
+    const originalLength = msg.content.length;
+    const compressed = msg.content.slice(0, TOOL_RESULT_MAX_CHARS);
+    return {
+      ...msg,
+      content: `${compressed}\n[... ${originalLength - TOOL_RESULT_MAX_CHARS} chars omitted — Phase 7A compression]`,
+    };
+  });
+}
 
 /**
  * Truncates content to fit within a character budget.
@@ -98,7 +138,9 @@ export function prepareMessagesForContext(
 ): ChatRequestMessage[] {
   const safeSystemPrompt = truncateToBudget(systemPrompt, MAX_CONTEXT_CHARS);
   const systemMessage: ChatRequestMessage = { role: 'system', content: safeSystemPrompt };
-  const nonSystemMessages = allMessages.filter(message => message.role !== 'system');
+  const nonSystemMessages = summarizeOldToolResults(
+    allMessages.filter(message => message.role !== 'system'),
+  );
 
   let remainingBudget = MAX_CONTEXT_CHARS - safeSystemPrompt.length;
   if (remainingBudget <= 0) return [systemMessage];

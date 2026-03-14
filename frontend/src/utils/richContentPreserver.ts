@@ -11,6 +11,7 @@
 
 import type { InheritedStyles } from './markdown';
 import { htmlToMarkdown } from './markdown';
+import { logService } from './logger';
 
 const PLACEHOLDER_PREFIX = '{{PRESERVE_';
 const PLACEHOLDER_SUFFIX = '}}';
@@ -140,7 +141,7 @@ export function extractTextFromHtml(html: string): RichContentContext {
       extractedStyles,
     };
   } catch (err) {
-    console.warn('[RichContentPreserver] Failed to parse HTML, falling back to plain text', err);
+    logService.warn('[RichContentPreserver] Failed to parse HTML, falling back to plain text', err instanceof Error ? err : new Error(String(err)));
     return {
       cleanText: html.replace(/<[^>]+>/g, ''),
       fragments,

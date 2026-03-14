@@ -1,3 +1,5 @@
+import { logService } from './logger';
+
 const ENABLED_TOOLS_STORAGE_KEY = 'enabledTools';
 const ENABLED_TOOLS_STORAGE_VERSION = 1;
 
@@ -21,7 +23,7 @@ export function persistEnabledTools(allToolNames: string[], enabledToolNames: Se
     localStorage.setItem(ENABLED_TOOLS_STORAGE_KEY, JSON.stringify(payload));
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[ToolStorage] localStorage quota exceeded — tool preferences not saved');
+      logService.warn('[ToolStorage] localStorage quota exceeded — tool preferences not saved');
     } else {
       throw e;
     }
@@ -60,7 +62,7 @@ function migrateToolPreferences(storedEnabledNames: string[], allToolNames: stri
   const addedTools = allToolNames.filter(n => !storedEnabledSet.has(n));
   const removedTools = storedEnabledNames.filter(n => !allToolNameSet.has(n));
   if (addedTools.length > 0 || removedTools.length > 0) {
-    console.info('[ToolStorage] Migrated tool preferences', {
+    logService.info('[ToolStorage] Migrated tool preferences', 'system', {
       addedTools: addedTools.length,
       removedTools: removedTools.length,
       preservedEnabled: migratedEnabled.size,
