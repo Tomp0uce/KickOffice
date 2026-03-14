@@ -1,7 +1,7 @@
 import type { ToolDefinition } from '@/types'
 import { logService } from '@/utils/logger'
 import { executeOfficeAction } from './officeAction'
-import { createOfficeTools } from './common'
+import { createOfficeTools, buildExecuteWrapper, type OfficeToolTemplate, getErrorMessage } from './common'
 import { localStorageKey } from './enum'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
@@ -21,7 +21,7 @@ async function safeGetSheet(context: Excel.RequestContext, sheetName?: string): 
   return sheet
 }
 
-type ExcelToolTemplate = Omit<ToolDefinition, 'execute'> & {
+type ExcelToolTemplate = OfficeToolTemplate<Excel.RequestContext> & {
   executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>
 }
 
@@ -34,7 +34,6 @@ export type ExcelToolName =
   | 'formatRange'
   | 'sortRange'
   | 'getWorksheetInfo'
-  | 'getDataFromSheet'
   | 'clearRange'
   | 'searchAndReplace'
   | 'addWorksheet'
@@ -551,7 +550,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
     name: 'formatRange',
     category: 'format',
     description:
-      'Apply formatting to the selected range or a specific range address. Can set fill color, font color, bold, italic, font size, and borders.',
+      '⚠️ DEPRECATED: Use setCellRange with formatting parameter instead. This tool is redundant and will be removed in a future version. Apply formatting to the selected range or a specific range address. Can set fill color, font color, bold, italic, font size, and borders.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1575,10 +1574,10 @@ try {
           explanation,
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         }, null, 2)
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
           codeExecuted: code.slice(0, 200) + '...',
           hint: 'Check that all properties are loaded before access, and context.sync() is called.',
@@ -1797,18 +1796,7 @@ try {
     },
   },
 
-}, (def) => async (args = {}) => {
-  try {
-    return await runExcel(ctx => def.executeExcel(ctx, args))
-  } catch (error: any) {
-    return JSON.stringify({
-      error: true,
-      message: error.message || String(error),
-      tool: def.name,
-      suggestion: 'Fix the error parameters or context and try again.'
-    }, null, 2)
-  }
-})
+}, buildExecuteWrapper<ExcelToolTemplate>('executeExcel', runExcel))
 
 /** Backend-calling tool: extracts data points from a chart image via pixel analysis. */
 const extractChartDataTool: ToolDefinition = {
@@ -1906,20 +1894,18 @@ const extractChartDataTool: ToolDefinition = {
         pixelsMatched: result.pixelsMatched,
         points: result.points,
       }, null, 2)
-    } catch (error: any) {
+    } catch (error: unknown) {
       return JSON.stringify({
-        error: true,
-        message: error.message || String(error),
+        success: false,
+        error: getErrorMessage(error),
         suggestion: 'Check that the imageId is valid and the image was recently uploaded. Adjust colorTolerance or targetColor if needed.',
       }, null, 2)
     }
   },
 }
 
-export function getToolDefinitions(): ToolDefinition[] {
+export function getExcelToolDefinitions(): ToolDefinition[] {
   return [...Object.values(excelToolDefinitions), extractChartDataTool]
 }
-
-export const getExcelToolDefinitions = getToolDefinitions
 
 export { excelToolDefinitions }

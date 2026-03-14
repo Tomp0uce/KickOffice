@@ -1,4 +1,5 @@
 import DiffMatchPatch from 'diff-match-patch'
+import type { ToolDefinition } from '@/types'
 
 
 // R17/CH5 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
@@ -41,6 +42,41 @@ export function computeTextDiffStats(originalText: string, revisedText: string):
 }
 
 /**
+ * Truncate a string to maxLen characters, appending '...' if truncated.
+ * Used by wordTools and outlookTools for error message truncation.
+ */
+export function truncateString(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str
+  return str.slice(0, maxLen) + '...'
+}
+
+/**
+ * Extract error message from unknown error type.
+ * Safely extracts error.message or converts to string for TypeScript strict mode.
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message
+  }
+  return String(error)
+}
+
+/**
+ * Generic Office Tool Template.
+ * Defines the structure for host-specific tool definitions before wrapping with execute().
+ *
+ * @template TContext - The Office.js context type (Word.RequestContext, Excel.RequestContext, etc.)
+ *
+ * Each host-specific tool file should extend this with their own executeXxx property:
+ * - Word: { executeWord: (context: Word.RequestContext, args: Record<string, unknown>) => Promise<string> }
+ * - Excel: { executeExcel: (context: Excel.RequestContext, args: Record<string, unknown>) => Promise<string> }
+ * - PowerPoint: { executePowerPoint: (context: PowerPoint.RequestContext, args: Record<string, unknown>) => Promise<string> }
+ * - Outlook: { executeOutlook: (item: Office.MessageCompose, args: Record<string, unknown>) => Promise<string> }
+ */
+export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>
+
+/**
  * Generic factory that wraps host-specific tool templates with a uniform `execute` method.
  * Each tool file passes a `buildExecute` callback that closes over its host runner
  * (runWord, runExcel, runPowerPoint, runOutlook).
@@ -55,6 +91,53 @@ export function createOfficeTools<TName extends string, TTemplate extends object
       { ...(def as object), execute: buildExecute(def as TTemplate) },
     ]),
   ) as unknown as Record<TName, TDef>
+}
+
+/**
+ * Generic wrapper builder for Office.js tool execution.
+ * Creates the execute wrapper that bridges the generic Tool interface with host-specific execution.
+ *
+ * Wraps host-specific executeXxx methods with:
+ * - Office.js context runner (runWord, runExcel, etc.)
+ * - Standard error handling
+ * - JSON stringified error responses
+ *
+ * @template TTemplate - The tool template type
+ * @param executeKey - The property name for the host-specific executor (e.g., 'executeWord', 'executeExcel')
+ * @param runner - The Office.js runner function that provides the context
+ * @returns A function that builds execute wrappers for tool definitions
+ *
+ * @example
+ * const buildExecute = buildExecuteWrapper<WordToolTemplate>(
+ *   'executeWord',
+ *   <T>(action: (ctx: Word.RequestContext) => Promise<T>) => executeOfficeAction(() => Word.run(action))
+ * )
+ */
+export function buildExecuteWrapper<TTemplate extends Record<string, any>>(
+  executeKey: string,
+  runner: <T>(action: (context: any) => Promise<T>) => Promise<T>,
+): (definition: TTemplate) => (args?: Record<string, any>) => Promise<string> {
+  return (def: TTemplate) => async (args: Record<string, any> = {}): Promise<string> => {
+    const hostExecute = def[executeKey]
+    if (!hostExecute || typeof hostExecute !== 'function') {
+      return JSON.stringify({
+        success: false,
+        error: `Tool definition missing ${executeKey} function`,
+        tool: def.name || 'unknown',
+      }, null, 2)
+    }
+
+    try {
+      return await runner((context: any) => hostExecute(context, args))
+    } catch (error: any) {
+      return JSON.stringify({
+        success: false,
+        error: error.message || String(error),
+        tool: def.name || 'unknown',
+        suggestion: 'Fix the error parameters or context and try again.',
+      }, null, 2)
+    }
+  }
 }
 
 export const optionLists = {

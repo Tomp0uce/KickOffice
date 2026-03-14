@@ -62,7 +62,7 @@
           target="_blank"
           rel="noopener noreferrer"
           class="text-xs text-accent underline"
-          >https://getkey.ai.kickmaker.net/</a
+          >{{ t('getApiKeyLink') }}</a
         >
       </div>
     </SettingCard>

@@ -3,11 +3,20 @@ import { logService } from '@/utils/logger'
 import { executeOfficeAction } from './officeAction'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
-import { applyRevisionToSelection, previewDiffStats, hasComplexContent } from './wordDiffUtils'
+import { applyRevisionToSelection } from './wordDiffUtils'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, htmlToMarkdown } from './markdown'
 
-import { createOfficeTools } from './common'
+import { createOfficeTools, truncateString, buildExecuteWrapper, type OfficeToolTemplate, getErrorMessage } from './common'
+import { escapeXml } from './pptxZipUtils'
+import {
+  WORD_SEARCH_TEXT_MAX_LENGTH,
+  WORD_HEADING_1_FONT_SIZE,
+  WORD_HEADING_2_FONT_SIZE,
+  WORD_HEADING_3_FONT_SIZE,
+  WORD_CODE_TRUNCATE_SHORT,
+  WORD_CODE_TRUNCATE_LONG,
+} from '@/constants/limits'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -37,7 +46,7 @@ export type WordToolName =
   | 'setPageSetup'
   | 'insertSectionBreak'
   | 'proposeRevision'
-  | 'previewRevision'
+  | 'editDocumentXml'
   | 'eval_wordjs'
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
@@ -126,9 +135,9 @@ async function applyHeadingBuiltinStyles(
     for (const p of paras.items) {
       const size = p.font.size
       if (!size) continue
-      if (size >= 20) p.styleBuiltIn = Word.BuiltInStyleName.heading1
-      else if (size >= 15) p.styleBuiltIn = Word.BuiltInStyleName.heading2
-      else if (size >= 12.5) p.styleBuiltIn = Word.BuiltInStyleName.heading3
+      if (size >= WORD_HEADING_1_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading1
+      else if (size >= WORD_HEADING_2_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading2
+      else if (size >= WORD_HEADING_3_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading3
     }
     await context.sync()
   } catch {
@@ -136,7 +145,7 @@ async function applyHeadingBuiltinStyles(
   }
 }
 
-type WordToolTemplate = Omit<ToolDefinition, 'execute'> & {
+type WordToolTemplate = OfficeToolTemplate<Word.RequestContext> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
 }
 
@@ -336,7 +345,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
       }
       
@@ -427,7 +436,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         fontName,
       } = args
 
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters.')
       }
 
@@ -530,7 +539,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
       }
       
@@ -1333,106 +1342,162 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
   proposeRevision: {
     name: 'proposeRevision',
     category: 'write',
-    description: `**PREFERRED TOOL** for modifying existing text. Computes a word-level diff and applies only the changes, preserving formatting (bold, italic, colors, fonts) on unchanged portions.
+    description: `**PREFERRED TOOL** for modifying existing text.
 
-HOW IT WORKS:
-1. Reads the currently selected text
-2. Computes diff between original and your revised version
-3. Applies only insertions/deletions, keeping unchanged text intact
-4. Optionally shows changes in Word's Track Changes
+Generates native Word Track Changes (redlines) using OOXML revision markup.
+The user can accept/reject each change individually in Word's Review pane.
 
-WHEN TO USE:
-- Fixing typos or grammatical errors
-- Rewriting phrases or sentences
-- Editing paragraphs while preserving formatting
-- Any modification where the user wants to keep existing styles
+Changes are attributed to a configurable author (default: "KickOffice AI")
+visible in the Track Changes panel, distinguishable from human edits.
 
-WHEN NOT TO USE:
-- Adding entirely new content (use insertContent instead)
-- Replacing with tables or complex structures (use insertContent)
-- The selection is empty (nothing to revise)`,
+**Input**: The COMPLETE revised version of the selected text.
+**Output**: The selection is replaced with tracked insertions/deletions.
+
+**Requirements**: Text must be selected in the document before calling.
+**Track Changes**: Enabled by default. Set enableTrackChanges=false for silent replacement.`,
+
     inputSchema: {
       type: 'object',
       properties: {
         revisedText: {
           type: 'string',
-          description: 'The complete revised version of the selected text. Write the full text as you want it to appear - the system will compute what changed.',
+          description: 'The complete revised version of the selected text. Must contain ALL text, not just changes.',
         },
         enableTrackChanges: {
           type: 'boolean',
-          description: 'Show changes in Word Track Changes UI so user can review/accept/reject. Default: true.',
+          description: 'Show changes in Word Track Changes panel (default: true). Set false for silent replacement.',
         },
       },
       required: ['revisedText'],
     },
+
     executeWord: async (context, args: Record<string, any>) => {
       const { revisedText, enableTrackChanges = true } = args
 
-      // Validate input
-      if (!revisedText || typeof revisedText !== 'string') {
-        return JSON.stringify({
-          success: false,
-          error: 'revisedText is required and must be a string',
-        }, null, 2)
-      }
-
-      // Apply revision using diff algorithm
       const result = await applyRevisionToSelection(context, revisedText, enableTrackChanges)
 
       return JSON.stringify({
         success: result.success,
         strategy: result.strategy,
-        changes: {
-          insertions: result.insertions,
-          deletions: result.deletions,
-          unchanged: result.unchanged,
-        },
+        author: result.author,
         message: result.message,
-        trackChangesEnabled: enableTrackChanges,
       }, null, 2)
     },
   },
 
-  previewRevision: {
-    name: 'previewRevision',
-    category: 'read',
-    description: `Preview the changes that would be made by proposeRevision without actually applying them, and check if the selected text has complex content (like tables or images) that may not diff well.`,
+  editDocumentXml: {
+    name: 'editDocumentXml',
+    category: 'write',
+    description: `Edit Word document OOXML directly for precision operations.
+
+**USE WHEN**: You need to modify text while preserving exact formatting
+(fonts, colors, sizes, styles) that would be lost with insertText/insertHtml.
+
+**DO NOT USE FOR**: Track Changes (use proposeRevision instead).
+
+The code receives:
+- \`ooxml\`: string — the raw Flat OPC XML of the target range
+- \`DOMParser\`, \`XMLSerializer\` — XML manipulation
+- \`escapeXml(str)\` — safely escape XML special chars
+- \`setResult(modifiedXml)\` — call this to write back the modified XML
+
+Your code should:
+1. Parse the ooxml with DOMParser
+2. Find and modify the desired elements
+3. Serialize back and call setResult()`,
+
     inputSchema: {
       type: 'object',
       properties: {
-        revisedText: {
+        target: {
           type: 'string',
-          description: 'The complete revised version of the selected text.',
+          enum: ['selection', 'paragraph'],
+          description: 'What to target: current selection or specific paragraph',
+        },
+        paragraphIndex: {
+          type: 'number',
+          description: 'If target=paragraph, the 0-based paragraph index',
+        },
+        code: {
+          type: 'string',
+          description: 'JavaScript code to manipulate the OOXML',
+        },
+        explanation: {
+          type: 'string',
+          description: 'What this code does (required for audit trail)',
         },
       },
-      required: ['revisedText'],
+      required: ['code', 'explanation'],
     },
-    executeWord: async (context, args: Record<string, any>) => {
-      const { revisedText } = args
-      
-      const range = context.document.getSelection()
-      range.load('text')
-      await context.sync()
 
-      const originalText = range.text
-      if (!originalText || !originalText.trim()) {
+    executeWord: async (context, args: Record<string, any>) => {
+      const { target = 'selection', paragraphIndex, code, explanation } = args
+
+      // 1. Get the target range
+      let range
+      if (target === 'paragraph' && paragraphIndex !== undefined) {
+        const paragraphs = context.document.body.paragraphs
+        paragraphs.load('items')
+        await context.sync()
+        if (paragraphIndex >= paragraphs.items.length) {
+          return JSON.stringify({
+            success: false,
+            error: `Paragraph ${paragraphIndex} out of bounds`,
+          }, null, 2)
+        }
+        range = paragraphs.items[paragraphIndex].getRange()
+      } else {
+        range = context.document.getSelection()
+      }
+
+      // 2. Get OOXML
+      const ooxmlResult = range.getOoxml()
+      await context.sync()
+      const ooxml = ooxmlResult.value
+
+      // 3. Execute code in sandbox
+      let modifiedXml: string | null = null
+      const setResult = (xml: string) => { modifiedXml = xml }
+
+      try {
+        await sandboxedEval(code, {
+          ooxml,
+          DOMParser,
+          XMLSerializer,
+          escapeXml,
+          setResult,
+        }, 'Word')
+      } catch (err: unknown) {
         return JSON.stringify({
-          error: 'No text selected. Please select text before using previewRevision.',
+          success: false,
+          error: getErrorMessage(err),
+          explanation,
         }, null, 2)
       }
 
-      const isComplex = hasComplexContent(originalText)
-      const stats = previewDiffStats(originalText, revisedText)
+      // 4. Write back if modified
+      if (modifiedXml) {
+        try {
+          range.insertOoxml(modifiedXml, 'Replace')
+          await context.sync()
+          return JSON.stringify({
+            success: true,
+            explanation,
+            action: 'OOXML modified and reinserted',
+          }, null, 2)
+        } catch (insertError: any) {
+          return JSON.stringify({
+            success: false,
+            error: `insertOoxml failed: ${insertError.message || String(insertError)}`,
+            explanation,
+          }, null, 2)
+        }
+      }
 
       return JSON.stringify({
-        hasComplexContent: isComplex,
-        complexContentWarning: isComplex ? 'Warning: The selected text contains complex content (like tables or images). The proposeRevision tool might fail or produce unexpected results.' : undefined,
-        stats: {
-          insertions: stats.insertions,
-          deletions: stats.deletions,
-          unchanged: stats.unchanged,
-          totalChanges: stats.totalChanges,
-        },
+        success: true,
+        explanation,
+        action: 'No modifications applied (setResult not called)',
       }, null, 2)
     },
   },
@@ -1509,7 +1574,7 @@ try {
           validationErrors: validation.errors,
           validationWarnings: validation.warnings,
           suggestion: 'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
-          codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
+          codeReceived: truncateString(code, WORD_CODE_TRUNCATE_LONG),
         }, null, 2)
       }
 
@@ -1536,34 +1601,21 @@ try {
           explanation,
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         }, null, 2)
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
-          codeExecuted: code.slice(0, 200) + '...',
+          codeExecuted: truncateString(code, WORD_CODE_TRUNCATE_SHORT),
           hint: 'Check that all properties are loaded before access, and context.sync() is called.',
         }, null, 2)
       }
     },
   },
-}, (def) => async (args = {}) => {
-  try {
-    return await runWord(ctx => def.executeWord(ctx, args))
-  } catch (error: any) {
-    return JSON.stringify({
-      error: true,
-      message: error.message || String(error),
-      tool: def.name,
-      suggestion: 'Fix the error parameters or context and try again.'
-    }, null, 2)
-  }
-})
+}, buildExecuteWrapper<WordToolTemplate>('executeWord', runWord))
 
-export function getToolDefinitions(): ToolDefinition[] {
+export function getWordToolDefinitions(): ToolDefinition[] {
   return Object.values(wordToolDefinitions)
 }
-
-export const getWordToolDefinitions = getToolDefinitions
 
 export { wordToolDefinitions }

@@ -11,6 +11,7 @@ import multer from 'multer'
 import { LLM_API_BASE_URL, LLM_API_KEY } from '../config/models.js'
 import { sanitizeErrorText, logAndRespond } from '../utils/http.js'
 import { ErrorCodes } from '../config/errorCodes.js'
+import { FILE_LIMITS } from '../config/limits.js'
 import logger from '../utils/logger.js'
 
 const filesRouter = Router()
@@ -18,7 +19,7 @@ const filesRouter = Router()
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB — larger limit for files API
+    fileSize: FILE_LIMITS.MAX_FILE_SIZE, // 50MB — larger limit for files API
   },
 })
 
@@ -77,7 +78,7 @@ filesRouter.post('/', upload.single('file'), async (req, res) => {
     return res.json({ fileId })
   } catch (err) {
     req.logger.error('POST /api/files error', { error: err })
-    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: `File upload failed: ${err.message}` }, 'POST /api/files')
+    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'File upload failed. Please try again.' }, 'POST /api/files')
   }
 })
 

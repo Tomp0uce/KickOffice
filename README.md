@@ -317,14 +317,21 @@ Inspired the Excel tooling and agent loop pattern:
 - **Agent loop pattern** — Send tools → detect tool_calls → execute → loop
 - **Formula localization** — Locale-specific function names (en/fr)
 
-### [office-word-diff](https://github.com/yuch85/office-word-diff) (Apache 2.0)
+### [docx-redline-js](https://github.com/AnsonLai/docx-redline-js) (MIT License)
 
-Integrated as a local package for format-preserving text editing:
+OOXML reconciliation engine for native Word Track Changes:
 
-- **Word-level diffing** — Token mapping with formatting preservation
-- **Track Changes integration** — Native Word revision tracking
-- **Cascading strategies** — Token → Sentence → Block fallback
-- **diff-match-patch extension** — Google's algorithm with word-mode
+- **Native revision markup** — Generates `<w:ins>` / `<w:del>` elements in OOXML
+- **Configurable author** — Track Changes attributed to "KickOffice AI" (customizable in Settings)
+- **Formatting preservation** — Maintains `<w:rPr>` (fonts, colors, styles) during text edits
+- **Zero dependencies** — Self-contained, includes diff-match-patch internalized
+
+### [Gemini AI for Office](https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting) (MIT License)
+
+Integration pattern for OOXML Track Changes:
+
+- **Disable/insert/restore pattern** — Temporarily disable Track Changes → insert OOXML with embedded `<w:ins>/<w:del>` → restore original mode
+- **OOXML survival technique** — Prevents double-tracking by Word when inserting revision markup
 
 ### [Redink](https://github.com/LawDigital/redink) (MIT License)
 
@@ -349,7 +356,7 @@ Used by the `editSlideXml` PowerPoint tool for OOXML editing:
 
 ## License
 
-This project is proprietary software. The integrated `office-word-diff` library is licensed under Apache 2.0. Third-party dependencies retain their original licenses.
+This project is proprietary software. Third-party dependencies retain their original licenses (MIT, Apache 2.0, etc.).
 
 ---
 

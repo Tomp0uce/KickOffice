@@ -6,16 +6,16 @@
   >
     <!-- Token counts -->
     <div class="flex items-center gap-2">
-      <span v-if="hasStats" :title="`Input tokens: ${sessionStats.inputTokens}`">
+      <span v-if="hasStats" :title="t('stats.inputTokens', { count: sessionStats.inputTokens })">
         ↑{{ formatTokens(sessionStats.inputTokens) }}
       </span>
-      <span v-if="hasStats" :title="`Output tokens: ${sessionStats.outputTokens}`">
+      <span v-if="hasStats" :title="t('stats.outputTokens', { count: sessionStats.outputTokens })">
         ↓{{ formatTokens(sessionStats.outputTokens) }}
       </span>
       <div
         v-if="(contextWindowTokens ?? 0) > 0 && sessionStats.inputTokens > 0"
         class="ml-1 flex items-center gap-1 w-20"
-        :title="`Context usage: ${sessionStats.inputTokens} / ${contextWindowTokens} tokens (${contextPct}%)`"
+        :title="contextPctNum >= 80 ? t('stats.contextWarning', { pct: contextPct }) : t('stats.contextUsage', { used: sessionStats.inputTokens, total: contextWindowTokens, pct: contextPct })"
       >
         <div class="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
           <div class="h-full transition-all" :class="contextBarColor" :style="{ width: contextPctClamped + '%' }"></div>
@@ -33,6 +33,9 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface TokenStats {
   inputTokens: number

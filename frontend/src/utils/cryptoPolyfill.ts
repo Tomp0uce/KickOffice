@@ -3,6 +3,8 @@
  * Provides fallback implementations when Web Crypto API is not available
  */
 
+import { logService } from './logger'
+
 /**
  * Generate a UUID (v4)
  * Falls back to a simple implementation if crypto.randomUUID is not available
@@ -44,9 +46,9 @@ export function getCryptoWarning(): string {
  */
 export function logCryptoStatus(): void {
   if (isCryptoAvailable()) {
-    console.info('[CryptoPolyfill] Web Crypto API available - using encrypted storage')
+    logService.info('[CryptoPolyfill] Web Crypto API available - using encrypted storage')
   } else {
-    console.warn('[CryptoPolyfill] Web Crypto API NOT available - using unencrypted storage')
-    console.warn('[CryptoPolyfill]', getCryptoWarning())
+    logService.warn('[CryptoPolyfill] Web Crypto API NOT available - using unencrypted storage')
+    logService.warn('[CryptoPolyfill]', getCryptoWarning())
   }
 }

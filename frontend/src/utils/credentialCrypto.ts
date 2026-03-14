@@ -4,6 +4,7 @@
  */
 
 import { isCryptoAvailable } from './cryptoPolyfill'
+import { logService } from './logger'
 
 const ENCRYPTION_KEY_NAME = 'ko_encryption_key'
 
@@ -24,7 +25,7 @@ export async function getEncryptionKey(remember: boolean): Promise<CryptoKey | n
     keyData = fallbackStorage.getItem(ENCRYPTION_KEY_NAME)
     if (keyData) {
       primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData)
-      console.info('[CredentialCrypto] Migrated encryption key to', remember ? 'localStorage' : 'sessionStorage')
+      logService.info('[CredentialCrypto] Migrated encryption key to', remember ? 'localStorage' : 'sessionStorage')
     }
   }
 
@@ -57,7 +58,7 @@ export async function encryptValue(plaintext: string, remember: boolean): Promis
   try {
     const key = await getEncryptionKey(remember)
     if (!key) {
-      console.warn('[CredentialCrypto] Crypto not available, storing plaintext')
+      logService.warn('[CredentialCrypto] Crypto not available, storing plaintext')
       return plaintext
     }
 
@@ -70,7 +71,7 @@ export async function encryptValue(plaintext: string, remember: boolean): Promis
     combined.set(new Uint8Array(ciphertext), iv.length)
     return btoa(String.fromCharCode(...combined))
   } catch (error) {
-    console.error('[CredentialCrypto] Encryption failed:', error)
+    logService.error('[CredentialCrypto] Encryption failed', error instanceof Error ? error : new Error(String(error)))
     return plaintext
   }
 }
@@ -86,13 +87,13 @@ export async function decryptValue(encrypted: string, remember: boolean, credent
     const cryptoKey = await getEncryptionKey(remember)
 
     if (!cryptoKey) {
-      console.warn('[CredentialCrypto] Crypto not available, treating as plaintext')
+      logService.warn('[CredentialCrypto] Crypto not available, treating as plaintext')
       try {
         atob(encrypted)
         // Looks like encrypted data but we can't decrypt it — clear it
-        console.error('[CredentialCrypto] Found encrypted data but crypto is not available')
+        logService.error('[CredentialCrypto] Found encrypted data but crypto is not available')
         if (credentialKey) {
-          console.warn(`[CredentialCrypto] Clearing unusable encrypted data for key: ${credentialKey}`)
+          logService.warn(`[CredentialCrypto] Clearing unusable encrypted data for key: ${credentialKey}`)
           localStorage.removeItem(`ko_cred_${credentialKey}`)
           sessionStorage.removeItem(`ko_cred_${credentialKey}`)
         }
@@ -108,9 +109,9 @@ export async function decryptValue(encrypted: string, remember: boolean, credent
     const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ciphertext)
     return new TextDecoder().decode(decrypted)
   } catch (error) {
-    console.error('[CredentialCrypto] Decryption failed:', error)
+    logService.error('[CredentialCrypto] Decryption failed', error instanceof Error ? error : new Error(String(error)))
     if (credentialKey) {
-      console.warn(`[CredentialCrypto] Clearing corrupted data for key: ${credentialKey}`)
+      logService.warn(`[CredentialCrypto] Clearing corrupted data for key: ${credentialKey}`)
       localStorage.removeItem(`ko_cred_${credentialKey}`)
       sessionStorage.removeItem(`ko_cred_${credentialKey}`)
       sessionStorage.removeItem(credentialKey)

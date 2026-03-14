@@ -1,59 +1,65 @@
 /**
- * Word Diff Utilities
+ * Word Diff Utilities — v2 (docx-redline-js)
  *
- * Wrapper around office-word-diff for surgical text editing.
- * Preserves formatting by computing word-level diffs and applying
- * only the changes, not replacing entire ranges.
+ * Generates native Word Track Changes (w:ins / w:del) by injecting
+ * revision markup into paragraph OOXML via docx-redline-js.
+ *
+ * Integration pattern from Gemini AI for Office (MIT License):
+ * https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting
+ * OOXML engine: https://github.com/AnsonLai/docx-redline-js (MIT License)
  */
 
-import { OfficeWordDiff, getDiffStats, computeDiff } from 'office-word-diff'
-import type { DiffStats } from 'office-word-diff'
+import {
+  applyRedlineToOxml,
+  setDefaultAuthor,
+} from '@ansonlai/docx-redline-js'
+
+import {
+  setChangeTrackingForAi,
+  restoreChangeTracking,
+  loadRedlineAuthor,
+} from './wordTrackChanges'
 
 export interface RevisionResult {
   success: boolean
-  strategy: 'token' | 'sentence' | 'block'
-  insertions: number
-  deletions: number
-  unchanged: number
+  strategy: 'redline' | 'direct-replace' | 'none'
+  author?: string
   message: string
 }
 
 /**
- * Apply a revision to selected text using word-level diffing.
+ * Apply a revision to the current selection using docx-redline-js.
+ *
+ * Follows the Gemini AI for Office pattern:
+ * 1. Extract selection text + OOXML via getOoxml()
+ * 2. Generate revision markup via applyRedlineToOxml() (w:ins / w:del)
+ * 3. Disable Track Changes via setChangeTrackingForAi() (prevent double-tracking)
+ * 4. Insert modified OOXML via insertOoxml() (revision markup survives)
+ * 5. Restore Track Changes via restoreChangeTracking()
  *
  * IMPORTANT: Must be called within Word.run() context.
- *
- * @param context - Word.RequestContext from Word.run()
- * @param revisedText - The new version of the text
- * @param enableTrackChanges - Show changes in Word's Track Changes (default: true)
- * @returns RevisionResult with operation details
- *
- * @example
- * await Word.run(async (context) => {
- *   const result = await applyRevisionToSelection(context, "New text here", true);
- *   console.log(`Applied ${result.insertions} insertions using ${result.strategy} strategy`);
- * });
  */
 export async function applyRevisionToSelection(
   context: Word.RequestContext,
   revisedText: string,
-  enableTrackChanges: boolean = true
+  enableTrackChanges: boolean = true,
 ): Promise<RevisionResult> {
-  // 1. Get selection and load text
-  const range = context.document.getSelection()
-  range.load('text')
+  const redlineAuthor = loadRedlineAuthor()
+
+  // 1. Get selection text + OOXML in a single sync batch
+  const selection = context.document.getSelection()
+  selection.load('text')
+  const ooxmlResult = selection.getOoxml()
   await context.sync()
 
-  const originalText = range.text
+  const originalText = selection.text
+  const ooxml = ooxmlResult.value
 
-  // 2. Handle edge cases
+  // 2. Edge cases
   if (!originalText || !originalText.trim()) {
     return {
       success: false,
-      strategy: 'block',
-      insertions: 0,
-      deletions: 0,
-      unchanged: 0,
+      strategy: 'none',
       message: 'Error: No text selected. Please select text before using proposeRevision.',
     }
   }
@@ -61,85 +67,76 @@ export async function applyRevisionToSelection(
   if (originalText === revisedText) {
     return {
       success: true,
-      strategy: 'token',
-      insertions: 0,
-      deletions: 0,
-      unchanged: originalText.length,
+      strategy: 'none',
       message: 'Text is identical, no changes needed.',
     }
   }
 
-  // 3. Preview stats before applying
-  const stats = getDiffStats(originalText, revisedText)
+  // 3. Generate revision markup via docx-redline-js
+  setDefaultAuthor(redlineAuthor)
 
-  // 4. Apply diff with cascading fallback
-  const differ = new OfficeWordDiff({
-    enableTracking: enableTrackChanges,
-    logLevel: 'info',
-    onLog: (msg: string, level: string) => {
-      if (level === 'error') console.error('[WordDiff]', msg)
-      else if (level === 'warn') console.warn('[WordDiff]', msg)
-    },
-  })
-
+  let resultOoxml: string
   try {
-    const result = await differ.applyDiff(context, range, originalText, revisedText)
-
-    return {
-      success: result.success,
-      strategy: result.strategyUsed,
-      insertions: result.insertions,
-      deletions: result.deletions,
-      unchanged: stats.unchanged,
-      message: result.success
-        ? `Successfully applied ${result.insertions} insertions and ${result.deletions} deletions using ${result.strategyUsed} strategy.`
-        : `Diff application failed. Check logs for details.`,
-    }
+    const redlineResult = await applyRedlineToOxml(
+      ooxml,
+      originalText,
+      revisedText,
+      {
+        author: enableTrackChanges ? redlineAuthor : undefined,
+        generateRedlines: enableTrackChanges,
+      },
+    )
+    resultOoxml = redlineResult.oxml
   } catch (error: any) {
-    console.error('[WordDiff] Unexpected error:', error)
+    console.error('[WordDiff] docx-redline-js error:', error)
     return {
       success: false,
-      strategy: 'block',
-      insertions: 0,
-      deletions: 0,
-      unchanged: 0,
-      message: `Error applying revision: ${error.message || String(error)}`,
+      strategy: 'none',
+      message: `Error generating revision markup: ${error.message || String(error)}`,
     }
   }
-}
 
-/**
- * Preview diff statistics without applying changes.
- * Does NOT require Word context - can be used for UI preview.
- */
-export function previewDiffStats(originalText: string, revisedText: string): DiffStats {
-  return getDiffStats(originalText, revisedText)
-}
+  // 4. Disable Track Changes, insert, restore — pattern from Gemini AI for Office
+  const trackingState = await setChangeTrackingForAi(
+    context,
+    enableTrackChanges,
+    'proposeRevision',
+  )
 
-/**
- * Compute raw diff operations for debugging/display.
- * Does NOT require Word context.
- *
- * @returns Array of [operation, text] tuples:
- *   - [0, "text"] = unchanged
- *   - [-1, "text"] = deletion
- *   - [1, "text"] = insertion
- */
-export function computeRawDiff(originalText: string, revisedText: string): Array<[number, string]> {
-  return computeDiff(originalText, revisedText)
-}
+  try {
+    // Insert the modified OOXML
+    // w:ins/w:del survive because native tracking is OFF
+    selection.insertOoxml(resultOoxml, 'Replace')
+    await context.sync()
+  } catch (insertError: any) {
+    // Fallback: if insertOoxml fails (Word Online), use direct text replacement
+    console.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError)
+    try {
+      selection.insertText(revisedText, 'Replace')
+      await context.sync()
+    } catch (fallbackError: any) {
+      return {
+        success: false,
+        strategy: 'none',
+        message: `Error applying revision: ${fallbackError.message || String(fallbackError)}`,
+      }
+    }
+    return {
+      success: true,
+      strategy: 'direct-replace',
+      message: 'Revision applied with direct replacement (insertOoxml unavailable).',
+    }
+  } finally {
+    // 5. ALWAYS restore the original tracking mode
+    await restoreChangeTracking(context, trackingState, 'proposeRevision')
+  }
 
-/**
- * Check if text has complex content that may not diff well.
- * Warns about tables, images, and other non-text content.
- */
-export function hasComplexContent(text: string): boolean {
-  // Check for table markers, image placeholders, or other special content
-  const complexPatterns = [
-    /\t.*\t/,           // Tab-separated (likely table)
-    /\[Image\]/i,       // Image placeholder
-    /\[Figure\]/i,      // Figure placeholder
-    /^\s*\|.*\|/m,      // Markdown table row
-  ]
-  return complexPatterns.some(pattern => pattern.test(text))
+  return {
+    success: true,
+    strategy: enableTrackChanges ? 'redline' : 'direct-replace',
+    author: enableTrackChanges ? redlineAuthor : undefined,
+    message: enableTrackChanges
+      ? `Revision applied with Track Changes (author: "${redlineAuthor}").`
+      : 'Revision applied with direct replacement (no Track Changes).',
+  }
 }
