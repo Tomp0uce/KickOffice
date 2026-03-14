@@ -1411,48 +1411,156 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-## 14. PHASE SUMMARY (v11.0)
+## 14. IMPLEMENTATION PHASES (v11.0 — Optimised)
 
-### Phase 0 — 🔴 CRITICAL (v10 complete, 2 new critical bugs)
-1. **TOOL-C1**: ~~Fix /v1/files integration~~ — **PARTIALLY FIXED** ✅ (doc re-send deferred)
-2. **USR-C1**: ~~Complete the feedback debug bundle~~ — **FIXED** ✅
-3. 🆕 **PPT-C1**: Fix `getAllSlidesOverview` InvalidArgument — **TODO**
-4. 🆕 **PPT-C2**: Fix `insertImageOnSlide` crash with UUID base64Data — **TODO**
-
-### Phase 1 — 🟠 HIGH (v10 partially done, 7 new high items)
-**v10 FIXED (4 items)**: USR-H1, USR-H2 timer, TOOL-H2 screenshots, TOOL-H1, ERR-H1, ERR-H2
-**v10 Still Active (2)**: DUP-H1, QUAL-H1
-**NEW v11 HIGH (7 items)**:
-- 🆕 **IMG-H1**: Fix image crop with gpt-image-1.5
-- 🆕 **PPT-H1**: Fix Quick Action "Image" → metaphorical illustration, not text
-- 🆕 **OUT-H1**: Prevent image deletion in Outlook translation
-- 🆕 **UX-H1**: Smart scroll (yoyo fix + interrupt mechanism)
-- 🆕 **LANG-H1**: Multilingual — UI lang for discussion, doc lang for proposals
-- 🆕 **LOG-H1**: Tool usage counting system in `backend/logs/`
-- 🆕 **PPT-H2**: New Quick Action "Review" replaces "Speaker Notes"
-- 🆕 **WORD-H1**: Track Changes via OOXML (w:ins/w:del), replaces office-word-diff approach
-
-### Phase 2 — 🟡 MEDIUM (v10 backlog + 6 new medium items)
-**v10 backlog (8 items)**: ARCH-H1, ARCH-H2, ERR-M1, ERR-M2, TOOL-M1–M4, DEAD-M1–M2, DUP-M1–M2, QUAL-M1–M3, UX-M1–M3
-**NEW v11 MEDIUM (6 items)**:
-- 🆕 **PPT-M1**: Quick Action Image — handle <5 words selection
-- 🆕 **XL-M1**: Chart extraction — support multiple curves
-- 🆕 **CLIP-M1**: Paste images from clipboard into chat
-- 🆕 **TOKEN-M1**: Token coherence (display vs actual) + raise max limit
-- 🆕 **OXML-M1**: OXML integration evaluation and improvement
-- 🆕 **FB-M1**: Feedback: last 4 requests + tool usage context
-
-### Phase 3 — 🟢 LOW (polish + 2 new low items)
-**v10 (5 items)**: UX-L1–L3, ARCH-L1, ARCH-L2
-**NEW v11 LOW (1 item)**:
-- 🆕 **SKILL-L1**: skill.md system for Quick Actions
-
-### Phase 4 — 🚀 DEFERRED
-**From v10**: TOOL-C1 (doc re-send), TOOL-H2 (Word screenshot), USR-H1 (empty shapes), USR-H2 (context bloat), PROSP-H2, IC2, IH2, IH3, UM10, PROSP-1, PROSP-2, PROSP-3, PROSP-4, PROSP-5
-**NEW v11 DEFERRED**:
-- 🆕 **DYNTOOL-D1**: Dynamic Tooling (detailed plan — see below)
+> **Principe de groupement** : chaque phase regroupe des items qui touchent les mêmes fichiers ou la même zone de code, pour minimiser la lecture de contexte. Maximum 3 items par phase pour respecter la limite de tokens toutes les 4h.
 
 ---
+
+### Phase 1A — 🔴 PPT Bugs Critiques
+**Fichiers clés** : `frontend/src/utils/powerpointTools.ts` (1 fichier principal)
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| PPT-C1 | Fix `getAllSlidesOverview` → InvalidArgument sur certaines slides | 🔴 Critical |
+| PPT-C2 | Fix `insertImageOnSlide` → crash "addImage is not a function" avec UUID | 🔴 Critical |
+
+**Contexte à lire** : `powerpointTools.ts` (sections getAllSlidesOverview et insertImageOnSlide uniquement)
+
+---
+
+### Phase 1B — 🖼️ Génération d'image
+**Fichiers clés** : `backend/src/routes/image.js`, `frontend/src/api/backend.ts`, `frontend/src/utils/constant.ts` (section `visual`)
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| IMG-H1 | Fix crop gpt-image-1.5 (framing instruction + taille landscape par défaut) | 🟠 High |
+| PPT-H1 | Quick Action Image → illustration métaphorique, pas de texte dans l'image | 🟠 High |
+
+**Contexte à lire** : `image.js`, `backend.ts` (ligne `generateImage`), `constant.ts` (section `visual` uniquement)
+
+---
+
+### Phase 1C — 🎯 Quick Actions PowerPoint
+**Fichiers clés** : `constant.ts` (section PPT), `useAgentLoop.ts` (section `applyQuickAction`), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| PPT-H2 | Nouvelle Quick Action "Review" qui remplace "Speaker Notes" | 🟠 High |
+| PPT-M1 | Quick Action Image : gérer le cas < 5 mots sélectionnés | 🟡 Medium |
+
+**Contexte à lire** : `constant.ts` (sections `speakerNotes` et `visual`), `useAgentLoop.ts` (lignes 888–1110), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
+
+---
+
+### Phase 2A — 📜 Scroll Intelligent (Smart Scroll)
+**Fichiers clés** : `useHomePage.ts`, `useAgentStream.ts`, `ChatMessageList.vue`, `HomePage.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| UX-H1 | Remplacer le comportement yoyo par un smart scroll avec interruption manuelle | 🟠 High |
+
+**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl + @scroll)
+
+---
+
+### Phase 2B — 🌐 Support Multilingue
+**Fichiers clés** : `useAgentPrompts.ts`, `common.skill.md`, `word.skill.md`, `excel.skill.md`, `powerpoint.skill.md`, `outlook.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| LANG-H1 | Discussion en langue UI, propositions de texte dans la langue du document | 🟠 High |
+
+**Contexte à lire** : `useAgentPrompts.ts` (section `lang`), tous les `*.skill.md` (section language rules)
+
+---
+
+### Phase 2C — 📧 Outlook : Traduction sans perte d'images
+**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `outlook.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| OUT-H1 | Empêcher la suppression des images lors de la traduction d'un email | 🟠 High |
+
+**Contexte à lire** : `outlookTools.ts` (outil `setBody` et `getBody`), `outlook.skill.md`
+
+---
+
+### Phase 3A — 📊 Logging Backend et Feedback
+**Fichiers clés** : `backend/src/routes/chat.js`, `backend/src/routes/feedback.js`, nouveau dossier `backend/logs/`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| LOG-H1 | Comptage des outils utilisés par plateforme dans `logs/tool-usage.jsonl` | 🟠 High |
+| FB-M1 | Feedback enrichi : 4 dernières requêtes backend + snapshot outil | 🟡 Medium |
+
+**Contexte à lire** : `chat.js` (parsing des tool_use events), `feedback.js` (structure payload), `logs.js`
+
+---
+
+### Phase 3B — 📈 Extraction de graphiques multi-courbes (Excel)
+**Fichiers clés** : `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts`, `frontend/src/skills/excel.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| XL-M1 | Extraction de plusieurs courbes : détection RGB par LLM + itération par courbe | 🟡 Medium |
+
+**Contexte à lire** : `plotDigitizerService.js` (fonction `extractChartData`), `excelTools.ts` (outil `extract_chart_data`), `excel.skill.md` (section chart extraction workflow)
+
+---
+
+### Phase 3C — 🖱️ Presse-papier et Config Tokens
+**Fichiers clés** : `ChatInput.vue`, `backend/src/middleware/validate.js`, `backend/src/config/models.js`, `frontend/src/utils/tokenManager.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| CLIP-M1 | Coller une image depuis le presse-papier directement dans le chat | 🟡 Medium |
+| TOKEN-M1 | Cohérence tokens affiché vs réel + augmenter la limite max | 🟡 Medium |
+
+**Contexte à lire** : `ChatInput.vue` (zone textarea + file upload), `validate.js` (validateMaxTokens), `models.js` (defaultMaxTokens), `tokenManager.ts`
+
+---
+
+### Phase 4A — 📝 Word : Track Changes OOXML
+**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, nouveau `wordOoxmlUtils.ts`, composant Settings
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| OXML-M1 | Évaluation de l'intégration OOXML sur tous les hosts (prérequis) | 🟡 Medium |
+| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` pour les révisions, remplacer office-word-diff | 🟠 High |
+
+**Ordre** : Faire OXML-M1 (lecture/évaluation) en premier, puis WORD-H1 (implémentation)
+**Contexte à lire** : `wordDiffUtils.ts`, `wordTools.ts` (outil `proposeRevision`), `wordOoxmlUtils.ts` à créer, composant Settings (champ auteur)
+
+---
+
+### Phase 4B — 🔧 Skill.md pour Quick Actions
+**Fichiers clés** : `frontend/src/skills/` (nouveaux fichiers), `frontend/src/composables/useAgentLoop.ts` (section `applyQuickAction`)
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif) | 🟢 Low |
+
+**Contexte à lire** : `useAgentLoop.ts` (applyQuickAction), `index.ts` du dossier skills, format des skill.md existants
+
+---
+
+### Tech Debt Continu (v10 — Backlog)
+> Ces items ne changent pas de priorité mais sont regroupés ici pour ne pas bloquer les phases v11. À traiter en parallèle ou entre les phases ci-dessus.
+
+| Phase suggérée | Items | Fichiers principaux |
+|----------------|-------|---------------------|
+| TD-A : Architecture | ARCH-H1 (split useAgentLoop), ARCH-H2 (provide/inject) | `useAgentLoop.ts`, `HomePage.vue` |
+| TD-B : Qualité types | DUP-H1 (factory OfficeToolTemplate), QUAL-H1 (replace `: any`) | `common.ts`, tous `*Tools.ts` |
+| TD-C : Backend routes | ERR-M1 (shared chat error handler), ERR-M2 (sanitize files.js) | `chat.js`, `files.js` |
+| TD-D : Tool descriptions | TOOL-M1–M4 (types, overlaps, locale, format) | `excelTools.ts`, `powerpointTools.ts`, `useAgentPrompts.ts` |
+| TD-E : Dead code | DEAD-M1–M2 (exports alias, formatRange), DUP-M1–M2 (truncateString, error format) | tous `*Tools.ts`, `common.ts` |
+| TD-F : Composants Vue | QUAL-M3 (split large components), UX-M1–M3 (focus, i18n, ctx%), UX-L1–L3 | `HomePage.vue`, `ChatInput.vue`, `StatsBar.vue` |
+| TD-G : Infrastructure | ARCH-L1 (npm ci), ARCH-L2 (manifests), IC2/IH2/IH3 (Docker security) | `Dockerfile`, `.env.example` |
+
+---
+
+### Déferred — 🚀 Phase 5+
 
 #### DYNTOOL-D1: Dynamic Tooling — Intent-Based Tool Loading 🚀 DEFERRED
 
@@ -1485,7 +1593,7 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 | Severity | Count | Status | Items |
 |----------|-------|--------|-------|
-| 🔴 **Critical (NEW)** | 2 | 📋 TODO | PPT-C1 (getAllSlidesOverview), PPT-C2 (insertImageOnSlide UUID) |
+| 🔴 **Critical (v11 active)** | 2 | 📋 Phase 1A | PPT-C1, PPT-C2 |
 | 🔴 **Critical (v10)** | 0 | ✅ All fixed | Phase 0 complete |
 | 🟠 **High (deferred)** | 5 + 1 prospective | ⏳ Pending | TOOL-C1 (3), TOOL-H2 (3), USR-H1 (2), USR-H2 (3), PROSP-H2 |
 | 🟡 **Medium (deferred)** | 2 prospective | — | PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
@@ -1495,4 +1603,24 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-*This review covers the full codebase as of 2026-03-14. Line numbers reference the current state of the repository on the `claude/design-review-planning-UcBZi` branch.*
+## Résumé des phases d'implémentation v11.0
+
+| Phase | Zone de code | Items | Priorité max |
+|-------|-------------|-------|-------------|
+| **1A** | `powerpointTools.ts` | PPT-C1, PPT-C2 | 🔴 Critical |
+| **1B** | `image.js` + `constant.ts` (visual) | IMG-H1, PPT-H1 | 🟠 High |
+| **1C** | `constant.ts` (PPT QA) + `useAgentLoop.ts` + `QuickActionsBar` | PPT-H2, PPT-M1 | 🟠 High |
+| **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` | UX-H1 | 🟠 High |
+| **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1 | 🟠 High |
+| **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1 | 🟠 High |
+| **3A** | `chat.js` + `feedback.js` + `logs/` | LOG-H1, FB-M1 | 🟠 High |
+| **3B** | `plotDigitizerService.js` + `excelTools.ts` + `excel.skill.md` | XL-M1 | 🟡 Medium |
+| **3C** | `ChatInput.vue` + `validate.js` + `models.js` + `tokenManager.ts` | CLIP-M1, TOKEN-M1 | 🟡 Medium |
+| **4A** | `wordDiffUtils.ts` + `wordTools.ts` + nouveau `wordOoxmlUtils.ts` | OXML-M1, WORD-H1 | 🟠 High |
+| **4B** | `skills/` (nouveaux fichiers) + `useAgentLoop.ts` | SKILL-L1 | 🟢 Low |
+| **Tech Debt** | Divers (voir tableau TD-A à TD-G) | DUP-H1, QUAL-H1, ARCH-H1–H2, ERR-M1–M2, TOOL-M1–M4, DEAD-M1–M2, etc. | 🟠–🟢 |
+| **Déferred 5+** | — | DYNTOOL-D1, PROSP-H2, PROSP-1–5, IC2/IH2/IH3/UM10 | 🚀 |
+
+---
+
+*Ce document couvre le codebase au 2026-03-14. Les numéros de ligne référencent l'état courant sur la branche `claude/design-review-planning-UcBZi`.*
