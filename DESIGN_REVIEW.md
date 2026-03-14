@@ -1,7 +1,7 @@
 # DESIGN_REVIEW.md — Code Audit v11.21
 
 **Date**: 2026-03-14
-**Version**: 11.21
+**Version**: 11.22
 **Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
@@ -12,7 +12,7 @@
 |--------|-------|-------|
 | ✅ **FIXED** | 56 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C), **UX-H1, ARCH-H2** (Phase 2A), **LANG-H1, TOOL-M4** (Phase 2B), **OUT-H1, QUAL-L2** (Phase 2C), **LOG-H1, FB-M1, ERR-M1** (Phase 3A), **XL-M1, TOOL-M1, TOOL-M2** (Phase 3B), **CLIP-M1, UX-M1, UX-L1** (Phase 3C), **OXML-M1, WORD-H1, DUP-M1** (Phase 4A), **SKILL-L1, ARCH-H1** (Phase 4B), **DUP-H1, QUAL-H1, DEAD-M1** (Phase 5A), **DEAD-M2, DUP-M2, ERR-M2** (Phase 5B), **ARCH-M1, ARCH-M2, ARCH-M3** (Phase 5C), **QUAL-M1, QUAL-M2** (Phase 6A partial), **UX-M2, UX-M3, UX-L2, UX-L3** (Phase 6B), **ARCH-L1, ARCH-L2, IC2, IH2, IH3** (Phase 6C) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
-| ⏳ **IN PROGRESS / PLANNED** | 22 | Phase 7A-7F items (see detailed breakdown below) |
+| ⏳ **IN PROGRESS / PLANNED** | 18 | Phase 7A-7C, 7E-7F items (7D closed, see detailed breakdown below) |
 | 📋 **BACKLOG** | 0 | All backlog items organized into Phases 7A-7F |
 | 🆕 **NEW (v11.0)** | 11 | 0 Critical + 6 High (6 fixed ✅) + 6 Medium (all 6 fixed ✅) + 0 Low (both fixed ✅) — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
@@ -65,6 +65,8 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 **v11.19 session (Phase 6B — 2026-03-14)**: ✅ **Phase 6B complete (UX-M2 ✅, UX-M3 ✅, UX-L2 ✅, UX-L3 ✅)** — **UX-M2 + UX-M3**: Internationalized all hardcoded tooltips in StatsBar.vue and ToolCallBlock.vue. Wrapped 7 tooltip strings in `t()` calls with i18n keys (`stats.inputTokens`, `stats.outputTokens`, `stats.contextUsage`, `stats.contextWarning`, `toolCall.args`, `toolCall.error`, `toolCall.result`). Added 8 new translation keys to en.json and fr.json with parameter interpolation support (`{count}`, `{used}`, `{total}`, `{pct}`). **UX-M3**: Implemented 80% context warning — conditional tooltip logic in StatsBar.vue switches to `stats.contextWarning` (⚠️ emoji + actionable message: "approaching limit, consider starting new conversation") when `contextPctNum >= 80`. **UX-L2**: Replaced raw URL (`https://getkey.ai.kickmaker.net/`) with descriptive link text in AccountTab.vue using i18n key `getApiKeyLink` ("Get your API key here" / "Obtenez votre clé API ici"). Improves accessibility for screen readers. **UX-L3**: Increased message bubble max-width from `max-w-[95%]` to `max-w-[98%]` in ChatMessageList.vue (2 instances: message bubbles + agent action indicator). Provides ~9px extra space on 300px task pane, ~13.5px on 450px pane while maintaining 2% visual margin. TypeScript: ✅ PASS. Build: ✅ SUCCESS.
 
 **v11.20 session (Phase 6C — 2026-03-14)**: ✅ **Phase 6C complete (ARCH-L1 ✅, ARCH-L2 ✅, IC2 ✅, IH2 ✅, IH3 ✅)** — **ARCH-L1**: Replaced `npm install` with `npm ci --no-audit --no-fund` in frontend/Dockerfile for reproducible builds. Removed obsolete `office-word-diff` local dependency copy (removed in Phase 4A v11.10). Updated comment to reflect npm ci usage. **ARCH-L2**: Added comprehensive 40-line documentation header in `generate-manifests.js` explaining current approach (Express route serving from project root for self-hosted with authentication), alternative approach (static files in frontend/public/assets/ for SaaS distribution), security considerations (public exposure of internal hostnames/URLs), and migration path. Decision: Keep current approach for security, documentation provides guidance for future SaaS migration. **IC2**: Implemented non-root users in both Dockerfiles for security — backend: added `USER node` directive (UID 1000) with `chown -R node:node /app` ownership change; frontend: replaced `nginx:stable` with `nginxinc/nginx-unprivileged:stable` (UID 101), migrated port 80→8080 in nginx.conf and docker-compose.yml (`${FRONTEND_PORT}:8080`). Both containers now run as non-root users. **IH2**: Sanitized private IP `192.168.50.10` to `localhost` placeholder with documentation in frontend/Dockerfile ARG, .env.example (root `SERVER_IP`), and backend/.env.example (`FRONTEND_URL`). Added comments: "Replace with your actual server IP". **IH3**: Sanitized DuckDNS domain `kickoffice.duckdns.org` to `your-domain.duckdns.org` placeholder in .env.example for `PUBLIC_FRONTEND_URL` and `PUBLIC_BACKEND_URL`. Added comment: "Replace with your actual DuckDNS domain or public URL". TypeScript: ✅ PASS. Build: ✅ SUCCESS (14.58s).
+
+**v11.22 post-PR193 audit (Regression Audit — 2026-03-14)**: 🔍 **Audit post-PR193→PR201** — Analyse de toutes les modifications depuis PR#193 pour identifier régressions et dommages collatéraux. **Résultats** : (1) Problème page blanche ✅ résolu (PR#201, semi:true). (2) 3 régressions MEDIUM trouvées : 13+ console.warn/error non migrés (REG-M1), require() dans ESM (REG-M2), 11 catch(error:any) restants (REG-M3). (3) 3 items LOW : ternaire inutile Track Changes (REG-L1), contextPct ordering (REG-L2), mixed imports (REG-L3). (4) Phase 7D fermée (déjà complète). (5) 3 items recommandés Won't Fix : TOOL-H2 Word screenshot, PROSP-3 PRD split, PROSP-4 Templates. (6) 5 améliorations OXML identifiées (OXML-IMP1 à IMP5). Build: ✅ SUCCESS (20.14s). Aucune ASI hazard restante.
 
 **v11.21 audit (Comprehensive Code Audit — 2026-03-14)**: 🔍 **Audit complet de tous les items** — Vérification systématique de TOUS les 56 items marqués ✅ FIXED dans DESIGN_REVIEW.md vs le code réel. **Résultat**: 100% de précision (56/56 items correctement implémentés, 0 faux positifs). Aucune régression détectée des changements récents. Build: ✅ SUCCESS (12.79s). TypeScript: ✅ PASS. Code quality: ✅ Seulement 3 commentaires BUGFIX (problèmes déjà résolus). **Items restants identifiés**: 22 items (1 IN PROGRESS, 3 PARTIELLEMENT FIXES avec sub-items, 18 DEFERRED). **Nouvelles phases créées**: Phases 7A-7F pour organiser le travail restant de manière cohérente. Phase 7A (Context Optimization) identifiée comme CRITICAL PATH bloquant TOOL-C1, USR-H2, TOKEN-M1. Rapport complet généré dans `AUDIT_REPORT_v11.20.md`. Progression globale: ~72% (56 items FIXED / 78 items totaux).
 
@@ -1912,24 +1914,19 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 7D — 🏗️ Refactoring Architecture
+### Phase 7D — 🏗️ Refactoring Architecture ✅ COMPLÈTE (vérifié v11.22)
 **Fichiers clés** : `frontend/src/composables/useAgentLoop.ts`, `useSessionFiles.ts`, `useQuickActions.ts`, `useMessageOrchestration.ts`
 
 | Item | Description | Statut |
 |------|-------------|--------|
-| ARCH-H1 | Split useAgentLoop monolith (1,145 → ~880 lignes) | ⚠️ Vérification requise |
+| ARCH-H1 | Split useAgentLoop monolith (1,145 → ~880 lignes) | ✅ COMPLÉTÉ (v11.12) |
 
-**Sous-tâches** :
-1. Vérifier que useSessionFiles, useQuickActions, useMessageOrchestration sont complets
-2. Extraire toute fonction restante de useAgentLoop si nécessaire
-3. Documenter les responsabilités des composables
-4. Mettre à jour les tests si nécessaire
-
-**Dépendances** : Aucune (peut être parallèle à 7C)
-
-**Note** : Peut déjà être complet selon vérification Phase 4B
-
-**Contexte à lire** : Tous les composables dans `frontend/src/composables/`
+**Vérification v11.22** : Tous les composables existent et sont fonctionnels :
+- `useSessionFiles.ts` ✅ — gestion fichiers uploadés
+- `useQuickActions.ts` ✅ — 459 lignes, exécution Quick Actions
+- `useMessageOrchestration.ts` ✅ — 191 lignes, construction messages LLM
+- `useAgentLoop.ts` réduit à 881 lignes ✅ — orchestrateur agent loop
+- Build passe ✅
 
 ---
 
@@ -2060,11 +2057,275 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 | **7A** ⏳ | `useAgentLoop.ts` + `useMessageOrchestration.ts` + `tokenManager.ts` | PROSP-H2 ⏳ | 🟠 High (CRITICAL PATH) |
 | **7B** ⏳ | `useAgentLoop.ts` + `backend.ts` | TOOL-C1 ⏳, USR-H2 ⏳, TOOL-H2 ⏳, USR-H1 ⏳ | 🟠 High (dépend de 7A) |
 | **7C** ⏳ | `models.js` + `validate.js` + `tokenManager.ts` + `StatsBar.vue` | TOKEN-M1 ⏳ | 🟡 Medium (dépend de 7A + données) |
-| **7D** ⏸️ | `composables/*.ts` (tous) | ARCH-H1 ⏸️ | 🟡 Medium (vérification requise) |
+| **7D** ✅ | `composables/*.ts` (tous) | ARCH-H1 ✅ | ✅ COMPLÈTE (vérifié v11.22) |
 | **7E** ⏸️ | `Claude.md` + `PRD.md` + `.github/` | PROSP-2 ⏸️, PROSP-3 ⏸️, PROSP-4 ⏸️ | 🟢 Low |
 | **7F** 🚀 | `tool-usage.jsonl` + tous `*Tools.ts` | DYNTOOL-D1 🚀, PROSP-1 🚀, PROSP-5 🚀 | 🚀 Déféré (besoin 2+ semaines données) |
 | **Won't Fix** | — | UM10 ❌ (PowerPoint HTML reconstruction) | ❌ Ne pas implémenter |
 
 ---
 
-*Ce document couvre le codebase au 2026-03-14. Les numéros de ligne référencent l'état courant sur la branche `claude/design-review-planning-UcBZi`.*
+---
+
+## 14. POST-PR193 REGRESSION AUDIT (v11.22 — 2026-03-14)
+
+Audit complet du code après les PRs #193 à #201 pour identifier erreurs, régressions et dommages collatéraux.
+
+### 14.1. Problème de page blanche au démarrage (RÉSOLU PR #201)
+
+**Diagnostic** : Le problème `TypeError: t[(intermediate value)(intermediate value)(intermediate value)] is not a function` était causé par le minificateur qui fusionnait des lignes sans semicolons (ASI hazard). **Corrigé dans PR #201** par `"semi": true` dans `.prettierrc`. Vérification post-fix : aucune ligne ASI hazard restante dans `frontend/src/`.
+
+**Statut** : ✅ RÉSOLU — Prettier est maintenant configuré avec `"semi": true`, tous les fichiers ont des semicolons.
+
+---
+
+### 14.2. Régressions et bugs trouvés dans le code actuel
+
+#### REG-M1 — `console.warn/error` non migrés vers `logService` (13+ instances restantes) [MEDIUM] 🟠
+
+**Problème** : ERR-H2 a été marqué ✅ FIXED mais 13+ fichiers utilisent encore `console.warn/error` directement au lieu de `logService`. Ces appels contournent le logging structuré.
+
+**Fichiers impactés** :
+- `wordTrackChanges.ts:53,83` — 2× `console.warn` pour Track Changes unavailable/restore failed
+- `wordDiffUtils.ts:83,105` — `console.error` + `console.warn` pour erreurs docx-redline-js
+- `toolProviderRegistry.ts:36,51` — 2× `console.warn` pour host overwrite/missing provider
+- `richContentPreserver.ts:143` — `console.warn` pour HTML parse failure
+- `lockdown.ts:51` — `console.warn` pour lockdown failure
+- `toolStorage.ts:24,63` — `console.warn` + `console.info` pour localStorage quota/migration
+- `useOfficeSelection.ts:278` — `console.warn` pour Word getHtml failure
+- `useOfficeInsert.ts:47,61,80,110,158` — 5× `console.warn` pour Office insert errors
+- `useImageActions.ts:81,95,125,160,181` — 5× `console.error/warn` pour image actions
+- `router/index.ts:31` — `console.error` pour chunk load failure
+
+**Impact** : Ces erreurs ne sont pas capturées dans les logs structurés, ni incluses dans les rapports de feedback. Rend le débogage difficile pour les erreurs signalées par les utilisateurs.
+
+**Action** : Remplacer tous les `console.warn/error` restants par `logService.warn/error` dans les fichiers ci-dessus. ~25 remplacements.
+
+---
+
+#### REG-M2 — `require()` dans un projet ESM (toolProviderRegistry.ts) [MEDIUM] 🟠
+
+**Fichier** : `frontend/src/utils/toolProviderRegistry.ts:91-94`
+
+```typescript
+const { getWordToolDefinitions } = require('@/utils/wordTools');
+const { getExcelToolDefinitions } = require('@/utils/excelTools');
+```
+
+**Problème** : Le projet est un projet Vite/ESM. `require()` est un pattern CommonJS qui:
+1. Ne bénéficie pas du tree-shaking de Vite/Rollup
+2. N'est pas standard en ESM — fonctionne uniquement grâce à `vite-plugin-node-polyfills`
+3. Crée un avertissement TypeScript (`TS2580: Cannot find name 'require'`)
+4. Empêche l'analyse statique des imports
+
+**Action** : Remplacer `require()` par `import()` dynamique ou des imports statiques ES6.
+
+---
+
+#### REG-M3 — `error: any` non migré vers `error: unknown` (11 catch blocks) [MEDIUM] 🟠
+
+**Problème** : QUAL-H1 a remplacé `error: any` → `error: unknown` dans les fichiers `*Tools.ts` principaux, mais a manqué :
+- `wordDiffUtils.ts:82,103,109` — 3× `catch (error: any)` / `catch (insertError: any)` / `catch (fallbackError: any)`
+- `generalTools.ts:96,124,154,177,196` — 5× `catch (error: any)`
+- `common.ts:148` — 1× `catch (error: any)`
+- `powerpointTools.ts:278` — 1× `catch (e: any)`
+- `useQuickActions.ts:523` — 1× `catch (err: any)`
+
+**Impact** : Incohérence typique TypeScript. Les catch blocks avec `: any` contournent la safety du `getErrorMessage()` helper créé dans QUAL-H1.
+
+**Action** : Migrer ces 11 instances vers `error: unknown` + utiliser `getErrorMessage(error)`.
+
+---
+
+#### REG-L1 — `setChangeTrackingForAi` force toujours `Off` quel que soit `redlineEnabled` [LOW] 🟢
+
+**Fichier** : `wordTrackChanges.ts:43-45`
+
+```typescript
+const desiredMode = redlineEnabled
+  ? Word.ChangeTrackingMode.off // OFF because w:ins/w:del are already in the XML
+  : Word.ChangeTrackingMode.off; // OFF for silent replacement too
+```
+
+**Problème** : La condition ternaire est inutile — les deux branches retournent `Word.ChangeTrackingMode.off`. Devrait probablement être :
+- `redlineEnabled = true` → `off` (pour que le markup w:ins/w:del survive)
+- `redlineEnabled = false` → garder le mode original (pas besoin de changer)
+
+**Impact** : Quand `enableTrackChanges=false`, le Track Changes est quand même désactivé puis restauré inutilement. Pas de bug fonctionnel mais code confus et opérations Office.js inutiles.
+
+**Action** : Simplifier — si `!redlineEnabled`, ne pas appeler `setChangeTrackingForAi()` du tout, ou ne changer le mode que si `redlineEnabled`.
+
+---
+
+#### REG-L2 — Variable `contextPct` utilisée avant affectation dans le timer [LOW] 🟢
+
+**Fichier** : `useAgentLoop.ts:291-303`
+
+```typescript
+const llmWaitTimer = setInterval(() => {
+  const ctxSuffix = contextPct >= 50 ? ` · ctx ${contextPct}%` : '';  // line 293
+  // ...
+}, 1000);
+// ...
+const contextPct = estimateContextUsagePercent(currentMessages, currentSystemPrompt);  // line 303
+```
+
+**Problème** : `contextPct` est référencé dans le callback du `setInterval` avant sa déclaration (`const` à la ligne 303). Grâce au fonctionnement asynchrone (le timer ne fire qu'après 1s), la variable est toujours assignée avant le premier callback. Mais ce pattern est fragile et peut confondre les développeurs/linters.
+
+**Action** : Déplacer la déclaration de `contextPct` AVANT le `setInterval`, ou la calculer à l'intérieur du callback.
+
+---
+
+#### REG-L3 — `backend.ts` importé à la fois statiquement et dynamiquement [LOW] 🟢
+
+**Fichier** : Build warning Vite :
+```
+(!) backend.ts is dynamically imported by powerpointTools.ts but also statically imported by AccountTab.vue, useAgentLoop.ts, etc.
+```
+
+**Impact** : Le code splitting n'est pas optimal — `backend.ts` ne peut pas être mis dans un chunk séparé car il est importé des deux façons. Pas de bug fonctionnel, mais contribue au gros chunk `index.js` (1.5 MB).
+
+**Action** : Convertir les imports dynamiques en imports statiques (ou vice versa) pour permettre un meilleur code splitting.
+
+---
+
+### 14.3. Analyse de pertinence des Phases 7 et déférées
+
+#### Phase 7A — Context Optimization : ✅ PERTINENT (CRITIQUE)
+
+PROSP-H2 est clairement le **plus gros impact fonctionnel** restant. Il débloque 3 items (TOOL-C1, USR-H2, TOKEN-M1) et améliore directement la latence et la qualité des réponses.
+
+**Suggestion** : Prioriser la "tool result summarization" (sous-tâche 1) qui est le quick-win le plus impactant. Le "document pinning" (sous-tâche 2) est plus complexe et peut être déféré.
+
+**Question** : Pour la summarisation des résultats d'outils après N itérations — avez-vous une préférence entre :
+- **Approche LLM** : appeler le LLM pour résumer (ajoute latence mais meilleure qualité)
+- **Approche heuristique** : tronquer les résultats > X chars avec un résumé template (rapide mais perte d'info)
+- **Approche hybride** : tronquer immédiatement, résumer via LLM en arrière-plan pour les prochaines itérations
+
+#### Phase 7B — Items Haute Priorité Restants : ⚠️ À RÉÉVALUER
+
+- **TOOL-C1** (doc re-send) : ✅ PERTINENT — dépend de 7A, à garder
+- **USR-H2** (context bloat) : ✅ PERTINENT — dépend de 7A, à garder
+- **TOOL-H2** (Word screenshot) : ❌ **PAS PERTINENT** — Il n'existe AUCUNE API Office.js pour capturer un screenshot de Word. Les alternatives tierces (html2canvas, puppeteer) ne fonctionnent pas dans un add-in sandboxé. **Recommandation : marquer Won't Fix** et utiliser `getDocumentAsHtml()` comme proxy visuel si nécessaire.
+- **USR-H1** (empty shapes bullets) : 🟡 **BASSE PERTINENCE** — Le fix `placeholderFormat/type` couvre 95% des cas. Les shapes vides avec bullets XML defaults sont un edge case rare. **Recommandation : déférer indéfiniment ou Won't Fix.**
+
+#### Phase 7C — Gestion des Tokens : 🟡 PERTINENT CONDITIONNEL
+
+TOKEN-M1 dépend de 2+ semaines de données LOG-H1. **Question** : LOG-H1 a-t-il été déployé et collecte-t-il des données actuellement ? Si non, cette phase ne peut pas commencer. Si oui, quelle est la taille du dataset actuel ?
+
+#### Phase 7D — Refactoring Architecture : ❌ **DÉJÀ FAIT — FERMER**
+
+ARCH-H1 est marqué ⏸️ "vérification requise" mais il a été **complété dans la session v11.12**. Le refactoring est fait :
+- `useSessionFiles.ts` ✅
+- `useQuickActions.ts` ✅
+- `useMessageOrchestration.ts` ✅
+- `useAgentLoop.ts` réduit de 1230 → 881 lignes ✅
+
+**Action** : Marquer Phase 7D comme ✅ COMPLÈTE et la retirer des items en attente.
+
+#### Phase 7E — Documentation & Templates : 🟢 BASSE PERTINENCE
+
+- **PROSP-2** (Claude.md overhaul) : 🟡 Utile mais pas urgent. Le Claude.md actuel fonctionne.
+- **PROSP-3** (PRD split) : ❌ **PAS PRIORITAIRE** — Le PRD n'est lu que par les agents AI qui peuvent gérer un fichier de 550 lignes sans problème. Le split ajoute de la complexité de maintenance pour un gain minimal.
+- **PROSP-4** (Templates) : ❌ **PAS PRIORITAIRE** — Les templates PR sont déjà définis dans Claude.md. Créer des fichiers `.github/` n'ajoute pas de valeur fonctionnelle.
+
+**Recommandation** : Ne garder que PROSP-2 avec scope réduit (ajout des 3-4 règles manquantes, pas de rewrite complet).
+
+#### Phase 7F — Fonctionnalités Avancées : 🚀 PRÉMATURÉ
+
+- **DYNTOOL-D1** et **PROSP-1** (dynamic tool loading) : Ces items dépendent de données d'usage qui n'existent probablement pas encore. GPT-5.2 gère 128+ tools, donc le problème de "trop de tools" n'est pas critique.
+- **PROSP-5** (static intent profiles) : Bonne idée conceptuelle mais manque de données pour définir les profils. **Recommandation : déférer jusqu'à avoir des données LOG-H1.**
+
+#### Items à marquer comme non pertinents / Won't Fix :
+
+| Item | Raison | Action |
+|------|--------|--------|
+| TOOL-H2 (Word screenshot) | Pas d'API disponible, alternatives impossibles dans add-in sandboxé | Won't Fix |
+| USR-H1 (empty shapes default bullets) | Edge case rare, 95% couvert par fix existant | Won't Fix ou Déféré indéfiniment |
+| PROSP-3 (PRD split) | Gain marginal, complexité de maintenance | Retirer des phases |
+| PROSP-4 (Templates) | Déjà dans Claude.md, pas de gain fonctionnel | Retirer des phases |
+| PROSP-1 (Dynamic tool loading — full) | Pas de données, GPT-5.2 gère 128+ tools | Garder en veille longue |
+
+---
+
+### 14.4. Analyse OXML Integration (OXML_INTEGRATION_GUIDE.md)
+
+#### Ce qui est bien implémenté :
+1. **Track Changes via docx-redline-js** : Architecture solide — pattern Gemini AI for Office bien reproduit (disable TC → insertOoxml → restore)
+2. **editDocumentXml tool** : Bonne addition pour la préservation de mise en forme via manipulation OOXML directe
+3. **Fallback robuste** : Si `insertOoxml()` échoue (Word Online), fallback vers `insertText()` automatique
+4. **Auteur configurable** : Settings UI pour le nom d'auteur des révisions
+
+#### Opportunités d'amélioration OXML non exploitées :
+
+##### OXML-IMP1 — Track Changes au niveau paragraphe (pas seulement sélection) [HIGH] 🟠
+
+**Problème actuel** : `proposeRevision` opère uniquement sur la **sélection courante**. Si l'utilisateur demande "réécris tout le document", l'agent doit soit sélectionner tout manuellement, soit traiter paragraphe par paragraphe (lent).
+
+**Amélioration possible** : Créer un tool `proposeDocumentRevision` qui :
+1. Itère sur `context.document.body.paragraphs`
+2. Pour chaque paragraphe modifié, applique `applyRedlineToOxml()` individuellement
+3. Batch les `insertOoxml()` dans un seul `context.sync()`
+
+**Avantage** : Track Changes chirurgical sur tout le document, pas seulement la sélection. Plus proche du workflow "suggérer des modifications" de Google Docs.
+
+**Complexité** : MEDIUM — nécessite une comparaison texte original vs texte révisé par paragraphe (diff au niveau paragraphe).
+
+##### OXML-IMP2 — Préservation des commentaires Word natifs [MEDIUM] 🟡
+
+**docx-redline-js offre** : `injectCommentsIntoOoxml()` — permet d'ajouter des commentaires Word natifs dans le OOXML.
+
+**Non implémenté** : L'agent n'a actuellement aucun moyen d'ajouter des commentaires Word (le tool `addComment` n'existe pas). Les commentaires sont une fonctionnalité clé du workflow de révision.
+
+**Amélioration possible** : Ajouter un tool `addWordComment` qui utilise `injectCommentsIntoOoxml()` pour insérer des commentaires natifs visibles dans le panneau Révisions de Word.
+
+**Note** : Office.js a aussi `context.document.body.getComments()` (WordApi 1.4) mais l'insertion de commentaires via API est limitée. L'approche OOXML pourrait être plus fiable.
+
+##### OXML-IMP3 — Accept/Reject programmatique des Track Changes [MEDIUM] 🟡
+
+**docx-redline-js offre** : `acceptTrackedChangesInOoxml()` — accepte les Track Changes par auteur dans le OOXML.
+
+**Non implémenté** : L'utilisateur doit accepter/rejeter manuellement les Track Changes dans Word. Un tool `acceptAiChanges` pourrait accepter automatiquement tous les changements de l'auteur "KickOffice AI" d'un coup.
+
+**Note** : Office.js WordApi 1.6 offre aussi `trackedChange.accept()` / `trackedChange.reject()` / `trackedChange.getRange()`. Les deux approches (OOXML et API) sont possibles.
+
+##### OXML-IMP4 — Insertion de contenu riche structuré (tables, listes numérotées) [MEDIUM] 🟡
+
+**Problème actuel** : L'insertion de contenu via `insertHtml()` ou `insertText()` perd parfois la mise en forme complexe (numérotation de listes, styles de tableaux, colonnes, en-têtes/pieds de page).
+
+**Amélioration possible** : Pour les insertions de contenu riche, générer du OOXML directement (via template) et utiliser `insertOoxml()`. Cela préserve :
+- Numérotation de listes (`<w:numPr>`)
+- Styles de tableaux (`<w:tblPr>` avec borders, shading, etc.)
+- Mise en page (colonnes, orientations, sections)
+
+**Complexité** : HIGH — requiert la génération de OOXML valide, ce qui est complexe (namespace management, relationship IDs, etc.).
+
+##### OXML-IMP5 — PowerPoint : édition de notes speaker via OOXML [LOW] 🟢
+
+**Déjà possible** : `editSlideXml` accède au slide XML. Les notes speaker sont dans `ppt/notesSlides/notesSlideN.xml` qui est accessible via JSZip.
+
+**Non implémenté** : Le pattern `withSlideZip` actuel ne cible que le slide XML principal. L'accès aux notes slides nécessiterait une extension du pattern pour cibler d'autres parties du PPTX.
+
+---
+
+### 14.5. Résumé des actions recommandées (par priorité)
+
+| Priorité | Item | Description | Effort |
+|----------|------|-------------|--------|
+| 🔴 Critical | Phase 7A (PROSP-H2) | Context optimization — tool result summarization | HIGH |
+| 🟠 High | REG-M1 | Migrer 25+ `console.warn/error` → `logService` | LOW |
+| 🟠 High | REG-M2 | Remplacer `require()` par `import` dans toolProviderRegistry | LOW |
+| 🟠 High | REG-M3 | Migrer 11 `catch (error: any)` → `error: unknown` | LOW |
+| 🟠 High | OXML-IMP1 | proposeDocumentRevision (TC sur tout le doc) | MEDIUM |
+| 🟡 Medium | OXML-IMP2 | addWordComment via OOXML | MEDIUM |
+| 🟡 Medium | OXML-IMP3 | acceptAiChanges programmatique | LOW |
+| 🟡 Medium | OXML-IMP4 | Insertion contenu riche via OOXML templates | HIGH |
+| 🟢 Low | REG-L1 | Simplifier setChangeTrackingForAi ternaire | LOW |
+| 🟢 Low | REG-L2 | Réordonner contextPct dans useAgentLoop | LOW |
+| 🟢 Low | REG-L3 | Unifier imports statiques/dynamiques backend.ts | LOW |
+| ❌ Close | Phase 7D | Déjà complété (ARCH-H1 done) | — |
+| ❌ Close | TOOL-H2 (Word screenshot) | Won't Fix — pas d'API | — |
+| ❌ Close | PROSP-3, PROSP-4 | Pas pertinent / gain marginal | — |
+
+---
+
+*Ce document couvre le codebase au 2026-03-14. Les numéros de ligne référencent l'état courant sur la branche `claude/review-recent-changes-1cs54`.*
