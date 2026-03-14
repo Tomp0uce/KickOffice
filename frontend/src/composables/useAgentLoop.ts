@@ -7,7 +7,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes, powerpointImageRegistry } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes, powerpointImageRegistry, powerpointToolDefinitions } from '@/utils/powerpointTools'
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
@@ -918,7 +918,32 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       // Get current slide text selection
-      const slideText = await getOfficeSelection({ actionKey })
+      let slideText = await getOfficeSelection({ actionKey })
+
+      // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
+      // to provide richer context for image generation
+      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length
+      if (wordCount < 5) {
+        try {
+          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({})
+          const screenshot = JSON.parse(screenshotJson)
+          if (screenshot.base64 && !screenshot.error) {
+            const dataUri = `data:image/png;base64,${screenshot.base64}`
+            let slideDesc = ''
+            await chatStream({
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: dataUri } },
+                { type: 'text', text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.' },
+              ] as any }],
+              modelTier: resolveChatModelTier(),
+              onStream: async (text: string) => { slideDesc = text },
+            })
+            if (slideDesc.trim()) slideText = slideDesc.trim()
+          }
+        } catch (err) {
+          logService.warn('[AgentLoop] PPT-M1: screenshot fallback for short selection failed', err)
+        }
+      }
 
       // Step 1: call standard LLM to generate a proper image description prompt
       const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'

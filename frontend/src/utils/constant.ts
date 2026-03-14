@@ -318,19 +318,25 @@ export const powerPointBuiltInPrompt = {
       Text: ${text}`,
   },
 
+  // PPT-H1: improved prompt — generate images that truly illustrate the slide content
   visual: {
     system: (language: string) =>
-      `You are a visual communication expert and creative director. Your task is to generate detailed image prompts for presentation visuals based on slide content in ${language}.`,
+      `You are a visual communication expert and creative director specializing in presentation design. Your task is to generate detailed image generation prompts that produce visuals which directly illustrate and represent the given slide content in ${language}. The image must feel like it was created specifically for this slide — not a generic stock photo.`,
     user: (text: string, language: string) =>
-      `Task: Based on the following slide content, generate a detailed image generation prompt.
+      `Task: Based on the following slide content, write a detailed prompt for an image generation model that will produce a visual directly illustrating this specific content.
+
       Requirements:
-      - Describe a professional, clean visual that would complement the slide content.
-      - Include style direction (e.g., flat illustration, photo-realistic, infographic style).
-      - Specify colors, mood, and composition.
-      - Keep it suitable for a professional presentation context.
+      - The image must visually represent the SPECIFIC topic, concept, or data from the slide — not a generic illustration.
+      - Choose the most appropriate visual style for the content: photo-realistic scene, flat vector illustration, isometric diagram, infographic, conceptual metaphor, data visualization, etc.
+      - If the concept benefits from including labels or short text in the image (e.g., a diagram with annotations), explicitly request it.
+      - Describe composition: what is in the foreground, background, key focal elements.
+      - Specify color palette, mood, and lighting that match the slide's tone (e.g., professional, energetic, calm, technical).
+      - Wide landscape format (16:9), high resolution, suitable for professional presentation slides.
+      - No generic filler images (e.g., no random handshakes or abstract blobs unless directly relevant).
+
       Constraints:
       1. Respond in ${language}.
-      2. OUTPUT ONLY the image prompt, ready to be used with an image generation tool.
+      2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.
 
       Slide content: ${text}`,
   },

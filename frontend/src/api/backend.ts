@@ -399,7 +399,8 @@ export interface ImageGenerateOptions {
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
-  const payload = { ...options, size: options.size || '1024x1024' }
+  // IMG-H1: default to landscape 1536x1024 to match PPT slide format and reduce cropping
+  const payload = { ...options, size: options.size || '1536x1024' }
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },

@@ -1,7 +1,7 @@
-# DESIGN_REVIEW.md — Code Audit v11.1
+# DESIGN_REVIEW.md — Code Audit v11.2
 
 **Date**: 2026-03-14
-**Version**: 11.1
+**Version**: 11.2
 **Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
@@ -10,11 +10,11 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 16 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A) |
+| ✅ **FIXED** | 19 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
-| 🆕 **NEW (v11.0)** | 17 | 0 Critical (both fixed) + 9 High + 7 Medium + 2 Low — see sections 11–13 |
+| 🆕 **NEW (v11.0)** | 14 | 0 Critical + 7 High (2 fixed) + 6 Medium (1 fixed) + 2 Low — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
 | 🚀 **DEFERRED** (Phase 4) | 18 | 11 functional improvements + 4 legacy (v7/v8) + 2 architectural + 1 dynamic tooling |
 
@@ -29,6 +29,8 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 **v11.0 session (2026-03-14)**: Added 20 new items — confirmed implementation status of all OFFICE_AGENTS_ANALYSIS features, added user-reported bugs (PPT-C1, PPT-C2, IMG-H1, PPT-H1, OUT-H1, UX-H1, LANG-H1), and new improvement items (LOG-H1, PPT-H2, WORD-H1, PPT-M1, XL-M1, CLIP-M1, TOKEN-M1, OXML-M1, FB-M1, SKILL-L1, DYNTOOL-D1).
 
 **v11.1 session (Phase 1A — 2026-03-14)**: ✅ **Phase 1A complete** — Fixed PPT-C1 (`getAllSlidesOverview`: per-slide try/catch + textSyncOk flag to isolate OLE/chart shape failures), fixed PPT-C2 (`insertImageOnSlide` + `insertIcon`: `slides.getItemAt(index)` → `slides.items[index]` to avoid post-sync proxy issue), implemented TOOL-M3 (`searchAndFormatInPresentation` tool: manual slide→shape→paragraph→textRun iteration with 4-sync batch pattern, supports bold/italic/underline/fontColor/fontSize/fontName).
+
+**v11.2 session (Phase 1B — 2026-03-14)**: ✅ **Phase 1B complete** — IMG-H1: strengthened `FRAMING_INSTRUCTION` in `image.js` (explicit rules: fit entire subject, 4-side padding, no edge clipping, landscape composition) + changed default size to `1536x1024` in `backend.ts`. PPT-H1: rewrote `powerPointBuiltInPrompt.visual` to generate content-specific representative images (explicit requirement to illustrate the exact topic, not generic stock, style guidance per content type, text allowed if useful). PPT-M1: in `useAgentLoop.ts` visual handler, if selection < 5 words → call `screenshotSlide`, send image to LLM for slide description, use description as context for the visual prompt.
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
@@ -1070,39 +1072,21 @@ Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could
 
 ---
 
-### IMG-H1 — Image generation cropped with gpt-image-1 / gpt-image-1.5 [HIGH]
+### IMG-H1 — Image generation cropped with gpt-image-1 / gpt-image-1.5 [HIGH] ✅ FIXED (Phase 1B)
 
-**File**: `backend/src/routes/image.js:21-28`
+**Files**: `backend/src/routes/image.js`, `frontend/src/api/backend.ts`
 
-The `FRAMING_INSTRUCTION` was added to fix cropping on `gpt-image-1`. With the upgrade to `gpt-image-1.5` (or newer model version), the issue has returned — generated images are being cropped on left and right edges again.
-
-**Current state**: `FRAMING_INSTRUCTION = 'Always fit the entire subject inside the frame with visible padding margins. Do not crop the left or right edges.'` is prepended to every prompt, but gpt-image-1.5 appears to ignore it or reinterpret it differently.
-
-**Action**:
-1. Review the default image size used: frontend sends `size: '1024x1024'` by default (`backend.ts:402`) which forces a square crop — for wide/landscape content this causes side-cropping. Change default to `'1792x1024'` (landscape)
-2. Strengthen the framing instruction: add `"Wide composition. Landscape orientation. No text overlays. Leave 10% padding on all edges."`
-3. Test with `gpt-image-1.5` specifically and document the prompt strategy that works
+**Fix**:
+1. Strengthened `FRAMING_INSTRUCTION` in `image.js` — explicit 4-rule composition mandate: fit entire subject, visible padding on all four sides, no clipping of heads/limbs/text/edges, landscape 16:9 composition.
+2. Changed default size from `1024x1024` → `1536x1024` in `backend.ts` — landscape format matches PowerPoint slide dimensions and prevents side-cropping of wide subjects.
 
 ---
 
-### PPT-H1 — Quick Action "Image" : l'image générée n'est pas représentative du contenu [HIGH]
+### PPT-H1 — Quick Action "Image" : l'image générée n'est pas représentative du contenu [HIGH] ✅ FIXED (Phase 1B)
 
-**File**: `frontend/src/utils/constant.ts:321-336` — `powerPointBuiltInPrompt.visual`
+**File**: `frontend/src/utils/constant.ts` — `powerPointBuiltInPrompt.visual`
 
-La Quick Action "Image" génère un prompt d'image à partir du texte de la slide, qui est ensuite envoyé à gpt-image. Le problème est que le prompt généré décrit le contenu de manière trop littérale ou trop vague — les images produites ne illustrent pas bien le message de la slide (mauvaise métaphore visuelle, image non représentative du sujet, hors contexte).
-
-**Note** : Il n'est PAS question d'interdire le texte dans l'image. Si du texte améliore l'illustration (titre, chiffre clé), c'est acceptable. L'objectif est de générer des visuels **pertinents et représentatifs** du contenu.
-
-**Current prompt**: "Describe a professional, clean visual that would complement the slide content" — trop générique, ne guide pas suffisamment le LLM pour choisir une métaphore visuelle forte et pertinente.
-
-**Action**:
-1. Réécrire le prompt `visual.user` pour guider la génération vers des visuels réellement représentatifs :
-   - Analyser le thème central et le message clé de la slide
-   - Choisir une métaphore visuelle forte qui illustre ce message (pas une description littérale de la slide)
-   - Décrire la composition, l'ambiance, les couleurs qui renforcent le message
-   - Si le sujet s'y prête (chiffre important, mot clé), intégrer ce texte visuellement dans l'image
-   - Style : clair, professionnel, adapté au contexte de présentation
-2. Mettre à jour le tooltip pour expliquer le comportement attendu
+**Fix**: Rewrote `visual.system` and `visual.user` prompts. New prompt explicitly requires: (1) visual must represent the SPECIFIC topic — no generic stock images, (2) style selection adapted to content type (photo-realistic, flat vector, isometric, infographic, etc.), (3) text in image explicitly allowed and requested when useful, (4) composition details: foreground/background/focal elements, (5) landscape 16:9 format, (6) output only the prompt with no preamble.
 
 ---
 
@@ -1239,24 +1223,11 @@ The ideal approach (inspired by `docx-redline-js` and the `Gemini-AI-for-Office`
 
 ---
 
-### PPT-M1 — Quick Action "Image": handle <5 words selection case [MEDIUM]
+### PPT-M1 — Quick Action "Image": handle <5 words selection case [MEDIUM] ✅ FIXED (Phase 1B)
 
-**Files**: `frontend/src/composables/useAgentLoop.ts:700-720` (image quick action), `frontend/src/utils/constant.ts:321-336`
+**File**: `frontend/src/composables/useAgentLoop.ts` — `visual` quick action handler
 
-**Problem**: When the user triggers the "Image" quick action with fewer than 5 words selected (or no selection), the prompt is too vague and produces poor results.
-
-**Proposed behavior**:
-- If **no selection or < 5 words**: show a user-facing message "Not enough text selected — using full slide content to generate the illustration." Then:
-  1. Take a screenshot of the current slide (`screenshotSlide`)
-  2. Send the screenshot to the LLM and ask: "Generate a detailed image prompt that creates a visual illustration representing the content and mood of this slide. No text in the image."
-  3. Use the LLM-generated prompt to call the image generation API
-- If **≥ 5 words selected**: generate image directly from selected text (current behavior, but with improved prompt from PPT-H1 fix)
-
-**Action**:
-1. In the image quick action handler (`useAgentLoop.ts`), check word count of selection
-2. Add user feedback message when falling back to full slide
-3. Add `screenshotSlide` → LLM prompt generation step for the fallback path
-4. Update tooltip text to reflect both behaviors
+**Fix**: In the `visual` handler, before Step 1 (image prompt generation), check word count of `slideText`. If `< 5 words`: call `powerpointToolDefinitions.screenshotSlide.execute({})`, parse the base64 result, send the slide image to the LLM as a vision message requesting a 2-3 sentence description of the slide content and visual concept, use that description as `slideText` for Step 1. Errors in the screenshot/description step are caught gracefully and fall back to the original (possibly empty) `slideText`.
 
 ---
 
@@ -1415,14 +1386,14 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 1B — 🖼️ Génération d'image + Quick Action Image
+### Phase 1B — 🖼️ Génération d'image + Quick Action Image ✅ DONE
 **Fichiers clés** : `backend/src/routes/image.js`, `frontend/src/api/backend.ts`, `frontend/src/utils/constant.ts` (section `visual`), `frontend/src/composables/useAgentLoop.ts` (handler image QA)
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| IMG-H1 | Fix crop gpt-image-1.5 : renforcer framing instruction + taille landscape par défaut | 🟠 High |
-| PPT-H1 | Améliorer le prompt de génération d'image pour produire des visuels réellement représentatifs du texte/slide (illustration adaptée, pas forcément sans texte) | 🟠 High |
-| PPT-M1 | Quick Action Image : si < 5 mots sélectionnés → screenshot de la slide + description via LLM avant génération | 🟡 Medium |
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| IMG-H1 | Fix crop gpt-image-1.5 : renforcer framing instruction + taille landscape par défaut | 🟠 High | ✅ FIXED |
+| PPT-H1 | Améliorer le prompt de génération d'image pour produire des visuels réellement représentatifs du texte/slide (illustration adaptée, pas forcément sans texte) | 🟠 High | ✅ FIXED |
+| PPT-M1 | Quick Action Image : si < 5 mots sélectionnés → screenshot de la slide + description via LLM avant génération | 🟡 Medium | ✅ IMPLEMENTED |
 
 **Contexte à lire** : `image.js` (FRAMING_INSTRUCTION), `backend.ts` (generateImage, size default), `constant.ts` (prompt `visual`), `useAgentLoop.ts` (handler image quick action ~l.700–720)
 
@@ -1674,7 +1645,7 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 | Phase | Zone de code principale | Items actifs | Priorité max |
 |-------|------------------------|-------------|-------------|
 | **1A** ✅ | `powerpointTools.ts` | PPT-C1 ✅, PPT-C2 ✅, TOOL-M3 ✅ | 🔴 Critical |
-| **1B** | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1, PPT-H1, PPT-M1 | 🟠 High |
+| **1B** ✅ | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1 ✅, PPT-H1 ✅, PPT-M1 ✅ | 🟠 High |
 | **1C** | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2, TOOL-L2, TOOL-L3 | 🟠 High |
 | **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
 | **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1, TOOL-M4 | 🟠 High |
