@@ -1101,23 +1101,24 @@ The `FRAMING_INSTRUCTION` was added to fix cropping on `gpt-image-1`. With the u
 
 ---
 
-### PPT-H1 — Quick Action "Image" generates text-based image, not illustration [HIGH]
+### PPT-H1 — Quick Action "Image" : l'image générée n'est pas représentative du contenu [HIGH]
 
 **File**: `frontend/src/utils/constant.ts:321-336` — `powerPointBuiltInPrompt.visual`
 
-The `visual` quick action generates an **image prompt** from slide text, which is then used with DALL-E/gpt-image. However the generated prompt tends to describe the slide content textually rather than creating a metaphorical/visual illustration — resulting in images that contain text or literal representations.
+La Quick Action "Image" génère un prompt d'image à partir du texte de la slide, qui est ensuite envoyé à gpt-image. Le problème est que le prompt généré décrit le contenu de manière trop littérale ou trop vague — les images produites ne illustrent pas bien le message de la slide (mauvaise métaphore visuelle, image non représentative du sujet, hors contexte).
 
-**Current prompt**: "Describe a professional, clean visual that would complement the slide content" — too generic, LLM tends to repeat slide text.
+**Note** : Il n'est PAS question d'interdire le texte dans l'image. Si du texte améliore l'illustration (titre, chiffre clé), c'est acceptable. L'objectif est de générer des visuels **pertinents et représentatifs** du contenu.
+
+**Current prompt**: "Describe a professional, clean visual that would complement the slide content" — trop générique, ne guide pas suffisamment le LLM pour choisir une métaphore visuelle forte et pertinente.
 
 **Action**:
-1. Update the `visual.user` prompt to explicitly forbid text in the image and force metaphorical/symbolic visuals:
-   ```
-   - ABSOLUTELY NO text, numbers, or labels in the image.
-   - Create a METAPHORICAL or SYMBOLIC visual (not a literal depiction of the text).
-   - Focus on mood, feeling, concept — not on listing the slide content.
-   - Prefer abstract backgrounds, human silhouettes, architecture, or nature metaphors.
-   ```
-2. Update tooltip to reflect new behavior
+1. Réécrire le prompt `visual.user` pour guider la génération vers des visuels réellement représentatifs :
+   - Analyser le thème central et le message clé de la slide
+   - Choisir une métaphore visuelle forte qui illustre ce message (pas une description littérale de la slide)
+   - Décrire la composition, l'ambiance, les couleurs qui renforcent le message
+   - Si le sujet s'y prête (chiffre important, mot clé), intégrer ce texte visuellement dans l'image
+   - Style : clair, professionnel, adapté au contexte de présentation
+2. Mettre à jour le tooltip pour expliquer le comportement attendu
 
 ---
 
@@ -1413,154 +1414,235 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ## 14. IMPLEMENTATION PHASES (v11.0 — Optimised)
 
-> **Principe de groupement** : chaque phase regroupe des items qui touchent les mêmes fichiers ou la même zone de code, pour minimiser la lecture de contexte. Maximum 3 items par phase pour respecter la limite de tokens toutes les 4h.
+> **Principe de groupement** : chaque phase regroupe des items qui touchent les mêmes fichiers ou la même zone de code, pour minimiser la lecture de contexte. Maximum 3 items actifs par phase pour respecter la limite de tokens toutes les 4h.
 
 ---
 
-### Phase 1A — 🔴 PPT Bugs Critiques
-**Fichiers clés** : `frontend/src/utils/powerpointTools.ts` (1 fichier principal)
+### Phase 1A — 🔴 PPT Bugs Critiques + qualité outil PPT
+**Fichiers clés** : `frontend/src/utils/powerpointTools.ts`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | PPT-C1 | Fix `getAllSlidesOverview` → InvalidArgument sur certaines slides | 🔴 Critical |
 | PPT-C2 | Fix `insertImageOnSlide` → crash "addImage is not a function" avec UUID | 🔴 Critical |
+| TOOL-M3 | Ajouter un équivalent de `searchAndFormat` pour PowerPoint | 🟡 Medium |
 
-**Contexte à lire** : `powerpointTools.ts` (sections getAllSlidesOverview et insertImageOnSlide uniquement)
+**Contexte à lire** : `powerpointTools.ts` (sections `getAllSlidesOverview`, `insertImageOnSlide`, fin du fichier pour ajout d'outil)
 
 ---
 
-### Phase 1B — 🖼️ Génération d'image
-**Fichiers clés** : `backend/src/routes/image.js`, `frontend/src/api/backend.ts`, `frontend/src/utils/constant.ts` (section `visual`)
+### Phase 1B — 🖼️ Génération d'image + Quick Action Image
+**Fichiers clés** : `backend/src/routes/image.js`, `frontend/src/api/backend.ts`, `frontend/src/utils/constant.ts` (section `visual`), `frontend/src/composables/useAgentLoop.ts` (handler image QA)
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| IMG-H1 | Fix crop gpt-image-1.5 (framing instruction + taille landscape par défaut) | 🟠 High |
-| PPT-H1 | Quick Action Image → illustration métaphorique, pas de texte dans l'image | 🟠 High |
+| IMG-H1 | Fix crop gpt-image-1.5 : renforcer framing instruction + taille landscape par défaut | 🟠 High |
+| PPT-H1 | Améliorer le prompt de génération d'image pour produire des visuels réellement représentatifs du texte/slide (illustration adaptée, pas forcément sans texte) | 🟠 High |
+| PPT-M1 | Quick Action Image : si < 5 mots sélectionnés → screenshot de la slide + description via LLM avant génération | 🟡 Medium |
 
-**Contexte à lire** : `image.js`, `backend.ts` (ligne `generateImage`), `constant.ts` (section `visual` uniquement)
+**Contexte à lire** : `image.js` (FRAMING_INSTRUCTION), `backend.ts` (generateImage, size default), `constant.ts` (prompt `visual`), `useAgentLoop.ts` (handler image quick action ~l.700–720)
 
 ---
 
-### Phase 1C — 🎯 Quick Actions PowerPoint
-**Fichiers clés** : `constant.ts` (section PPT), `useAgentLoop.ts` (section `applyQuickAction`), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
+### Phase 1C — 🎯 Nouvelle Quick Action "Review" PPT + nettoyage prompts
+**Fichiers clés** : `frontend/src/utils/constant.ts` (section PPT), `frontend/src/composables/useAgentLoop.ts` (applyQuickAction), `frontend/src/components/chat/QuickActionsBar.vue`, `frontend/src/components/settings/BuiltinPromptsTab.vue`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | PPT-H2 | Nouvelle Quick Action "Review" qui remplace "Speaker Notes" | 🟠 High |
-| PPT-M1 | Quick Action Image : gérer le cas < 5 mots sélectionnés | 🟡 Medium |
+| TOOL-L2 | Clarifier l'indexation 1-based du paramètre `slideNumber` dans les descriptions | 🟢 Low |
+| TOOL-L3 | Restreindre la règle anti em-dash/point-virgule aux contextes PPT/bullets uniquement | 🟢 Low |
 
-**Contexte à lire** : `constant.ts` (sections `speakerNotes` et `visual`), `useAgentLoop.ts` (lignes 888–1110), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
+**Contexte à lire** : `constant.ts` (sections `speakerNotes`, `visual`, `punchify`), `useAgentLoop.ts` (lignes 888–1110), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
 
 ---
 
-### Phase 2A — 📜 Scroll Intelligent (Smart Scroll)
-**Fichiers clés** : `useHomePage.ts`, `useAgentStream.ts`, `ChatMessageList.vue`, `HomePage.vue`
+### Phase 2A — 📜 Scroll Intelligent + Architecture HomePage
+**Fichiers clés** : `frontend/src/composables/useHomePage.ts`, `frontend/src/composables/useAgentStream.ts`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/pages/HomePage.vue`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| UX-H1 | Remplacer le comportement yoyo par un smart scroll avec interruption manuelle | 🟠 High |
+| UX-H1 | Smart scroll avec interruption manuelle (yoyo fix, isAutoScrollEnabled) | 🟠 High |
+| ARCH-H2 | Réduire le prop drilling de HomePage.vue via provide/inject (~44 bindings) | 🟠 High |
 
-**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl + @scroll)
+**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl, @scroll), `HomePage.vue` (props passées aux enfants)
 
 ---
 
-### Phase 2B — 🌐 Support Multilingue
-**Fichiers clés** : `useAgentPrompts.ts`, `common.skill.md`, `word.skill.md`, `excel.skill.md`, `powerpoint.skill.md`, `outlook.skill.md`
+### Phase 2B — 🌐 Support Multilingue + locale formules
+**Fichiers clés** : `frontend/src/composables/useAgentPrompts.ts`, `frontend/src/skills/*.skill.md`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | LANG-H1 | Discussion en langue UI, propositions de texte dans la langue du document | 🟠 High |
+| TOOL-M4 | Étendre la détection de locale formule Excel à toutes les langues (10 langues dans constant.ts) | 🟡 Medium |
 
-**Contexte à lire** : `useAgentPrompts.ts` (section `lang`), tous les `*.skill.md` (section language rules)
+**Contexte à lire** : `useAgentPrompts.ts` (section `lang`, instruction formule), `constant.ts` (language map), tous les `*.skill.md` (règles de langue)
 
 ---
 
-### Phase 2C — 📧 Outlook : Traduction sans perte d'images
-**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `outlook.skill.md`
+### Phase 2C — 📧 Outlook : traduction + qualité code
+**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `frontend/src/skills/outlook.skill.md`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | OUT-H1 | Empêcher la suppression des images lors de la traduction d'un email | 🟠 High |
+| QUAL-L2 | Documenter le pattern `resolveAsyncResult()` (mélange async/await et callbacks Outlook API) | 🟢 Low |
 
-**Contexte à lire** : `outlookTools.ts` (outil `setBody` et `getBody`), `outlook.skill.md`
+**Contexte à lire** : `outlookTools.ts` (outil `setBody`, `getBody`, `resolveAsyncResult()`), `outlook.skill.md`
 
 ---
 
-### Phase 3A — 📊 Logging Backend et Feedback
-**Fichiers clés** : `backend/src/routes/chat.js`, `backend/src/routes/feedback.js`, nouveau dossier `backend/logs/`
+### Phase 3A — 📊 Logging Backend + Error Handling
+**Fichiers clés** : `backend/src/routes/chat.js`, `backend/src/routes/feedback.js`, `backend/src/routes/logs.js`, nouveau dossier `backend/logs/`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
 | LOG-H1 | Comptage des outils utilisés par plateforme dans `logs/tool-usage.jsonl` | 🟠 High |
-| FB-M1 | Feedback enrichi : 4 dernières requêtes backend + snapshot outil | 🟡 Medium |
+| FB-M1 | Feedback enrichi : 4 dernières requêtes backend + snapshot usage outils | 🟡 Medium |
+| ERR-M1 | Extraire un handler d'erreur partagé pour `/api/chat` et `/api/chat/sync` (~80% de code dupliqué) | 🟡 Medium |
 
-**Contexte à lire** : `chat.js` (parsing des tool_use events), `feedback.js` (structure payload), `logs.js`
+**Contexte à lire** : `chat.js` (blocs d'erreur des deux routes), `feedback.js`, `logs.js`, structure existante `backend/logs/`
 
 ---
 
-### Phase 3B — 📈 Extraction de graphiques multi-courbes (Excel)
+### Phase 3B — 📈 Excel : extraction multi-courbes + qualité outils
 **Fichiers clés** : `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts`, `frontend/src/skills/excel.skill.md`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| XL-M1 | Extraction de plusieurs courbes : détection RGB par LLM + itération par courbe | 🟡 Medium |
+| XL-M1 | Extraction de plusieurs courbes : 1er call LLM détecte RGB de chaque série → itération | 🟡 Medium |
+| TOOL-M1 | Mettre à jour la description du paramètre `values` pour documenter les types acceptés (nombre, booléen, null…) | 🟡 Medium |
+| TOOL-M2 | Fusionner `getWorksheetData` et `getDataFromSheet` (outils redondants) | 🟡 Medium |
 
-**Contexte à lire** : `plotDigitizerService.js` (fonction `extractChartData`), `excelTools.ts` (outil `extract_chart_data`), `excel.skill.md` (section chart extraction workflow)
+**Contexte à lire** : `plotDigitizerService.js` (extractChartData), `excelTools.ts` (extract_chart_data, getWorksheetData, getDataFromSheet), `excel.skill.md`
 
 ---
 
-### Phase 3C — 🖱️ Presse-papier et Config Tokens
-**Fichiers clés** : `ChatInput.vue`, `backend/src/middleware/validate.js`, `backend/src/config/models.js`, `frontend/src/utils/tokenManager.ts`
+### Phase 3C — 🖱️ Presse-papier + UX input
+**Fichiers clés** : `frontend/src/components/chat/ChatInput.vue`
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| CLIP-M1 | Coller une image depuis le presse-papier directement dans le chat | 🟡 Medium |
-| TOKEN-M1 | Cohérence tokens affiché vs réel + augmenter la limite max | 🟡 Medium |
+| CLIP-M1 | Coller une image depuis le presse-papier (Ctrl+V) directement dans le chat | 🟡 Medium |
+| UX-M1 | Restaurer les indicateurs de focus (focus:ring) sur tous les éléments interactifs | 🟡 Medium |
+| UX-L1 | Déplacer les styles d'animation inline de ChatInput.vue vers `<style scoped>` | 🟢 Low |
 
-**Contexte à lire** : `ChatInput.vue` (zone textarea + file upload), `validate.js` (validateMaxTokens), `models.js` (defaultMaxTokens), `tokenManager.ts`
+**Contexte à lire** : `ChatInput.vue` (textarea, upload, animation, focus)
 
 ---
 
 ### Phase 4A — 📝 Word : Track Changes OOXML
-**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, nouveau `wordOoxmlUtils.ts`, composant Settings
+**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, nouveau `frontend/src/utils/wordOoxmlUtils.ts`, composant Settings
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| OXML-M1 | Évaluation de l'intégration OOXML sur tous les hosts (prérequis) | 🟡 Medium |
-| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` pour les révisions, remplacer office-word-diff | 🟠 High |
+| OXML-M1 | Évaluation OOXML sur tous les hosts (prérequis, phase lecture/analyse) | 🟡 Medium |
+| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` + auteur configurable, remplacer office-word-diff | 🟠 High |
+| DUP-M1 | Extraire `truncateString(str, maxLen)` dans `common.ts` (4 occurrences dans wordTools + outlookTools) | 🟡 Medium |
 
-**Ordre** : Faire OXML-M1 (lecture/évaluation) en premier, puis WORD-H1 (implémentation)
-**Contexte à lire** : `wordDiffUtils.ts`, `wordTools.ts` (outil `proposeRevision`), `wordOoxmlUtils.ts` à créer, composant Settings (champ auteur)
+**Ordre** : OXML-M1 d'abord (lecture), puis WORD-H1 (implémentation), DUP-M1 en profiter pour les fichiers déjà ouverts
+**Contexte à lire** : `wordDiffUtils.ts`, `wordTools.ts` (proposeRevision, eval_wordjs), `wordOoxmlUtils.ts` à créer, `common.ts`, Settings component (champ auteur Redline)
 
 ---
 
-### Phase 4B — 🔧 Skill.md pour Quick Actions
-**Fichiers clés** : `frontend/src/skills/` (nouveaux fichiers), `frontend/src/composables/useAgentLoop.ts` (section `applyQuickAction`)
+### Phase 4B — 🔧 Architecture AgentLoop + Skill System
+**Fichiers clés** : `frontend/src/composables/useAgentLoop.ts`, `frontend/src/skills/` (nouveaux fichiers)
 
 | Item | Description | Priorité |
 |------|-------------|----------|
-| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif) | 🟢 Low |
+| ARCH-H1 | Découper `useAgentLoop.ts` (1145 lignes) en composables focalisés | 🟠 High |
+| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif, type skill.md) | 🟢 Low |
 
-**Contexte à lire** : `useAgentLoop.ts` (applyQuickAction), `index.ts` du dossier skills, format des skill.md existants
-
----
-
-### Tech Debt Continu (v10 — Backlog)
-> Ces items ne changent pas de priorité mais sont regroupés ici pour ne pas bloquer les phases v11. À traiter en parallèle ou entre les phases ci-dessus.
-
-| Phase suggérée | Items | Fichiers principaux |
-|----------------|-------|---------------------|
-| TD-A : Architecture | ARCH-H1 (split useAgentLoop), ARCH-H2 (provide/inject) | `useAgentLoop.ts`, `HomePage.vue` |
-| TD-B : Qualité types | DUP-H1 (factory OfficeToolTemplate), QUAL-H1 (replace `: any`) | `common.ts`, tous `*Tools.ts` |
-| TD-C : Backend routes | ERR-M1 (shared chat error handler), ERR-M2 (sanitize files.js) | `chat.js`, `files.js` |
-| TD-D : Tool descriptions | TOOL-M1–M4 (types, overlaps, locale, format) | `excelTools.ts`, `powerpointTools.ts`, `useAgentPrompts.ts` |
-| TD-E : Dead code | DEAD-M1–M2 (exports alias, formatRange), DUP-M1–M2 (truncateString, error format) | tous `*Tools.ts`, `common.ts` |
-| TD-F : Composants Vue | QUAL-M3 (split large components), UX-M1–M3 (focus, i18n, ctx%), UX-L1–L3 | `HomePage.vue`, `ChatInput.vue`, `StatsBar.vue` |
-| TD-G : Infrastructure | ARCH-L1 (npm ci), ARCH-L2 (manifests), IC2/IH2/IH3 (Docker security) | `Dockerfile`, `.env.example` |
+**Contexte à lire** : `useAgentLoop.ts` (entier), `index.ts` du dossier skills, `useToolExecutor.ts`, `useAgentStream.ts`
 
 ---
 
-### Déferred — 🚀 Phase 5+
+### Phase 5A — 🏗️ Qualité types + Dead Code (tous les *Tools.ts)
+**Fichiers clés** : `frontend/src/utils/common.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| DUP-H1 | Créer `OfficeToolTemplate<THost>` générique et `buildExecuteWrapper` partagé dans `common.ts` | 🟠 High |
+| QUAL-H1 | Remplacer les 128 `: any` critiques par des types Office.js propres | 🟠 High |
+| DEAD-M1 | Supprimer les exports alias `getToolDefinitions()` redondants dans les 4 fichiers tools | 🟡 Medium |
+
+**Contexte à lire** : `common.ts` (createOfficeTools, factories existantes), les 4 `*Tools.ts` (sections type + export)
+
+---
+
+### Phase 5B — 🧹 Dead Code Excel + Nettoyage erreurs backend
+**Fichiers clés** : `frontend/src/utils/excelTools.ts`, `frontend/src/utils/common.ts`, `backend/src/routes/files.js`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| DEAD-M2 | Déprécier `formatRange` (redondant avec `setCellRange`) | 🟡 Medium |
+| DUP-M2 | Standardiser le format d'erreur retourné par tous les outils (3 formats différents aujourd'hui) | 🟡 Medium |
+| ERR-M2 | Sanitiser le message d'erreur raw exposé dans `files.js:79` | 🟡 Medium |
+
+**Contexte à lire** : `excelTools.ts` (formatRange vs setCellRange), `common.ts` (buildExecute), `files.js:79`
+
+---
+
+### Phase 5C — 🏛️ Architecture Backend
+**Fichiers clés** : `backend/src/middleware/validate.js`, `frontend/src/utils/credentialStorage.ts`, `frontend/src/composables/useAgentLoop.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| ARCH-M1 | Créer un `ToolProviderRegistry` pour rendre l'agent loop host-agnostique | 🟡 Medium |
+| ARCH-M2 | Découper `validate.js` (236 lignes) en validators par domaine | 🟡 Medium |
+| ARCH-M3 | Simplifier la migration dual-storage credentials (6 fallback paths → 1 migration au startup) | 🟡 Medium |
+
+**Contexte à lire** : `validate.js` (validateTools, validateChat), `credentialStorage.ts`, `useAgentLoop.ts` (imports tools)
+
+---
+
+### Phase 6A — 🎨 Qualité code Vue + Console logs
+**Fichiers clés** : `frontend/src/pages/HomePage.vue`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/components/chat/ChatInput.vue`, `frontend/src/utils/credentialCrypto.ts`, `frontend/src/utils/credentialStorage.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| QUAL-M3 | Découper les composants > 300 lignes : extraire `AttachedFilesList`, `MessageItem`, `ConfirmationDialogs` | 🟡 Medium |
+| QUAL-M2 | Remplacer les 12 `console.log` restants dans credentialCrypto/Storage/Polyfill par `logService` | 🟡 Medium |
+| QUAL-M1 | Déplacer les magic numbers (255, 20_000, 1000/2000…) dans `constants/limits.ts` | 🟡 Medium |
+
+**Contexte à lire** : `HomePage.vue`, `ChatMessageList.vue`, `ChatInput.vue`, `credentialCrypto.ts`, `credentialStorage.ts`, `constant.ts`
+
+---
+
+### Phase 6B — 💅 UX Polish & i18n
+**Fichiers clés** : `frontend/src/components/chat/StatsBar.vue`, `frontend/src/components/chat/ToolCallBlock.vue`, `frontend/src/components/settings/AccountTab.vue`, `frontend/src/components/chat/ChatMessageList.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| UX-M2 | Traduire les tooltips hardcodés en anglais (StatsBar, ToolCallBlock) via `t()` | 🟡 Medium |
+| UX-M3 | Ajouter un tooltip/notification quand le contexte dépasse 80% | 🟡 Medium |
+| UX-L2 | Remplacer l'URL brute par un texte descriptif dans AccountTab.vue | 🟢 Low |
+| UX-L3 | Revoir `max-w-[95%]` sur les bulles de message pour mobile | 🟢 Low |
+
+**Contexte à lire** : `StatsBar.vue`, `ToolCallBlock.vue`, `AccountTab.vue`, `ChatMessageList.vue`, fichiers i18n
+
+---
+
+### Phase 6C — 🔩 Infrastructure + Sécurité
+**Fichiers clés** : `backend/Dockerfile`, `frontend/Dockerfile`, `.env.example`, `scripts/generate-manifests.js`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| ARCH-L1 | Passer de `npm install` à `npm ci` dans le Dockerfile frontend | 🟢 Low |
+| ARCH-L2 | Évaluer déplacement des manifests vers `frontend/public/assets/` pour SaaS | 🟢 Low |
+| IC2 | Ajouter directive `USER` non-root dans les deux Dockerfiles | 🟢 Low |
+| IH2 | Remplacer l'IP privée `192.168.50.10` par un placeholder dans `.env.example` | 🟢 Low |
+| IH3 | Remplacer le domaine DuckDNS réel par un placeholder dans `.env.example` | 🟢 Low |
+
+**Contexte à lire** : `backend/Dockerfile`, `frontend/Dockerfile`, `.env.example`, `generate-manifests.js`
+
+---
+
+### 🚀 DEFERRED — Phase 7+
+
+**TOKEN-M1** (🟡 Medium — déféré) : Cohérence tokens affiché vs réel + augmenter limite max. Attendre d'avoir LOG-H1 actif pour mesurer l'écart réel.
+- Fichiers : `validate.js`, `models.js`, `tokenManager.ts`
 
 #### DYNTOOL-D1: Dynamic Tooling — Intent-Based Tool Loading 🚀 DEFERRED
 
@@ -1593,33 +1675,38 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 | Severity | Count | Status | Items |
 |----------|-------|--------|-------|
-| 🔴 **Critical (v11 active)** | 2 | 📋 Phase 1A | PPT-C1, PPT-C2 |
+| 🔴 **Critical (v11 actif)** | 2 | 📋 Phase 1A | PPT-C1, PPT-C2 |
 | 🔴 **Critical (v10)** | 0 | ✅ All fixed | Phase 0 complete |
-| 🟠 **High (deferred)** | 5 + 1 prospective | ⏳ Pending | TOOL-C1 (3), TOOL-H2 (3), USR-H1 (2), USR-H2 (3), PROSP-H2 |
-| 🟡 **Medium (deferred)** | 2 prospective | — | PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
-| 🟢 **Low (deferred)** | 4 legacy + 3 prospective | — | IC2, IH2, IH3, UM10 + PROSP-1/3/4 |
-| 🚀 **New deferred** | 1 | — | DYNTOOL-D1 (dynamic tooling, needs LOG-H1 data first) |
-| **TOTAL DEFERRED** | **18** | | 11 functional + 6 architectural/legacy + 1 new |
+| 🟠 **High (déféré v10)** | 5 + 1 prospectif | ⏳ Pending | TOOL-C1 (doc re-send), TOOL-H2 (Word screenshot), USR-H1 (empty shapes), USR-H2 (context bloat), PROSP-H2 |
+| 🟡 **Medium (déféré v10)** | 3 | — | TOKEN-M1 (nouveau), PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
+| 🟢 **Low (déféré v10)** | 1 + 3 prospectifs | — | UM10 (PPT HTML reconstruction — fermé, ne pas implémenter) + PROSP-1/3/4 |
+| 🚀 **New deferred** | 1 | — | DYNTOOL-D1 (dynamic tooling, besoin données LOG-H1 d'abord) |
+| **TOTAL DEFERRED** | **18** | | 11 fonctionnel + 5 architectural/legacy + 2 nouveaux (TOKEN-M1, DYNTOOL-D1) |
 
 ---
 
-## Résumé des phases d'implémentation v11.0
+## Résumé des phases v11.0
 
-| Phase | Zone de code | Items | Priorité max |
-|-------|-------------|-------|-------------|
-| **1A** | `powerpointTools.ts` | PPT-C1, PPT-C2 | 🔴 Critical |
-| **1B** | `image.js` + `constant.ts` (visual) | IMG-H1, PPT-H1 | 🟠 High |
-| **1C** | `constant.ts` (PPT QA) + `useAgentLoop.ts` + `QuickActionsBar` | PPT-H2, PPT-M1 | 🟠 High |
-| **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` | UX-H1 | 🟠 High |
-| **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1 | 🟠 High |
-| **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1 | 🟠 High |
-| **3A** | `chat.js` + `feedback.js` + `logs/` | LOG-H1, FB-M1 | 🟠 High |
-| **3B** | `plotDigitizerService.js` + `excelTools.ts` + `excel.skill.md` | XL-M1 | 🟡 Medium |
-| **3C** | `ChatInput.vue` + `validate.js` + `models.js` + `tokenManager.ts` | CLIP-M1, TOKEN-M1 | 🟡 Medium |
-| **4A** | `wordDiffUtils.ts` + `wordTools.ts` + nouveau `wordOoxmlUtils.ts` | OXML-M1, WORD-H1 | 🟠 High |
-| **4B** | `skills/` (nouveaux fichiers) + `useAgentLoop.ts` | SKILL-L1 | 🟢 Low |
-| **Tech Debt** | Divers (voir tableau TD-A à TD-G) | DUP-H1, QUAL-H1, ARCH-H1–H2, ERR-M1–M2, TOOL-M1–M4, DEAD-M1–M2, etc. | 🟠–🟢 |
-| **Déferred 5+** | — | DYNTOOL-D1, PROSP-H2, PROSP-1–5, IC2/IH2/IH3/UM10 | 🚀 |
+| Phase | Zone de code principale | Items actifs | Priorité max |
+|-------|------------------------|-------------|-------------|
+| **1A** | `powerpointTools.ts` | PPT-C1, PPT-C2, TOOL-M3 | 🔴 Critical |
+| **1B** | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1, PPT-H1, PPT-M1 | 🟠 High |
+| **1C** | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2, TOOL-L2, TOOL-L3 | 🟠 High |
+| **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
+| **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1, TOOL-M4 | 🟠 High |
+| **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1, QUAL-L2 | 🟠 High |
+| **3A** | `chat.js` + `feedback.js` + `logs/` | LOG-H1, FB-M1, ERR-M1 | 🟠 High |
+| **3B** | `plotDigitizerService.js` + `excelTools.ts` + `excel.skill.md` | XL-M1, TOOL-M1, TOOL-M2 | 🟡 Medium |
+| **3C** | `ChatInput.vue` | CLIP-M1, UX-M1, UX-L1 | 🟡 Medium |
+| **4A** | `wordDiffUtils.ts` + `wordTools.ts` + `wordOoxmlUtils.ts` | OXML-M1, WORD-H1, DUP-M1 | 🟠 High |
+| **4B** | `useAgentLoop.ts` + `skills/` | ARCH-H1, SKILL-L1 | 🟠 High |
+| **5A** | `common.ts` + tous `*Tools.ts` (types + exports) | DUP-H1, QUAL-H1, DEAD-M1 | 🟠 High |
+| **5B** | `excelTools.ts` + `common.ts` + `files.js` | DEAD-M2, DUP-M2, ERR-M2 | 🟡 Medium |
+| **5C** | `validate.js` + `credentialStorage.ts` + `useAgentLoop.ts` (registry) | ARCH-M1, ARCH-M2, ARCH-M3 | 🟡 Medium |
+| **6A** | `HomePage.vue` + `ChatMessageList.vue` + `credentialCrypto.ts` | QUAL-M3, QUAL-M2, QUAL-M1 | 🟡 Medium |
+| **6B** | `StatsBar.vue` + `ToolCallBlock.vue` + `AccountTab.vue` | UX-M2, UX-M3, UX-L2, UX-L3 | 🟡 Medium |
+| **6C** | `Dockerfile` × 2 + `.env.example` | ARCH-L1, ARCH-L2, IC2, IH2, IH3 | 🟢 Low |
+| **Déféré 7+** | — | TOKEN-M1, DYNTOOL-D1, PROSP-H2, PROSP-1–5, TOOL-C1↗, TOOL-H2↗, USR-H1↗, USR-H2↗ | 🚀 |
 
 ---
 
