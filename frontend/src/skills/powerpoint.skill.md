@@ -7,7 +7,7 @@
 Unlike older documentation suggests, modern PowerPoint DOES support `PowerPoint.run()`:
 
 ```javascript
-await PowerPoint.run(async (context) => {
+await PowerPoint.run(async context => {
   const slides = context.presentation.slides;
   slides.load('items');
   await context.sync();
@@ -23,7 +23,7 @@ const slides = context.presentation.slides;
 slides.load('items');
 await context.sync();
 
-const slideThree = slides.items[2];  // Index 2 = slide 3
+const slideThree = slides.items[2]; // Index 2 = slide 3
 ```
 
 ### Rule 3: Shape text is accessed via textFrame.textRange
@@ -34,7 +34,7 @@ const textRange = shape.textFrame.textRange;
 textRange.load('text');
 await context.sync();
 
-console.log(textRange.text);  // The text content
+console.log(textRange.text); // The text content
 
 // To modify:
 textRange.text = 'New text';
@@ -44,29 +44,30 @@ await context.sync();
 ### Rule 4: Common API still available for basic operations
 
 For simple text operations, the Common API works:
+
 ```javascript
-Office.context.document.getSelectedDataAsync(
-  Office.CoercionType.Text,
-  (result) => {
-    console.log(result.value);
-  }
-);
+Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, result => {
+  console.log(result.value);
+});
 ```
 
 ### Rule 5: Keep bullet points SHORT and FEW
 
 **Content guidelines:**
+
 - Max 8-10 words per bullet point
 - Max 6-7 bullets per slide
 - Use active voice, present tense
 - No full sentences — fragments are better
 
 **WRONG:**
+
 ```
 - The implementation of the new system will require careful consideration of multiple factors including budget constraints and timeline requirements.
 ```
 
 **CORRECT:**
+
 ```
 - New system implementation
 - Budget constraints
@@ -76,30 +77,33 @@ Office.context.document.getSelectedDataAsync(
 ## AVAILABLE TOOLS
 
 ### For READING:
-| Tool | When to use |
-|------|-------------|
-| `getAllSlidesOverview` | Get text overview of all slides |
-| `getSlideContent` | Read all text from specific slide |
-| `getShapes` | Discover shape IDs/names on a slide |
-| `getSelectedText` | Read current text selection |
-| `screenshotSlide` | Capture a slide as PNG image for visual verification |
-| `verifySlides` | Check all slides for shape overflows and overlaps |
-| `searchIcons` | Search Iconify library for icon IDs |
+
+| Tool                   | When to use                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `getAllSlidesOverview` | Get text overview of all slides                      |
+| `getSlideContent`      | Read all text from specific slide                    |
+| `getShapes`            | Discover shape IDs/names on a slide                  |
+| `getSelectedText`      | Read current text selection                          |
+| `screenshotSlide`      | Capture a slide as PNG image for visual verification |
+| `verifySlides`         | Check all slides for shape overflows and overlaps    |
+| `searchIcons`          | Search Iconify library for icon IDs                  |
 
 ### For WRITING:
-| Tool | When to use |
-|------|-------------|
-| `insertContent` | **PREFERRED** — Update shape text with Markdown |
-| `proposeShapeTextRevision` | Edit shape text with diff tracking |
-| `addSlide` | Create new slide |
-| `deleteSlide` | Remove a slide |
-| `duplicateSlide` | Duplicate an existing slide |
-| `insertIcon` | Insert an Iconify icon as SVG image on a slide |
-| `editSlideXml` | Edit slide OOXML directly via JSZip (advanced) |
+
+| Tool                       | When to use                                     |
+| -------------------------- | ----------------------------------------------- |
+| `insertContent`            | **PREFERRED** — Update shape text with Markdown |
+| `proposeShapeTextRevision` | Edit shape text with diff tracking              |
+| `addSlide`                 | Create new slide                                |
+| `deleteSlide`              | Remove a slide                                  |
+| `duplicateSlide`           | Duplicate an existing slide                     |
+| `insertIcon`               | Insert an Iconify icon as SVG image on a slide  |
+| `editSlideXml`             | Edit slide OOXML directly via JSZip (advanced)  |
 
 ### ESCAPE HATCH:
-| Tool | When to use |
-|------|-------------|
+
+| Tool                | When to use                       |
+| ------------------- | --------------------------------- |
 | `eval_powerpointjs` | Speaker notes, images, animations |
 
 ## WORKFLOW: Always discover before modifying
@@ -117,7 +121,11 @@ Office.context.document.getSelectedDataAsync(
 Use `addSlide` with `title` and `body` parameters to create a slide and populate its template text boxes in one step:
 
 ```json
-{ "layout": "TitleAndContent", "title": "My Slide Title", "body": "- Bullet one\n- Bullet two\n- Bullet three" }
+{
+  "layout": "TitleAndContent",
+  "title": "My Slide Title",
+  "body": "- Bullet one\n- Bullet two\n- Bullet three"
+}
 ```
 
 The tool will automatically find the title and body shapes of the layout and fill them.
@@ -139,6 +147,7 @@ After generating speaker notes text, ALWAYS call `setSpeakerNotes` to insert the
 ## COMMON PATTERNS
 
 ### Get all slides
+
 ```javascript
 const slides = context.presentation.slides;
 slides.load('items,items/id');
@@ -150,6 +159,7 @@ for (const slide of slides.items) {
 ```
 
 ### Get shapes on a slide
+
 ```javascript
 const slide = context.presentation.slides.items[0];
 const shapes = slide.shapes;
@@ -162,6 +172,7 @@ for (const shape of shapes.items) {
 ```
 
 ### Modify shape text
+
 ```javascript
 const slide = context.presentation.slides.items[0];
 const shape = slide.shapes.getItem('Title 1');
@@ -170,6 +181,7 @@ await context.sync();
 ```
 
 ### Add speaker notes
+
 ```javascript
 const slide = context.presentation.slides.items[0];
 slide.notesPage.textBody.text = 'Speaker notes go here...';
@@ -185,11 +197,13 @@ After creating or significantly modifying a slide (adding images, heavy text edi
 ```
 
 Use your vision capability to inspect the screenshot:
+
 - Text overflowing shape boundaries → adjust content or use a shorter text
 - Image misaligned or wrong size → call `insertImageOnSlide` again with corrected parameters
 - Missing elements → check shape IDs with `getShapes` and retry
 
 **When to screenshot**:
+
 - After `insertImageOnSlide` (verify image placement)
 - After creating a slide from an image (verify content matches original)
 - When the user asks "does it look right?"

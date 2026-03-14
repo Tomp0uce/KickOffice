@@ -1,15 +1,21 @@
-import type { ToolInputSchema, ToolCategory } from '@/types'
-import { evaluate } from 'mathjs'
-import { getBash, writeFile as vfsWrite, readFile as vfsRead, listUploads } from '@/utils/vfs'
+import type { ToolInputSchema, ToolCategory } from '@/types';
+import { evaluate } from 'mathjs';
+import { getBash, writeFile as vfsWrite, readFile as vfsRead, listUploads } from '@/utils/vfs';
 
-export type GeneralToolName = 'getCurrentDate' | 'calculateMath' | 'executeBash' | 'vfsWriteFile' | 'vfsReadFile' | 'vfsListFiles'
+export type GeneralToolName =
+  | 'getCurrentDate'
+  | 'calculateMath'
+  | 'executeBash'
+  | 'vfsWriteFile'
+  | 'vfsReadFile'
+  | 'vfsListFiles';
 
 export interface GeneralToolDefinition {
-  name: GeneralToolName
-  category: ToolCategory
-  description: string
-  inputSchema: ToolInputSchema
-  execute: (args: Record<string, any>) => Promise<string>
+  name: GeneralToolName;
+  category: ToolCategory;
+  description: string;
+  inputSchema: ToolInputSchema;
+  execute: (args: Record<string, any>) => Promise<string>;
 }
 
 const generalToolDefinitions: GeneralToolDefinition[] = [
@@ -23,15 +29,16 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       properties: {
         format: {
           type: 'string',
-          description: 'Format: "full" (date and time), "date" (date only), "time" (time only), "iso" (ISO 8601)',
+          description:
+            'Format: "full" (date and time), "date" (date only), "time" (time only), "iso" (ISO 8601)',
           enum: ['full', 'date', 'time', 'iso'],
         },
       },
       required: [],
     },
-    execute: async (args) => {
-      const { format = 'full' } = args
-      const now = new Date()
+    execute: async args => {
+      const { format = 'full' } = args;
+      const now = new Date();
 
       switch (format) {
         case 'date':
@@ -39,15 +46,15 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
             year: 'numeric',
             month: 'long',
             day: 'numeric',
-          })
+          });
         case 'time':
           return now.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
-          })
+          });
         case 'iso':
-          return now.toISOString()
+          return now.toISOString();
         case 'full':
         default:
           return now.toLocaleString('en-US', {
@@ -57,7 +64,7 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
-          })
+          });
       }
     },
   },
@@ -76,18 +83,18 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       },
       required: ['expression'],
     },
-    execute: async (args) => {
-      const { expression } = args as Record<string, any>
+    execute: async args => {
+      const { expression } = args as Record<string, any>;
       try {
-        const result = evaluate(expression)
+        const result = evaluate(expression);
 
         if (typeof result !== 'number' && typeof result !== 'bigint') {
-          return `Calculation completed, but result is not a simple number: ${result}`
+          return `Calculation completed, but result is not a simple number: ${result}`;
         }
 
-        return `${expression} = ${result}`
+        return `${expression} = ${result}`;
       } catch (error: any) {
-        return `Error evaluating expression: ${error.message}`
+        return `Error evaluating expression: ${error.message}`;
       }
     },
   },
@@ -101,20 +108,21 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       properties: {
         command: {
           type: 'string',
-          description: 'The bash command to execute. Examples: "ls /home/user/uploads", "cat data.txt | grep error", "source /home/user/scripts/my_tool.sh && my_tool arg"',
+          description:
+            'The bash command to execute. Examples: "ls /home/user/uploads", "cat data.txt | grep error", "source /home/user/scripts/my_tool.sh && my_tool arg"',
         },
       },
       required: ['command'],
     },
-    execute: async (args) => {
-      const { command } = args as { command: string }
+    execute: async args => {
+      const { command } = args as { command: string };
       try {
-        const shell = getBash()
-        const result = await shell.exec(command)
-        const output = [result.stdout, result.stderr].filter(Boolean).join('\n')
-        return output || '(no output)'
+        const shell = getBash();
+        const result = await shell.exec(command);
+        const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+        return output || '(no output)';
       } catch (error: any) {
-        return `Shell error: ${error.message}`
+        return `Shell error: ${error.message}`;
       }
     },
   },
@@ -137,22 +145,21 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       },
       required: ['path', 'content'],
     },
-    execute: async (args) => {
-      const { path, content } = args as { path: string; content: string }
+    execute: async args => {
+      const { path, content } = args as { path: string; content: string };
       try {
-        await vfsWrite(path, content)
-        const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`
-        return `File written successfully to ${fullPath}`
+        await vfsWrite(path, content);
+        const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
+        return `File written successfully to ${fullPath}`;
       } catch (error: any) {
-        return `Error writing file: ${error.message}`
+        return `Error writing file: ${error.message}`;
       }
     },
   },
   {
     name: 'vfsReadFile',
     category: 'read',
-    description:
-      'Read text content from a file in the sandboxed virtual filesystem (VFS).',
+    description: 'Read text content from a file in the sandboxed virtual filesystem (VFS).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -163,20 +170,19 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       },
       required: ['path'],
     },
-    execute: async (args) => {
-      const { path } = args as { path: string }
+    execute: async args => {
+      const { path } = args as { path: string };
       try {
-        return await vfsRead(path)
+        return await vfsRead(path);
       } catch (error: any) {
-        return `Error reading file: ${error.message}`
+        return `Error reading file: ${error.message}`;
       }
     },
   },
   {
     name: 'vfsListFiles',
     category: 'read',
-    description:
-      'List all files available in the sandboxed virtual filesystem uploads directory.',
+    description: 'List all files available in the sandboxed virtual filesystem uploads directory.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -184,16 +190,16 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
     },
     execute: async () => {
       try {
-        const files = await listUploads()
-        if (files.length === 0) return 'No files in VFS uploads directory.'
-        return `Files in /home/user/uploads/:\n${files.map(f => `  - ${f}`).join('\n')}`
+        const files = await listUploads();
+        if (files.length === 0) return 'No files in VFS uploads directory.';
+        return `Files in /home/user/uploads/:\n${files.map(f => `  - ${f}`).join('\n')}`;
       } catch (error: any) {
-        return `Error listing files: ${error.message}`
+        return `Error listing files: ${error.message}`;
       }
     },
   },
-]
+];
 
 export function getGeneralToolDefinitions(): GeneralToolDefinition[] {
-  return generalToolDefinitions
+  return generalToolDefinitions;
 }

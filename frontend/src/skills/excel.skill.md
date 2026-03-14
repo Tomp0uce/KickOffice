@@ -9,20 +9,20 @@ Excel ranges are always 2D, even for single cells.
 **WRONG:**
 
 ```javascript
-range.values = 'Hello' // Error: not an array
-range.values = ['A', 'B', 'C'] // Error: not 2D
+range.values = 'Hello'; // Error: not an array
+range.values = ['A', 'B', 'C']; // Error: not 2D
 ```
 
 **CORRECT:**
 
 ```javascript
-range.values = [['Hello']] // Single cell
-range.values = [['A', 'B', 'C']] // 1 row, 3 columns
-range.values = [['A1'], ['A2'], ['A3']] // 3 rows, 1 column
+range.values = [['Hello']]; // Single cell
+range.values = [['A', 'B', 'C']]; // 1 row, 3 columns
+range.values = [['A1'], ['A2'], ['A3']]; // 3 rows, 1 column
 range.values = [
   ['A1', 'B1'],
   ['A2', 'B2'],
-] // 2x2 grid
+]; // 2x2 grid
 ```
 
 ### Rule 2: Array dimensions MUST match range dimensions
@@ -30,19 +30,19 @@ range.values = [
 **WRONG:**
 
 ```javascript
-const range = sheet.getRange('A1:C3') // 3x3 range
-range.values = [['Only one']] // 1x1 array - MISMATCH!
+const range = sheet.getRange('A1:C3'); // 3x3 range
+range.values = [['Only one']]; // 1x1 array - MISMATCH!
 ```
 
 **CORRECT:**
 
 ```javascript
-const range = sheet.getRange('A1:C3') // 3x3 range
+const range = sheet.getRange('A1:C3'); // 3x3 range
 range.values = [
   ['A1', 'B1', 'C1'],
   ['A2', 'B2', 'C2'],
   ['A3', 'B3', 'C3'],
-] // 3x3 array - matches!
+]; // 3x3 array - matches!
 ```
 
 ### Rule 3: Formula language depends on user's Excel locale
@@ -50,15 +50,15 @@ range.values = [
 **English Excel:**
 
 ```javascript
-range.formulas = [['=SUM(A1,B1)']] // Comma separator
-range.formulas = [['=VLOOKUP(A1,B:C,2,FALSE)']]
+range.formulas = [['=SUM(A1,B1)']]; // Comma separator
+range.formulas = [['=VLOOKUP(A1,B:C,2,FALSE)']];
 ```
 
 **French Excel:**
 
 ```javascript
-range.formulas = [['=SOMME(A1;B1)']] // Semicolon separator
-range.formulas = [['=RECHERCHEV(A1;B:C;2;FAUX)']]
+range.formulas = [['=SOMME(A1;B1)']]; // Semicolon separator
+range.formulas = [['=RECHERCHEV(A1;B:C;2;FAUX)']];
 ```
 
 **IMPORTANT**: Check the `excelFormulaLanguage` setting in the agent context.
@@ -96,15 +96,15 @@ Then use the returned `suggestedHasHeaders` and `suggestedSeriesBy` values in `m
 **WRONG — May be slow or include empty cells:**
 
 ```javascript
-const range = sheet.getRange('A1:ZZ10000')
+const range = sheet.getRange('A1:ZZ10000');
 ```
 
 **CORRECT — Only populated cells:**
 
 ```javascript
-const usedRange = sheet.getUsedRange()
-usedRange.load('values,address')
-await context.sync()
+const usedRange = sheet.getUsedRange();
+usedRange.load('values,address');
+await context.sync();
 ```
 
 ### Rule 5: Never modify cells while iterating
@@ -112,9 +112,9 @@ await context.sync()
 **WRONG — May corrupt iteration:**
 
 ```javascript
-const range = sheet.getUsedRange()
-range.load('values')
-await context.sync()
+const range = sheet.getUsedRange();
+range.load('values');
+await context.sync();
 
 for (let row of range.values) {
   // Modifying during iteration is dangerous
@@ -140,17 +140,17 @@ await context.sync();
 
 ### For READING:
 
-| Tool                | When to use                                       |
-| ------------------- | ------------------------------------------------- |
-| `getSelectedCells`  | Get values from current selection                 |
+| Tool                | When to use                                                                  |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `getSelectedCells`  | Get values from current selection                                            |
 | `getWorksheetData`  | Read data from any worksheet (active or by name) with optional range address |
-| `getWorksheetInfo`  | Get workbook structure, sheet names               |
-| `getAllObjects`     | List charts and pivot tables                      |
-| `getNamedRanges`    | List named ranges                                 |
-| `findData`          | Search for values workbook-wide (with pagination) |
-| `getRangeAsCsv`     | Read range as CSV (token-efficient for large data)|
-| `screenshotRange`   | Capture a range as PNG image for visual inspection|
-| `detectDataHeaders` | Detect column/row headers before chart creation   |
+| `getWorksheetInfo`  | Get workbook structure, sheet names                                          |
+| `getAllObjects`     | List charts and pivot tables                                                 |
+| `getNamedRanges`    | List named ranges                                                            |
+| `findData`          | Search for values workbook-wide (with pagination)                            |
+| `getRangeAsCsv`     | Read range as CSV (token-efficient for large data)                           |
+| `screenshotRange`   | Capture a range as PNG image for visual inspection                           |
+| `detectDataHeaders` | Detect column/row headers before chart creation                              |
 
 ### For WRITING:
 
@@ -172,8 +172,8 @@ await context.sync();
 
 ### For CHART IMAGE EXTRACTION:
 
-| Tool                 | When to use                                                |
-| -------------------- | ---------------------------------------------------------- |
+| Tool                 | When to use                                                     |
+| -------------------- | --------------------------------------------------------------- |
 | `extract_chart_data` | Extract data points from a chart/graph IMAGE via pixel analysis |
 
 ### ESCAPE HATCH:
@@ -187,43 +187,43 @@ await context.sync();
 ### Read active sheet data
 
 ```javascript
-const sheet = context.workbook.worksheets.getActiveWorksheet()
-const range = sheet.getUsedRange()
-range.load('values,address,rowCount,columnCount')
-await context.sync()
+const sheet = context.workbook.worksheets.getActiveWorksheet();
+const range = sheet.getUsedRange();
+range.load('values,address,rowCount,columnCount');
+await context.sync();
 ```
 
 ### Write to specific range
 
 ```javascript
-const sheet = context.workbook.worksheets.getActiveWorksheet()
-const range = sheet.getRange('A1:C3')
+const sheet = context.workbook.worksheets.getActiveWorksheet();
+const range = sheet.getRange('A1:C3');
 range.values = [
   ['Header1', 'Header2', 'Header3'],
   [1, 2, 3],
   [4, 5, 6],
-]
-await context.sync()
+];
+await context.sync();
 ```
 
 ### Add formula with fill-down
 
 ```javascript
-const sheet = context.workbook.worksheets.getActiveWorksheet()
-const range = sheet.getRange('D2:D100')
-range.formulas = [['=A2+B2']] // First cell only
-range.autoFill('D2:D100', 'FillDown')
-await context.sync()
+const sheet = context.workbook.worksheets.getActiveWorksheet();
+const range = sheet.getRange('D2:D100');
+range.formulas = [['=A2+B2']]; // First cell only
+range.autoFill('D2:D100', 'FillDown');
+await context.sync();
 ```
 
 ### Format range
 
 ```javascript
-const range = sheet.getRange('A1:C1')
-range.format.font.bold = true
-range.format.fill.color = '#4472C4'
-range.format.font.color = 'white'
-await context.sync()
+const range = sheet.getRange('A1:C1');
+range.format.font.bold = true;
+range.format.fill.color = '#4472C4';
+range.format.font.color = 'white';
+await context.sync();
 ```
 
 ### Create a Pivot Table (Tableau Croisé Dynamique)
@@ -247,6 +247,7 @@ When the user uploads a chart/graph image and asks to reproduce it in Excel, fol
 ### Step 1: Analyze the image (Vision)
 
 Use your vision capability to inspect the uploaded chart image and determine:
+
 - **Chart type**: line, scatter, bar, area, column, pie, etc.
 - **X axis range**: read the min and max labels on the horizontal axis (e.g., [0, 100], [2020, 2025])
 - **Y axis range**: read the min and max labels on the vertical axis (e.g., [0, 50000])
@@ -283,6 +284,7 @@ Call `extract_chart_data` with the parameters you identified. The **`plotAreaBox
 - `yMaxPx`: fraction from top where the X-axis horizontal line sits (e.g. 0.88)
 
 **Chart type mapping** (important for correct Y-value extraction):
+
 - Use `"line"` for line charts → median pixel Y per bucket
 - Use `"scatter"` for scatter/XY plots → median pixel Y per bucket
 - Use `"bar"` for column charts (vertical bars) AND horizontal bar charts → min pixel Y per bucket (= top of bar)
@@ -291,6 +293,7 @@ Call `extract_chart_data` with the parameters you identified. The **`plotAreaBox
 If the tool returns few or zero points, increase `colorTolerance` (default 120, try 150–200).
 
 **MULTI-SERIES CHARTS**: For charts with multiple data series (e.g., 3 different colored lines):
+
 1. Call `extract_chart_data` ONCE PER SERIES with the specific `targetColor` for each
 2. Use the SAME `plotAreaBox`, `xAxisRange`, `yAxisRange`, `chartType` for all calls — only change `targetColor`
 3. Example for a 3-series chart:
@@ -303,6 +306,7 @@ If the tool returns few or zero points, increase `colorTolerance` (default 120, 
 Use `setCellRange` to write the extracted points.
 
 **Single-series chart**:
+
 ```json
 {
   "address": "A1",
@@ -311,6 +315,7 @@ Use `setCellRange` to write the extracted points.
 ```
 
 **Multi-series chart** (write each series to adjacent columns):
+
 ```json
 {
   "address": "A1",
@@ -328,6 +333,7 @@ For multi-series, extract the X values from the first series call, then align su
 ### Step 4: Create the chart
 
 Use `manageObject` to create the chart matching the original type:
+
 ```json
 {
   "operation": "create",
@@ -343,11 +349,13 @@ Use `manageObject` to create the chart matching the original type:
 ### Step 5: Visual verification
 
 After creating the chart, call `screenshotRange` on the data range to capture the result as an image:
+
 ```json
 { "address": "A1:B41" }
 ```
 
 Use your vision capability to compare the screenshot with the original uploaded chart image:
+
 - Are the axis ranges consistent?
 - Do data points trend similarly?
 - Are labels and title matching?
@@ -355,6 +363,7 @@ Use your vision capability to compare the screenshot with the original uploaded 
 If significant discrepancies exist (wrong trend, missing data), adjust the data or chart parameters and re-verify.
 
 ### Important notes:
+
 - **Always analyze the image FIRST** to extract semantic info (axis ranges, colors)
 - **imageId** is found in the `<uploaded_images>` context block — do NOT fabricate it
 - The pixel extraction works best on clean charts with distinct colors

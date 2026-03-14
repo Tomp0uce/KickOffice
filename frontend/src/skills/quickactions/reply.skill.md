@@ -1,20 +1,24 @@
 # Reply Quick Action Skill
 
 ## Purpose
+
 Generate an appropriate email reply based on user's intent and the original email context, maintaining professional tone and addressing all points.
 
 ## When to Use
+
 - User clicks "Reply" Quick Action in Outlook (smart-reply mode)
 - User has specified reply intent in the text field (e.g., "accept the meeting" or "decline politely")
 - Goal: Draft a complete, contextually appropriate reply
 
 ## Input Contract
+
 - **Reply intent**: User's instruction for what the reply should say (from text field after clicking Reply)
 - **Original email context**: The email being replied to (injected by system)
 - **Language**: Match the language of the original email
 - **Rich content**: May contain `{{PRESERVE_N}}` placeholders if original email has images
 
 ## Output Requirements
+
 1. **Address the intent**: Accomplish what the user requested
 2. **Reference original email**: Acknowledge key points from the message being replied to
 3. **Professional tone**: Courteous, clear, appropriately formal
@@ -26,55 +30,68 @@ Generate an appropriate email reply based on user's intent and the original emai
 ## Reply Types
 
 ### 1. Acceptance
+
 User intent examples: "accept", "yes", "I'll attend", "sounds good"
 
 Response should:
+
 - Clearly confirm acceptance
 - Acknowledge key details (date, time, location)
 - Express enthusiasm (when appropriate)
 - Ask clarifying questions if needed
 
 ### 2. Decline
+
 User intent examples: "decline politely", "can't make it", "need to pass"
 
 Response should:
+
 - Politely decline
 - Provide brief reason (if user indicated one)
 - Suggest alternative (if applicable)
 - Maintain positive relationship
 
 ### 3. Request Information
+
 User intent examples: "ask for more details", "need clarification on budget", "what's the deadline?"
 
 Response should:
+
 - Acknowledge the original message
 - List specific questions clearly
 - Explain why information is needed (if relevant)
 - Provide context for the request
 
 ### 4. Confirmation
+
 User intent examples: "confirm receipt", "acknowledge", "got it thanks"
 
 Response should:
+
 - Confirm understanding
 - Summarize key points (if complex)
 - State next steps or expected actions
 
 ### 5. Follow-up
+
 User intent examples: "follow up on status", "checking in", "any updates?"
 
 Response should:
+
 - Reference previous communication
 - Politely request update
 - Provide context for urgency (if applicable)
 
 ## Tool Usage
+
 **DO NOT** call Office.js tools. Return pure email reply text.
 
 ## Example Replies
 
 ### Example 1: Meeting Acceptance
+
 **Original Email**:
+
 ```
 Hi John,
 
@@ -89,6 +106,7 @@ Sarah
 **User Intent**: "accept"
 
 **Generated Reply**:
+
 ```
 Hi Sarah,
 
@@ -103,7 +121,9 @@ John
 ---
 
 ### Example 2: Polite Decline with Alternative
+
 **Original Email**:
+
 ```
 Hello,
 
@@ -118,6 +138,7 @@ David
 **User Intent**: "decline politely, I have a conflict but suggest they check with my colleague Maria"
 
 **Generated Reply**:
+
 ```
 Hi David,
 
@@ -134,7 +155,9 @@ Best regards,
 ---
 
 ### Example 3: Request for Information
+
 **Original Email**:
+
 ```
 Team,
 
@@ -148,6 +171,7 @@ Alex
 **User Intent**: "ask what this means for the budget and if we have capacity"
 
 **Generated Reply**:
+
 ```
 Hi Alex,
 
@@ -166,7 +190,9 @@ Best,
 ---
 
 ### Example 4: Confirmation with Summary
+
 **Original Email**:
+
 ```
 Hi Lisa,
 
@@ -184,6 +210,7 @@ Michael
 **User Intent**: "confirm everything is correct"
 
 **Generated Reply**:
+
 ```
 Hi Michael,
 
@@ -202,7 +229,9 @@ Lisa
 ---
 
 ### Example 5: Follow-up on Pending Item
+
 **Original Email** (sent 1 week ago):
+
 ```
 Hi team,
 
@@ -215,6 +244,7 @@ Jennifer
 **User Intent**: "follow up, politely ask for the feedback"
 
 **Generated Reply**:
+
 ```
 Hi Jennifer,
 
@@ -229,7 +259,9 @@ Thanks!
 ---
 
 ### Example 6: French Reply
+
 **Original Email**:
+
 ```
 Bonjour,
 
@@ -242,6 +274,7 @@ Marie
 **User Intent**: "confirmer et demander l'adresse exacte"
 
 **Generated Reply**:
+
 ```
 Bonjour Marie,
 
@@ -256,29 +289,35 @@ Merci et à bientôt,
 ## Reply Tone Guidelines
 
 ### Professional but Warm
+
 - Use "Thanks" not "Thx"
 - "Looking forward" not "Can't wait"
 - "I appreciate" not "You're awesome"
 - Keep exclamation marks to 1-2 maximum
 
 ### Match Formality
+
 - If original email is formal ("Dear Sir/Madam"), mirror that formality
 - If original is casual ("Hey!"), you can be slightly casual (but still professional)
 
 ### Language Matching
+
 - **CRITICAL**: Reply in the same language as the original email
 - French email → French reply
 - Spanish email → Spanish reply
 - English email → English reply
 
 ## Edge Cases
+
 - **Vague user intent**: "respond appropriately" → Ask user for clarification via error message (system should handle this)
 - **Conflicting instructions**: If user says "accept but mention I might be late" → Handle both ("Yes, I'll attend, though I may arrive 10 minutes late")
 - **Multiple questions in original**: Address all points unless user intent is very specific
 - **Informal original email**: Mirror tone but stay professional (don't be overly casual)
 
 ## Quality Check
+
 After generating reply, verify:
+
 - ✓ Addresses user's intent?
 - ✓ References key points from original email?
 - ✓ Professional tone?
@@ -287,6 +326,7 @@ After generating reply, verify:
 - ✓ Clear next steps (if applicable)?
 
 ## Reply vs Other Actions
+
 - **Reply** = generate new email in response to original (smart-reply mode)
 - **Translate** = convert existing text to another language
 - **Concise** = shorten existing text

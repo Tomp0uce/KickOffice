@@ -1,4 +1,4 @@
-import type { ToolDefinition } from '@/types'
+import type { ToolDefinition } from '@/types';
 
 /**
  * ARCH-M1: ToolProviderRegistry
@@ -13,17 +13,17 @@ import type { ToolDefinition } from '@/types'
  * - Clear separation of concerns
  */
 
-type ToolProvider = () => ToolDefinition[]
+type ToolProvider = () => ToolDefinition[];
 
 interface ToolProviderRegistry {
-  register(hostName: string, provider: ToolProvider): void
-  getTools(hostName: string): ToolDefinition[]
-  getRegisteredHosts(): string[]
-  hasProvider(hostName: string): boolean
+  register(hostName: string, provider: ToolProvider): void;
+  getTools(hostName: string): ToolDefinition[];
+  getRegisteredHosts(): string[];
+  hasProvider(hostName: string): boolean;
 }
 
 class ToolProviderRegistryImpl implements ToolProviderRegistry {
-  private providers = new Map<string, ToolProvider>()
+  private providers = new Map<string, ToolProvider>();
 
   /**
    * Register a tool provider for a specific host
@@ -31,11 +31,11 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
    * @param provider - Function that returns tool definitions for this host
    */
   register(hostName: string, provider: ToolProvider): void {
-    const normalizedName = hostName.toLowerCase()
+    const normalizedName = hostName.toLowerCase();
     if (this.providers.has(normalizedName)) {
-      console.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`)
+      console.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`);
     }
-    this.providers.set(normalizedName, provider)
+    this.providers.set(normalizedName, provider);
   }
 
   /**
@@ -44,40 +44,42 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
    * @returns Array of tool definitions, or empty array if host not registered
    */
   getTools(hostName: string): ToolDefinition[] {
-    const normalizedName = hostName.toLowerCase()
-    const provider = this.providers.get(normalizedName)
+    const normalizedName = hostName.toLowerCase();
+    const provider = this.providers.get(normalizedName);
 
     if (!provider) {
-      console.warn(`[ToolProviderRegistry] No provider registered for host: ${hostName}. Available hosts: ${this.getRegisteredHosts().join(', ')}`)
-      return []
+      console.warn(
+        `[ToolProviderRegistry] No provider registered for host: ${hostName}. Available hosts: ${this.getRegisteredHosts().join(', ')}`,
+      );
+      return [];
     }
 
-    return provider()
+    return provider();
   }
 
   /**
    * Get list of all registered host names
    */
   getRegisteredHosts(): string[] {
-    return Array.from(this.providers.keys())
+    return Array.from(this.providers.keys());
   }
 
   /**
    * Check if a provider is registered for a host
    */
   hasProvider(hostName: string): boolean {
-    return this.providers.has(hostName.toLowerCase())
+    return this.providers.has(hostName.toLowerCase());
   }
 }
 
 // Singleton instance
-const registry = new ToolProviderRegistryImpl()
+const registry = new ToolProviderRegistryImpl();
 
 /**
  * Get the global tool provider registry
  */
 export function getToolProviderRegistry(): ToolProviderRegistry {
-  return registry
+  return registry;
 }
 
 /**
@@ -86,15 +88,15 @@ export function getToolProviderRegistry(): ToolProviderRegistry {
  */
 export function initializeToolProviders(): void {
   // Direct imports (not lazy) - these are already loaded by the app
-  const { getWordToolDefinitions } = require('@/utils/wordTools')
-  const { getExcelToolDefinitions } = require('@/utils/excelTools')
-  const { getPowerPointToolDefinitions } = require('@/utils/powerpointTools')
-  const { getOutlookToolDefinitions } = require('@/utils/outlookTools')
+  const { getWordToolDefinitions } = require('@/utils/wordTools');
+  const { getExcelToolDefinitions } = require('@/utils/excelTools');
+  const { getPowerPointToolDefinitions } = require('@/utils/powerpointTools');
+  const { getOutlookToolDefinitions } = require('@/utils/outlookTools');
 
-  registry.register('Word', getWordToolDefinitions)
-  registry.register('Excel', getExcelToolDefinitions)
-  registry.register('PowerPoint', getPowerPointToolDefinitions)
-  registry.register('Outlook', getOutlookToolDefinitions)
+  registry.register('Word', getWordToolDefinitions);
+  registry.register('Excel', getExcelToolDefinitions);
+  registry.register('PowerPoint', getPowerPointToolDefinitions);
+  registry.register('Outlook', getOutlookToolDefinitions);
 }
 
 /**
@@ -103,19 +105,19 @@ export function initializeToolProviders(): void {
  * @returns Tool definitions for the current host
  */
 export function getToolsForHost(hostFlags: {
-  isOutlook: boolean
-  isPowerPoint: boolean
-  isExcel: boolean
+  isOutlook: boolean;
+  isPowerPoint: boolean;
+  isExcel: boolean;
 }): ToolDefinition[] {
-  const { isOutlook, isPowerPoint, isExcel } = hostFlags
+  const { isOutlook, isPowerPoint, isExcel } = hostFlags;
 
-  let hostName = 'Word' // default
-  if (isOutlook) hostName = 'Outlook'
-  else if (isPowerPoint) hostName = 'PowerPoint'
-  else if (isExcel) hostName = 'Excel'
+  let hostName = 'Word'; // default
+  if (isOutlook) hostName = 'Outlook';
+  else if (isPowerPoint) hostName = 'PowerPoint';
+  else if (isExcel) hostName = 'Excel';
 
-  return registry.getTools(hostName)
+  return registry.getTools(hostName);
 }
 
 // Auto-initialize on module load
-initializeToolProviders()
+initializeToolProviders();

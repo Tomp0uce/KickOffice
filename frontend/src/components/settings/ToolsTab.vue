@@ -1,8 +1,5 @@
 <template>
-  <div
-    role="tabpanel"
-    class="w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1"
-  >
+  <div role="tabpanel" class="w-full flex-1 items-center gap-2 overflow-hidden bg-bg-secondary p-1">
     <div
       class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
     >
@@ -18,7 +15,10 @@
       </div>
 
       <!-- Word-specific settings -->
-      <div v-if="isWord" class="flex flex-col gap-2 rounded-md border border-border-secondary p-2 shadow-sm">
+      <div
+        v-if="isWord"
+        class="flex flex-col gap-2 rounded-md border border-border-secondary p-2 shadow-sm"
+      >
         <h4 class="text-xs font-semibold text-accent/70">Word Track Changes Settings</h4>
 
         <!-- Enable Track Changes toggle -->
@@ -82,18 +82,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-import { forHost } from '@/utils/hostDetection'
-import { getExcelToolDefinitions } from '@/utils/excelTools'
-import { getGeneralToolDefinitions } from '@/utils/generalTools'
-import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions } from '@/utils/powerpointTools'
-import { getWordToolDefinitions } from '@/utils/wordTools'
-import { getEnabledToolNamesFromStorage, persistEnabledTools } from '@/utils/toolStorage'
+import { forHost } from '@/utils/hostDetection';
+import { getExcelToolDefinitions } from '@/utils/excelTools';
+import { getGeneralToolDefinitions } from '@/utils/generalTools';
+import { getOutlookToolDefinitions } from '@/utils/outlookTools';
+import { getPowerPointToolDefinitions } from '@/utils/powerpointTools';
+import { getWordToolDefinitions } from '@/utils/wordTools';
+import { getEnabledToolNamesFromStorage, persistEnabledTools } from '@/utils/toolStorage';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 const appToolsList =
   forHost({
@@ -101,67 +101,67 @@ const appToolsList =
     excel: getExcelToolDefinitions(),
     powerpoint: getPowerPointToolDefinitions(),
     word: getWordToolDefinitions(),
-  }) || []
-const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList]
-const enabledTools = ref<Set<string>>(new Set())
+  }) || [];
+const allToolsList = [...getGeneralToolDefinitions(), ...appToolsList];
+const enabledTools = ref<Set<string>>(new Set());
 
 // Word-specific settings
-const isWord = Office?.context?.host === Office.HostType.Word
-const redlineEnabled = ref(true)
-const redlineAuthor = ref('KickOffice AI')
+const isWord = Office?.context?.host === Office.HostType.Word;
+const redlineEnabled = ref(true);
+const redlineAuthor = ref('KickOffice AI');
 
 const toolDescriptionKey = forHost({
   outlook: 'outlookToolsDescription',
   excel: 'excelToolsDescription',
   powerpoint: 'powerpointToolsDescription',
   word: 'wordToolsDescription',
-}) as string
+}) as string;
 
 const toolTranslationPrefix = forHost({
   outlook: 'outlookTool',
   excel: 'excelTool',
   powerpoint: 'powerpointTool',
   word: 'wordTool',
-}) as string
+}) as string;
 
 function loadToolPreferences() {
-  enabledTools.value = getEnabledToolNamesFromStorage(allToolsList.map(tool => tool.name))
+  enabledTools.value = getEnabledToolNamesFromStorage(allToolsList.map(tool => tool.name));
 }
 
 function toggleTool(toolName: string) {
   if (enabledTools.value.has(toolName)) {
-    enabledTools.value.delete(toolName)
+    enabledTools.value.delete(toolName);
   } else {
-    enabledTools.value.add(toolName)
+    enabledTools.value.add(toolName);
   }
   persistEnabledTools(
     allToolsList.map(tool => tool.name),
     enabledTools.value,
-  )
+  );
 }
 
 function loadRedlineSettings() {
-  const storedEnabled = localStorage.getItem('redlineEnabled')
+  const storedEnabled = localStorage.getItem('redlineEnabled');
   if (storedEnabled !== null) {
-    redlineEnabled.value = storedEnabled === 'true'
+    redlineEnabled.value = storedEnabled === 'true';
   }
 
-  const storedAuthor = localStorage.getItem('redlineAuthor')
+  const storedAuthor = localStorage.getItem('redlineAuthor');
   if (storedAuthor && storedAuthor.trim() !== '') {
-    redlineAuthor.value = storedAuthor
+    redlineAuthor.value = storedAuthor;
   }
 }
 
 function saveRedlineSettings() {
-  localStorage.setItem('redlineEnabled', String(redlineEnabled.value))
-  localStorage.setItem('redlineAuthor', redlineAuthor.value.trim() || 'KickOffice AI')
+  localStorage.setItem('redlineEnabled', String(redlineEnabled.value));
+  localStorage.setItem('redlineAuthor', redlineAuthor.value.trim() || 'KickOffice AI');
 }
 
 // Initial load
-loadToolPreferences()
+loadToolPreferences();
 onMounted(() => {
   if (isWord) {
-    loadRedlineSettings()
+    loadRedlineSettings();
   }
-})
+});
 </script>

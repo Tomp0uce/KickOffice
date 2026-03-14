@@ -30,23 +30,23 @@
 </template>
 
 <script setup lang="ts">
-import { EyeClosedIcon, EyeIcon } from 'lucide-vue-next'
-import { ref } from 'vue'
-import { ICON_SIZE_MD } from '@/constants/limits'
+import { EyeClosedIcon, EyeIcon } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { ICON_SIZE_MD } from '@/constants/limits';
 
 const [modelValue, modifiers] = defineModel<string | number>({
   set(value) {
-    let result = value
+    let result = value;
     if (modifiers.trim && typeof result === 'string') {
-      result = result.trim()
+      result = result.trim();
     }
     if (modifiers.number && typeof result === 'string') {
-      const n = parseFloat(result)
-      result = isNaN(n) ? result : n
+      const n = parseFloat(result);
+      result = isNaN(n) ? result : n;
     }
-    return result
+    return result;
   },
-})
+});
 
 const {
   isPassword = false,
@@ -55,16 +55,16 @@ const {
   placeholder,
   required = false,
 } = defineProps<{
-  isPassword?: boolean
-  title: string
-  inputType?: string
-  placeholder: string
-  required?: boolean
-}>()
+  isPassword?: boolean;
+  title: string;
+  inputType?: string;
+  placeholder: string;
+  required?: boolean;
+}>();
 
 defineOptions({
   inheritAttrs: false,
-})
+});
 
-const type = ref(isPassword ? 'password' : inputType)
+const type = ref(isPassword ? 'password' : inputType);
 </script>

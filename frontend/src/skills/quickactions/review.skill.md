@@ -1,20 +1,24 @@
 # Review Quick Action Skill
 
 ## Purpose
+
 Provide actionable, specific feedback on a PowerPoint slide to improve content clarity, visual balance, and message impact.
 
 ## When to Use
+
 - User clicks the "Review" Quick Action in PowerPoint
 - Works on the CURRENT slide (no text selection required)
 - Goal: Expert presentation coach feedback
 
 ## Input Contract
+
 - **Current slide screenshot**: Visual layout via `screenshotSlide` tool
 - **Slide index**: Via `getCurrentSlideIndex` tool
 - **Presentation context**: Via `getAllSlidesOverview` tool
 - **Language**: User's interface language (English or French)
 
 ## Required Tool Sequence
+
 **MUST execute in this exact order:**
 
 1. **`getCurrentSlideIndex`**
@@ -31,6 +35,7 @@ Provide actionable, specific feedback on a PowerPoint slide to improve content c
    - Purpose: Understand full presentation context for consistency check
 
 ## Output Requirements
+
 Format response as **3-5 numbered, actionable suggestions**:
 
 ```
@@ -40,6 +45,7 @@ Format response as **3-5 numbered, actionable suggestions**:
 ```
 
 ### Review Focus Areas
+
 - **Content clarity**: Is the message immediately clear? Too much/too little text?
 - **Visual balance**: Text density, white space, image placement
 - **Message impact**: Does the slide convey its key point effectively?
@@ -47,6 +53,7 @@ Format response as **3-5 numbered, actionable suggestions**:
 - **Readability**: Font sizes, contrast, bullet point structure
 
 ### What to AVOID
+
 - Generic advice ("make it better", "improve the design")
 - Suggestions for OTHER slides (focus on THIS slide only)
 - Color scheme critiques unless severely impacting readability
@@ -55,6 +62,7 @@ Format response as **3-5 numbered, actionable suggestions**:
 ## Example Output
 
 **English**:
+
 ```
 1. Too much text: Reduce body text to 5-6 bullets maximum. Current 9 bullets create visual clutter and reduce impact.
 
@@ -66,6 +74,7 @@ Format response as **3-5 numbered, actionable suggestions**:
 ```
 
 **French**:
+
 ```
 1. Trop de texte : Réduire à 5-6 puces maximum. Les 9 puces actuelles créent un encombrement visuel et réduisent l'impact.
 
@@ -77,17 +86,20 @@ Format response as **3-5 numbered, actionable suggestions**:
 ```
 
 ## Language Handling
+
 - Respond in the user's interface language (stored in `localStorage.getItem('localLanguage')`)
 - English UI → English feedback
 - French UI → French feedback
 - Do NOT translate the slide content itself
 
 ## Error Handling
+
 - If `screenshotSlide` fails: Proceed with text-only analysis from overview
 - If slide is blank: Focus on structural suggestions (add title, add content, etc.)
 - If this is the only slide: Skip consistency checks, focus on standalone quality
 
 ## Tone
+
 - Professional and constructive
 - Direct and specific (avoid hedging: "you might want to consider...")
 - Action-oriented (tell them WHAT to do, not just what's wrong)

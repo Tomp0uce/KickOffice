@@ -18,40 +18,40 @@
 </template>
 
 <script lang="ts" setup>
-import { AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-vue-next'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-vue-next';
+import { onMounted, onUnmounted, ref } from 'vue';
 
 interface Props {
-  message: string
-  type?: 'error' | 'success' | 'info' | 'warning'
-  duration?: number
+  message: string;
+  type?: 'error' | 'success' | 'info' | 'warning';
+  duration?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   type: 'info',
   duration: 3000,
-})
+});
 
-const visible = ref(false)
-const emit = defineEmits(['close'])
+const visible = ref(false);
+const emit = defineEmits(['close']);
 
-let hideTimeout: number
-let closeTimeout: number
+let hideTimeout: number;
+let closeTimeout: number;
 
 onMounted(() => {
-  visible.value = true
+  visible.value = true;
   if (props.duration > 0) {
     hideTimeout = window.setTimeout(() => {
-      visible.value = false
-      closeTimeout = window.setTimeout(() => emit('close'), 300)
-    }, props.duration)
+      visible.value = false;
+      closeTimeout = window.setTimeout(() => emit('close'), 300);
+    }, props.duration);
   }
-})
+});
 
 onUnmounted(() => {
-  clearTimeout(hideTimeout)
-  clearTimeout(closeTimeout)
-})
+  clearTimeout(hideTimeout);
+  clearTimeout(closeTimeout);
+});
 </script>
 
 <style scoped>

@@ -1,5 +1,5 @@
-import type { IStringKeyMap } from '@/types'
-import { logService } from '@/utils/logger'
+import type { IStringKeyMap } from '@/types';
+import { logService } from '@/utils/logger';
 export const languageMap: IStringKeyMap = {
   en: 'English',
   es: 'Espa\u00f1ol',
@@ -14,14 +14,27 @@ export const languageMap: IStringKeyMap = {
   pl: 'Polski',
   ar: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629',
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
-}
+};
 
 // TOOL-M4: Type for Excel formula language (extended from 'en' | 'fr' to all supported languages)
-export type ExcelFormulaLanguage = 'en' | 'fr' | 'de' | 'es' | 'it' | 'pt' | 'zh-cn' | 'ja' | 'ko' | 'nl' | 'pl' | 'ar' | 'ru'
+export type ExcelFormulaLanguage =
+  | 'en'
+  | 'fr'
+  | 'de'
+  | 'es'
+  | 'it'
+  | 'pt'
+  | 'zh-cn'
+  | 'ja'
+  | 'ko'
+  | 'nl'
+  | 'pl'
+  | 'ar'
+  | 'ru';
 
 /// TOOL-L3: em-dash/semicolon ban is PPT/bullet-only — applied per-prompt, not globally
 export const PPT_STYLE_RULES = `- NEVER use em-dashes (—).
-- NEVER use semicolons (;).`
+- NEVER use semicolons (;).`;
 
 export const GLOBAL_STYLE_INSTRUCTIONS = `
 CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
@@ -32,9 +45,10 @@ CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
   - Use 2-space indentation for nested sub-items
   - Each bullet should be a concise, standalone point
 - For emphasis, use **bold** (not CAPS or underlining)
-- For document structure, use Markdown headings (# ## ###)`
+- For document structure, use Markdown headings (# ## ###)`;
 
-const LANGUAGE_MATCH_INSTRUCTION = 'Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.'
+const LANGUAGE_MATCH_INSTRUCTION =
+  'Analyze the language of the provided text. You MUST respond in the exact SAME language as the original text, disregarding any other UI language preferences.';
 
 export const builtInPrompt = {
   translate: {
@@ -134,7 +148,7 @@ Text: ${text}`,
 
       Text: ${text}`,
   },
-}
+};
 
 export const excelBuiltInPrompt = {
   analyze: {
@@ -245,7 +259,7 @@ export const excelBuiltInPrompt = {
 
       Data: ${text}`,
   },
-}
+};
 
 export const powerPointBuiltInPrompt = {
   bullets: {
@@ -350,35 +364,38 @@ export const powerPointBuiltInPrompt = {
 
       Slide content: ${text}`,
   },
-}
+};
 
 export const getPowerPointBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_ppt_v5')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_ppt_v5');
   if (!stored) {
-    return powerPointBuiltInPrompt
+    return powerPointBuiltInPrompt;
   }
 
   try {
-    const customPrompts = JSON.parse(stored)
-    const result = { ...powerPointBuiltInPrompt }
+    const customPrompts = JSON.parse(stored);
+    const result = { ...powerPointBuiltInPrompt };
 
     Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof powerPointBuiltInPrompt
+      const typedKey = key as keyof typeof powerPointBuiltInPrompt;
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
+          system: (language: string) =>
+            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
-        }
+            customPrompts[key].user
+              .replace(/\[TEXT\]/g, () => text)
+              .replace(/\[LANGUAGE\]/g, () => language),
+        };
       }
-    })
+    });
 
-    return result
+    return result;
   } catch (error) {
-    logService.error('Error loading custom PowerPoint built-in prompts:', error)
-    return powerPointBuiltInPrompt
+    logService.error('Error loading custom PowerPoint built-in prompts:', error);
+    return powerPointBuiltInPrompt;
   }
-}
+};
 
 export const outlookBuiltInPrompt = {
   reply: {
@@ -508,88 +525,97 @@ OUTPUT: The corrected and lightly improved email body only.`,
 
       Email: ${text}`,
   },
-}
+};
 
 export const getOutlookBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_outlook_v5')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_outlook_v5');
   if (!stored) {
-    return outlookBuiltInPrompt
+    return outlookBuiltInPrompt;
   }
 
   try {
-    const customPrompts = JSON.parse(stored)
-    const result = { ...outlookBuiltInPrompt }
+    const customPrompts = JSON.parse(stored);
+    const result = { ...outlookBuiltInPrompt };
 
     Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof outlookBuiltInPrompt
+      const typedKey = key as keyof typeof outlookBuiltInPrompt;
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
+          system: (language: string) =>
+            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
-        }
+            customPrompts[key].user
+              .replace(/\[TEXT\]/g, () => text)
+              .replace(/\[LANGUAGE\]/g, () => language),
+        };
       }
-    })
+    });
 
-    return result
+    return result;
   } catch (error) {
-    logService.error('Error loading custom Outlook built-in prompts:', error)
-    return outlookBuiltInPrompt
+    logService.error('Error loading custom Outlook built-in prompts:', error);
+    return outlookBuiltInPrompt;
   }
-}
+};
 
 export const getExcelBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_excel_v5')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_excel_v5');
   if (!stored) {
-    return excelBuiltInPrompt
+    return excelBuiltInPrompt;
   }
 
   try {
-    const customPrompts = JSON.parse(stored)
-    const result = { ...excelBuiltInPrompt }
+    const customPrompts = JSON.parse(stored);
+    const result = { ...excelBuiltInPrompt };
 
     Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof excelBuiltInPrompt
+      const typedKey = key as keyof typeof excelBuiltInPrompt;
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
+          system: (language: string) =>
+            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
-        }
+            customPrompts[key].user
+              .replace(/\[TEXT\]/g, () => text)
+              .replace(/\[LANGUAGE\]/g, () => language),
+        };
       }
-    })
+    });
 
-    return result
+    return result;
   } catch (error) {
-    logService.error('Error loading custom Excel built-in prompts:', error)
-    return excelBuiltInPrompt
+    logService.error('Error loading custom Excel built-in prompts:', error);
+    return excelBuiltInPrompt;
   }
-}
+};
 
 export const getBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_word_v5')
+  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_word_v5');
   if (!stored) {
-    return builtInPrompt
+    return builtInPrompt;
   }
 
   try {
-    const customPrompts = JSON.parse(stored)
-    const result = { ...builtInPrompt }
+    const customPrompts = JSON.parse(stored);
+    const result = { ...builtInPrompt };
 
     Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof builtInPrompt
+      const typedKey = key as keyof typeof builtInPrompt;
       if (result[typedKey]) {
         result[typedKey] = {
-          system: (language: string) => customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
+          system: (language: string) =>
+            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
           user: (text: string, language: string) =>
-            customPrompts[key].user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
-        }
+            customPrompts[key].user
+              .replace(/\[TEXT\]/g, () => text)
+              .replace(/\[LANGUAGE\]/g, () => language),
+        };
       }
-    })
+    });
 
-    return result
+    return result;
   } catch (error) {
-    logService.error('Error loading custom built-in prompts:', error)
-    return builtInPrompt
+    logService.error('Error loading custom built-in prompts:', error);
+    return builtInPrompt;
   }
-}
+};

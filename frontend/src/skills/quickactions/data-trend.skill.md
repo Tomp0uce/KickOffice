@@ -1,20 +1,24 @@
 # Data Trend Quick Action Skill (Excel)
 
 ## Purpose
+
 Analyze trends in selected data, identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.
 
 ## When to Use
+
 - User clicks "Data Trend" Quick Action in Excel
 - Selected data represents time series, sequential measurements, or comparable values
 - Goal: Provide analytical insights about trends, not just description
 
 ## Input Contract
+
 - **Selected cells**: Numeric data (ideally with labels/dates)
 - **Language**: Respond in UI language
 - **Context**: Excel worksheet with data to analyze
 - **Mode**: Immediate execution (agent loop)
 
 ## Output Requirements
+
 1. **Overall trend**: Is data increasing, decreasing, stable, or cyclical?
 2. **Key patterns**: Seasonality, peaks, troughs, anomalies
 3. **Outliers**: Identify unusual data points that deviate significantly
@@ -26,6 +30,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Tool Usage
 
 **Optional**:
+
 - `getSelectedCells` or `getWorksheetData` — If you need to inspect the actual data structure
 
 **DO NOT** modify data or create charts. This is a read-only analytical action. (User can use Auto-Graph for visualization)
@@ -33,6 +38,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Analysis Framework
 
 ### 1. Identify Trend Direction
+
 - **Upward trend**: Values generally increasing over time
 - **Downward trend**: Values generally decreasing over time
 - **Stable/flat**: Values remain relatively constant
@@ -40,22 +46,26 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 - **Volatile**: High variability, no clear pattern
 
 ### 2. Calculate Growth Metrics
+
 - **Total change**: `(Last value - First value) / First value * 100`
 - **Average growth per period**: `((Last/First)^(1/periods) - 1) * 100`
 - **Peak-to-trough**: Identify highest and lowest points
 - **Volatility**: Standard deviation or variance
 
 ### 3. Detect Patterns
+
 - **Seasonality**: Regular patterns (e.g., higher sales in Q4)
 - **Peaks/troughs**: When do maximums and minimums occur?
 - **Acceleration/deceleration**: Is growth speeding up or slowing down?
 - **Breakpoints**: Sudden shifts in trend direction
 
 ### 4. Identify Outliers
+
 - **Statistical outliers**: Values >2 standard deviations from mean
 - **Contextual outliers**: Values unusual given surrounding data
 
 ### 5. Provide Insights
+
 - **What does this mean?** Interpret the trend
 - **Why might this be happening?** Suggest possible causes
 - **What should be done?** Recommend actions
@@ -63,6 +73,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Response Structure
 
 ### Format:
+
 ```
 # Data Trend Analysis
 
@@ -84,7 +95,9 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Example Analyses
 
 ### Example 1: Monthly Sales Data
+
 **Data** (Monthly Revenue, Jan-Dec):
+
 ```
 | Month | Revenue |
 |-------|---------|
@@ -103,6 +116,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 **Analysis**:
+
 ```
 # Data Trend Analysis
 
@@ -123,7 +137,9 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 ### Example 2: Website Traffic Data
+
 **Data** (Daily visitors for 14 days):
+
 ```
 | Day | Visitors |
 |-----|----------|
@@ -144,6 +160,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 **Analysis**:
+
 ```
 # Data Trend Analysis
 
@@ -164,7 +181,9 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 ### Example 3: Product Defect Rates (Quarterly)
+
 **Data**:
+
 ```
 | Quarter | Defect Rate (%) |
 |---------|-----------------|
@@ -179,6 +198,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 **Analysis**:
+
 ```
 # Data Trend Analysis
 
@@ -199,7 +219,9 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 ### Example 4: French Data (Sales Performance)
+
 **Data** (French monthly sales):
+
 ```
 | Mois | Ventes |
 |------|--------|
@@ -210,6 +232,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ```
 
 **Analysis** (in French):
+
 ```
 # Analyse des Tendances
 
@@ -232,48 +255,62 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Outlier Detection
 
 ### Statistical Method
+
 Calculate mean and standard deviation:
+
 - **Mild outlier**: Value >1.5 SD from mean
 - **Extreme outlier**: Value >2 SD from mean
 
 ### Contextual Method
+
 Compare to surrounding values:
+
 - If value differs by >20% from previous/next values → flag as outlier
 
 ## Actionable Insights Examples
 
 ### Growth Insights
+
 - "Revenue is growing but decelerating—consider new strategies to maintain momentum"
 - "Q4 consistently outperforms—allocate more budget to year-end campaigns"
 
 ### Stability Insights
+
 - "Traffic is flat despite marketing spend—reevaluate campaign effectiveness"
 - "Costs remain stable despite volume increase—excellent operational efficiency"
 
 ### Volatility Insights
+
 - "High variability suggests external factors—investigate correlation with market events"
 - "Unpredictable sales pattern—implement demand forecasting system"
 
 ### Outlier Insights
+
 - "March spike (+50%) coincided with product launch—replicate strategy for future releases"
 - "August dip likely due to vacation season—plan reduced staffing accordingly"
 
 ## Edge Cases
 
 ### Insufficient data (<5 data points)
+
 "Limited data makes trend analysis unreliable. Collect more data points for meaningful insights."
 
 ### All values identical
+
 "No trend detected—all values are constant at [X]. This could indicate data source issue or truly stable metric."
 
 ### Extreme outliers
+
 Mention outliers but don't let them dominate the analysis—focus on overall trend
 
 ### Non-numeric data
+
 "Selected data is not numeric. Trend analysis requires numerical values."
 
 ## Quality Check
+
 After analysis, verify:
+
 - ✓ Quantified findings (percentages, numbers)?
 - ✓ Identified actual patterns (not just describing data)?
 - ✓ Provided actionable insights?
@@ -281,6 +318,7 @@ After analysis, verify:
 - ✓ Correct language?
 
 ## Data Trend vs Other Excel Actions
+
 - **Data Trend** = analytical insights about patterns and changes (read-only)
 - **Explain** = describe formula/data structure (educational)
 - **Auto-Graph** = create visual charts (visualization)

@@ -1,5 +1,5 @@
 export function useLoopDetection(windowSize: number = 5, repeatThreshold: number = 2) {
-  const recentSignatures: string[] = []
+  const recentSignatures: string[] = [];
 
   /**
    * Adds the tool call signature (toolName + serialized args) to a sliding window
@@ -10,21 +10,21 @@ export function useLoopDetection(windowSize: number = 5, repeatThreshold: number
    * - Same tool, different args (e.g. setCellRange(A1) then setCellRange(B1)) → does NOT trigger
    */
   function addSignatureAndCheckLoop(signature: string): boolean {
-    if (!signature) return false
-    recentSignatures.push(signature)
+    if (!signature) return false;
+    recentSignatures.push(signature);
     if (recentSignatures.length > windowSize) {
-      recentSignatures.shift()
+      recentSignatures.shift();
     }
-    const sigCount = recentSignatures.filter(s => s === signature).length
-    return sigCount >= repeatThreshold
+    const sigCount = recentSignatures.filter(s => s === signature).length;
+    return sigCount >= repeatThreshold;
   }
 
   function clearSignatures() {
-    recentSignatures.length = 0
+    recentSignatures.length = 0;
   }
 
   return {
     addSignatureAndCheckLoop,
-    clearSignatures
-  }
+    clearSignatures,
+  };
 }

@@ -29,8 +29,11 @@
         <div class="flex flex-row items-start justify-between">
           <div class="flex items-center gap-2">
             <span class="text-sm font-semibold text-secondary">{{
-              t(hostIsExcel ? `excel${(key as string).charAt(0).toUpperCase() + (key as string).slice(1)}` : (key as string)) ||
-              key
+              t(
+                hostIsExcel
+                  ? `excel${(key as string).charAt(0).toUpperCase() + (key as string).slice(1)}`
+                  : (key as string),
+              ) || key
             }}</span>
           </div>
           <div class="flex gap-1">
@@ -80,9 +83,7 @@
           <p class="text-xs leading-normal wrap-break-word text-secondary">
             {{ getSystemPromptPreview(promptConfig.system) }}
           </p>
-          <p class="mt-2 mb-2 text-xs font-semibold text-secondary">
-            {{ t('userPrompt') }}:
-          </p>
+          <p class="mt-2 mb-2 text-xs font-semibold text-secondary">{{ t('userPrompt') }}:</p>
           <p class="text-xs leading-normal wrap-break-word text-secondary">
             {{ getUserPromptPreview(promptConfig.user) }}
           </p>
@@ -93,37 +94,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Edit2, RotateCcwIcon, Save } from 'lucide-vue-next'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { Edit2, RotateCcwIcon, Save } from 'lucide-vue-next';
 
-import CustomButton from '@/components/CustomButton.vue'
+import CustomButton from '@/components/CustomButton.vue';
 import {
   builtInPrompt,
   excelBuiltInPrompt,
   outlookBuiltInPrompt,
   powerPointBuiltInPrompt,
-} from '@/utils/constant'
-import { isExcel, forHost } from '@/utils/hostDetection'
+} from '@/utils/constant';
+import { isExcel, forHost } from '@/utils/hostDetection';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const hostIsExcel = isExcel()
+const hostIsExcel = isExcel();
 
 // Types
-type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'proofread'
-type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain'
-type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'proofread' | 'visual'
-type OutlookBuiltinPromptKey = 'reply' | 'translate_formalize' | 'concise' | 'proofread' | 'extract'
+type WordBuiltinPromptKey = 'translate' | 'polish' | 'academic' | 'summary' | 'proofread';
+type ExcelBuiltinPromptKey = 'analyze' | 'chart' | 'formula' | 'format' | 'explain';
+type PowerPointBuiltinPromptKey = 'bullets' | 'speakerNotes' | 'punchify' | 'proofread' | 'visual';
+type OutlookBuiltinPromptKey =
+  | 'reply'
+  | 'translate_formalize'
+  | 'concise'
+  | 'proofread'
+  | 'extract';
 type BuiltinPromptKey =
   | WordBuiltinPromptKey
   | ExcelBuiltinPromptKey
   | PowerPointBuiltinPromptKey
-  | OutlookBuiltinPromptKey
+  | OutlookBuiltinPromptKey;
 
 interface BuiltinPromptConfig {
-  system: (language: string) => string
-  user: (text: string, language: string) => string
+  system: (language: string) => string;
+  user: (text: string, language: string) => string;
 }
 
 const wordBuiltInPromptsData: Record<WordBuiltinPromptKey, BuiltinPromptConfig> = {
@@ -132,7 +138,7 @@ const wordBuiltInPromptsData: Record<WordBuiltinPromptKey, BuiltinPromptConfig> 
   academic: { ...builtInPrompt.academic },
   summary: { ...builtInPrompt.summary },
   proofread: { ...builtInPrompt.proofread },
-}
+};
 
 const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig> = {
   analyze: { ...excelBuiltInPrompt.analyze },
@@ -140,7 +146,7 @@ const excelBuiltInPromptsData: Record<ExcelBuiltinPromptKey, BuiltinPromptConfig
   formula: { ...excelBuiltInPrompt.formula },
   format: { ...excelBuiltInPrompt.format },
   explain: { ...excelBuiltInPrompt.explain },
-}
+};
 
 const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPromptConfig> = {
   bullets: { ...powerPointBuiltInPrompt.bullets },
@@ -148,7 +154,7 @@ const powerPointBuiltInPromptsData: Record<PowerPointBuiltinPromptKey, BuiltinPr
   punchify: { ...powerPointBuiltInPrompt.punchify },
   proofread: { ...powerPointBuiltInPrompt.proofread },
   visual: { ...powerPointBuiltInPrompt.visual },
-}
+};
 
 const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptConfig> = {
   reply: { ...outlookBuiltInPrompt.reply },
@@ -156,30 +162,30 @@ const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptCo
   concise: { ...outlookBuiltInPrompt.concise },
   proofread: { ...outlookBuiltInPrompt.proofread },
   extract: { ...outlookBuiltInPrompt.extract },
-}
+};
 
 const selectedBuiltInPromptsData = forHost({
   outlook: { ...outlookBuiltInPromptsData },
   excel: { ...excelBuiltInPromptsData },
   powerpoint: { ...powerPointBuiltInPromptsData },
   word: { ...wordBuiltInPromptsData },
-}) as Record<string, BuiltinPromptConfig>
+}) as Record<string, BuiltinPromptConfig>;
 
 const selectedOriginalBuiltInPrompts = forHost({
   outlook: { ...outlookBuiltInPrompt },
   excel: { ...excelBuiltInPrompt },
   powerpoint: { ...powerPointBuiltInPrompt },
   word: { ...builtInPrompt },
-}) as Record<string, BuiltinPromptConfig>
+}) as Record<string, BuiltinPromptConfig>;
 
-const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(selectedBuiltInPromptsData)
-const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = selectedOriginalBuiltInPrompts
+const builtInPromptsData = ref<Record<string, BuiltinPromptConfig>>(selectedBuiltInPromptsData);
+const originalBuiltInPrompts: Record<string, BuiltinPromptConfig> = selectedOriginalBuiltInPrompts;
 
-const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('')
+const editingBuiltinPromptKey = ref<BuiltinPromptKey | ''>('');
 const editingBuiltinPrompt = ref<{ system: string; user: string }>({
   system: '',
   user: '',
-})
+});
 
 const builtInPromptsStorageKey = forHost({
   default: 'ki_Settings_BuiltInPrompts_v5',
@@ -187,13 +193,13 @@ const builtInPromptsStorageKey = forHost({
   outlook: 'ki_Settings_BuiltInPrompts_outlook_v5',
   word: 'ki_Settings_BuiltInPrompts_word_v5',
   excel: 'ki_Settings_BuiltInPrompts_excel_v5',
-}) as string
+}) as string;
 
 function loadBuiltInPrompts() {
-  const stored = localStorage.getItem(builtInPromptsStorageKey)
+  const stored = localStorage.getItem(builtInPromptsStorageKey);
   if (stored) {
     try {
-      const customPrompts = JSON.parse(stored)
+      const customPrompts = JSON.parse(stored);
       Object.keys(customPrompts).forEach(key => {
         if (builtInPromptsData.value[key]) {
           builtInPromptsData.value[key] = {
@@ -201,30 +207,32 @@ function loadBuiltInPrompts() {
               customPrompts[key].system.replace(/\[LANGUAGE\]/g, language),
             user: (text: string, language: string) =>
               customPrompts[key].user.replace(/\[TEXT\]/g, text).replace(/\[LANGUAGE\]/g, language),
-          }
+          };
         }
-      })
+      });
     } catch (error) {
-      console.error('Error loading custom built-in prompts:', error)
+      console.error('Error loading custom built-in prompts:', error);
     }
   }
 }
 
 function saveBuiltInPrompts() {
-  const customPrompts: Record<string, { system: string; user: string }> = {}
+  const customPrompts: Record<string, { system: string; user: string }> = {};
   Object.keys(builtInPromptsData.value).forEach(key => {
     customPrompts[key] = {
       system: builtInPromptsData.value[key].system('[LANGUAGE]'),
       user: builtInPromptsData.value[key].user('[TEXT]', '[LANGUAGE]'),
-    }
-  })
+    };
+  });
   try {
-    localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts))
+    localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[BuiltinPromptsTab] localStorage quota exceeded — built-in prompts not persisted')
+      console.warn(
+        '[BuiltinPromptsTab] localStorage quota exceeded — built-in prompts not persisted',
+      );
     } else {
-      throw e
+      throw e;
     }
   }
 }
@@ -238,50 +246,50 @@ function toggleEditBuiltinPrompt(key: string) {
         editingBuiltinPrompt.value.user
           .replace(/\[TEXT\]/g, text)
           .replace(/\[LANGUAGE\]/g, language),
-    }
-    saveBuiltInPrompts()
-    editingBuiltinPromptKey.value = ''
+    };
+    saveBuiltInPrompts();
+    editingBuiltinPromptKey.value = '';
   } else {
-    editingBuiltinPromptKey.value = key as BuiltinPromptKey
+    editingBuiltinPromptKey.value = key as BuiltinPromptKey;
     editingBuiltinPrompt.value = {
       system: builtInPromptsData.value[key].system('[LANGUAGE]'),
       user: builtInPromptsData.value[key].user('[TEXT]', '[LANGUAGE]'),
-    }
+    };
   }
 }
 
 function isBuiltinPromptModified(key: string): boolean {
-  if (!originalBuiltInPrompts[key]) return false
+  if (!originalBuiltInPrompts[key]) return false;
   const current = {
     system: builtInPromptsData.value[key].system('English'),
     user: builtInPromptsData.value[key].user('sample text', 'English'),
-  }
+  };
   const original = {
     system: originalBuiltInPrompts[key].system('English'),
     user: originalBuiltInPrompts[key].user('sample text', 'English'),
-  }
-  return current.system !== original.system || current.user !== original.user
+  };
+  return current.system !== original.system || current.user !== original.user;
 }
 
 function resetBuiltinPrompt(key: string) {
-  if (!originalBuiltInPrompts[key]) return
-  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] }
-  saveBuiltInPrompts()
+  if (!originalBuiltInPrompts[key]) return;
+  builtInPromptsData.value[key] = { ...originalBuiltInPrompts[key] };
+  saveBuiltInPrompts();
   if (editingBuiltinPromptKey.value === key) {
-    editingBuiltinPromptKey.value = ''
+    editingBuiltinPromptKey.value = '';
   }
 }
 
 function getSystemPromptPreview(systemFunc: (language: string) => string): string {
-  const full = systemFunc('English')
-  return full.length > 100 ? full.substring(0, 100) + '...' : full
+  const full = systemFunc('English');
+  return full.length > 100 ? full.substring(0, 100) + '...' : full;
 }
 
 function getUserPromptPreview(userFunc: (text: string, language: string) => string): string {
-  const full = userFunc('[selected text]', 'English')
-  return full.length > 100 ? full.substring(0, 100) + '...' : full
+  const full = userFunc('[selected text]', 'English');
+  return full.length > 100 ? full.substring(0, 100) + '...' : full;
 }
 
 // Initial load
-loadBuiltInPrompts()
+loadBuiltInPrompts();
 </script>

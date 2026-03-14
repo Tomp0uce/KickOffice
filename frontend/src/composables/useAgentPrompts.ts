@@ -1,16 +1,16 @@
-import type { Ref } from 'vue'
-import { GLOBAL_STYLE_INSTRUCTIONS, type ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
-import { getSkillForHost, type OfficeHost } from '@/skills'
+import type { Ref } from 'vue';
+import { GLOBAL_STYLE_INSTRUCTIONS, type ExcelFormulaLanguage } from '@/utils/constant'; // TOOL-M4
+import { getSkillForHost, type OfficeHost } from '@/skills';
 
 export interface UseAgentPromptsOptions {
-  t: (key: string) => string
-  userGender: Ref<string>
-  userFirstName: Ref<string>
-  userLastName: Ref<string>
-  excelFormulaLanguage: Ref<ExcelFormulaLanguage> // TOOL-M4: extended from 'en' | 'fr'
-  hostIsOutlook: boolean
-  hostIsPowerPoint: boolean
-  hostIsExcel: boolean
+  t: (key: string) => string;
+  userGender: Ref<string>;
+  userFirstName: Ref<string>;
+  userLastName: Ref<string>;
+  excelFormulaLanguage: Ref<ExcelFormulaLanguage>; // TOOL-M4: extended from 'en' | 'fr'
+  hostIsOutlook: boolean;
+  hostIsPowerPoint: boolean;
+  hostIsExcel: boolean;
 }
 
 export function useAgentPrompts(options: UseAgentPromptsOptions) {
@@ -23,17 +23,17 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
-  } = options
+  } = options;
 
   // TOOL-M4: Extend formula locale support to all languages in constant.ts
   const excelFormulaLanguageInstruction = () => {
-    const locale = excelFormulaLanguage.value
+    const locale = excelFormulaLanguage.value;
 
     // Languages that use semicolon (;) as formula separator and comma (,) for decimals
-    const semicolonLanguages = ['fr', 'de', 'es', 'it', 'pt', 'nl', 'pl', 'ru']
+    const semicolonLanguages = ['fr', 'de', 'es', 'it', 'pt', 'nl', 'pl', 'ru'];
 
     // Languages that use comma (,) as formula separator and period (.) for decimals
-    const commaLanguages = ['en', 'zh-cn', 'ja', 'ko', 'ar']
+    const commaLanguages = ['en', 'zh-cn', 'ja', 'ko', 'ar'];
 
     if (semicolonLanguages.includes(locale)) {
       const languageNames: Record<string, string> = {
@@ -44,10 +44,10 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
         pt: 'Portuguese',
         nl: 'Dutch',
         pl: 'Polish',
-        ru: 'Russian'
-      }
-      const langName = languageNames[locale] || locale
-      return `Excel interface locale: ${langName}. Use localized ${langName} function names, semicolon (;) as argument separator, and comma (,) for decimal numbers when providing formulas.`
+        ru: 'Russian',
+      };
+      const langName = languageNames[locale] || locale;
+      return `Excel interface locale: ${langName}. Use localized ${langName} function names, semicolon (;) as argument separator, and comma (,) for decimal numbers when providing formulas.`;
     }
 
     if (commaLanguages.includes(locale) || locale === 'en') {
@@ -56,33 +56,34 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
         'zh-cn': 'Chinese (Simplified)',
         ja: 'Japanese',
         ko: 'Korean',
-        ar: 'Arabic'
-      }
-      const langName = languageNames[locale] || 'English'
-      return `Excel interface locale: ${langName}. Use ${langName === 'English' ? 'English' : 'localized'} function names, comma (,) as argument separator, and period (.) for decimal numbers when providing formulas.`
+        ar: 'Arabic',
+      };
+      const langName = languageNames[locale] || 'English';
+      return `Excel interface locale: ${langName}. Use ${langName === 'English' ? 'English' : 'localized'} function names, comma (,) as argument separator, and period (.) for decimal numbers when providing formulas.`;
     }
 
     // Fallback to English for unknown locales
-    return 'Excel interface locale: English. Use English function names and standard English formula syntax (comma separator, period for decimals).'
-  }
+    return 'Excel interface locale: English. Use English function names and standard English formula syntax (comma separator, period for decimals).';
+  };
 
   const userProfilePromptBlock = () => {
     // Sanitize user input to prevent prompt injection
     const sanitize = (str: string) =>
       str
-        .replace(/[\r\n\t]/g, ' ')              // strip newlines (injection vectors)
-        .replace(/[<>{}[\]`|#*_~\\]/g, '')      // strip markdown/HTML special chars
-    const firstName = sanitize(userFirstName.value).trim()
-    const lastName = sanitize(userLastName.value).trim()
-    const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName')
+        .replace(/[\r\n\t]/g, ' ') // strip newlines (injection vectors)
+        .replace(/[<>{}[\]`|#*_~\\]/g, ''); // strip markdown/HTML special chars
+    const firstName = sanitize(userFirstName.value).trim();
+    const lastName = sanitize(userLastName.value).trim();
+    const fullName = `${firstName} ${lastName}`.trim() || t('userProfileUnknownName');
     const genderMap: Record<string, string> = {
-      female: t('userGenderFemale'), male: t('userGenderMale'), nonbinary: t('userGenderNonBinary'), unspecified: t('userGenderUnspecified'),
-    }
-    const genderLabel = genderMap[userGender.value] || t('userGenderUnspecified')
-    return `\n\nUser profile context for communications (especially emails):\n- First name: ${firstName || t('userProfileUnknownFirstName')}\n- Last name: ${lastName || t('userProfileUnknownLastName')}\n- Full name: ${fullName}\n- Gender: ${genderLabel}\nUse this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`
-  }
-
-
+      female: t('userGenderFemale'),
+      male: t('userGenderMale'),
+      nonbinary: t('userGenderNonBinary'),
+      unspecified: t('userGenderUnspecified'),
+    };
+    const genderLabel = genderMap[userGender.value] || t('userGenderUnspecified');
+    return `\n\nUser profile context for communications (especially emails):\n- First name: ${firstName || t('userProfileUnknownFirstName')}\n- Last name: ${lastName || t('userProfileUnknownLastName')}\n- Full name: ${fullName}\n- Gender: ${genderLabel}\nUse this profile when drafting salutations, signatures, and tone, unless the user asks otherwise.`;
+  };
 
   const COMMON_SHELL_INSTRUCTIONS = `
 # Sandboxed Shell & VFS (Virtual File System)
@@ -99,7 +100,7 @@ You have access to an in-memory, stateful bash shell and filesystem.
   3. Call it in subsequent \`executeBash\` calls.
   4. Or, write bash functions to a file and \`source /home/user/scripts/utils.sh\` before calling them.
 - **Available Commands**: \`ls\`, \`cat\`, \`grep\`, \`find\`, \`awk\`, \`sed\`, \`sort\`, \`uniq\`, \`wc\`, \`cut\`, \`head\`, \`tail\`, \`base64\`, \`curl\` (mocked/basic), etc.
-- **Excel formula language**: When generating Excel formulas inside bash scripts or VFS files for Excel use, respect the \`excelFormulaLanguage\` setting from the agent context. Use French function names and semicolon separators for French locale, English names and comma separators for English locale.`
+- **Excel formula language**: When generating Excel formulas inside bash scripts or VFS files for Excel use, respect the \`excelFormulaLanguage\` setting from the agent context. Use French function names and semicolon separators for French locale, English names and comma separators for English locale.`;
 
   const wordAgentPrompt = (lang: string) => `# Role
 You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist users in creating, editing, and formatting documents with professional precision.
@@ -159,7 +160,7 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
 5. **No Style Hallucinations**: DO NOT arbitrarily bold the first word of paragraphs. Preserve the original formatting exactly, UNLESS the user explicitly asks you to change it (e.g., "put the first words in bold").
 6. **NEVER use \`eval_wordjs\` with \`insertText(..., 'Replace')\` on a range** — this destroys Word formatting (bold, italic, colors, fonts). Use \`proposeRevision\` for any text modification on existing content.
 
-${COMMON_SHELL_INSTRUCTIONS}`
+${COMMON_SHELL_INSTRUCTIONS}`;
 
   const excelAgentPrompt = (lang: string) => `# Role
 You are a highly skilled Microsoft Excel Expert Agent. Your goal is to assist users with data analysis, formulas, charts, formatting, and spreadsheet operations with professional precision.
@@ -227,7 +228,7 @@ Do NOT skip the analysis step. Do NOT fabricate an imageId.
 - **Chart Image Extraction**: Use \`extract_chart_data\` to digitize chart images into data.
 - **Escape Hatch**: \`eval_officejs\` for niche Office.js operations.
 
-${COMMON_SHELL_INSTRUCTIONS}`
+${COMMON_SHELL_INSTRUCTIONS}`;
 
   const powerPointAgentPrompt = (lang: string) => `# Role
 You are a highly skilled Microsoft PowerPoint Expert Agent.
@@ -276,7 +277,7 @@ When the user provides an image and asks to create a slide from it:
 4. **No markdown bullets in body placeholders**: When inserting into a body/content placeholder shape, do NOT use markdown list syntax (\`- item\`). The shape already has native bullets configured — plain text lines are sufficient. Markdown \`-\` prefixes cause double-bullets.
 5. **Visual verification**: After creating or significantly modifying a slide (adding shapes, images, heavy text), call \`screenshotSlide\` to confirm the visual result before reporting success.
 
-${COMMON_SHELL_INSTRUCTIONS}`
+${COMMON_SHELL_INSTRUCTIONS}`;
 
   const outlookAgentPrompt = (lang: string) => `# Role
 You are a highly skilled Microsoft Outlook Email Expert Agent.
@@ -310,32 +311,34 @@ You are a highly skilled Microsoft Outlook Email Expert Agent.
    - **Reply/Email Content Language**: When drafting or modifying email body content, ALWAYS reply in the SAME language as the original email. Analyze the language of the email thread to determine the target language for email content. This rule takes absolute priority over the UI language.
 3. **Formatting**: Markdown is supported and preferred for clarity.
 
-${COMMON_SHELL_INSTRUCTIONS}`
+${COMMON_SHELL_INSTRUCTIONS}`;
 
   const agentPrompt = (lang: string) => {
-    let base = ''
-    let hostType: OfficeHost = 'Word'
+    let base = '';
+    let hostType: OfficeHost = 'Word';
 
     if (hostIsOutlook) {
-      base = outlookAgentPrompt(lang)
-      hostType = 'Outlook'
+      base = outlookAgentPrompt(lang);
+      hostType = 'Outlook';
     } else if (hostIsPowerPoint) {
-      base = powerPointAgentPrompt(lang)
-      hostType = 'PowerPoint'
+      base = powerPointAgentPrompt(lang);
+      hostType = 'PowerPoint';
     } else if (hostIsExcel) {
-      base = excelAgentPrompt(lang)
-      hostType = 'Excel'
+      base = excelAgentPrompt(lang);
+      hostType = 'Excel';
     } else {
-      base = wordAgentPrompt(lang)
-      hostType = 'Word'
+      base = wordAgentPrompt(lang);
+      hostType = 'Word';
     }
 
     // Inject skills after base prompt, before user profile
-    const skills = getSkillForHost(hostType)
-    const skillsSection = skills ? `\n\n# Office.js Skills and Best Practices\n\n${skills}\n\n` : ''
+    const skills = getSkillForHost(hostType);
+    const skillsSection = skills
+      ? `\n\n# Office.js Skills and Best Practices\n\n${skills}\n\n`
+      : '';
 
-    return `${base}${skillsSection}${userProfilePromptBlock()}\n\n# Contextual Awareness (Selection)\n- The user message may include a block labeled "[Selected text]", "[Selected cells]", etc.\n- **Smart Modifier Pattern**: If the user asks to "fix", "improve", "rewrite", or "format" something without specifying what, apply the action to this selected context.\n- If the user's request is general, use the selection only as background information.\n- Always preserve existing formatting unless instructed to change it.\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
-  }
+    return `${base}${skillsSection}${userProfilePromptBlock()}\n\n# Contextual Awareness (Selection)\n- The user message may include a block labeled "[Selected text]", "[Selected cells]", etc.\n- **Smart Modifier Pattern**: If the user asks to "fix", "improve", "rewrite", or "format" something without specifying what, apply the action to this selected context.\n- If the user's request is general, use the selection only as background information.\n- Always preserve existing formatting unless instructed to change it.\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
+  };
 
-  return { agentPrompt }
+  return { agentPrompt };
 }

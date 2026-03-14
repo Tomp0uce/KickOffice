@@ -116,65 +116,65 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Check, ChevronDown, MessageSquare, Plus, Settings, Trash2 } from 'lucide-vue-next'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { Check, ChevronDown, MessageSquare, Plus, Settings, Trash2 } from 'lucide-vue-next';
 
-import CustomButton from '@/components/CustomButton.vue'
-import type { ChatSession } from '@/composables/useSessionManager'
-import { getSessionMessageCount } from '@/composables/useSessionManager'
+import CustomButton from '@/components/CustomButton.vue';
+import type { ChatSession } from '@/composables/useSessionManager';
+import { getSessionMessageCount } from '@/composables/useSessionManager';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 const props = defineProps<{
-  settingsTitle: string
-  loading: boolean
-  sessions: ChatSession[]
-  currentSessionId: string | null
-}>()
+  settingsTitle: string;
+  loading: boolean;
+  sessions: ChatSession[];
+  currentSessionId: string | null;
+}>();
 
 const emit = defineEmits<{
-  (e: 'new-chat'): void
-  (e: 'settings'): void
-  (e: 'switch-session', sessionId: string): void
-  (e: 'delete-session'): void
-}>()
+  (e: 'new-chat'): void;
+  (e: 'settings'): void;
+  (e: 'switch-session', sessionId: string): void;
+  (e: 'delete-session'): void;
+}>();
 
-const dropdownOpen = ref(false)
-const dropdownRef = ref<HTMLElement>()
+const dropdownOpen = ref(false);
+const dropdownRef = ref<HTMLElement>();
 
 const currentSessionName = computed(() => {
-  const session = props.sessions.find(s => s.id === props.currentSessionId)
-  const name = session?.name ?? t('newChat')
-  return name.length > 30 ? `${name.slice(0, 28)}…` : name
-})
+  const session = props.sessions.find(s => s.id === props.currentSessionId);
+  const name = session?.name ?? t('newChat');
+  return name.length > 30 ? `${name.slice(0, 28)}…` : name;
+});
 
 function handleNewChat() {
-  dropdownOpen.value = false
-  emit('new-chat')
+  dropdownOpen.value = false;
+  emit('new-chat');
 }
 
 function handleSwitchSession(sessionId: string) {
-  dropdownOpen.value = false
-  emit('switch-session', sessionId)
+  dropdownOpen.value = false;
+  emit('switch-session', sessionId);
 }
 
 function handleDeleteSession() {
-  dropdownOpen.value = false
-  emit('delete-session')
+  dropdownOpen.value = false;
+  emit('delete-session');
 }
 
 function handleClickOutside(event: MouseEvent) {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
-    dropdownOpen.value = false
+    dropdownOpen.value = false;
   }
 }
 
 onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside)
-})
+  document.addEventListener('mousedown', handleClickOutside);
+});
 
 onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', handleClickOutside)
-})
+  document.removeEventListener('mousedown', handleClickOutside);
+});
 </script>

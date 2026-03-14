@@ -120,99 +120,101 @@
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from '@/types'
-import { Send, Square, Paperclip, Loader2 } from 'lucide-vue-next'
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { message as messageUtil } from '@/utils/message'
-import { ICON_SIZE_MD, MAX_UPLOAD_BYTES } from '@/constants/limits'
+import type { ModelInfo } from '@/types';
+import { Send, Square, Paperclip, Loader2 } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { message as messageUtil } from '@/utils/message';
+import { ICON_SIZE_MD, MAX_UPLOAD_BYTES } from '@/constants/limits';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 const props = defineProps<{
-  availableModels: Record<string, ModelInfo>
-  selectedModelTier: string
-  modelValue: string
-  inputPlaceholder: string
-  loading: boolean
-  backendOnline: boolean
-  showWordFormatting: boolean
-  useWordFormatting: boolean
-  useSelectedText: boolean
-  useWordFormattingLabel: string
-  includeSelectionLabel: string
-  taskTypeLabel: string
-  sendLabel: string
-  stopLabel: string
-  isDraftFocusGlowing?: boolean
-}>()
+  availableModels: Record<string, ModelInfo>;
+  selectedModelTier: string;
+  modelValue: string;
+  inputPlaceholder: string;
+  loading: boolean;
+  backendOnline: boolean;
+  showWordFormatting: boolean;
+  useWordFormatting: boolean;
+  useSelectedText: boolean;
+  useWordFormattingLabel: string;
+  includeSelectionLabel: string;
+  taskTypeLabel: string;
+  sendLabel: string;
+  stopLabel: string;
+  isDraftFocusGlowing?: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'update:selectedModelTier', value: string): void
-  (e: 'update:modelValue', value: string): void
-  (e: 'submit', value: string, files?: File[]): void
-  (e: 'stop'): void
-}>()
+  (e: 'update:selectedModelTier', value: string): void;
+  (e: 'update:modelValue', value: string): void;
+  (e: 'submit', value: string, files?: File[]): void;
+  (e: 'stop'): void;
+}>();
 
-const isDragOver = ref(false)
-const dragCounter = ref(0)
-const attachedFiles = ref<File[]>([])
-const fileInputEl = ref<HTMLInputElement>()
-const isFocused = ref(false)
+const isDragOver = ref(false);
+const dragCounter = ref(0);
+const attachedFiles = ref<File[]>([]);
+const fileInputEl = ref<HTMLInputElement>();
+const isFocused = ref(false);
 
 const handleModelTierChange = (event: Event) => {
-  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value)
-}
+  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value);
+};
 
 const handleInput = (event: Event) => {
-  const val = (event.target as HTMLTextAreaElement).value
-  emit('update:modelValue', val)
-}
+  const val = (event.target as HTMLTextAreaElement).value;
+  emit('update:modelValue', val);
+};
 
 const handleFocus = () => {
-  isFocused.value = true
-}
+  isFocused.value = true;
+};
 
 const handleBlur = () => {
-  isFocused.value = false
-}
+  isFocused.value = false;
+};
 
 // --- CLIPBOARD PASTE LOGIC (CLIP-M1) ---
 const handlePaste = async (event: ClipboardEvent) => {
-  const items = event.clipboardData?.items
-  if (!items) return
+  const items = event.clipboardData?.items;
+  if (!items) return;
 
-  const imageFiles: File[] = []
+  const imageFiles: File[] = [];
 
   // Check for image items in clipboard
   for (let i = 0; i < items.length; i++) {
-    const item = items[i]
+    const item = items[i];
     if (item.type.startsWith('image/')) {
-      const blob = item.getAsFile()
+      const blob = item.getAsFile();
       if (blob) {
         // Create a File object with a descriptive name
-        const timestamp = new Date().getTime()
-        const extension = item.type.split('/')[1] || 'png'
-        const file = new File([blob], `pasted-image-${timestamp}.${extension}`, { type: item.type })
-        imageFiles.push(file)
+        const timestamp = new Date().getTime();
+        const extension = item.type.split('/')[1] || 'png';
+        const file = new File([blob], `pasted-image-${timestamp}.${extension}`, {
+          type: item.type,
+        });
+        imageFiles.push(file);
       }
     }
   }
 
   // Process pasted images through the same pipeline as uploaded files
   if (imageFiles.length > 0) {
-    event.preventDefault() // Prevent default paste behavior for images
-    const fileList = createFileList(imageFiles)
-    await processFiles(fileList)
+    event.preventDefault(); // Prevent default paste behavior for images
+    const fileList = createFileList(imageFiles);
+    await processFiles(fileList);
   }
-}
+};
 
 // Helper to create a FileList-like object from File array
 const createFileList = (files: File[]): FileList => {
-  const dataTransfer = new DataTransfer()
-  files.forEach(file => dataTransfer.items.add(file))
-  return dataTransfer.files
-}
+  const dataTransfer = new DataTransfer();
+  files.forEach(file => dataTransfer.items.add(file));
+  return dataTransfer.files;
+};
 
 // --- FILE UPLOAD LOGIC ---
 const allowedTypes = [
@@ -224,48 +226,48 @@ const allowedTypes = [
   'text/markdown',
   'image/png',
   'image/jpeg',
-]
+];
 
 const handleDragOver = (e: DragEvent) => {
-  e.preventDefault() // Ensure default behavior is prevented
+  e.preventDefault(); // Ensure default behavior is prevented
   if (e.dataTransfer?.types.includes('Files')) {
-    dragCounter.value++
-    isDragOver.value = true
+    dragCounter.value++;
+    isDragOver.value = true;
   }
-}
+};
 
 const handleDragLeave = () => {
-  dragCounter.value--
+  dragCounter.value--;
   if (dragCounter.value === 0) {
-    isDragOver.value = false
+    isDragOver.value = false;
   }
-}
+};
 
 const handleDrop = (e: DragEvent) => {
-  isDragOver.value = false
-  const files = e.dataTransfer?.files
-  if (files) processFiles(files)
-}
+  isDragOver.value = false;
+  const files = e.dataTransfer?.files;
+  if (files) processFiles(files);
+};
 
 const triggerFileInput = () => {
-  fileInputEl.value?.click()
-}
+  fileInputEl.value?.click();
+};
 
 const onFileSelected = async (e: Event) => {
-  const target = e.target as HTMLInputElement
+  const target = e.target as HTMLInputElement;
   if (target.files) {
-    await processFiles(target.files)
+    await processFiles(target.files);
   }
   // Reset input seulement une fois que les fichiers ont été extraits en mémoire
-  if (fileInputEl.value) fileInputEl.value.value = ''
-}
+  if (fileInputEl.value) fileInputEl.value.value = '';
+};
 
-const processingFiles = ref(false)
+const processingFiles = ref(false);
 
 const processFiles = async (fileList: FileList) => {
-  processingFiles.value = true
+  processingFiles.value = true;
   // Small artificial delay to show UI feedback for large files
-  await new Promise(resolve => setTimeout(resolve, 300))
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   // Check for allowed extensions if mime type misses
   const allowedExtensions = [
@@ -279,68 +281,68 @@ const processFiles = async (fileList: FileList) => {
     '.png',
     '.jpeg',
     '.jpg',
-  ]
-  let rejectedCount = 0
-  let oversizedCount = 0
+  ];
+  let rejectedCount = 0;
+  let oversizedCount = 0;
 
   for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i]
+    const file = fileList[i];
 
     // Limits: Max 3 files
     if (attachedFiles.value.length >= 3) {
-      messageUtil.warning(t('maxFilesWarning'))
-      break
+      messageUtil.warning(t('maxFilesWarning'));
+      break;
     }
 
-    const isExtensionOk = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+    const isExtensionOk = allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      oversizedCount++
-      continue
+      oversizedCount++;
+      continue;
     }
 
     if (allowedTypes.includes(file.type) || isExtensionOk) {
       // Avoid duplicate by name
       if (!attachedFiles.value.some(f => f.name === file.name)) {
-        attachedFiles.value.push(file)
+        attachedFiles.value.push(file);
       }
     } else {
-      rejectedCount++
+      rejectedCount++;
     }
   }
 
   if (oversizedCount > 0) {
-    messageUtil.error(t('filesOversized', { count: oversizedCount }))
+    messageUtil.error(t('filesOversized', { count: oversizedCount }));
   }
   if (rejectedCount > 0) {
-    messageUtil.error(t('filesRejected', { count: rejectedCount }))
+    messageUtil.error(t('filesRejected', { count: rejectedCount }));
   }
-  processingFiles.value = false
-}
+  processingFiles.value = false;
+};
 
 const removeFile = (index: number) => {
-  attachedFiles.value.splice(index, 1)
-}
+  attachedFiles.value.splice(index, 1);
+};
 // -------------------------
 
 const triggerSubmit = () => {
   if (!props.modelValue.trim() && attachedFiles.value.length === 0) {
-    return
+    return;
   }
 
   // Pass a copy of the files to prevent issues, then clear immediately
-  emit('submit', props.modelValue, [...attachedFiles.value])
-  attachedFiles.value = []
-}
+  emit('submit', props.modelValue, [...attachedFiles.value]);
+  attachedFiles.value = [];
+};
 
 const handleStop = () => {
-  emit('stop')
-}
+  emit('stop');
+};
 
-const textareaEl = ref<HTMLTextAreaElement>()
-const modelTierSelectId = 'chat-model-tier-select'
-const modelTierLabelId = 'chat-model-tier-label'
-defineExpose({ textareaEl })
+const textareaEl = ref<HTMLTextAreaElement>();
+const modelTierSelectId = 'chat-model-tier-select';
+const modelTierLabelId = 'chat-model-tier-label';
+defineExpose({ textareaEl });
 </script>
 
 <style scoped>

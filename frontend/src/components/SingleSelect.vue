@@ -46,61 +46,61 @@
 </template>
 
 <script setup lang="ts">
-import { onClickOutside } from '@vueuse/core'
-import { ChevronDownIcon, SortAscIcon } from 'lucide-vue-next'
-import { nextTick, ref, type Component } from 'vue'
+import { onClickOutside } from '@vueuse/core';
+import { ChevronDownIcon, SortAscIcon } from 'lucide-vue-next';
+import { nextTick, ref, type Component } from 'vue';
 
-const dropdownRef = ref(null)
-const modelValue = defineModel<string>()
-const triggerRef = ref<HTMLElement | null>(null)
-const optionsRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref(null);
+const modelValue = defineModel<string>();
+const triggerRef = ref<HTMLElement | null>(null);
+const optionsRef = ref<HTMLElement | null>(null);
 
 function selectItem(key: string) {
-  modelValue.value = key
-  dropDownOpen.value = false
+  modelValue.value = key;
+  dropDownOpen.value = false;
 }
 
-const dropDownOpen = ref(false)
+const dropDownOpen = ref(false);
 
 async function toggleDropdown() {
-  dropDownOpen.value = !dropDownOpen.value
+  dropDownOpen.value = !dropDownOpen.value;
 
   if (dropDownOpen.value) {
-    await nextTick()
-    updatePosition()
+    await nextTick();
+    updatePosition();
   }
 }
 
 function updatePosition() {
-  const trigger = triggerRef.value
-  const dropdown = optionsRef.value
-  if (!trigger || !dropdown) return
+  const trigger = triggerRef.value;
+  const dropdown = optionsRef.value;
+  if (!trigger || !dropdown) return;
 
-  const rect = trigger.getBoundingClientRect()
-  const dropdownHeight = dropdown.offsetHeight
-  const viewportHeight = window.innerHeight
+  const rect = trigger.getBoundingClientRect();
+  const dropdownHeight = dropdown.offsetHeight;
+  const viewportHeight = window.innerHeight;
 
-  const spaceBelow = viewportHeight - rect.bottom
-  const canFitBelow = spaceBelow > dropdownHeight + 10
+  const spaceBelow = viewportHeight - rect.bottom;
+  const canFitBelow = spaceBelow > dropdownHeight + 10;
 
   if (!canFitBelow && rect.top > dropdownHeight) {
-    dropdown.style.top = 'auto'
-    dropdown.style.bottom = '100%'
+    dropdown.style.top = 'auto';
+    dropdown.style.bottom = '100%';
   } else {
-    dropdown.style.top = '100%'
-    dropdown.style.bottom = 'auto'
+    dropdown.style.top = '100%';
+    dropdown.style.bottom = 'auto';
   }
 
-  let dropdownWidth = Math.max(rect.width, 160)
-  dropdown.style.left = '0px'
-  dropdown.style.width = `${dropdownWidth}px`
+  let dropdownWidth = Math.max(rect.width, 160);
+  dropdown.style.left = '0px';
+  dropdown.style.width = `${dropdownWidth}px`;
 }
 
 onClickOutside(dropdownRef, () => {
   if (dropDownOpen.value) {
-    dropDownOpen.value = false
+    dropDownOpen.value = false;
   }
-})
+});
 
 const {
   title,
@@ -113,14 +113,14 @@ const {
   customFrontIcon = null,
   required = false,
 } = defineProps<{
-  title: string
-  icon?: Component | null
-  iconSize?: number
-  tight?: boolean
-  placeholder?: string
-  fronticon?: boolean
-  customFrontIcon?: Component | null
-  keyList: string[]
-  required?: boolean
-}>()
+  title: string;
+  icon?: Component | null;
+  iconSize?: number;
+  tight?: boolean;
+  placeholder?: string;
+  fronticon?: boolean;
+  customFrontIcon?: Component | null;
+  keyList: string[];
+  required?: boolean;
+}>();
 </script>

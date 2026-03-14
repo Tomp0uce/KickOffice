@@ -1,22 +1,26 @@
-import { logService } from '@/utils/logger'
-import DOMPurify from 'dompurify'
-import type { Config as DOMPurifyConfig } from 'dompurify'
-import MarkdownIt from 'markdown-it'
-import markdownItDeflist from 'markdown-it-deflist'
-import markdownItFootnote from 'markdown-it-footnote'
-import markdownItTaskLists from 'markdown-it-task-lists'
-import TurndownService from 'turndown'
+import { logService } from '@/utils/logger';
+import DOMPurify from 'dompurify';
+import type { Config as DOMPurifyConfig } from 'dompurify';
+import MarkdownIt from 'markdown-it';
+import markdownItDeflist from 'markdown-it-deflist';
+import markdownItFootnote from 'markdown-it-footnote';
+import markdownItTaskLists from 'markdown-it-task-lists';
+import TurndownService from 'turndown';
 
 // R16 — Reusable TurndownService instance configured for Office markdown output
-const turndownService = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' })
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced',
+});
 turndownService.addRule('underline', {
   filter: ['u', 'ins'],
-  replacement: (content) => `__${content}__`,
-})
+  replacement: content => `__${content}__`,
+});
 turndownService.addRule('strikethrough', {
   filter: ['del', 's', 'strike'],
-  replacement: (content) => `~~${content}~~`,
-})
+  replacement: content => `~~${content}~~`,
+});
 
 // Turndown rule to convert color styles into custom markup [color:#HEX]text[/color]
 turndownService.addRule('color', {
@@ -24,7 +28,7 @@ turndownService.addRule('color', {
     return (
       node.nodeType === 1 &&
       (node.getAttribute('style')?.includes('color:') || node.hasAttribute('color'))
-    )
+    );
   },
   replacement: (content: string, node: any) => {
     let color = '';
@@ -35,49 +39,62 @@ turndownService.addRule('color', {
     } else {
       color = (node as HTMLElement).getAttribute('color') || '';
     }
-    
+
     // Ignore default/black colors to avoid wrapping all standard text
-    const isBlack = color.replace(/\s+/g, '').toLowerCase() === 'rgb(0,0,0)' || 
-                    color.toLowerCase() === '#000000' || 
-                    color.toLowerCase() === 'black' || 
-                    color.toLowerCase() === 'windowtext';
-                    
+    const isBlack =
+      color.replace(/\s+/g, '').toLowerCase() === 'rgb(0,0,0)' ||
+      color.toLowerCase() === '#000000' ||
+      color.toLowerCase() === 'black' ||
+      color.toLowerCase() === 'windowtext';
+
     // Only wrap if it's an actual hex or named color (and not black/default), and content is not empty
     if (color && !isBlack && content.trim()) {
       return `[color:${color}]${content}[/color]`;
     }
     return content;
-  }
-})
+  },
+});
 
 export function htmlToMarkdown(html: string): string {
-  if (!html) return ''
-  
+  if (!html) return '';
+
   try {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
     // Pre-process inline styles to semantic tags for better Markdown conversion
-    const styledElements = doc.querySelectorAll('[style]')
-    styledElements.forEach((node) => {
-      const style = node.getAttribute('style') || ''
-      let wrapStart = ''
-      let wrapEnd = ''
-      
-      if (/font-weight:\s*(bold|[7-9]\d{2})/i.test(style)) { wrapStart += '<b>'; wrapEnd = '</b>' + wrapEnd }
-      if (/font-style:\s*italic/i.test(style)) { wrapStart += '<i>'; wrapEnd = '</i>' + wrapEnd }
-      if (/text-decoration(?:-line)?:\s*underline/i.test(style)) { wrapStart += '<u>'; wrapEnd = '</u>' + wrapEnd }
-      if (/text-decoration(?:-line)?:\s*line-through/i.test(style)) { wrapStart += '<s>'; wrapEnd = '</s>' + wrapEnd }
-      
-      if (wrapStart && node.innerHTML) {
-        node.innerHTML = wrapStart + node.innerHTML + wrapEnd
+    const styledElements = doc.querySelectorAll('[style]');
+    styledElements.forEach(node => {
+      const style = node.getAttribute('style') || '';
+      let wrapStart = '';
+      let wrapEnd = '';
+
+      if (/font-weight:\s*(bold|[7-9]\d{2})/i.test(style)) {
+        wrapStart += '<b>';
+        wrapEnd = '</b>' + wrapEnd;
       }
-    })
-    
-    return turndownService.turndown(doc.body.innerHTML)
+      if (/font-style:\s*italic/i.test(style)) {
+        wrapStart += '<i>';
+        wrapEnd = '</i>' + wrapEnd;
+      }
+      if (/text-decoration(?:-line)?:\s*underline/i.test(style)) {
+        wrapStart += '<u>';
+        wrapEnd = '</u>' + wrapEnd;
+      }
+      if (/text-decoration(?:-line)?:\s*line-through/i.test(style)) {
+        wrapStart += '<s>';
+        wrapEnd = '</s>' + wrapEnd;
+      }
+
+      if (wrapStart && node.innerHTML) {
+        node.innerHTML = wrapStart + node.innerHTML + wrapEnd;
+      }
+    });
+
+    return turndownService.turndown(doc.body.innerHTML);
   } catch (err) {
-    logService.warn('[htmlToMarkdown] DOM parsing failed, falling back to raw html', err)
-    return turndownService.turndown(html)
+    logService.warn('[htmlToMarkdown] DOM parsing failed, falling back to raw html', err);
+    return turndownService.turndown(html);
   }
 }
 
@@ -87,13 +104,13 @@ export function createBaseMarkdownParser(html: boolean = true): MarkdownIt {
     html: html,
     linkify: true,
     typographer: true,
-  })
+  });
 }
 
 const officeMarkdownParser = createBaseMarkdownParser()
   .use(markdownItTaskLists, { enabled: true })
   .use(markdownItDeflist)
-  .use(markdownItFootnote)
+  .use(markdownItFootnote);
 
 /**
  * R1 — Font and spacing properties captured from the insertion point in Word.
@@ -101,13 +118,13 @@ const officeMarkdownParser = createBaseMarkdownParser()
  * visually matches the surrounding text.
  */
 export interface InheritedStyles {
-  fontFamily: string
-  fontSize: string
-  fontWeight: string
-  fontStyle: string
-  color: string
-  marginTop: string
-  marginBottom: string
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: string;
+  fontStyle: string;
+  color: string;
+  marginTop: string;
+  marginBottom: string;
 }
 
 /**
@@ -116,27 +133,27 @@ export interface InheritedStyles {
  * Headings and already-styled elements are left untouched.
  */
 export function applyInheritedStyles(html: string, styles: InheritedStyles): string {
-  const cssRules: string[] = []
-  if (styles.fontFamily) cssRules.push(`font-family:'${styles.fontFamily}'`)
-  if (styles.fontSize && styles.fontSize !== '0pt') cssRules.push(`font-size:${styles.fontSize}`)
-  if (styles.color) cssRules.push(`color:${styles.color}`)
+  const cssRules: string[] = [];
+  if (styles.fontFamily) cssRules.push(`font-family:'${styles.fontFamily}'`);
+  if (styles.fontSize && styles.fontSize !== '0pt') cssRules.push(`font-size:${styles.fontSize}`);
+  if (styles.color) cssRules.push(`color:${styles.color}`);
 
-  if (cssRules.length === 0) return html
+  if (cssRules.length === 0) return html;
 
-  const fontCss = cssRules.join('; ')
-  const marginCss = `margin:${styles.marginTop || '0pt'} 0 ${styles.marginBottom || '0pt'} 0`
+  const fontCss = cssRules.join('; ');
+  const marginCss = `margin:${styles.marginTop || '0pt'} 0 ${styles.marginBottom || '0pt'} 0`;
 
   return html
     .replace(/<p>/gi, `<p style="${fontCss}; ${marginCss}">`)
-    .replace(/<li>/gi, `<li style="${fontCss}">`)
+    .replace(/<li>/gi, `<li style="${fontCss}">`);
 }
 
 type StyleDefinition = {
-  fontSize?: string
-  fontWeight?: string
-  fontStyle?: string
-  marginBottom?: string
-}
+  fontSize?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  marginBottom?: string;
+};
 
 const STYLE_ALIASES: Record<string, StyleDefinition> = {
   // Word default-ish families (EN + FR variants)
@@ -169,22 +186,22 @@ const STYLE_ALIASES: Record<string, StyleDefinition> = {
   intense_quote: { fontStyle: 'italic', fontWeight: '700', marginBottom: '6px' },
   list_paragraph: { marginBottom: '2px' },
   no_spacing: { marginBottom: '0' },
-}
+};
 
 function normalizeStyleKey(styleName: string): string {
   return styleName
     .trim()
     .toLowerCase()
-    .replace(/[\s-]+/g, '_')
+    .replace(/[\s-]+/g, '_');
 }
 
 function styleDefinitionToInlineCss(definition: StyleDefinition): string {
-  const rules: string[] = []
-  if (definition.fontSize) rules.push(`font-size:${definition.fontSize}`)
-  if (definition.fontWeight) rules.push(`font-weight:${definition.fontWeight}`)
-  if (definition.fontStyle) rules.push(`font-style:${definition.fontStyle}`)
-  if (definition.marginBottom !== undefined) rules.push(`margin:0 0 ${definition.marginBottom} 0`)
-  return rules.join(';')
+  const rules: string[] = [];
+  if (definition.fontSize) rules.push(`font-size:${definition.fontSize}`);
+  if (definition.fontWeight) rules.push(`font-weight:${definition.fontWeight}`);
+  if (definition.fontStyle) rules.push(`font-style:${definition.fontStyle}`);
+  if (definition.marginBottom !== undefined) rules.push(`margin:0 0 ${definition.marginBottom} 0`);
+  return rules.join(';');
 }
 
 /**
@@ -193,7 +210,7 @@ function styleDefinitionToInlineCss(definition: StyleDefinition): string {
  * sequences of 3+ newlines into a single paragraph break.
  */
 function preserveMultipleLineBreaks(content: string): string {
-  return content.replace(/\n[ \t]*\n[ \t]*\n/g, '\n\n&nbsp;\n\n')
+  return content.replace(/\n[ \t]*\n[ \t]*\n/g, '\n\n&nbsp;\n\n');
 }
 
 /**
@@ -206,39 +223,45 @@ function preserveMultipleLineBreaks(content: string): string {
  */
 function splitBrInListItems(html: string): string {
   try {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
 
     // Split <br> inside <li> into sibling <p> elements
-    doc.querySelectorAll('li').forEach((li) => {
-      if (!/<br\s*\/?>/i.test(li.innerHTML)) return
-      const segments = li.innerHTML.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean)
-      if (segments.length <= 1) return
-      li.innerHTML = '<p>' + segments.join('</p><p>') + '</p>'
-    })
+    doc.querySelectorAll('li').forEach(li => {
+      if (!/<br\s*\/?>/i.test(li.innerHTML)) return;
+      const segments = li.innerHTML
+        .split(/<br\s*\/?>/i)
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (segments.length <= 1) return;
+      li.innerHTML = '<p>' + segments.join('</p><p>') + '</p>';
+    });
 
     // Split <br> inside <p> into sibling <p> elements
     // Iterate over a snapshot to avoid live-collection issues
-    const paragraphs = Array.from(doc.querySelectorAll('p'))
+    const paragraphs = Array.from(doc.querySelectorAll('p'));
     for (const p of paragraphs) {
-      if (!/<br\s*\/?>/i.test(p.innerHTML)) continue
-      const segments = p.innerHTML.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean)
-      if (segments.length <= 1) continue
-      const parent = p.parentNode
-      if (!parent) continue
-      const style = p.getAttribute('style') ?? ''
+      if (!/<br\s*\/?>/i.test(p.innerHTML)) continue;
+      const segments = p.innerHTML
+        .split(/<br\s*\/?>/i)
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (segments.length <= 1) continue;
+      const parent = p.parentNode;
+      if (!parent) continue;
+      const style = p.getAttribute('style') ?? '';
       for (const seg of segments) {
-        const newP = document.createElement('p')
-        newP.innerHTML = seg
-        if (style) newP.setAttribute('style', style)
-        parent.insertBefore(newP, p)
+        const newP = document.createElement('p');
+        newP.innerHTML = seg;
+        if (style) newP.setAttribute('style', style);
+        parent.insertBefore(newP, p);
       }
-      parent.removeChild(p)
+      parent.removeChild(p);
     }
 
-    return doc.body.innerHTML
+    return doc.body.innerHTML;
   } catch {
-    return html
+    return html;
   }
 }
 
@@ -254,99 +277,131 @@ function splitBrInListItems(html: string): string {
  * numbers so they remain visible in the body text.
  */
 function processFootnotes(html: string): string {
-  if (!html.includes('class="footnotes"')) return html
+  if (!html.includes('class="footnotes"')) return html;
 
   try {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    const section = doc.querySelector('section.footnotes')
-    if (!section) return html
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const section = doc.querySelector('section.footnotes');
+    if (!section) return html;
 
     // Build replacement: separator + numbered footnote list
-    const items = Array.from(section.querySelectorAll('li.footnote-item'))
+    const items = Array.from(section.querySelectorAll('li.footnote-item'));
     if (items.length === 0) {
-      section.remove()
-      return doc.body.innerHTML
+      section.remove();
+      return doc.body.innerHTML;
     }
 
-    const separator = doc.createElement('p')
-    separator.setAttribute('style', 'border-bottom:1px solid #999; margin:12px 0;')
-    separator.innerHTML = '&nbsp;'
+    const separator = doc.createElement('p');
+    separator.setAttribute('style', 'border-bottom:1px solid #999; margin:12px 0;');
+    separator.innerHTML = '&nbsp;';
 
-    const ol = doc.createElement('ol')
-    ol.setAttribute('style', 'font-size:0.85em; color:#555; margin:4px 0; padding-left:1.5em;')
+    const ol = doc.createElement('ol');
+    ol.setAttribute('style', 'font-size:0.85em; color:#555; margin:4px 0; padding-left:1.5em;');
 
     for (const item of items) {
       // Strip back-reference links (<a class="footnote-backref">)
-      item.querySelectorAll('a.footnote-backref').forEach(a => a.remove())
-      const li = doc.createElement('li')
-      li.innerHTML = item.innerHTML.trim()
-      ol.appendChild(li)
+      item.querySelectorAll('a.footnote-backref').forEach(a => a.remove());
+      const li = doc.createElement('li');
+      li.innerHTML = item.innerHTML.trim();
+      ol.appendChild(li);
     }
 
-    section.replaceWith(separator, ol)
-    return doc.body.innerHTML
+    section.replaceWith(separator, ol);
+    return doc.body.innerHTML;
   } catch {
-    return html
+    return html;
   }
 }
 
 function normalizeUnderlineMarkdown(rawContent: string): string {
   // Many model prompts use __text__ to ask for underline. Convert it to <u>...</u>
   // before markdown parsing so Office hosts render the expected style.
-  return rawContent.replace(/(^|[^*])__(.+?)__(?!\*)/g, '$1<u>$2</u>')
+  return rawContent.replace(/(^|[^*])__(.+?)__(?!\*)/g, '$1<u>$2</u>');
 }
 
 function normalizeSuperAndSubScript(rawContent: string): string {
-  return rawContent
-    // ^^texte^^ or ^texte^ => superscript
-    .replace(/\^\^(.+?)\^\^/g, '<sup>$1</sup>')
-    .replace(/\^([^\^\n]+?)\^/g, '<sup>$1</sup>')
-    // ~texte~ => subscript (while preserving markdown strikethrough ~~texte~~)
-    .replace(/(^|[^~])~([^~\n]+?)~(?=[^~]|$)/g, '$1<sub>$2</sub>')
+  return (
+    rawContent
+      // ^^texte^^ or ^texte^ => superscript
+      .replace(/\^\^(.+?)\^\^/g, '<sup>$1</sup>')
+      .replace(/\^([^\^\n]+?)\^/g, '<sup>$1</sup>')
+      // ~texte~ => subscript (while preserving markdown strikethrough ~~texte~~)
+      .replace(/(^|[^~])~([^~\n]+?)~(?=[^~]|$)/g, '$1<sub>$2</sub>')
+  );
 }
 
 function normalizeNamedStyles(rawContent: string): string {
   const byTag = rawContent
     .replace(/<\s*(title|titre)\s*>([\s\S]*?)<\s*\/\s*(title|titre)\s*>/gi, '<h1>$2</h1>')
-    .replace(/<\s*(subtitle|sous[-\s]?titre)\s*>([\s\S]*?)<\s*\/\s*(subtitle|sous[-\s]?titre)\s*>/gi, '<h2><em>$2</em></h2>')
-    .replace(/<\s*(normal|paragraph|style-normal)\s*>([\s\S]*?)<\s*\/\s*(normal|paragraph|style-normal)\s*>/gi, '<p>$2</p>')
-    .replace(/<\s*(quote|citation)\s*>([\s\S]*?)<\s*\/\s*(quote|citation)\s*>/gi, '<blockquote>$2</blockquote>')
-    .replace(/<\s*(intense[-\s]?quote)\s*>([\s\S]*?)<\s*\/\s*(intense[-\s]?quote)\s*>/gi, '<blockquote><strong><em>$2</em></strong></blockquote>')
-    .replace(/<\s*(heading|titre)\s*([1-9])\s*>([\s\S]*?)<\s*\/\s*(heading|titre)\s*\2\s*>/gi, (_, _prefix, level, text) => {
-      const htmlLevel = Math.min(6, Number(level))
-      return `<h${htmlLevel}>${text}</h${htmlLevel}>`
-    })
+    .replace(
+      /<\s*(subtitle|sous[-\s]?titre)\s*>([\s\S]*?)<\s*\/\s*(subtitle|sous[-\s]?titre)\s*>/gi,
+      '<h2><em>$2</em></h2>',
+    )
+    .replace(
+      /<\s*(normal|paragraph|style-normal)\s*>([\s\S]*?)<\s*\/\s*(normal|paragraph|style-normal)\s*>/gi,
+      '<p>$2</p>',
+    )
+    .replace(
+      /<\s*(quote|citation)\s*>([\s\S]*?)<\s*\/\s*(quote|citation)\s*>/gi,
+      '<blockquote>$2</blockquote>',
+    )
+    .replace(
+      /<\s*(intense[-\s]?quote)\s*>([\s\S]*?)<\s*\/\s*(intense[-\s]?quote)\s*>/gi,
+      '<blockquote><strong><em>$2</em></strong></blockquote>',
+    )
+    .replace(
+      /<\s*(heading|titre)\s*([1-9])\s*>([\s\S]*?)<\s*\/\s*(heading|titre)\s*\2\s*>/gi,
+      (_, _prefix, level, text) => {
+        const htmlLevel = Math.min(6, Number(level));
+        return `<h${htmlLevel}>${text}</h${htmlLevel}>`;
+      },
+    );
 
   const byPrefix = byTag
     .replace(/^\s*(title|titre)\s*:\s+(.+)$/gim, '# $2')
     .replace(/^\s*(subtitle|sous[-\s]?titre)\s*:\s+(.+)$/gim, '## *$2*')
-    .replace(/^\s*(heading|titre)\s*([1-9])\s*:\s+(.+)$/gim, (_m, _h, level, text) => `${'#'.repeat(Math.min(6, Number(level)))} ${text}`)
-    .replace(/^\s*(normal|paragraph|style\s*normal)\s*:\s+(.+)$/gim, '$2')
+    .replace(
+      /^\s*(heading|titre)\s*([1-9])\s*:\s+(.+)$/gim,
+      (_m, _h, level, text) => `${'#'.repeat(Math.min(6, Number(level)))} ${text}`,
+    )
+    .replace(/^\s*(normal|paragraph|style\s*normal)\s*:\s+(.+)$/gim, '$2');
 
   // Explicit wrapper form: [style:Heading 3]text[/style]
-  return byPrefix.replace(/\[style\s*:\s*([^\]]+)\]([\s\S]*?)\[\/style\]/gi, (_m, styleName, text) => {
-    const key = normalizeStyleKey(styleName)
-    const style = STYLE_ALIASES[key]
-    if (!style) return text
-    const css = styleDefinitionToInlineCss(style)
-    return `<p style="${css}">${text}</p>`
-  })
+  return byPrefix.replace(
+    /\[style\s*:\s*([^\]]+)\]([\s\S]*?)\[\/style\]/gi,
+    (_m, styleName, text) => {
+      const key = normalizeStyleKey(styleName);
+      const style = STYLE_ALIASES[key];
+      if (!style) return text;
+      const css = styleDefinitionToInlineCss(style);
+      return `<p style="${css}">${text}</p>`;
+    },
+  );
 }
 
 function applyOfficeBlockStyles(html: string): string {
   // Two-pass code styling: protect <code> inside <pre> from inline-code rules
   // by temporarily marking it, then style standalone <code> separately.
   const withPreCode = html
-    .replace(/<pre>/gi, '<pre style="font-family:Consolas,\'Courier New\',monospace; font-size:10pt; background:#f4f4f4; padding:8px; margin:6px 0; border-left:3px solid #ccc;">')
-    .replace(/(<pre[^>]*>)(<code>)/gi, '$1<code data-pre="1">')
+    .replace(
+      /<pre>/gi,
+      '<pre style="font-family:Consolas,\'Courier New\',monospace; font-size:10pt; background:#f4f4f4; padding:8px; margin:6px 0; border-left:3px solid #ccc;">',
+    )
+    .replace(/(<pre[^>]*>)(<code>)/gi, '$1<code data-pre="1">');
 
   const withCode = withPreCode
-    .replace(/<code(?! data-pre)/gi, '<code style="font-family:Consolas,\'Courier New\',monospace; font-size:0.9em; background:#f0f0f0; padding:1px 4px;">')
-    .replace(/ data-pre="1"/gi, '')
-    
+    .replace(
+      /<code(?! data-pre)/gi,
+      '<code style="font-family:Consolas,\'Courier New\',monospace; font-size:0.9em; background:#f0f0f0; padding:1px 4px;">',
+    )
+    .replace(/ data-pre="1"/gi, '');
+
   // Transform [color:HEX]text[/color] syntax into <span style="color:HEX">text</span>
-  const withColor = withCode.replace(/\[color:\s*([^\]]+)\]([\s\S]*?)\[\/color\]/gi, '<span style="color:$1">$2</span>')
+  const withColor = withCode.replace(
+    /\[color:\s*([^\]]+)\]([\s\S]*?)\[\/color\]/gi,
+    '<span style="color:$1">$2</span>',
+  );
 
   return withColor
     .replace(/<hr\s*\/?>/gi, '<p style="border-bottom:1px solid #999; margin:8px 0;">&nbsp;</p>')
@@ -359,26 +414,26 @@ function applyOfficeBlockStyles(html: string): string {
     .replace(/<p>/gi, '<p style="margin:0 0 6px 0;">')
     .replace(/<ul>/gi, '<ul style="margin:0 0 6px 0; padding-left:1.25em;">')
     .replace(/<ol>/gi, '<ol style="margin:0 0 6px 0; padding-left:1.25em;">')
-    .replace(/<li>/gi, '<li style="margin:0 0 2px 0;">')
+    .replace(/<li>/gi, '<li style="margin:0 0 2px 0;">');
 }
 
 function normalizeNumberedListItem(marker: string): string {
-  return marker.endsWith(')') ? `${marker.slice(0, -1)}.` : marker
+  return marker.endsWith(')') ? `${marker.slice(0, -1)}.` : marker;
 }
 
 function normalizeListIndentationForPlainText(content: string): string {
   return content
     .split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/)
-      if (!match) return line
+    .map(line => {
+      const match = line.match(/^(\s*)([-*+]|\d+[.)])\s+(.+)$/);
+      if (!match) return line;
 
-      const [, leading, marker, itemText] = match
-      const indentLevel = Math.floor(leading.replace(/\t/g, '  ').length / 2)
-      const prefix = /^\d+[.)]$/.test(marker) ? normalizeNumberedListItem(marker) : '•'
-      return `${'\t'.repeat(indentLevel)}${prefix} ${itemText}`
+      const [, leading, marker, itemText] = match;
+      const indentLevel = Math.floor(leading.replace(/\t/g, '  ').length / 2);
+      const prefix = /^\d+[.)]$/.test(marker) ? normalizeNumberedListItem(marker) : '•';
+      return `${'\t'.repeat(indentLevel)}${prefix} ${itemText}`;
     })
-    .join('\n')
+    .join('\n');
 }
 
 /**
@@ -389,41 +444,69 @@ function normalizeListIndentationForPlainText(content: string): string {
 export function stripMarkdownListMarkers(content: string): string {
   return content
     .split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/)
-      if (!match) return line
+    .map(line => {
+      const match = line.match(/^(\s*)(?:[-*+]|\d+[.)])\s+(.+)$/);
+      if (!match) return line;
 
-      const [, leading, itemText] = match
-      const indentLevel = Math.floor(leading.replace(/\t/g, '  ').length / 2)
-      return `${'\t'.repeat(indentLevel)}${itemText}`
+      const [, leading, itemText] = match;
+      const indentLevel = Math.floor(leading.replace(/\t/g, '  ').length / 2);
+      return `${'\t'.repeat(indentLevel)}${itemText}`;
     })
-    .join('\n')
+    .join('\n');
 }
 
 /** Shared DOMPurify wrapper — single import point for all Office HTML sanitization. */
 export function sanitizeHtml(html: string, options?: DOMPurifyConfig): string {
-  return DOMPurify.sanitize(html, options) as string
+  return DOMPurify.sanitize(html, options) as string;
 }
 
 export function renderOfficeRichHtml(content: string): string {
-  const withStyleAliases = normalizeNamedStyles(content?.trim() ?? '')
-  const withPreservedBreaks = preserveMultipleLineBreaks(withStyleAliases)  // R5
-  const withUnderline = normalizeUnderlineMarkdown(withPreservedBreaks)
-  const normalizedContent = normalizeSuperAndSubScript(withUnderline)
-  const unsafeHtml = officeMarkdownParser.render(normalizedContent)
+  const withStyleAliases = normalizeNamedStyles(content?.trim() ?? '');
+  const withPreservedBreaks = preserveMultipleLineBreaks(withStyleAliases); // R5
+  const withUnderline = normalizeUnderlineMarkdown(withPreservedBreaks);
+  const normalizedContent = normalizeSuperAndSubScript(withUnderline);
+  const unsafeHtml = officeMarkdownParser.render(normalizedContent);
 
   const sanitized = DOMPurify.sanitize(unsafeHtml, {
     ALLOWED_TAGS: [
-      'a', 'b', 'blockquote', 'br', 'code', 'dd', 'del', 'div', 'dl', 'dt', 'em',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i',
-      'input', 'li', 'ol', 'p', 'pre', 'section', 'span', 'strong', 'sub', 'sup', 'u', 'ul',
+      'a',
+      'b',
+      'blockquote',
+      'br',
+      'code',
+      'dd',
+      'del',
+      'div',
+      'dl',
+      'dt',
+      'em',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'hr',
+      'i',
+      'input',
+      'li',
+      'ol',
+      'p',
+      'pre',
+      'section',
+      'span',
+      'strong',
+      'sub',
+      'sup',
+      'u',
+      'ul',
     ],
     ALLOWED_ATTR: ['checked', 'class', 'disabled', 'href', 'id', 'rel', 'target', 'type', 'style'],
-  })
+  });
 
-  const withFootnotes = processFootnotes(sanitized)  // R19
-  const withListFix = splitBrInListItems(withFootnotes)  // R4
-  return applyOfficeBlockStyles(withListFix)  // C1: apply [color:] and block styles for all Office pipelines
+  const withFootnotes = processFootnotes(sanitized); // R19
+  const withListFix = splitBrInListItems(withFootnotes); // R4
+  return applyOfficeBlockStyles(withListFix); // C1: apply [color:] and block styles for all Office pipelines
 }
 
 /**
@@ -432,14 +515,14 @@ export function renderOfficeRichHtml(content: string): string {
  */
 export function renderOfficeCommonApiHtml(content: string): string {
   // applyOfficeBlockStyles is already called inside renderOfficeRichHtml (idempotent)
-  const richHtml = renderOfficeRichHtml(content)
-  return richHtml.trim() || content
+  const richHtml = renderOfficeRichHtml(content);
+  return richHtml.trim() || content;
 }
 
 export function stripRichFormattingSyntax(content: string, stripListMarkers = false): string {
   const withLineBreaks = content
     .replace(/<br\s*\/?\s*>/gi, '\n')
-    .replace(/<\/\s*(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre|ul|ol)\s*>/gi, '\n')
+    .replace(/<\/\s*(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre|ul|ol)\s*>/gi, '\n');
 
   const stripped = withLineBreaks
     .replace(/<[^>]+>/g, '')
@@ -456,7 +539,9 @@ export function stripRichFormattingSyntax(content: string, stripListMarkers = fa
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
+    .trim();
 
-  return stripListMarkers ? stripMarkdownListMarkers(stripped) : normalizeListIndentationForPlainText(stripped)
+  return stripListMarkers
+    ? stripMarkdownListMarkers(stripped)
+    : normalizeListIndentationForPlainText(stripped);
 }

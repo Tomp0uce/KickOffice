@@ -17,16 +17,16 @@
 
 ### For WRITING/EDITING content:
 
-| Tool                 | When to use                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `proposeRevision`    | **PREFERRED** for editing existing text. Creates native Word Track Changes (redlines)          |
-| `editDocumentXml`    | Edit text while preserving exact formatting (fonts, colors) in heavily styled documents        |
-| `searchAndReplace`   | Fix specific words/phrases throughout document                                                 |
-| `insertContent`      | Add NEW content only (Markdown + inline color/style syntax)                                    |
-| `insertHyperlink`    | Add clickable links                                                                            |
-| `addComment`         | Add review comments                                                                            |
-| `insertHeaderFooter` | Add headers/footers                                                                            |
-| `insertFootnote`     | Add footnotes                                                                                  |
+| Tool                 | When to use                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `proposeRevision`    | **PREFERRED** for editing existing text. Creates native Word Track Changes (redlines)   |
+| `editDocumentXml`    | Edit text while preserving exact formatting (fonts, colors) in heavily styled documents |
+| `searchAndReplace`   | Fix specific words/phrases throughout document                                          |
+| `insertContent`      | Add NEW content only (Markdown + inline color/style syntax)                             |
+| `insertHyperlink`    | Add clickable links                                                                     |
+| `addComment`         | Add review comments                                                                     |
+| `insertHeaderFooter` | Add headers/footers                                                                     |
+| `insertFootnote`     | Add footnotes                                                                           |
 
 ### For FORMATTING:
 
@@ -195,9 +195,9 @@ Other:
 ### Getting selection
 
 ```javascript
-const range = context.document.getSelection()
-range.load('text,font/bold,font/size,font/color,font/name')
-await context.sync()
+const range = context.document.getSelection();
+range.load('text,font/bold,font/size,font/color,font/name');
+await context.sync();
 ```
 
 ### Searching text
@@ -206,32 +206,32 @@ await context.sync()
 const results = context.document.body.search('find this', {
   matchCase: false,
   matchWholeWord: true,
-})
-results.load('items')
-await context.sync()
+});
+results.load('items');
+await context.sync();
 
 for (const item of results.items) {
-  item.insertText('replace with', 'Replace')
+  item.insertText('replace with', 'Replace');
 }
-await context.sync()
+await context.sync();
 ```
 
 ### Working with paragraphs
 
 ```javascript
-const paragraphs = context.document.body.paragraphs
-paragraphs.load('items,items/text')
-await context.sync()
+const paragraphs = context.document.body.paragraphs;
+paragraphs.load('items,items/text');
+await context.sync();
 
-const firstPara = paragraphs.items[0]
+const firstPara = paragraphs.items[0];
 ```
 
 ### Inserting HTML (for complex content)
 
 ```javascript
-const range = context.document.getSelection()
-range.insertHtml('<b>Bold</b> and <i>italic</i>', 'Replace')
-await context.sync()
+const range = context.document.getSelection();
+range.insertHtml('<b>Bold</b> and <i>italic</i>', 'Replace');
+await context.sync();
 ```
 
 ## COMMON ERRORS AND FIXES

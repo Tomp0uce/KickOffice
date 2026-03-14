@@ -1,20 +1,24 @@
 # Proofread Quick Action Skill
 
 ## Purpose
+
 Identify and correct spelling, grammar, punctuation, and style errors while preserving the author's voice and intent.
 
 ## When to Use
+
 - User clicks "Proofread" Quick Action in Word or Outlook
 - Text may contain errors, typos, or style inconsistencies
 - Goal: Error-free, polished text
 
 ## Input Contract
+
 - **Selected text**: Content to proofread (may contain errors)
 - **Language**: Auto-detect and preserve original language
 - **Context**: Any written content
 - **Rich content**: May contain `{{PRESERVE_N}}` placeholders (Outlook)
 
 ## Output Requirements
+
 1. **Fix ALL errors**: Spelling, grammar, punctuation, capitalization
 2. **Preserve author's voice**: Don't rewrite, just correct
 3. **Maintain structure**: Keep original formatting and organization
@@ -25,11 +29,13 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 ## Error Categories
 
 ### 1. Spelling Errors
+
 - Typos: "teh" → "the", "recieve" → "receive"
 - Homophones: "there/their/they're", "your/you're", "its/it's"
 - Commonly misspelled: "accommodate", "occurred", "separate"
 
 ### 2. Grammar Errors
+
 - **Subject-verb agreement**: "The team are" → "The team is"
 - **Tense consistency**: Maintain consistent tense throughout
 - **Pronoun agreement**: "Everyone should bring their" (acceptable) vs formal alternatives
@@ -37,6 +43,7 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 - **Sentence fragments**: Complete incomplete sentences (unless intentional style)
 
 ### 3. Punctuation Errors
+
 - **Missing commas**: In lists, after introductory phrases, between clauses
 - **Comma splices**: Don't join independent clauses with just a comma
 - **Apostrophes**: "its" (possessive) vs "it's" (it is)
@@ -44,12 +51,14 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 - **Hyphens/Dashes**: Compound modifiers, em-dashes for breaks
 
 ### 4. Capitalization
+
 - **Proper nouns**: Names, places, brands
 - **Titles**: Headline style vs sentence style
 - **After punctuation**: Capitalize after periods, not after commas
 - **Acronyms**: Keep uppercase (CEO, NASA, FAQ)
 
 ### 5. Style & Consistency
+
 - **Number style**: Spell out one-ten, use digits for 11+, or follow document convention
 - **Date format**: Consistent throughout (March 14, 2024 vs 14/03/2024)
 - **Abbreviations**: Consistent use (e.g. vs eg vs e.g.)
@@ -58,6 +67,7 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 ## What NOT to Change
 
 ### Preserve Intent
+
 - **Informal language**: If author wrote casually, keep it casual
 - **Technical terms**: Don't "correct" specialized vocabulary
 - **Brand names**: Keep unconventional capitalizations (iPhone, eBay)
@@ -65,28 +75,34 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 - **Style choices**: Author's voice > strict rules
 
 ### Regional Variations
+
 - **British vs American English**: Be consistent within document
   - colour/color, realise/realize, centre/center
   - organisation/organization
 - **French variations**: Quebec vs France spellings
 
 ## Tool Usage
+
 **DO NOT** call Office.js tools. Return pure corrected text.
 
 ## Example Corrections
 
 ### Example 1: Multiple Error Types
+
 **Before**:
+
 ```
 The companys new policy is affect all employee's. Their will be a meeting to discuss this on tuesday, march 15th at 10:00 AM in the main conference room. Everyone should bring there laptop and be prepared to take notes.
 ```
 
 **After**:
+
 ```
 The company's new policy affects all employees. There will be a meeting to discuss this on Tuesday, March 15th at 10:00 AM in the main conference room. Everyone should bring their laptop and be prepared to take notes.
 ```
 
 **Corrections made**:
+
 - "companys" → "company's" (apostrophe for possessive)
 - "affect" → "affects" (subject-verb agreement)
 - "employee's" → "employees" (plural, not possessive)
@@ -95,24 +111,30 @@ The company's new policy affects all employees. There will be a meeting to discu
 - "there" → "their" (possessive pronoun)
 
 ### Example 2: Punctuation & Grammar
+
 **Before**:
+
 ```
 The project was completed ahead of schedule however the team encountered several challenges along the way. Including budget constraints limited resources and tight deadlines.
 ```
 
 **After**:
+
 ```
 The project was completed ahead of schedule; however, the team encountered several challenges along the way, including budget constraints, limited resources, and tight deadlines.
 ```
 
 **Corrections made**:
+
 - Added semicolon before "however"
 - Added comma after "however"
 - Fixed sentence fragment by connecting to previous sentence
 - Added commas in list
 
 ### Example 3: Outlook Email with Placeholder
+
 **Before**:
+
 ```
 Hi John
 
@@ -122,6 +144,7 @@ Best regard's
 ```
 
 **After**:
+
 ```
 Hi John,
 
@@ -131,6 +154,7 @@ Best regards,
 ```
 
 **Corrections made**:
+
 - Added comma after greeting
 - "you're" → "your" (possessive)
 - "question's" → "questions" (plural, not possessive)
@@ -140,7 +164,9 @@ Best regards,
 - "regard's" → "regards," (no apostrophe, add comma)
 
 ### Example 4: French Text
+
 **Before**:
+
 ```
 Bonjour,
 
@@ -150,6 +176,7 @@ Cordialement
 ```
 
 **After**:
+
 ```
 Bonjour,
 
@@ -159,6 +186,7 @@ Cordialement,
 ```
 
 **Corrections made**:
+
 - "recu" → "reçu" (accent)
 - "informez" → "informer" (infinitive after "vous")
 - "terminer" → "terminé" (past participle with "sera")
@@ -166,11 +194,13 @@ Cordialement,
 - Added comma after closing
 
 ## Preservation Rules (Outlook)
+
 - Keep `{{PRESERVE_N}}` placeholders EXACTLY as-is
 - Ensure proper punctuation around them
 - Don't "correct" them
 
 ## Edge Cases
+
 - **Already perfect**: Return unchanged (don't introduce errors!)
 - **Ambiguous errors**: If unsure, leave as-is
 - **Multiple valid corrections**: Choose the most conventional
@@ -178,7 +208,9 @@ Cordialement,
 - **Code/technical content**: Don't "fix" syntax that's correct in that context
 
 ## Quality Metrics
+
 A good proofread:
+
 - ✓ Fixes all objective errors (spelling, grammar)
 - ✓ Maintains author's voice
 - ✓ Doesn't introduce new errors
@@ -186,6 +218,7 @@ A good proofread:
 - ✓ Preserves intended meaning
 
 ## When to Be Conservative
+
 - **Legal documents**: Prefer minimal changes
 - **Quotes**: Never alter quoted text
 - **Poetry/creative writing**: Respect artistic license

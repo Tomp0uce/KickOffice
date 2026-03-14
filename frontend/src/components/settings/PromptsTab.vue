@@ -1,8 +1,5 @@
 <template>
-  <div
-    role="tabpanel"
-    class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1"
-  >
+  <div role="tabpanel" class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1">
     <div
       class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
     >
@@ -59,10 +56,7 @@
           </div>
         </div>
 
-        <div
-          v-if="editingPromptId === prompt.id"
-          class="mt-3 border-t border-t-border pt-3"
-        >
+        <div v-if="editingPromptId === prompt.id" class="mt-3 border-t border-t-border pt-3">
           <label class="mb-1 block text-xs font-semibold text-secondary">{{
             t('systemPrompt')
           }}</label>
@@ -84,18 +78,8 @@
           />
 
           <div class="mt-3 flex gap-2">
-            <CustomButton
-              type="primary"
-              class="flex-1"
-              :text="t('save')"
-              @click="savePromptEdit"
-            />
-            <CustomButton
-              type="secondary"
-              class="flex-1"
-              :text="t('cancel')"
-              @click="cancelEdit"
-            />
+            <CustomButton type="primary" class="flex-1" :text="t('save')" @click="savePromptEdit" />
+            <CustomButton type="secondary" class="flex-1" :text="t('cancel')" @click="cancelEdit" />
           </div>
         </div>
 
@@ -111,43 +95,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Edit2, Plus, Trash2 } from 'lucide-vue-next'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { Edit2, Plus, Trash2 } from 'lucide-vue-next';
 
-import CustomButton from '@/components/CustomButton.vue'
-import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts'
+import CustomButton from '@/components/CustomButton.vue';
+import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const savedPrompts = ref<SavedPrompt[]>([])
-const editingPromptId = ref<string>('')
+const savedPrompts = ref<SavedPrompt[]>([]);
+const editingPromptId = ref<string>('');
 const editingPrompt = ref<SavedPrompt>({
   id: '',
   name: '',
   systemPrompt: '',
   userPrompt: '',
-})
+});
 
 function loadPrompts() {
   const defaultPrompts: SavedPrompt[] = [
     { id: 'default', name: 'Default', systemPrompt: '', userPrompt: '' },
-  ]
-  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts)
+  ];
+  savedPrompts.value = loadSavedPromptsFromStorage(defaultPrompts);
   if (savedPrompts.value.length === 0) {
-    savedPrompts.value = defaultPrompts
+    savedPrompts.value = defaultPrompts;
   }
-  savePromptsToStorage()
+  savePromptsToStorage();
 }
 
 function savePromptsToStorage() {
   try {
-    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts.value))
+    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts.value));
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[PromptsTab] localStorage quota exceeded — saved prompts not persisted')
+      console.warn('[PromptsTab] localStorage quota exceeded — saved prompts not persisted');
     } else {
-      throw e
+      throw e;
     }
   }
 }
@@ -158,40 +142,40 @@ function addNewPrompt() {
     name: `Prompt ${savedPrompts.value.length + 1}`,
     systemPrompt: '',
     userPrompt: '',
-  }
-  savedPrompts.value.push(newPrompt)
-  savePromptsToStorage()
-  startEditPrompt(newPrompt)
+  };
+  savedPrompts.value.push(newPrompt);
+  savePromptsToStorage();
+  startEditPrompt(newPrompt);
 }
 
 function startEditPrompt(prompt: SavedPrompt) {
-  editingPromptId.value = prompt.id
-  editingPrompt.value = { ...prompt }
+  editingPromptId.value = prompt.id;
+  editingPrompt.value = { ...prompt };
 }
 
 function savePromptEdit() {
-  const index = savedPrompts.value.findIndex(p => p.id === editingPromptId.value)
+  const index = savedPrompts.value.findIndex(p => p.id === editingPromptId.value);
   if (index !== -1) {
-    savedPrompts.value[index] = { ...editingPrompt.value }
-    savePromptsToStorage()
+    savedPrompts.value[index] = { ...editingPrompt.value };
+    savePromptsToStorage();
   }
-  editingPromptId.value = ''
+  editingPromptId.value = '';
 }
 
 function cancelEdit() {
-  editingPromptId.value = ''
-  editingPrompt.value = { id: '', name: '', systemPrompt: '', userPrompt: '' }
+  editingPromptId.value = '';
+  editingPrompt.value = { id: '', name: '', systemPrompt: '', userPrompt: '' };
 }
 
 function deletePrompt(id: string) {
-  if (savedPrompts.value.length <= 1) return
-  const index = savedPrompts.value.findIndex(p => p.id === id)
+  if (savedPrompts.value.length <= 1) return;
+  const index = savedPrompts.value.findIndex(p => p.id === id);
   if (index !== -1) {
-    savedPrompts.value.splice(index, 1)
-    savePromptsToStorage()
+    savedPrompts.value.splice(index, 1);
+    savePromptsToStorage();
   }
 }
 
 // Allow parent to trigger initial load
-loadPrompts()
+loadPrompts();
 </script>

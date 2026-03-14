@@ -1,8 +1,8 @@
-import { ensureLockdown } from './lockdown'
+import { ensureLockdown } from './lockdown';
 
 /* global Compartment */
 
-export type SandboxHost = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook'
+export type SandboxHost = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook';
 
 /**
  * Execute code in a sandboxed environment with SES.
@@ -15,12 +15,12 @@ export type SandboxHost = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook'
 export function sandboxedEval(
   code: string,
   globals: Record<string, any>,
-  host?: SandboxHost
+  host?: SandboxHost,
 ): unknown {
-  ensureLockdown()
+  ensureLockdown();
 
   // Build filtered globals based on host
-  const filteredGlobals = buildHostGlobals(globals, host)
+  const filteredGlobals = buildHostGlobals(globals, host);
 
   // @ts-ignore - Compartment is provided by SES
   const compartment = new Compartment({
@@ -51,47 +51,42 @@ export function sandboxedEval(
       WebSocket: undefined,
     },
     __options__: true,
-  })
+  });
 
   // Audit trail: log host and truncated code for debugging
-  const preview = code.length > 200 ? `${code.slice(0, 200)}…` : code
-  console.info(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`)
+  const preview = code.length > 200 ? `${code.slice(0, 200)}…` : code;
+  console.info(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`);
 
   // Wrap in async IIFE and execute
-  return compartment.evaluate(`(async () => { ${code} })()`)
+  return compartment.evaluate(`(async () => { ${code} })()`);
 }
 
 /**
  * Build globals object filtered by host.
  * Prevents cross-host API access (e.g., using Word API in Excel).
  */
-function buildHostGlobals(
-  globals: Record<string, any>,
-  host?: SandboxHost
-): Record<string, any> {
-  const result = { ...globals }
+function buildHostGlobals(globals: Record<string, any>, host?: SandboxHost): Record<string, any> {
+  const result = { ...globals };
 
   // If no host specified, allow all (backwards compatibility)
   if (!host) {
-    return result
+    return result;
   }
 
   // Remove namespaces not matching the current host
   const namespaceMap: Record<SandboxHost, string[]> = {
-    Word: ['Excel', 'PowerPoint'],      // Remove these from Word
-    Excel: ['Word', 'PowerPoint'],       // Remove these from Excel
-    PowerPoint: ['Word', 'Excel'],       // Remove these from PowerPoint
-    Outlook: ['Word', 'Excel', 'PowerPoint'],  // Remove all from Outlook
-  }
+    Word: ['Excel', 'PowerPoint'], // Remove these from Word
+    Excel: ['Word', 'PowerPoint'], // Remove these from Excel
+    PowerPoint: ['Word', 'Excel'], // Remove these from PowerPoint
+    Outlook: ['Word', 'Excel', 'PowerPoint'], // Remove all from Outlook
+  };
 
-  const toRemove = namespaceMap[host] || []
+  const toRemove = namespaceMap[host] || [];
   for (const ns of toRemove) {
     if (ns in result) {
-      result[ns] = undefined
+      result[ns] = undefined;
     }
   }
 
-  return result
+  return result;
 }
-
-

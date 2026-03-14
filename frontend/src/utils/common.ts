@@ -1,44 +1,50 @@
-import DiffMatchPatch from 'diff-match-patch'
-import type { ToolDefinition } from '@/types'
-
+import DiffMatchPatch from 'diff-match-patch';
+import type { ToolDefinition } from '@/types';
 
 // R17/CH5 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
 export function generateVisualDiff(originalText: unknown, newText: unknown): string {
   if (typeof originalText !== 'string' || typeof newText !== 'string') {
-    return ''
+    return '';
   }
-  const dmp = new DiffMatchPatch()
-  const diffs = dmp.diff_main(originalText, newText)
-  dmp.diff_cleanupSemantic(diffs)
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(originalText, newText);
+  dmp.diff_cleanupSemantic(diffs);
 
   return diffs
     .map(([op, text]) => {
-      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
-      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`
-      if (op === -1) return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`
-      return escaped
+      const escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      if (op === 1) return `<span style="color:blue;text-decoration:underline;">${escaped}</span>`;
+      if (op === -1)
+        return `<span style="color:red;text-decoration:line-through;">${escaped}</span>`;
+      return escaped;
     })
-    .join('')
+    .join('');
 }
 
 export interface TextDiffStats {
-  insertions: number
-  deletions: number
-  unchanged: number
+  insertions: number;
+  deletions: number;
+  unchanged: number;
 }
 
 /** Compute word-level diff stats between two strings (used by hosts that report diff info without a visual HTML diff). */
 export function computeTextDiffStats(originalText: string, revisedText: string): TextDiffStats {
-  const dmp = new DiffMatchPatch()
-  const diffs = dmp.diff_main(originalText, revisedText)
-  dmp.diff_cleanupSemantic(diffs)
-  let insertions = 0, deletions = 0, unchanged = 0
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(originalText, revisedText);
+  dmp.diff_cleanupSemantic(diffs);
+  let insertions = 0,
+    deletions = 0,
+    unchanged = 0;
   for (const [op, text] of diffs) {
-    if (op === 0) unchanged += text.length
-    else if (op === -1) deletions += text.length
-    else if (op === 1) insertions += text.length
+    if (op === 0) unchanged += text.length;
+    else if (op === -1) deletions += text.length;
+    else if (op === 1) insertions += text.length;
   }
-  return { insertions, deletions, unchanged }
+  return { insertions, deletions, unchanged };
 }
 
 /**
@@ -46,8 +52,8 @@ export function computeTextDiffStats(originalText: string, revisedText: string):
  * Used by wordTools and outlookTools for error message truncation.
  */
 export function truncateString(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str
-  return str.slice(0, maxLen) + '...'
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen) + '...';
 }
 
 /**
@@ -55,11 +61,16 @@ export function truncateString(str: string, maxLen: number): string {
  * Safely extracts error.message or converts to string for TypeScript strict mode.
  */
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-    return error.message
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
   }
-  return String(error)
+  return String(error);
 }
 
 /**
@@ -74,7 +85,7 @@ export function getErrorMessage(error: unknown): string {
  * - PowerPoint: { executePowerPoint: (context: PowerPoint.RequestContext, args: Record<string, unknown>) => Promise<string> }
  * - Outlook: { executeOutlook: (item: Office.MessageCompose, args: Record<string, unknown>) => Promise<string> }
  */
-export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>
+export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>;
 
 /**
  * Generic factory that wraps host-specific tool templates with a uniform `execute` method.
@@ -90,7 +101,7 @@ export function createOfficeTools<TName extends string, TTemplate extends object
       name,
       { ...(def as object), execute: buildExecute(def as TTemplate) },
     ]),
-  ) as unknown as Record<TName, TDef>
+  ) as unknown as Record<TName, TDef>;
 }
 
 /**
@@ -117,27 +128,36 @@ export function buildExecuteWrapper<TTemplate extends Record<string, any>>(
   executeKey: string,
   runner: <T>(action: (context: any) => Promise<T>) => Promise<T>,
 ): (definition: TTemplate) => (args?: Record<string, any>) => Promise<string> {
-  return (def: TTemplate) => async (args: Record<string, any> = {}): Promise<string> => {
-    const hostExecute = def[executeKey]
-    if (!hostExecute || typeof hostExecute !== 'function') {
-      return JSON.stringify({
-        success: false,
-        error: `Tool definition missing ${executeKey} function`,
-        tool: def.name || 'unknown',
-      }, null, 2)
-    }
+  return (def: TTemplate) =>
+    async (args: Record<string, any> = {}): Promise<string> => {
+      const hostExecute = def[executeKey];
+      if (!hostExecute || typeof hostExecute !== 'function') {
+        return JSON.stringify(
+          {
+            success: false,
+            error: `Tool definition missing ${executeKey} function`,
+            tool: def.name || 'unknown',
+          },
+          null,
+          2,
+        );
+      }
 
-    try {
-      return await runner((context: any) => hostExecute(context, args))
-    } catch (error: any) {
-      return JSON.stringify({
-        success: false,
-        error: error.message || String(error),
-        tool: def.name || 'unknown',
-        suggestion: 'Fix the error parameters or context and try again.',
-      }, null, 2)
-    }
-  }
+      try {
+        return await runner((context: any) => hostExecute(context, args));
+      } catch (error: any) {
+        return JSON.stringify(
+          {
+            success: false,
+            error: error.message || String(error),
+            tool: def.name || 'unknown',
+            suggestion: 'Fix the error parameters or context and try again.',
+          },
+          null,
+          2,
+        );
+      }
+    };
 }
 
 export const optionLists = {
@@ -145,7 +165,7 @@ export const optionLists = {
     { label: 'English', value: 'en' },
     { label: 'Fran\u00e7ais', value: 'fr' },
   ],
-}
+};
 
 /**
  * Normalizes line endings to \n (removes \r).
@@ -153,6 +173,6 @@ export const optionLists = {
  * across Word and PowerPoint.
  */
 export function normalizeLineEndings(text: string): string {
-  if (!text) return ''
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (!text) return '';
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }

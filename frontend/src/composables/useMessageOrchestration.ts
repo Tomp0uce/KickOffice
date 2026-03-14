@@ -10,52 +10,51 @@
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
-import { type Ref } from 'vue'
-import type { DisplayMessage } from '@/types/chat'
-import type { ChatMessage, ChatRequestMessage } from '@/api/backend'
+import { type Ref } from 'vue';
+import type { DisplayMessage } from '@/types/chat';
+import type { ChatMessage, ChatRequestMessage } from '@/api/backend';
 import {
   getExcelDocumentContext,
   getPowerPointDocumentContext,
   getOutlookDocumentContext,
   getWordDocumentContext,
-} from '@/utils/officeDocumentContext'
-import { getPreservationInstruction } from '@/utils/richContentPreserver'
-import { getLastRichContext } from '@/utils/richContextStore'
-import { logService } from '@/utils/logger'
-import type { SessionFile } from './useSessionFiles'
+} from '@/utils/officeDocumentContext';
+import { getPreservationInstruction } from '@/utils/richContentPreserver';
+import { getLastRichContext } from '@/utils/richContextStore';
+import { logService } from '@/utils/logger';
+import type { SessionFile } from './useSessionFiles';
 
 export interface UseMessageOrchestrationOptions {
-  history: Ref<DisplayMessage[]>
-  hostIsOutlook: boolean
-  hostIsPowerPoint: boolean
-  hostIsExcel: boolean
-  hostIsWord: boolean
+  history: Ref<DisplayMessage[]>;
+  hostIsOutlook: boolean;
+  hostIsPowerPoint: boolean;
+  hostIsExcel: boolean;
+  hostIsWord: boolean;
 }
 
 export function useMessageOrchestration(options: UseMessageOrchestrationOptions) {
-  const {
-    history,
-    hostIsOutlook,
-    hostIsPowerPoint,
-    hostIsExcel,
-    hostIsWord,
-  } = options
+  const { history, hostIsOutlook, hostIsPowerPoint, hostIsExcel, hostIsWord } = options;
 
   /**
    * Build base chat messages from history.
    * Converts DisplayMessage[] to ChatMessage[].
    */
   function buildChatMessages(systemPrompt: string): ChatMessage[] {
-    const msgs: ChatRequestMessage[] = [{ role: 'system', content: systemPrompt }]
+    const msgs: ChatRequestMessage[] = [{ role: 'system', content: systemPrompt }];
     for (const m of history.value) {
-      let contentToKeep = m.content
+      let contentToKeep = m.content;
       // If the assistant message only had tool calls and no content, ensure it's not totally empty
-      if (m.role === 'assistant' && !contentToKeep?.trim() && m.rawMessages && m.rawMessages.length > 0) {
-        contentToKeep = `[Tools executed internally]`
+      if (
+        m.role === 'assistant' &&
+        !contentToKeep?.trim() &&
+        m.rawMessages &&
+        m.rawMessages.length > 0
+      ) {
+        contentToKeep = `[Tools executed internally]`;
       }
-      msgs.push({ role: m.role, content: contentToKeep || '' })
+      msgs.push({ role: m.role, content: contentToKeep || '' });
     }
-    return msgs as ChatMessage[]
+    return msgs as ChatMessage[];
   }
 
   /**
@@ -67,24 +66,24 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    */
   async function injectDocumentContext(messages: ChatMessage[]): Promise<ChatMessage[]> {
     try {
-      let docContextJson = ''
-      if (hostIsExcel) docContextJson = await getExcelDocumentContext()
-      else if (hostIsPowerPoint) docContextJson = await getPowerPointDocumentContext()
-      else if (hostIsOutlook) docContextJson = await getOutlookDocumentContext()
-      else if (hostIsWord) docContextJson = await getWordDocumentContext()
+      let docContextJson = '';
+      if (hostIsExcel) docContextJson = await getExcelDocumentContext();
+      else if (hostIsPowerPoint) docContextJson = await getPowerPointDocumentContext();
+      else if (hostIsOutlook) docContextJson = await getOutlookDocumentContext();
+      else if (hostIsWord) docContextJson = await getWordDocumentContext();
 
       if (docContextJson) {
-        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+        const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
         if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
-          messages[lastUserIdx].content += `\n\n<doc_context>\n${docContextJson}\n</doc_context>`
+          messages[lastUserIdx].content += `\n\n<doc_context>\n${docContextJson}\n</doc_context>`;
         }
       }
     } catch (err) {
       // Document context is optional — continue without it if it fails
-      logService.warn('[MessageOrchestration] Failed to inject document context', err)
+      logService.warn('[MessageOrchestration] Failed to inject document context', err);
     }
 
-    return messages
+    return messages;
   }
 
   /**
@@ -103,39 +102,43 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
   ): ChatMessage[] {
     // Legacy string-based injection (kept for any call sites that still pass it)
     if (injectedContext) {
-      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
       if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
-        messages[lastUserIdx].content += `\n\n<attached_files>\n${injectedContext}\n</attached_files>`
+        messages[lastUserIdx].content +=
+          `\n\n<attached_files>\n${injectedContext}\n</attached_files>`;
       }
     }
 
     // Modern file injection with platform file IDs
     if (uploadedFiles && uploadedFiles.length > 0) {
-      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user')
+      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
       if (lastUserIdx !== -1) {
-        const hasFileRefs = uploadedFiles.some(f => f.fileId)
+        const hasFileRefs = uploadedFiles.some(f => f.fileId);
         if (hasFileRefs && typeof messages[lastUserIdx].content === 'string') {
           // Convert to content array: text + file references + inline fallback for files without fileId
-          const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }]
+          const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }];
           for (const f of uploadedFiles) {
             if (f.fileId) {
-              parts.push({ type: 'file', file: { file_id: f.fileId } })
+              parts.push({ type: 'file', file: { file_id: f.fileId } });
             } else {
-              parts.push({ type: 'text', text: `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]` })
+              parts.push({
+                type: 'text',
+                text: `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`,
+              });
             }
           }
-          messages[lastUserIdx].content = parts
+          messages[lastUserIdx].content = parts;
         } else if (typeof messages[lastUserIdx].content === 'string') {
           // All inline fallback
           const inlineText = uploadedFiles
             .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
-            .join('')
-          messages[lastUserIdx].content += `\n\n<attached_files>${inlineText}\n</attached_files>`
+            .join('');
+          messages[lastUserIdx].content += `\n\n<attached_files>${inlineText}\n</attached_files>`;
         }
       }
     }
 
-    return messages
+    return messages;
   }
 
   /**
@@ -146,11 +149,11 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    * @returns The modified messages array
    */
   function injectRichContentInstructions(messages: ChatMessage[]): ChatMessage[] {
-    const richContext = getLastRichContext()
+    const richContext = getLastRichContext();
     if (richContext?.hasRichContent && messages[0]?.role === 'system') {
-      messages[0].content += getPreservationInstruction(richContext)
+      messages[0].content += getPreservationInstruction(richContext);
     }
-    return messages
+    return messages;
   }
 
   /**
@@ -171,11 +174,11 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
     uploadedFiles?: SessionFile[],
     injectedContext?: string,
   ): Promise<ChatMessage[]> {
-    let messages = buildChatMessages(systemPrompt)
-    messages = await injectDocumentContext(messages)
-    messages = injectUploadedFiles(messages, uploadedFiles, injectedContext)
-    messages = injectRichContentInstructions(messages)
-    return messages
+    let messages = buildChatMessages(systemPrompt);
+    messages = await injectDocumentContext(messages);
+    messages = injectUploadedFiles(messages, uploadedFiles, injectedContext);
+    messages = injectRichContentInstructions(messages);
+    return messages;
   }
 
   return {
@@ -184,5 +187,5 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
     injectUploadedFiles,
     injectRichContentInstructions,
     prepareMessages,
-  }
+  };
 }
