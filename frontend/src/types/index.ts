@@ -20,13 +20,14 @@ export interface ToolInputSchema {
 }
 
 export interface ToolProperty {
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+  type?: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null'
   description?: string
   enum?: string[]
   items?: ToolProperty
   properties?: Record<string, ToolProperty>
   required?: string[]
   default?: any
+  anyOf?: ToolProperty[]
 }
 
 export type ToolCategory = 'read' | 'write' | 'format'

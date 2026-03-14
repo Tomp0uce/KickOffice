@@ -289,7 +289,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     mode: 'immediate',
     executeWithAgent: true,
     systemPrompt:
-      "You are a data visualization expert. Analyze the selected data. Generate new columns if necessary (and visually highlight them with 'formatRange'). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool with hasHeaders: true when the first row/column contains labels. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
+      "You are a data visualization expert. Analyze the selected data. Generate new columns if necessary (and visually highlight them with 'setCellRange' formatting parameter). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool with hasHeaders: true when the first row/column contains labels. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
     tooltipKey: 'excelAutoGraph_tooltip',
   },
   {

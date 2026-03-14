@@ -61,7 +61,8 @@ services:
     container_name: kickoffice-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:80"
+      # IC2: Map to 8080 (nginx-unprivileged internal port)
+      - "${FRONTEND_PORT}:8080"
     depends_on:
       manifest-gen:
         condition: service_completed_successfully

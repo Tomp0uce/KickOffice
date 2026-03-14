@@ -17,12 +17,12 @@
     </button>
     <div v-if="expanded" class="border-t border-border-secondary">
       <div class="px-2 py-1.5 text-xs">
-        <div class="text-[10px] uppercase text-secondary mb-1">args</div>
+        <div class="text-[10px] uppercase text-secondary mb-1">{{ t('toolCall.args') }}</div>
         <pre class="text-[10px] max-h-28 overflow-y-auto whitespace-pre-wrap wrap-break-word text-main/70 bg-bg-secondary rounded p-1">{{ argsText }}</pre>
       </div>
       <div v-if="props.toolCall.result" class="px-2 py-1.5 text-xs border-t border-border-secondary">
         <div class="text-[10px] uppercase mb-1" :class="props.toolCall.status === 'error' ? 'text-red-400' : 'text-secondary'">
-          {{ props.toolCall.status === 'error' ? 'error' : 'result' }}
+          {{ props.toolCall.status === 'error' ? t('toolCall.error') : t('toolCall.result') }}
         </div>
         <pre
           class="text-[10px] max-h-32 overflow-y-auto whitespace-pre-wrap wrap-break-word rounded p-1"
@@ -40,8 +40,10 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue'
 import { ChevronDown, ChevronRight, CheckCircle2, Loader2, Wrench, XCircle } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
 import type { ToolCallPart } from '@/types/chat'
 
+const { t } = useI18n()
 const props = defineProps<{ toolCall: ToolCallPart }>()
 
 const expanded = ref(false)

@@ -422,6 +422,7 @@
   "litellmUserEmailLabel": "Email utilisateur",
   "litellmUserEmailPlaceholder": "votre.email{'@'}kickmaker.net",
   "litellmCredentialsInfo": "Obtenez votre clé sur",
+  "getApiKeyLink": "Obtenez votre clé API ici",
   "litellmCredentialsConfigured": "Identifiants configurés",
   "litellmCredentialsMissing": "Identifiants non configurés",
   "credentialsRequired": "Veuillez configurer vos identifiants dans Paramètres > Compte pour utiliser cette fonctionnalité.",
@@ -441,5 +442,12 @@
   "regenerate": "Régénérer",
   "editMessage": "Modifier le message",
   "invalidImageUrl": "URL d'image invalide",
-  "failedToSaveChatData": "Impossible de sauvegarder la conversation. Le stockage du navigateur est peut-être plein."
+  "failedToSaveChatData": "Impossible de sauvegarder la conversation. Le stockage du navigateur est peut-être plein.",
+  "stats.inputTokens": "Tokens d'entrée : {count}",
+  "stats.outputTokens": "Tokens de sortie : {count}",
+  "stats.contextUsage": "Utilisation du contexte : {used} / {total} tokens ({pct}%)",
+  "stats.contextWarning": "⚠️ Utilisation du contexte à {pct}% - limite approchée. Envisagez de démarrer une nouvelle conversation.",
+  "toolCall.args": "Arguments",
+  "toolCall.error": "Erreur",
+  "toolCall.result": "Résultat"
 }

@@ -9,5 +9,9 @@ RUN npm ci --omit=dev
 
 COPY src/ ./src/
 
+# IC2: Run as non-root user for security (node user exists in official Node.js images)
+RUN chown -R node:node /app
+USER node
+
 CMD ["node", "src/server.js"]
 

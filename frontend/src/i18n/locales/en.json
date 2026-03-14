@@ -416,6 +416,7 @@
   "litellmUserEmailLabel": "User Email",
   "litellmUserEmailPlaceholder": "your.email{'@'}kickmaker.net",
   "litellmCredentialsInfo": "Get your key at",
+  "getApiKeyLink": "Get your API key here",
   "litellmCredentialsConfigured": "Credentials configured",
   "litellmCredentialsMissing": "Credentials not configured",
   "credentialsRequired": "Please configure your credentials in Settings > Account to use this feature.",
@@ -435,5 +436,12 @@
   "regenerate": "Regenerate",
   "editMessage": "Edit message",
   "invalidImageUrl": "Invalid image URL",
-  "failedToSaveChatData": "Failed to save chat data. Browser storage might be full."
+  "failedToSaveChatData": "Failed to save chat data. Browser storage might be full.",
+  "stats.inputTokens": "Input tokens: {count}",
+  "stats.outputTokens": "Output tokens: {count}",
+  "stats.contextUsage": "Context usage: {used} / {total} tokens ({pct}%)",
+  "stats.contextWarning": "⚠️ Context usage at {pct}% - approaching limit. Consider starting a new conversation.",
+  "toolCall.args": "Arguments",
+  "toolCall.error": "Error",
+  "toolCall.result": "Result"
 }

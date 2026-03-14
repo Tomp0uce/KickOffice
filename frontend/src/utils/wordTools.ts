@@ -7,8 +7,16 @@ import { applyRevisionToSelection } from './wordDiffUtils'
 
 import { applyInheritedStyles, type InheritedStyles, renderOfficeRichHtml, htmlToMarkdown } from './markdown'
 
-import { createOfficeTools, truncateString } from './common'
+import { createOfficeTools, truncateString, buildExecuteWrapper, type OfficeToolTemplate, getErrorMessage } from './common'
 import { escapeXml } from './pptxZipUtils'
+import {
+  WORD_SEARCH_TEXT_MAX_LENGTH,
+  WORD_HEADING_1_FONT_SIZE,
+  WORD_HEADING_2_FONT_SIZE,
+  WORD_HEADING_3_FONT_SIZE,
+  WORD_CODE_TRUNCATE_SHORT,
+  WORD_CODE_TRUNCATE_LONG,
+} from '@/constants/limits'
 
 export type WordToolName =
   | 'getSelectedText'
@@ -127,9 +135,9 @@ async function applyHeadingBuiltinStyles(
     for (const p of paras.items) {
       const size = p.font.size
       if (!size) continue
-      if (size >= 20) p.styleBuiltIn = Word.BuiltInStyleName.heading1
-      else if (size >= 15) p.styleBuiltIn = Word.BuiltInStyleName.heading2
-      else if (size >= 12.5) p.styleBuiltIn = Word.BuiltInStyleName.heading3
+      if (size >= WORD_HEADING_1_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading1
+      else if (size >= WORD_HEADING_2_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading2
+      else if (size >= WORD_HEADING_3_FONT_SIZE) p.styleBuiltIn = Word.BuiltInStyleName.heading3
     }
     await context.sync()
   } catch {
@@ -137,7 +145,7 @@ async function applyHeadingBuiltinStyles(
   }
 }
 
-type WordToolTemplate = Omit<ToolDefinition, 'execute'> & {
+type WordToolTemplate = OfficeToolTemplate<Word.RequestContext> & {
   executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>
 }
 
@@ -337,7 +345,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, replaceText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
       }
       
@@ -428,7 +436,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         fontName,
       } = args
 
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters.')
       }
 
@@ -531,7 +539,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
     },
     executeWord: async (context, args: Record<string, any>) => {
       const { searchText, matchCase = false, matchWholeWord = false } = args as Record<string, any>
-      if (typeof searchText === 'string' && searchText.length > 255) {
+      if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
         throw new Error('Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.')
       }
       
@@ -1459,10 +1467,10 @@ Your code should:
           escapeXml,
           setResult,
         }, 'Word')
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
         }, null, 2)
       }
@@ -1566,7 +1574,7 @@ try {
           validationErrors: validation.errors,
           validationWarnings: validation.warnings,
           suggestion: 'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
-          codeReceived: truncateString(code, 300),
+          codeReceived: truncateString(code, WORD_CODE_TRUNCATE_LONG),
         }, null, 2)
       }
 
@@ -1593,34 +1601,21 @@ try {
           explanation,
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         }, null, 2)
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
-          codeExecuted: truncateString(code, 200),
+          codeExecuted: truncateString(code, WORD_CODE_TRUNCATE_SHORT),
           hint: 'Check that all properties are loaded before access, and context.sync() is called.',
         }, null, 2)
       }
     },
   },
-}, (def) => async (args = {}) => {
-  try {
-    return await runWord(ctx => def.executeWord(ctx, args))
-  } catch (error: any) {
-    return JSON.stringify({
-      error: true,
-      message: error.message || String(error),
-      tool: def.name,
-      suggestion: 'Fix the error parameters or context and try again.'
-    }, null, 2)
-  }
-})
+}, buildExecuteWrapper<WordToolTemplate>('executeWord', runWord))
 
-export function getToolDefinitions(): ToolDefinition[] {
+export function getWordToolDefinitions(): ToolDefinition[] {
   return Object.values(wordToolDefinitions)
 }
-
-export const getWordToolDefinitions = getToolDefinitions
 
 export { wordToolDefinitions }

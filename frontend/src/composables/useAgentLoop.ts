@@ -1,19 +1,15 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
 import { nextTick, ref, type Ref, type ComputedRef } from 'vue'
 
-import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, uploadFileToPlatform, categorizeError } from '@/api/backend'
-import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt, type ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
-import { getQuickActionSkill } from '@/skills'
-import { getExcelToolDefinitions } from '@/utils/excelTools'
+import { type ChatMessage, type ChatRequestMessage, type TokenUsage, uploadFile, uploadFileToPlatform, categorizeError, chatStream, generateImage } from '@/api/backend'
+import { type ExcelFormulaLanguage, GLOBAL_STYLE_INSTRUCTIONS, getOutlookBuiltInPrompt } from '@/utils/constant'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
-import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions, powerpointImageRegistry, powerpointToolDefinitions } from '@/utils/powerpointTools'
+import { powerpointImageRegistry } from '@/utils/powerpointTools'
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager'
-import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
-import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
-import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
+import { getToolsForHost } from '@/utils/toolProviderRegistry'
+import { getPreservationInstruction, extractTextFromHtml } from '@/utils/richContentPreserver'
 import { useAgentPrompts } from '@/composables/useAgentPrompts'
 import { useOfficeSelection } from '@/composables/useOfficeSelection'
 import { setLastRichContext, clearLastRichContext, getLastRichContext } from '@/utils/richContextStore'
@@ -87,6 +83,11 @@ interface UseAgentLoopOptions {
   helpers: AgentLoopHelpers
 }
 
+export interface SessionStats {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
 
 export function useAgentLoop(options: UseAgentLoopOptions) {
   const { t, refs, models, host, settings, actions, helpers } = options
@@ -95,14 +96,14 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const { addSignatureAndCheckLoop, clearSignatures } = useLoopDetection(5, 2)
 
   // ARCH-H1: Extract session files management
-  const { sessionUploadedFiles, addSessionFile, rebuildSessionFiles, getSessionFilesForChat } = useSessionFiles({
+  const { addSessionFile, rebuildSessionFiles, getSessionFilesForChat } = useSessionFiles({
     history: refs.history,
   })
   const sessionUploadedImages = ref<{ filename: string; dataUri: string; imageId?: string; fileId?: string }[]>([])
 
   // ARCH-H1: Extract message orchestration
   const hostIsWord = !host.isOutlook && !host.isPowerPoint && !host.isExcel
-  const { prepareMessages, buildChatMessages } = useMessageOrchestration({
+  const { prepareMessages } = useMessageOrchestration({
     history: refs.history,
     hostIsOutlook: host.isOutlook,
     hostIsPowerPoint: host.isPowerPoint,
@@ -222,10 +223,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
 
 async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
-    let appToolDefs = getWordToolDefinitions()
-    if (hostIsOutlook) appToolDefs = getOutlookToolDefinitions()
-    else if (hostIsPowerPoint) appToolDefs = getPowerPointToolDefinitions()
-    else if (hostIsExcel) appToolDefs = getExcelToolDefinitions()
+    // ARCH-M1: Use ToolProviderRegistry instead of direct imports
+    const appToolDefs = getToolsForHost({ isOutlook: hostIsOutlook, isPowerPoint: hostIsPowerPoint, isExcel: hostIsExcel })
 
     const generalToolDefs = getGeneralToolDefinitions()
     const allToolDefs = [...generalToolDefs, ...appToolDefs]
@@ -625,12 +624,10 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
     isDraftFocusGlowing,
     availableModels,
     selectedModelTier,
-    selectedModelInfo,
     firstChatModelTier,
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
-    hostIsWord: !hostIsOutlook && !hostIsPowerPoint && !hostIsExcel,
     quickActions,
     outlookQuickActions,
     excelQuickActions,

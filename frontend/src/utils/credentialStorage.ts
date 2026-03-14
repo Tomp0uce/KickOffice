@@ -6,6 +6,7 @@
 
 import { logCryptoStatus } from './cryptoPolyfill'
 import { encryptValue, decryptValue, clearEncryptionKeys } from './credentialCrypto'
+import { logService } from './logger'
 
 const STORAGE_PREFIX = 'ko_cred_'
 
@@ -20,7 +21,7 @@ function safeSetItem(key: string, value: string): void {
     localStorage.setItem(key, value)
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[CredentialStorage] localStorage quota exceeded — credential not saved:', key)
+      logService.warn('[CredentialStorage] localStorage quota exceeded — credential not saved:', key)
     } else {
       throw e
     }
@@ -28,8 +29,55 @@ function safeSetItem(key: string, value: string): void {
 }
 
 /**
+ * ARCH-M3: One-time credential migration at app startup
+ * Migrates credentials between localStorage and sessionStorage based on "remember" preference.
+ * This runs once at startup instead of on every credential read.
+ */
+export async function migrateCredentialsOnStartup(): Promise<void> {
+  const remember = getRememberCredentials()
+  const credentialKeys = ['litellmUserKey', 'litellmUserEmail']
+
+  for (const key of credentialKeys) {
+    if (remember) {
+      // Should use localStorage - migrate from sessionStorage if needed
+      const sessionValue = sessionStorage.getItem(key)
+      const localEncrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
+
+      if (sessionValue && !localEncrypted) {
+        try {
+          const encrypted = await encryptValue(sessionValue, true)
+          safeSetItem(`${STORAGE_PREFIX}${key}`, encrypted)
+          sessionStorage.removeItem(key)
+          logService.info(`[CredentialStorage] Migrated "${key}" from sessionStorage to localStorage`)
+        } catch (err) {
+          logService.error(`[CredentialStorage] Failed to migrate "${key}" to localStorage`, err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+    } else {
+      // Should use sessionStorage - migrate from localStorage if needed
+      const localEncrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
+      const sessionValue = sessionStorage.getItem(key)
+
+      if (localEncrypted && !sessionValue) {
+        try {
+          const decrypted = await decryptValue(localEncrypted, false, key)
+          if (decrypted) {
+            sessionStorage.setItem(key, decrypted)
+            localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+            logService.info(`[CredentialStorage] Migrated "${key}" from localStorage to sessionStorage`)
+          }
+        } catch (err) {
+          logService.error(`[CredentialStorage] Failed to migrate "${key}" to sessionStorage`, err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+    }
+  }
+}
+
+/**
+ * ARCH-M3: Simplified credential retrieval without inline migration
  * Get credential from the appropriate storage (with decryption for localStorage).
- * Checks both storages as fallback to survive migrations.
+ * Migration is now handled by migrateCredentialsOnStartup() called at app init.
  */
 async function getCredential(key: string, remember: boolean): Promise<string> {
   if (remember) {
@@ -38,34 +86,12 @@ async function getCredential(key: string, remember: boolean): Promise<string> {
       const decrypted = await decryptValue(encrypted, true, key)
       if (decrypted) return decrypted
     }
-
-    // Fallback: migrate from sessionStorage
-    const sessionValue = sessionStorage.getItem(key)
-    if (sessionValue) {
-      console.info(`[CredentialStorage] Migrating "${key}" from sessionStorage to localStorage`)
-      await setCredential(key, sessionValue, true)
-      return sessionValue
-    }
-
     return ''
   }
 
   // sessionStorage path
   const sessionValue = sessionStorage.getItem(key)
-  if (sessionValue) return sessionValue
-
-  // Fallback: migrate from encrypted localStorage
-  const encrypted = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
-  if (encrypted) {
-    const decrypted = await decryptValue(encrypted, false, key)
-    if (decrypted) {
-      console.info(`[CredentialStorage] Migrating "${key}" from localStorage to sessionStorage`)
-      sessionStorage.setItem(key, decrypted)
-      return decrypted
-    }
-  }
-
-  return ''
+  return sessionValue || ''
 }
 
 /**
@@ -193,11 +219,11 @@ export async function areCredentialsConfigured(): Promise<boolean> {
     const email = await getUserEmail()
     const hasCredentials = key.length > 0 && email.length > 0
     if (!hasCredentials) {
-      console.warn('[CredentialStorage] Credentials not configured - key or email missing')
+      logService.warn('[CredentialStorage] Credentials not configured - key or email missing')
     }
     return hasCredentials
   } catch (error) {
-    console.error('[CredentialStorage] Error checking credentials:', error)
+    logService.error('[CredentialStorage] Error checking credentials', error instanceof Error ? error : new Error(String(error)))
     return false
   }
 }

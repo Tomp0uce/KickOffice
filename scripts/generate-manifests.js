@@ -12,6 +12,36 @@
  *   SERVER_IP       – host IP (required)
  *   FRONTEND_PORT   – frontend port (default: 3002)
  *   BACKEND_PORT    – backend port  (default: 3003)
+ *
+ * -------------------------------------------------------------------
+ * ARCH-L2: Manifest Serving Strategy
+ * -------------------------------------------------------------------
+ *
+ * CURRENT APPROACH (Self-hosted / Internal):
+ *   - Manifests generated to: generated-manifests/ (project root)
+ *   - Served via Express route: /manifests/manifest-office.xml
+ *   - Benefits: Can add authentication, rate limiting, server-side logic
+ *   - Security: Manifests contain internal hostnames/URLs but are only
+ *               accessible to authenticated users on the internal network
+ *
+ * ALTERNATIVE APPROACH (SaaS / Public distribution):
+ *   - Output manifests to: frontend/public/assets/manifests/
+ *   - Served as static files directly by Vite/Nginx
+ *   - Benefits: Works with static hosting (CDN), no Express dependency,
+ *               same-origin serving (no CORS), simpler distribution
+ *   - Security considerations:
+ *       * Manifests become publicly discoverable
+ *       * Internal hostnames/URLs exposed to anyone with the URL
+ *       * Mitigation: Use relative paths where possible, serve manifests
+ *                     only at non-obvious paths, implement allowlist for
+ *                     which configurations can be served publicly
+ *
+ * RECOMMENDATION:
+ *   - Keep current approach for self-hosted/internal deployments
+ *   - When moving to SaaS model, change OUTPUT_DIR to:
+ *     path.join(ROOT_DIR, 'frontend/public/assets/manifests')
+ *   - Add route-level authentication/allowlist before exposing publicly
+ * -------------------------------------------------------------------
  */
 
 'use strict';

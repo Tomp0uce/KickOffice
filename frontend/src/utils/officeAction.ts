@@ -1,4 +1,5 @@
 import { logService } from './logger'
+import { OFFICE_RETRY_BACKOFF_DELAY_1, OFFICE_RETRY_BACKOFF_DELAY_2 } from '@/constants/limits'
 
 const DEFAULT_OFFICE_ACTION_TIMEOUT_MS = 10_000
 const OFFICE_BUSY_TIMEOUT_MESSAGE = 'Office app is busy. Please exit cell editing or close dialogs.'
@@ -17,7 +18,7 @@ export async function executeOfficeAction<T>(
   }
 
   const maxRetries = 2
-  const backoffDelays = [1000, 2000]
+  const backoffDelays = [OFFICE_RETRY_BACKOFF_DELAY_1, OFFICE_RETRY_BACKOFF_DELAY_2]
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (abortSignal?.aborted) {

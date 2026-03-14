@@ -6,9 +6,10 @@ import { renderOfficeRichHtml, sanitizeHtml } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
 
-import { generateVisualDiff, createOfficeTools, truncateString } from './common'
+import { generateVisualDiff, createOfficeTools, truncateString, buildExecuteWrapper, type OfficeToolTemplate, getErrorMessage } from './common'
 import { getLastRichContext, setLastRichContext } from './richContextStore'
 import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver'
+import { OUTLOOK_ACTION_TIMEOUT_MS } from '@/constants/limits'
 
 export type OutlookToolName =
   | 'getEmailBody'
@@ -37,9 +38,9 @@ function getOfficeCoercionType(): any {
 }
 
 const runOutlook = <T>(action: () => Promise<T>): Promise<T> =>
-  executeOfficeAction(action, 'outlook_action', 20_000)
+  executeOfficeAction(action, 'outlook_action', OUTLOOK_ACTION_TIMEOUT_MS)
 
-type OutlookToolTemplate = Omit<ToolDefinition, 'execute'> & {
+type OutlookToolTemplate = OfficeToolTemplate & {
   executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>
 }
 
@@ -518,10 +519,10 @@ try {
           explanation,
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         }, null, 2)
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
           codeExecuted: truncateString(code, 200),
           hint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
@@ -533,22 +534,20 @@ try {
   try {
     return await runOutlook(async () => Promise.race([
       def.executeOutlook(getMailbox(), args),
-      new Promise<string>(resolve => setTimeout(() => resolve('Error: Outlook API request timed out after 20 seconds.'), 20_000)),
+      new Promise<string>(resolve => setTimeout(() => resolve(`Error: Outlook API request timed out after ${OUTLOOK_ACTION_TIMEOUT_MS / 1000} seconds.`), OUTLOOK_ACTION_TIMEOUT_MS)),
     ]))
-  } catch (error: any) {
+  } catch (error: unknown) {
     return JSON.stringify({
-      error: true,
-      message: error.message || String(error),
+      success: false,
+      error: getErrorMessage(error),
       tool: def.name,
       suggestion: 'Fix the error parameters or context and try again.'
     }, null, 2)
   }
 })
 
-export function getToolDefinitions(): ToolDefinition[] {
+export function getOutlookToolDefinitions(): ToolDefinition[] {
   return Object.values(outlookToolDefinitions)
 }
-
-export const getOutlookToolDefinitions = getToolDefinitions
 
 export { outlookToolDefinitions }

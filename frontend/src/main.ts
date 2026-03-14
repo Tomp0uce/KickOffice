@@ -7,7 +7,7 @@ import { i18n } from './i18n'
 import router from './router'
 import { localStorageKey } from './utils/enum'
 import { detectOfficeHost, markOfficeReady } from './utils/hostDetection'
-import { setRememberCredentials } from './utils/credentialStorage'
+import { setRememberCredentials, migrateCredentialsOnStartup } from './utils/credentialStorage'
 import { logService } from './utils/logger'
 
 // Monkey patch console.error and console.warn
@@ -46,6 +46,9 @@ window.Office.onReady(async () => {
       await setRememberCredentials(true)
     }
   }
+
+  // ARCH-M3: One-time credential migration at startup
+  await migrateCredentialsOnStartup()
 
   const app = createApp(App)
 

@@ -11,7 +11,7 @@ import { executeOfficeAction } from './officeAction'
 import { renderOfficeCommonApiHtml, stripRichFormattingSyntax, stripMarkdownListMarkers, applyInheritedStyles, type InheritedStyles } from './markdown'
 import { sandboxedEval } from './sandbox'
 import { validateOfficeCode } from './officeCodeValidator'
-import { computeTextDiffStats, createOfficeTools, normalizeLineEndings } from './common'
+import { computeTextDiffStats, createOfficeTools, normalizeLineEndings, getErrorMessage } from './common'
 import { message as messageUtil } from '@/utils/message'
 import { withSlideZip, escapeXml } from './pptxZipUtils'
 import { logService } from '@/utils/logger'
@@ -294,8 +294,8 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       } else {
         fallbackToText(normalizedNewlines, resolve, reject)
       }
-    } catch (err: any) {
-      reject(new Error(err?.message || 'setSelectedDataAsync unavailable'))
+    } catch (err: unknown) {
+      reject(new Error(getErrorMessage(err) || 'setSelectedDataAsync unavailable'))
     }
   })
 }
@@ -515,10 +515,10 @@ PARAMETERS:
           message: `Updated shape text. ${insertions} characters added, ${deletions} removed.`,
           note: 'PowerPoint applies full text replacement. Formatting may need manual adjustment.',
         }, null, 2)
-      } catch (error: any) {
+      } catch (error: unknown) {
         return JSON.stringify({
           success: false,
-          error: error.message || String(error),
+          error: getErrorMessage(error),
         }, null, 2)
       }
     },
@@ -745,10 +745,10 @@ try {
           explanation,
           warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
         }, null, 2)
-      } catch (err: any) {
+      } catch (err: unknown) {
         return JSON.stringify({
           success: false,
-          error: err.message || String(err),
+          error: getErrorMessage(err),
           explanation,
           codeExecuted: code.slice(0, 200) + '...',
           hint: 'Check that all properties are loaded before access, and context.sync() is called.',
@@ -976,9 +976,9 @@ try {
             } catch {}
           }
           await context.sync()
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Non-fatal: slide was created, just couldn't populate shapes
-          return `Successfully added a slide${chosenLayoutName ? ` with layout "${chosenLayoutName}"` : ''} but could not auto-fill shapes: ${err?.message ?? 'unknown error'}`
+          return `Successfully added a slide${chosenLayoutName ? ` with layout "${chosenLayoutName}"` : ''} but could not auto-fill shapes: ${getErrorMessage(err)}`
         }
       }
 
@@ -1483,10 +1483,10 @@ ALWAYS call markDirty() after modifying the zip.`,
   try {
     if (def.executePowerPoint) return await runPowerPoint(ctx => def.executePowerPoint!(ctx, args))
     return await executeOfficeAction(() => def.executeCommon!(args))
-  } catch (error: any) {
+  } catch (error: unknown) {
     return JSON.stringify({
-      error: true,
-      message: error.message || String(error),
+      success: false,
+      error: getErrorMessage(error),
       tool: def.name,
       suggestion: 'Fix the error parameters or context and try again.'
     }, null, 2)
@@ -1533,10 +1533,8 @@ export async function getSlideContentStandalone(context: any, slideNumber: numbe
   return lines.join('\n')
 }
 
-export function getToolDefinitions(): ToolDefinition[] {
+export function getPowerPointToolDefinitions(): ToolDefinition[] {
   return Object.values(powerpointToolDefinitions)
 }
-
-export const getPowerPointToolDefinitions = getToolDefinitions
 
 export { powerpointToolDefinitions }

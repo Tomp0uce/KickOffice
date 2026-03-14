@@ -21,6 +21,7 @@ import {
 } from '@/utils/officeDocumentContext'
 import { getPreservationInstruction } from '@/utils/richContentPreserver'
 import { getLastRichContext } from '@/utils/richContextStore'
+import { logService } from '@/utils/logger'
 import type { SessionFile } from './useSessionFiles'
 
 export interface UseMessageOrchestrationOptions {
@@ -80,7 +81,7 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
       }
     } catch (err) {
       // Document context is optional — continue without it if it fails
-      console.warn('[MessageOrchestration] Failed to inject document context', err)
+      logService.warn('[MessageOrchestration] Failed to inject document context', err)
     }
 
     return messages

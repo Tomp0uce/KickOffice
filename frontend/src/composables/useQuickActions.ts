@@ -11,7 +11,7 @@
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
-import { type Ref, type ComputedRef, nextTick } from 'vue'
+import { type Ref, type ComputedRef, ref, nextTick } from 'vue'
 import type { ModelTier, ModelInfo } from '@/types'
 import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
 import type { ChatMessage } from '@/api/backend'
@@ -22,7 +22,6 @@ import { message as messageUtil } from '@/utils/message'
 import { powerpointToolDefinitions } from '@/utils/powerpointTools'
 import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
 import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
-import { setLastRichContext, clearLastRichContext } from '@/utils/richContextStore'
 import { areCredentialsConfigured } from '@/utils/credentialStorage'
 import { logService } from '@/utils/logger'
 import { getQuickActionSkill } from '@/skills'
@@ -44,14 +43,12 @@ export interface UseQuickActionsOptions {
   // Models
   availableModels: Ref<Record<string, ModelInfo>>
   selectedModelTier: Ref<ModelTier>
-  selectedModelInfo: Ref<ModelInfo | undefined>
   firstChatModelTier: Ref<ModelTier>
 
   // Host detection
   hostIsOutlook: boolean
   hostIsPowerPoint: boolean
   hostIsExcel: boolean
-  hostIsWord: boolean
 
   // Quick Actions
   quickActions: ComputedRef<QuickAction[] | undefined>
@@ -88,11 +85,9 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     inputTextarea,
     isDraftFocusGlowing,
     availableModels,
-    selectedModelInfo,
     hostIsOutlook,
     hostIsPowerPoint,
     hostIsExcel,
-    hostIsWord,
     quickActions,
     outlookQuickActions,
     excelQuickActions,
@@ -432,11 +427,10 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
     }
   }
 
+  // Dummy ref for pendingSmartReply (used in smart-reply mode)
+  const pendingSmartReply = ref(false)
+
   return {
     applyQuickAction,
   }
 }
-
-// Dummy ref for pendingSmartReply (to fix compilation)
-import { ref } from 'vue'
-const pendingSmartReply = ref(false)

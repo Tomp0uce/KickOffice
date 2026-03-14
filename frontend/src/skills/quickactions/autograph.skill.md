@@ -15,7 +15,7 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 
 ## Output Requirements
 1. **Analyze data structure**: Identify x-axis, y-axis, categories, time series, etc.
-2. **Generate derived columns if beneficial**: Create calculated fields and highlight them with `formatRange`
+2. **Generate derived columns if beneficial**: Create calculated fields and highlight them with `setCellRange` formatting parameter
 3. **Select appropriate chart type**: Column, line, scatter, pie based on data characteristics
 4. **Insert chart using `manageObject`**: MUST call tool to actually create the chart in Excel
 5. **Set `hasHeaders: true`**: If first row/column contains labels
@@ -25,9 +25,8 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 
 **CRITICAL SEQUENCE**:
 1. **Inspect Data** — `getSelectedCells` or `getWorksheetData` to understand structure
-2. **Generate Derived Columns (Optional)** — `setCellRange` to add calculated fields
-3. **Highlight New Columns** — `formatRange` with distinctive formatting (e.g., yellow fill)
-4. **Insert Chart** — `manageObject` with action='create', type='chart', config with proper source address
+2. **Generate Derived Columns (Optional)** — `setCellRange` to add calculated fields with formatting parameter for highlighting (e.g., yellow fill)
+3. **Insert Chart** — `manageObject` with action='create', type='chart', config with proper source address
 
 ## Chart Type Selection Guide
 
@@ -114,7 +113,7 @@ Add column:
 | Feb   | 12000 | 20%      |
 ```
 
-Use `formatRange` to highlight "Growth %" column (yellow fill)
+Use `setCellRange` with formatting parameter to highlight "Growth %" column (yellow fill)
 
 ### Example 2: Add Running Total
 ```
@@ -146,8 +145,7 @@ Add column:
 
 ### Required Tools
 - **`getSelectedCells`**: Determine source range for chart
-- **`setCellRange`** (optional): Add derived columns
-- **`formatRange`** (optional): Highlight new columns
+- **`setCellRange`** (optional): Add derived columns with formatting parameter for highlighting
 - **`manageObject`**: INSERT the chart (MANDATORY)
 
 ### manageObject Parameters
@@ -216,7 +214,7 @@ manageObject({
 
 **Execution**:
 ```javascript
-// Step 1: Add growth % column
+// Step 1: Add growth % column with yellow highlighting
 setCellRange({
   address: "C1:C6",
   values: [
@@ -226,19 +224,14 @@ setCellRange({
     [-7.7],           // Mar: (48000-52000)/52000 = -7.7%
     [14.6],           // Apr
     [3.6]             // May
-  ]
-})
-
-// Step 2: Highlight new column
-formatRange({
-  address: "C1:C6",
-  format: {
-    fill: { color: "#FFFF00" },  // Yellow
-    font: { bold: true }
+  ],
+  formatting: {
+    fillColor: "#FFFF00",  // Yellow background
+    bold: true
   }
 })
 
-// Step 3: Create line chart (Revenue + Growth)
+// Step 2: Create line chart (Revenue + Growth)
 manageObject({
   action: 'create',
   type: 'chart',
@@ -316,11 +309,13 @@ Use the first contiguous block or ask via error message
 
 ### How to highlight
 ```javascript
-formatRange({
+setCellRange({
   address: "C1:C10",
-  format: {
-    fill: { color: "#FFFF00" },      // Yellow background
-    font: { bold: true, color: "#000000" }
+  values: [[/* your data */]],
+  formatting: {
+    fillColor: "#FFFF00",        // Yellow background
+    bold: true,
+    fontColor: "#000000"
   }
 })
 ```
