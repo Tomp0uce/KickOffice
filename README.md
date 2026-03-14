@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 139 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
+AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 89 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
 
 **Built for enterprise environments**: API keys never reach the client, all LLM traffic flows through a controlled backend, and no data is sent to third-party services.
 
@@ -9,20 +9,19 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 139 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 89 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
-- **Format Preservation** — Word-level diffing preserves formatting when editing text
-- **Multi-Host Support** — Word (41 tools), Excel (49 tools), PowerPoint (22 tools), Outlook (14 tools)
+- **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane
+- **Multi-Host Support** — Word (30 tools), Excel (24 tools), PowerPoint (21 tools), Outlook (8 tools)
+- **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
+- **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
-- **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents (up to 10 MB)
-- **Session Persistence** — Uploaded files and images stay in context across the entire conversation and are restored on session switch
-- **Large File Support** — Extended 5-minute LLM timeout for large document processing; uploaded files optionally forwarded to the LLM provider via `/v1/files` API to avoid re-sending content on every message
-- **File Attachment Badges** — Attached document names displayed inline in the chat message bubble
-- **Log Sanitization** — Automatic truncation of Base64 data to protect server logs and disk space
+- **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents (up to 50 MB)
+- **Session Persistence** — Uploaded files and images stay in context across the conversation and are restored on session switch
+- **Large File Support** — Extended 5-minute LLM timeout; files optionally forwarded via `/v1/files` API to avoid re-sending content on every message
 - **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
 - **Reverse Proxy Support** — Compatible with Synology/nginx reverse proxies
-- **Message Timestamps** — Chat messages display creation time for better context
 
 ---
 
@@ -45,7 +44,7 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 
 ### Frontend
 
-Vue 3 task pane loaded inside Office apps. Handles UI, chat, and agent tool execution (Office.js API calls run locally in the browser).
+Vue 3 task pane loaded inside Office apps via `createMemoryHistory` router (avoids URL conflicts with Office iframe). Composable-based architecture: `useAgentLoop`, `useQuickActions`, `useSessionFiles`, `useOfficeInsert`, `useImageActions`, and more.
 
 ### Backend
 
@@ -57,8 +56,8 @@ Express.js proxy server. Holds all secrets (API keys), validates requests, rate-
 - `POST /api/upload` — File processing (PDF, DOCX, XLSX, CSV, images)
 - `POST /api/chart-extract` — Chart image data extraction (pixel color analysis)
 - `POST /api/files` — Proxy: upload file to LLM provider's `/v1/files` endpoint, returns `file_id`
-- `GET /api/icons/search` — Icon search proxy (Iconify API, thousands of icon sets)
-- `GET /api/icons/svg/:prefix/:name` — SVG icon fetch proxy with optional color parameter
+- `GET /api/icons/search` — Icon search proxy (Iconify API)
+- `GET /api/icons/svg/:prefix/:name` — SVG icon fetch with optional color
 - `GET /api/models` — Available model tiers
 - `GET /health` — Health check
 
@@ -86,41 +85,40 @@ KickOffice implements three complementary systems for reliable Office.js code ex
 
 ### 1. Skills System (Defensive Prompting)
 
-Office.js best practices automatically injected into agent prompts:
+Office.js best practices automatically injected into agent prompts via `.skill.md` files:
 
-- **THE PROXY PATTERN**: Explains Office.js object lifecycle (proxy → load → sync → access)
-- **5 Critical Rules**: Always load() before reading, always sync() after writing, use try/catch, check empty selections, prefer dedicated tools
-- **Host-Specific Guidance**: Word, Excel, PowerPoint, Outlook patterns
+- **5 host skills**: `common.skill.md` (universal) + Word / Excel / PowerPoint / Outlook
+- **17 Quick Action skills**: bullets, punchify, review, translate, formalize, concise, proofread, polish, academic, summary, ingest, autograph, explain-excel, formula-generator, data-trend, extract, reply
+- Skills define tool sequences, output format rules, and language preservation constraints
 
 ### 2. Code Validator (Pre-Execution Safety)
 
 All `eval_*` tools validate code before execution:
 
-- **Blocked**: Missing sync(), missing load(), wrong namespace, infinite loops, eval()/new Function()
+- **Blocked**: Missing `sync()`, missing `load()`, wrong namespace, infinite loops, `eval()`/`new Function()`
 - **Warnings**: Missing try/catch, excessive sync calls, incorrect array formats
 
-### 3. Diffing Integration (Format Preservation)
+### 3. Track Changes Integration (Format Preservation)
 
-Word-level surgical editing via `office-word-diff` library (local package at `office-word-diff/`, Apache 2.0):
+Native Word revision markup via `docx-redline-js`:
 
-- **Word `proposeRevision`**: Applies only insertions/deletions, preserving formatting (bold, italic, colors, fonts) on unchanged text. Backed by `wordDiffUtils.ts`.
-- **PowerPoint `proposeShapeTextRevision`**: Diff statistics with full replacement (Word Range API unavailable in PowerPoint)
-- **Cascading strategies**: Token Map → Sentence Diff → Block Replace fallback
-- **Track Changes**: `proposeRevision` wraps edits in Word's Track Changes by default so users can review/accept/reject
-- **Mandatory agent workflow**: agent must call `getSelectedTextWithFormatting` before `proposeRevision` (tool reads selection internally, but agent needs the original text to generate a meaningful revision). `eval_wordjs` with `insertText(..., 'Replace')` is explicitly forbidden as it destroys formatting.
+- **`proposeRevision`**: Applies Track Changes to the current selection — `w:ins`/`w:del` OOXML injected via disable-TC → insertOoxml → restore-TC pattern
+- **`proposeDocumentRevision`**: Same chirurgical diff, document-wide — matches paragraphs by text, applies redlines paragraph by paragraph without requiring a selection
+- **`editDocumentXml`**: Direct OOXML manipulation for formatting preservation (fonts, colors, styles)
+- **Configurable author**: Track Changes attributed to "KickOffice AI" (customizable in Settings)
 
 ---
 
 ## Tool Summary
 
-| Host           | Tools   | Highlights                                                                                  |
-| -------------- | ------- | ------------------------------------------------------------------------------------------- |
-| **Word**       | 41      | `proposeRevision` (format-preserving edits), `eval_wordjs`, tables, comments, Track Changes |
-| **Excel**      | 49      | `eval_officejs`, formulas, charts, screenshots, CSV export, workbook structure management, header detection |
-| **PowerPoint** | 22      | `proposeShapeTextRevision`, slides, shapes, speaker notes, screenshots, OOXML, icon library |
-| **Outlook**    | 14      | `eval_outlookjs`, email body/subject, recipients, attachments                               |
-| **General**    | 6       | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                     |
-| **Total**      | **139** |                                                                                             |
+| Host           | Tools  | Highlights                                                                                    |
+| -------------- | ------ | --------------------------------------------------------------------------------------------- |
+| **Word**       | 30     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `eval_wordjs`, Track Changes |
+| **Excel**      | 24     | `eval_officejs`, formulas, charts, screenshots, CSV export, header detection                  |
+| **PowerPoint** | 21     | `editSlideXml`, slides, shapes, speaker notes, screenshots, icons (Iconify)                   |
+| **Outlook**    | 8      | `eval_outlookjs`, email body/subject, recipients, rich content preservation                   |
+| **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
+| **Total**      | **89** |                                                                                               |
 
 ---
 
@@ -128,19 +126,15 @@ Word-level surgical editing via `office-word-diff` library (local package at `of
 
 ### Word
 
-Translate, Polish, Academic, Summary, Grammar Check
+Translate, Polish, Academic, Summary, Proofread, Formalize, Concise
 
 ### Excel
 
-Clean, Beautify, Formula, Transform, Highlight
-
-**Header Detection** — `detectDataHeaders` automatically detects column and row headers in a data range, providing correct `hasHeaders` and `seriesBy` parameters for chart creation.
+Clean (Ingest), Beautify (Autograph), Formula (Formula Generator), Data Trend, Explain Excel
 
 ### PowerPoint
 
-Bullets, Speaker Notes, Impact, Shrink, Visual
-
-**Slide Layout Selection** — `addSlide` discovers the presentation's actual slide master layouts and picks the best matching layout by name (no longer defaults to title layout).
+Bullets, Speaker Notes (Review), Impact (Punchify), Visual
 
 ### Outlook
 
@@ -187,8 +181,10 @@ Smart Reply, Formalize, Concise, Proofread, Extract Tasks
 | Container                 | Port | Description                                               |
 | ------------------------- | ---- | --------------------------------------------------------- |
 | `kickoffice-manifest-gen` | —    | Generates manifests from templates (init, can be removed) |
-| `kickoffice-backend`      | 3003 | Express.js API server with health check                   |
-| `kickoffice-frontend`     | 3002 | Nginx serving Vue app                                     |
+| `kickoffice-backend`      | 3003 | Express.js API server (non-root, node:22-slim)            |
+| `kickoffice-frontend`     | 3002 | nginx-unprivileged serving Vue app                        |
+
+> **Note**: All containers run as non-root users. Debian-based images required (`node:22-slim`, `nginxinc/nginx-unprivileged`) — Alpine is incompatible with older Intel Celeron hardware (Synology DS416play).
 
 ---
 
@@ -199,23 +195,25 @@ KickOffice/
 ├── backend/                    # Express.js API server
 │   └── src/
 │       ├── server.js           # Entry point
-│       ├── config/             # env.js, models.js, limits.js (centralized)
-│       ├── middleware/         # auth.js, validate.js
+│       ├── config/             # env.js, models.js, limits.js
+│       ├── middleware/         # auth.js, validate.js + validators/
 │       ├── routes/             # chat, image, upload, files, icons, models, health, logs
 │       ├── services/           # llmClient.js, plotDigitizerService.js, imageStore.js
 │       └── utils/              # http.js, logger.js
 ├── frontend/                   # Vue 3 + TypeScript
 │   └── src/
-│       ├── api/                # backend.ts (HTTP client + header cache)
-│       ├── components/         # Chat UI, settings tabs (modulized)
-│       ├── composables/        # useHomePage, useAgentLoop, useImageActions, etc.
+│       ├── api/                # backend.ts (HTTP client)
+│       ├── components/         # Chat UI, settings tabs
+│       ├── composables/        # useAgentLoop, useQuickActions, useSessionFiles,
+│       │                       # useOfficeInsert, useImageActions, useMessageOrchestration, etc.
 │       ├── constants/          # limits.ts (centralized magic numbers)
 │       ├── i18n/               # en.json, fr.json
 │       ├── pages/              # HomePage, SettingsPage
-│       ├── skills/             # Office.js best practices (5 files)
+│       ├── router/             # Memory history router (Office iframe compatible)
+│       ├── skills/             # 5 host skills + 17 Quick Action skills
 │       ├── types/              # TypeScript definitions
-│       └── utils/              # Tools (word, excel, ppt, outlook), validators
-├── office-word-diff/           # Word diffing library (Apache 2.0)
+│       └── utils/              # Tools (word, excel, ppt, outlook, general),
+│                               # tokenManager, wordDiffUtils, toolProviderRegistry, etc.
 ├── manifests-templates/        # XML templates for Office add-ins
 ├── scripts/                    # generate-manifests.js
 ├── docker-compose.yml
@@ -241,13 +239,7 @@ npm run dev           # Port 3003 with --watch
 cd frontend
 npm install
 npm run dev           # Port 3002 with HMR
-```
-
-### Testing
-
-```bash
-cd frontend
-npm run test:e2e      # Playwright tests
+npm run build         # Production build
 ```
 
 ---
@@ -256,11 +248,11 @@ npm run test:e2e      # Playwright tests
 
 ### Root (`.env`)
 
-| Variable        | Description     | Default         |
-| --------------- | --------------- | --------------- |
-| `SERVER_IP`     | Host machine IP | `192.168.50.10` |
-| `FRONTEND_PORT` | Frontend port   | `3002`          |
-| `BACKEND_PORT`  | Backend port    | `3003`          |
+| Variable        | Description     | Default       |
+| --------------- | --------------- | ------------- |
+| `SERVER_IP`     | Host machine IP | `localhost`   |
+| `FRONTEND_PORT` | Frontend port   | `3002`        |
+| `BACKEND_PORT`  | Backend port    | `3003`        |
 
 ### Backend (`backend/.env`)
 
@@ -280,94 +272,49 @@ npm run test:e2e      # Playwright tests
 - **API keys server-side only** — Never sent to client
 - **CORS restricted** — Frontend origin only
 - **Rate limiting** — IP-based on chat, image, and upload endpoints
-- **Frontend Logging** — Secure collection of client errors/warnings to backend files
 - **Credential encryption** — Web Crypto API (AES-GCM 256-bit) for stored credentials
-- **Header Cache** — Asynchronous cache for global headers to minimize storage reads
-- **CSRF protection** — Origin validation for state-changing requests
-- **Stream abort handling** — Proper cleanup and timeout for streaming connections
+- **Non-root containers** — Both backend and frontend run as non-root users
 - **SES sandbox** — Safe dynamic code execution with host isolation
 - **Code validation** — Pre-execution checks for Office.js patterns
 - **Helmet headers** — HSTS, X-Frame-Options, X-Content-Type-Options
 - **DOMPurify** — XSS protection with strict allowlists
-- **Safe JSON handling** — Depth validation and circular reference detection
+- **Structured logging** — All errors/warnings routed through logService (not raw console)
 - **No third-party services** — Privacy-first, no telemetry
 
 ---
 
 ## Credits & Inspirations
 
-KickOffice builds upon several excellent open-source projects:
-
 ### [word-GPT-Plus](https://github.com/Kuingsmile/word-GPT-Plus) (MIT License)
 
-The original foundation for the Word add-in architecture. Directly reused or adapted:
-
-- **`wordFormatter.ts`** — Markdown-to-Word conversion engine
-- **Chat UI architecture** — Vue 3 task pane, message bubbles, SSE streaming
-- **Built-in prompt structure** — Translate, polish, academic, summary patterns
-- **Settings page architecture** — Custom prompt management
-- **i18n framework** — vue-i18n integration
+Original foundation for the Word add-in architecture: chat UI, SSE streaming, settings page, i18n framework, built-in prompt structure.
 
 ### [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) (MIT License)
 
-Inspired the Excel tooling and agent loop pattern:
-
-- **Tool definition schema** — `{ name, description, inputSchema, execute }` pattern
-- **Excel tool set** — Tool names, descriptions, parameter schemas
-- **Agent loop pattern** — Send tools → detect tool_calls → execute → loop
-- **Formula localization** — Locale-specific function names (en/fr)
+Inspired the tool definition schema, Excel tool set, agent loop pattern, and formula localization.
 
 ### [docx-redline-js](https://github.com/AnsonLai/docx-redline-js) (MIT License)
 
-OOXML reconciliation engine for native Word Track Changes:
-
-- **Native revision markup** — Generates `<w:ins>` / `<w:del>` elements in OOXML
-- **Configurable author** — Track Changes attributed to "KickOffice AI" (customizable in Settings)
-- **Formatting preservation** — Maintains `<w:rPr>` (fonts, colors, styles) during text edits
-- **Zero dependencies** — Self-contained, includes diff-match-patch internalized
+OOXML reconciliation engine for native Word Track Changes (`<w:ins>` / `<w:del>`), configurable author, formatting preservation. Zero dependencies.
 
 ### [Gemini AI for Office](https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting) (MIT License)
 
-Integration pattern for OOXML Track Changes:
-
-- **Disable/insert/restore pattern** — Temporarily disable Track Changes → insert OOXML with embedded `<w:ins>/<w:del>` → restore original mode
-- **OOXML survival technique** — Prevents double-tracking by Word when inserting revision markup
-
-### [Redink](https://github.com/LawDigital/redink) (MIT License)
-
-Conceptual inspiration for document comparison and revision workflows.
+Integration pattern: disable TC → insertOoxml with embedded revision markup → restore TC. Prevents double-tracking.
 
 ### [Iconify](https://iconify.design) (MIT License — API free to use)
 
-Icon search and SVG delivery for the `searchIcons` / `insertIcon` PowerPoint tools:
-
-- **Icon API** — Free REST API at `api.iconify.design` with 200,000+ icons across 150+ icon sets (Material Design, Fluent UI, Feather, Bootstrap, Heroicons, etc.)
-- **No attribution required** — Individual icons follow their respective icon set licenses (MIT, Apache 2.0, or similar open licenses)
-- **Proxied via backend** — All Iconify API calls go through `/api/icons/` to avoid CORS issues and stay consistent with the project's privacy-first architecture
+Icon search and SVG delivery for the `searchIcons` / `insertIcon` PowerPoint tools. 200,000+ icons, proxied via `/api/icons/` backend route.
 
 ### [JSZip](https://stuk.github.io/jszip/) (MIT License)
 
-Used by the `editSlideXml` PowerPoint tool for OOXML editing:
+PPTX ZIP manipulation for the `editSlideXml` PowerPoint tool.
 
-- **ZIP manipulation** — Load/modify/repack PPTX archives in the browser
-- **OOXML editing** — Directly edit slide XML when Office.js API is insufficient (charts, diagrams, SmartArt, animations)
+### [Redink](https://github.com/LawDigital/redink) (MIT License)
+
+Conceptual inspiration for document revision workflows.
 
 ---
 
 ## License
 
 This project is proprietary software. Third-party dependencies retain their original licenses (MIT, Apache 2.0, etc.).
-
----
-
-## Known Issues
-
-See [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for the complete audit history.
-
-All critical and major issues from the v7.0 audit (March 2026) have been resolved.
-
-Current focus:
-
-- Monitoring backend stability under high concurrency
-- Improving agent tool selection for complex Excel tasks
-- Investigating PowerPoint HTML object reconstruction (low priority)
