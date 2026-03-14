@@ -5,6 +5,7 @@
     aria-live="polite"
     aria-relevant="additions text"
     class="card flex flex-1 flex-col gap-4 overflow-y-auto min-h-0"
+    @scroll="handleScrollEvent"
   >
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {{ liveAnnouncement }}
@@ -134,7 +135,7 @@
             type="secondary"
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
-            @click="$emit('insert-message', item.message, 'replace')"
+            @click="context.insertMessageToDocument(item.message, 'replace')"
           />
           <CustomButton
             :title="appendToSelection"
@@ -143,7 +144,7 @@
             type="secondary"
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
-            @click="$emit('insert-message', item.message, 'append')"
+            @click="context.insertMessageToDocument(item.message, 'append')"
           />
           <CustomButton
             :title="copyToClipboard"
@@ -152,7 +153,7 @@
             type="secondary"
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
-            @click="$emit('copy-message', item.message)"
+            @click="context.copyMessageToClipboard(item.message)"
           />
           <!-- Regenerate: only on the last assistant message (U-L2) -->
           <CustomButton
@@ -163,7 +164,7 @@
             type="secondary"
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
-            @click="$emit('regenerate')"
+            @click="context.handleRegenerate()"
           />
         </div>
         <!-- User message edit button: hidden until hover (U-L2) -->
@@ -178,7 +179,7 @@
             type="secondary"
             class="bg-surface! p-1.5! text-secondary!"
             :icon-size="12"
-            @click="$emit('edit-message', item.message)"
+            @click="context.handleEditMessage(item.message)"
           />
         </div>
       </div>
@@ -229,35 +230,78 @@ import MarkdownRenderer from '@/components/chat/MarkdownRenderer.vue'
 import ToolCallBlock from '@/components/chat/ToolCallBlock.vue'
 import type { DisplayMessage, RenderSegment } from '@/types/chat'
 import { ICON_SIZE_SM } from '@/constants/limits'
+import { useHomePageContext } from '@/composables/useHomePageContext' // ARCH-H2
+import { forHost } from '@/utils/hostDetection' // ARCH-H2
 
-const props = defineProps<{
-  history: DisplayMessage[]
-  historyWithSegments: Array<{
+// ARCH-H2 — Use context instead of props to eliminate prop drilling
+const context = useHomePageContext()
+
+// Keep props optional for backward compatibility during migration
+const props = withDefaults(defineProps<{
+  history?: DisplayMessage[]
+  historyWithSegments?: Array<{
     key: string
     message: DisplayMessage
     segments: RenderSegment[]
   }>
-  currentAction: string
-  loading: boolean
-  backendOnline: boolean
-  emptyTitle: string
-  emptySubtitle: string
-  backendOnlineLabel: string
-  backendOfflineLabel: string
-  replaceSelectedText: string
-  appendToSelection: string
-  copyToClipboard: string
-  thoughtProcessLabel: string
-  regenerateLabel: string
-  editMessageLabel: string
-}>()
+  currentAction?: string
+  loading?: boolean
+  backendOnline?: boolean
+  emptyTitle?: string
+  emptySubtitle?: string
+  backendOnlineLabel?: string
+  backendOfflineLabel?: string
+  replaceSelectedText?: string
+  appendToSelection?: string
+  copyToClipboard?: string
+  thoughtProcessLabel?: string
+  regenerateLabel?: string
+  editMessageLabel?: string
+  onScroll?: () => void // UX-H1 — Optional scroll handler
+}>(), {})
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'insert-message', message: DisplayMessage, type: 'replace' | 'append'): void
   (e: 'copy-message', message: DisplayMessage): void
   (e: 'regenerate'): void
   (e: 'edit-message', message: DisplayMessage): void
 }>()
+
+// ARCH-H2 — Use context values with props as fallback
+const history = computed(() => props.history ?? context.history.value)
+const historyWithSegments = computed(() => props.historyWithSegments ?? context.historyWithSegments.value)
+const currentAction = computed(() => props.currentAction ?? context.currentAction.value)
+const loading = computed(() => props.loading ?? context.loading.value)
+const backendOnline = computed(() => props.backendOnline ?? context.backendOnline.value)
+const emptyTitle = computed(() => props.emptyTitle ?? context.t('emptyTitle'))
+const emptySubtitle = computed(() => {
+  if (props.emptySubtitle) return props.emptySubtitle
+  // ARCH-H2 — Use forHost to determine the correct subtitle key
+  const subtitleKey = forHost({
+    outlook: 'emptySubtitleOutlook',
+    powerpoint: 'emptySubtitlePowerPoint',
+    excel: 'emptySubtitleExcel',
+    word: 'emptySubtitle',
+  }) || 'emptySubtitle'
+  return context.t(subtitleKey)
+})
+const backendOnlineLabel = computed(() => props.backendOnlineLabel ?? context.t('backendOnline'))
+const backendOfflineLabel = computed(() => props.backendOfflineLabel ?? context.t('backendOffline'))
+const replaceSelectedText = computed(() => props.replaceSelectedText ?? context.t('replaceSelectedText'))
+const appendToSelection = computed(() => props.appendToSelection ?? context.t('appendToSelection'))
+const copyToClipboard = computed(() => props.copyToClipboard ?? context.t('copyToClipboard'))
+const thoughtProcessLabel = computed(() => props.thoughtProcessLabel ?? context.t('thoughtProcess'))
+const regenerateLabel = computed(() => props.regenerateLabel ?? context.t('regenerate'))
+const editMessageLabel = computed(() => props.editMessageLabel ?? context.t('editMessage'))
+
+// UX-H1 — Delegate scroll event to context or prop handler
+function handleScrollEvent() {
+  if (props.onScroll) {
+    props.onScroll()
+  } else {
+    context.handleScroll()
+  }
+}
 
 const containerEl = ref<HTMLElement>()
 

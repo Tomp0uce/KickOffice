@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { GLOBAL_STYLE_INSTRUCTIONS } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, type ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
 import { getSkillForHost, type OfficeHost } from '@/skills'
 
 export interface UseAgentPromptsOptions {
@@ -7,7 +7,7 @@ export interface UseAgentPromptsOptions {
   userGender: Ref<string>
   userFirstName: Ref<string>
   userLastName: Ref<string>
-  excelFormulaLanguage: Ref<'en' | 'fr'>
+  excelFormulaLanguage: Ref<ExcelFormulaLanguage> // TOOL-M4: extended from 'en' | 'fr'
   hostIsOutlook: boolean
   hostIsPowerPoint: boolean
   hostIsExcel: boolean
@@ -25,9 +25,46 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
     hostIsExcel,
   } = options
 
-  const excelFormulaLanguageInstruction = () => excelFormulaLanguage.value === 'fr'
-    ? 'Excel interface locale: French. Use localized French function names and separators when providing formulas, and prefer localized formula tool behavior.'
-    : 'Excel interface locale: English. Use English function names and standard English formula syntax.'
+  // TOOL-M4: Extend formula locale support to all languages in constant.ts
+  const excelFormulaLanguageInstruction = () => {
+    const locale = excelFormulaLanguage.value
+
+    // Languages that use semicolon (;) as formula separator and comma (,) for decimals
+    const semicolonLanguages = ['fr', 'de', 'es', 'it', 'pt', 'nl', 'pl', 'ru']
+
+    // Languages that use comma (,) as formula separator and period (.) for decimals
+    const commaLanguages = ['en', 'zh-cn', 'ja', 'ko', 'ar']
+
+    if (semicolonLanguages.includes(locale)) {
+      const languageNames: Record<string, string> = {
+        fr: 'French',
+        de: 'German',
+        es: 'Spanish',
+        it: 'Italian',
+        pt: 'Portuguese',
+        nl: 'Dutch',
+        pl: 'Polish',
+        ru: 'Russian'
+      }
+      const langName = languageNames[locale] || locale
+      return `Excel interface locale: ${langName}. Use localized ${langName} function names, semicolon (;) as argument separator, and comma (,) for decimal numbers when providing formulas.`
+    }
+
+    if (commaLanguages.includes(locale) || locale === 'en') {
+      const languageNames: Record<string, string> = {
+        en: 'English',
+        'zh-cn': 'Chinese (Simplified)',
+        ja: 'Japanese',
+        ko: 'Korean',
+        ar: 'Arabic'
+      }
+      const langName = languageNames[locale] || 'English'
+      return `Excel interface locale: ${langName}. Use ${langName === 'English' ? 'English' : 'localized'} function names, comma (,) as argument separator, and period (.) for decimal numbers when providing formulas.`
+    }
+
+    // Fallback to English for unknown locales
+    return 'Excel interface locale: English. Use English function names and standard English formula syntax (comma separator, period for decimals).'
+  }
 
   const userProfilePromptBlock = () => {
     // Sanitize user input to prevent prompt injection
@@ -116,7 +153,9 @@ You are a highly skilled Microsoft Word Expert Agent. Your goal is to assist use
    - To rewrite/edit existing text: use \`proposeRevision\`
    - To add NEW content only: use \`insertContent\`
 3. **Track Changes**: \`proposeRevision\` enables Track Changes so users can review. Prefer it for edits.
-4. **Language**: Communicate entirely in ${lang}.
+4. **Language** (LANG-H1 — separate conversation from content generation):
+   - **Conversation Language**: Communicate explanations, questions, and commentary in ${lang}.
+   - **Content Generation Language**: When generating or proposing document text, ALWAYS use the SAME language as the selected text or document content. If the user selects English text and asks to improve it, provide the improved version in English — regardless of the UI language. Analyze the language of any [Selected text] block to determine the target language for generated content.
 5. **No Style Hallucinations**: DO NOT arbitrarily bold the first word of paragraphs. Preserve the original formatting exactly, UNLESS the user explicitly asks you to change it (e.g., "put the first words in bold").
 6. **NEVER use \`eval_wordjs\` with \`insertText(..., 'Replace')\` on a range** — this destroys Word formatting (bold, italic, colors, fonts). Use \`proposeRevision\` for any text modification on existing content.
 
@@ -178,7 +217,9 @@ Do NOT skip the analysis step. Do NOT fabricate an imageId.
 # Guidelines
 1. **Tool Precision**: Always use \`setCellRange\` with 2D arrays for writing multi-cell data.
 2. **Formula duplication**: Use \`copyToRange\` parameter in \`setCellRange\` to fill a formula down efficiently.
-3. **Language**: Communicate entirely in ${lang}.
+3. **Language** (LANG-H1 — separate conversation from content generation):
+   - **Conversation Language**: Communicate explanations, questions, and commentary in ${lang}.
+   - **Content Generation Language**: When generating or proposing cell text, labels, or data, ALWAYS use the SAME language as the existing spreadsheet content. If the spreadsheet contains English headers and the user asks to add data, provide it in English — regardless of the UI language. Analyze the language of any [Selected cells] block to determine the target language for generated content.
 4. **Formula locale**: ${excelFormulaLanguageInstruction()}
 
 # Advanced Capabilities
@@ -229,7 +270,9 @@ When the user provides an image and asks to create a slide from it:
 # Guidelines
 1. **One overview call**: Call \`getAllSlidesOverview\` at most once. If you need details on a specific slide, use \`getSlideContent\` or \`getShapes\`.
 2. **Slide Aesthetics**: Keep bullets concise (max 8-10 words). Max 6-7 bullets per slide.
-3. **Language**: Communicate entirely in ${lang}.
+3. **Language** (LANG-H1 — separate conversation from content generation):
+   - **Conversation Language**: Communicate explanations, questions, and commentary in ${lang}.
+   - **Content Generation Language**: When generating or proposing slide text, ALWAYS use the SAME language as the existing presentation content. If the user selects English text on a slide and asks to improve it, provide the improved version in English — regardless of the UI language. Analyze the language of any [Selected text] block or slide content to determine the target language for generated content.
 4. **No markdown bullets in body placeholders**: When inserting into a body/content placeholder shape, do NOT use markdown list syntax (\`- item\`). The shape already has native bullets configured — plain text lines are sufficient. Markdown \`-\` prefixes cause double-bullets.
 5. **Visual verification**: After creating or significantly modifying a slide (adding shapes, images, heavy text), call \`screenshotSlide\` to confirm the visual result before reporting success.
 
@@ -262,9 +305,10 @@ You are a highly skilled Microsoft Outlook Email Expert Agent.
 
 # Guidelines
 1. **Tool Choice**: Use \`writeEmailBody\`. Avoid destructive overwrites unless starting from scratch.
-2. **Reply Language**: ALWAYS reply in the SAME language as the original email.
+2. **Language** (LANG-H1 — separate conversation from content generation):
+   - **Conversation Language**: Communicate explanations, questions, and commentary in ${lang}.
+   - **Reply/Email Content Language**: When drafting or modifying email body content, ALWAYS reply in the SAME language as the original email. Analyze the language of the email thread to determine the target language for email content. This rule takes absolute priority over the UI language.
 3. **Formatting**: Markdown is supported and preferred for clarity.
-4. **Other tasks**: Communicate in ${lang}.
 
 ${COMMON_SHELL_INSTRUCTIONS}`
 

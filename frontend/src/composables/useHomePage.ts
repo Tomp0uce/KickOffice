@@ -4,8 +4,12 @@
  * Exposes scroll helpers, textarea sizing, session handlers, chat actions,
  * and prompt management as composable functions so HomePage.vue only handles
  * template binding and high-level composition.
+ *
+ * UX-H1 — Smart scroll with manual interruption: auto-scroll is disabled
+ * when the user manually scrolls away from the bottom, and re-enabled when
+ * they scroll back near the bottom.
  */
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type ChatInput from '@/components/chat/ChatInput.vue'
@@ -18,6 +22,9 @@ import type { useSessionManager } from '@/composables/useSessionManager'
 type SessionManager = ReturnType<typeof useSessionManager>
 
 type ScrollMode = 'bottom' | 'message-top' | 'auto'
+
+// UX-H1: Threshold in pixels from bottom to consider user "at bottom"
+const SCROLL_BOTTOM_THRESHOLD_PX = 100
 
 export function useHomePage(deps: {
   chatInputRef: Ref<InstanceType<typeof ChatInput> | undefined>
@@ -51,6 +58,9 @@ export function useHomePage(deps: {
     stopGeneration,
   } = deps
 
+  // UX-H1 — Smart scroll: auto-scroll enabled by default, disabled when user scrolls up
+  const isAutoScrollEnabled = ref(true)
+
   // ─── Textarea ─────────────────────────────────────────────────────────────
 
   function adjustTextareaHeight() {
@@ -68,11 +78,36 @@ export function useHomePage(deps: {
 
   // ─── Scroll helpers ────────────────────────────────────────────────────────
 
-  async function scrollToBottom(mode: ScrollMode = 'auto') {
+  // UX-H1 — Check if container is scrolled near bottom
+  function isNearBottom(container: HTMLElement): boolean {
+    const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    return scrollBottom <= SCROLL_BOTTOM_THRESHOLD_PX
+  }
+
+  // UX-H1 — Handle scroll event to detect manual user scrolling
+  function handleScroll() {
+    const rawContainer = messageListRef.value?.containerEl
+    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
+    if (!container) return
+
+    // If user scrolls near the bottom, re-enable auto-scroll
+    // If user scrolls away from the bottom, disable auto-scroll
+    isAutoScrollEnabled.value = isNearBottom(container)
+  }
+
+  async function scrollToBottom(mode: ScrollMode = 'auto', force = false) {
     await nextTick()
     const rawContainer = messageListRef.value?.containerEl
     const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
     if (!container) return
+
+    // UX-H1 — If forced, re-enable auto-scroll
+    if (force) {
+      isAutoScrollEnabled.value = true
+    }
+
+    // UX-H1 — Respect auto-scroll flag unless forced
+    if (!force && !isAutoScrollEnabled.value) return
 
     const messageElements = container.querySelectorAll('[data-message]')
     const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined
@@ -99,11 +134,13 @@ export function useHomePage(deps: {
   }
 
   async function scrollToMessageTop() {
-    await scrollToBottom('message-top')
+    // UX-H1 — scrollToMessageTop is always called when new content arrives,
+    // so we always force-enable auto-scroll to ensure the user sees new messages
+    await scrollToBottom('message-top', true)
   }
 
   async function scrollToVeryBottom() {
-    await scrollToBottom('bottom')
+    await scrollToBottom('bottom', false)
   }
 
   async function scrollToConversationTop() {
@@ -111,6 +148,8 @@ export function useHomePage(deps: {
     const rawContainer = messageListRef.value?.containerEl
     const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
     if (!container) return
+    // UX-H1 — Disable auto-scroll when explicitly scrolling to top
+    isAutoScrollEnabled.value = false
     container.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -227,5 +266,8 @@ export function useHomePage(deps: {
     handleEditMessage,
     loadSavedPrompts,
     loadSelectedPrompt,
+    // UX-H1 — Smart scroll exports
+    handleScroll,
+    isAutoScrollEnabled,
   }
 }

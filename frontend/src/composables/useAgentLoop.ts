@@ -2,7 +2,7 @@ import type { ModelTier, ModelInfo, ToolCategory } from '@/types'
 import { nextTick, ref, type Ref, type ComputedRef } from 'vue'
 
 import { type ChatMessage, type ChatRequestMessage, type TokenUsage, chatStream, generateImage, uploadFile, uploadFileToPlatform, categorizeError } from '@/api/backend'
-import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt } from '@/utils/constant'
+import { GLOBAL_STYLE_INSTRUCTIONS, builtInPrompt, excelBuiltInPrompt, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt, type ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
 import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
@@ -58,7 +58,7 @@ interface AgentLoopHost {
 interface AgentLoopSettings {
   customSystemPrompt: Ref<string>
   agentMaxIterations: Ref<number>
-  excelFormulaLanguage: Ref<'en' | 'fr'>
+  excelFormulaLanguage: Ref<ExcelFormulaLanguage> // TOOL-M4: extended from 'en' | 'fr'
   userGender: Ref<string>
   userFirstName: Ref<string>
   userLastName: Ref<string>

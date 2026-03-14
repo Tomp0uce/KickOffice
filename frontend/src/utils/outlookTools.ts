@@ -43,6 +43,37 @@ type OutlookToolTemplate = Omit<ToolDefinition, 'execute'> & {
   executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>
 }
 
+/**
+ * QUAL-L2: Helper to bridge Outlook's callback-based Office.AsyncResult with async/await patterns.
+ *
+ * **Why this exists:**
+ * The Outlook JavaScript API uses callback-based patterns (Office.AsyncResult) instead of Promises.
+ * This helper wraps the AsyncResult callback pattern to work seamlessly with our async/await codebase.
+ *
+ * **Pattern:**
+ * ```typescript
+ * // Instead of this (callback style):
+ * mailbox.item.subject.getAsync((result) => {
+ *   if (result.status === Office.AsyncResultStatus.Succeeded) {
+ *     return result.value
+ *   } else {
+ *     throw new Error(result.error.message)
+ *   }
+ * })
+ *
+ * // We wrap it in a Promise and use this helper:
+ * return new Promise<string>((resolve) => {
+ *   mailbox.item.subject.getAsync((result) => {
+ *     resolve(resolveAsyncResult(result, (value) => value))
+ *   })
+ * })
+ * ```
+ *
+ * @param result - The Office.AsyncResult object from the callback
+ * @param onSuccess - Callback to transform the successful result.value into the desired output
+ * @returns The transformed result on success
+ * @throws Error if the AsyncResult status is not Succeeded
+ */
 function resolveAsyncResult(result: any, onSuccess: (value: any) => string): string {
   if (result.status === getOfficeAsyncStatus()?.Succeeded) {
     return onSuccess(result.value)

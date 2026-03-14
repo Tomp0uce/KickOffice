@@ -16,6 +16,9 @@ export const languageMap: IStringKeyMap = {
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
 }
 
+// TOOL-M4: Type for Excel formula language (extended from 'en' | 'fr' to all supported languages)
+export type ExcelFormulaLanguage = 'en' | 'fr' | 'de' | 'es' | 'it' | 'pt' | 'zh-cn' | 'ja' | 'ko' | 'nl' | 'pl' | 'ar' | 'ru'
+
 /// TOOL-L3: em-dash/semicolon ban is PPT/bullet-only — applied per-prompt, not globally
 export const PPT_STYLE_RULES = `- NEVER use em-dashes (—).
 - NEVER use semicolons (;).`
@@ -57,7 +60,8 @@ Constraints:
 1. Detect language first (internal reasoning only — do not output this step).
 2. Translate to the opposite language with natural, idiomatic phrasing.
 3. Preserve all formatting exactly (Markdown, bullets, bold, line breaks).
-4. OUTPUT ONLY the translated text. Do not include any preamble, explanation, or language label.
+4. OUT-H1: CRITICAL — If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep these placeholders EXACTLY as-is in their original positions. These represent embedded images and other non-text elements that must not be translated, removed, or modified.
+5. OUTPUT ONLY the translated text. Do not include any preamble, explanation, or language label.
 
 Text: ${text}`,
   },
@@ -439,7 +443,8 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
       - Fix any grammar or spelling errors in the process.
       Constraints:
       1. Keep the output language opposite to the input language (FR <-> EN).
-      2. OUTPUT ONLY the rewritten professional email text.
+      2. OUT-H1: CRITICAL — If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep these placeholders EXACTLY as-is in their original positions. These represent embedded images and other non-text elements.
+      3. OUTPUT ONLY the rewritten professional email text.
 
       Text: ${text}`,
   },
@@ -456,7 +461,8 @@ ${GLOBAL_STYLE_INSTRUCTIONS}`,
       - Preserve all essential facts, dates, names, and action items.
       Constraints:
       1. ${LANGUAGE_MATCH_INSTRUCTION}
-      2. OUTPUT ONLY the condensed text.
+      2. OUT-H1: If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep them EXACTLY as-is in their positions. These represent embedded images.
+      3. OUTPUT ONLY the condensed text.
 
       Text: ${text}`,
   },
@@ -475,6 +481,7 @@ KEY CONSTRAINTS:
   3. Lightly adjust style for naturalness — but stay very close to the original.
   4. Keep formatting (bullets, line breaks, bold) intact.
 - Apply minimum-edit strategy: do NOT add new ideas, do NOT expand or shorten significantly.
+- OUT-H1: CRITICAL — If the text contains preservation placeholders like {{PRESERVE_0}}, {{PRESERVE_1}}, etc., you MUST keep these placeholders EXACTLY as-is in their original positions. These represent embedded images and other non-text elements.
 - OUTPUT ONLY the corrected/improved text — no explanations, no meta-commentary.`,
     user: (text: string, _language: string) =>
       `Correct grammar/spelling and lightly improve the style of this email compose reply. Stay as close to the original as possible.

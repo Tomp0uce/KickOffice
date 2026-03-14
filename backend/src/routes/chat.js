@@ -6,8 +6,53 @@ import { validateChatRequest } from '../middleware/validate.js'
 import { chatCompletion, handleErrorResponse, RateLimitError } from '../services/llmClient.js'
 import { logAndRespond } from '../utils/http.js'
 import logger from '../utils/logger.js'
+import { logToolUsage, logChatRequest } from '../utils/toolUsageLogger.js'
 
 const chatRouter = Router()
+
+/**
+ * ERR-M1: Shared error handler for chat endpoints
+ *
+ * Handles common error types:
+ * - AbortError: LLM API timeout
+ * - RateLimitError: Upstream rate limiting
+ * - Generic errors: Internal server errors
+ *
+ * @param {Response} res - Express response object
+ * @param {Error} error - Error to handle
+ * @param {Object} req - Express request object (for logger)
+ * @param {string} endpoint - Endpoint name for logging (e.g., 'POST /api/chat')
+ * @param {boolean} isStreaming - Whether this is a streaming endpoint
+ * @returns {void}
+ */
+function handleChatError(res, error, req, endpoint, isStreaming = false) {
+  // Special handling for streaming endpoints that already sent headers
+  if (isStreaming && res.headersSent) {
+    req.logger.error(`${endpoint} proxy error during stream`, { error, traffic: 'system' })
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ error: 'Internal server error during stream processing' })}\n\n`)
+      res.end()
+    }
+    return
+  }
+
+  // AbortError: LLM API timeout
+  if (error.name === 'AbortError') {
+    req.logger.error(`${endpoint} LLM API request timeout`, { traffic: 'system' })
+    return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, endpoint)
+  }
+
+  // RateLimitError: Upstream rate limiting
+  if (error instanceof RateLimitError) {
+    req.logger.warn(`${endpoint} rate limited by upstream`, { retryAfterMs: error.retryAfterMs, traffic: 'system' })
+    return logAndRespond(res, 429, { code: ErrorCodes.RATE_LIMITED, error: 'Rate limit exceeded. Please wait before retrying.' }, endpoint)
+  }
+
+  // Generic internal error
+  const errorType = isStreaming ? 'proxy error' : 'Chat sync proxy error'
+  req.logger.error(`${endpoint} ${errorType}`, { error, traffic: 'system' })
+  return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, endpoint)
+}
 
 chatRouter.post('/', async (req, res) => {
   const { messages, modelTier = 'standard', temperature, maxTokens, tools } = req.body
@@ -24,6 +69,15 @@ chatRouter.post('/', async (req, res) => {
   }
 
   const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
+
+  // FB-M1: Log chat request for history tracking
+  try {
+    const userId = req.logger.defaultMeta?.userId || 'anonymous'
+    const host = req.logger.defaultMeta?.host || 'unknown'
+    logChatRequest(userId, host, '/api/chat', messages?.length || 0)
+  } catch (logError) {
+    req.logger.warn('Failed to log chat request', { error: logError, traffic: 'system' })
+  }
 
   try {
     const body = buildChatBody({
@@ -83,6 +137,7 @@ chatRouter.post('/', async (req, res) => {
     })
 
     let streamContent = ''
+    let toolCalls = [] // LOG-H1: Accumulate tool calls from stream
 
     try {
       while (true) {
@@ -109,6 +164,26 @@ chatRouter.post('/', async (req, res) => {
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
         streamContent += chunk
+
+        // LOG-H1: Parse SSE chunks for tool calls
+        try {
+          const lines = chunk.split('\n').filter(line => line.startsWith('data: '))
+          for (const line of lines) {
+            const jsonStr = line.slice(6) // Remove 'data: ' prefix
+            if (jsonStr === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(jsonStr)
+              const deltaToolCalls = parsed?.choices?.[0]?.delta?.tool_calls
+              if (deltaToolCalls && Array.isArray(deltaToolCalls)) {
+                toolCalls.push(...deltaToolCalls)
+              }
+            } catch {
+              // Ignore parse errors for individual chunks
+            }
+          }
+        } catch {
+          // Ignore parsing errors
+        }
 
         // Check if client disconnected before writing
         if (clientDisconnected) break
@@ -147,6 +222,17 @@ chatRouter.post('/', async (req, res) => {
         responseLength: streamContent.length,
         responseContent: streamContent
       })
+
+      // LOG-H1: Log tool usage if tool calls were detected in stream
+      if (toolCalls.length > 0) {
+        try {
+          const userId = req.logger.defaultMeta?.userId || 'anonymous'
+          const host = req.logger.defaultMeta?.host || 'unknown'
+          logToolUsage(userId, host, toolCalls)
+        } catch (logError) {
+          req.logger.warn('Failed to log tool usage', { error: logError, traffic: 'system' })
+        }
+      }
     } catch (streamError) {
       if (!clientDisconnected) {
         req.logger.error('POST /api/chat stream error', { error: streamError, traffic: 'system' })
@@ -164,24 +250,8 @@ chatRouter.post('/', async (req, res) => {
       }
     }
   } catch (error) {
-    if (res.headersSent) {
-      req.logger.error('POST /api/chat proxy error during stream', { error, traffic: 'system' })
-      if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: 'Internal server error during stream processing' })}\n\n`)
-        res.end()
-      }
-      return
-    }
-    if (error.name === 'AbortError') {
-      req.logger.error('POST /api/chat LLM API request timeout', { traffic: 'system' })
-      return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat')
-    }
-    if (error instanceof RateLimitError) {
-      req.logger.warn('POST /api/chat rate limited by upstream', { retryAfterMs: error.retryAfterMs, traffic: 'system' })
-      return logAndRespond(res, 429, { code: ErrorCodes.RATE_LIMITED, error: 'Rate limit exceeded. Please wait before retrying.' }, 'POST /api/chat')
-    }
-    req.logger.error('POST /api/chat Chat proxy error', { error, traffic: 'system' })
-    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat')
+    // ERR-M1: Use shared error handler
+    handleChatError(res, error, req, 'POST /api/chat', true)
   }
 })
 
@@ -201,6 +271,15 @@ chatRouter.post('/sync', async (req, res) => {
   }
 
   const { modelConfig, parsedTools, temperature: validTemp, maxTokens: validMaxTokens } = validation
+
+  // FB-M1: Log chat request for history tracking
+  try {
+    const userId = req.logger.defaultMeta?.userId || 'anonymous'
+    const host = req.logger.defaultMeta?.host || 'unknown'
+    logChatRequest(userId, host, '/api/chat/sync', messages?.length || 0)
+  } catch (logError) {
+    req.logger.warn('Failed to log chat request', { error: logError, traffic: 'system' })
+  }
 
   try {
     const body = buildChatBody({
@@ -288,20 +367,25 @@ chatRouter.post('/sync', async (req, res) => {
       hasContent: !!data?.choices?.[0]?.message?.content,
       toolCallCount: data?.choices?.[0]?.message?.tool_calls?.length || 0,
     })
-    
+
     req.logger.info('POST /api/chat/sync upstream response completed', { traffic: 'llm', response: data })
+
+    // LOG-H1: Log tool usage if tool calls present
+    const toolCalls = data?.choices?.[0]?.message?.tool_calls
+    if (toolCalls && toolCalls.length > 0) {
+      try {
+        const userId = req.logger.defaultMeta?.userId || 'anonymous'
+        const host = req.logger.defaultMeta?.host || 'unknown'
+        logToolUsage(userId, host, toolCalls)
+      } catch (logError) {
+        req.logger.warn('Failed to log tool usage', { error: logError, traffic: 'system' })
+      }
+    }
+
     res.json(data)
   } catch (error) {
-    if (error.name === 'AbortError') {
-      req.logger.error('POST /api/chat/sync LLM API request timeout', { traffic: 'system' })
-      return logAndRespond(res, 504, { code: ErrorCodes.LLM_TIMEOUT, error: 'LLM API request timeout' }, 'POST /api/chat/sync')
-    }
-    if (error instanceof RateLimitError) {
-      req.logger.warn('POST /api/chat/sync rate limited by upstream', { retryAfterMs: error.retryAfterMs, traffic: 'system' })
-      return logAndRespond(res, 429, { code: ErrorCodes.RATE_LIMITED, error: 'Rate limit exceeded. Please wait before retrying.' }, 'POST /api/chat/sync')
-    }
-    req.logger.error('POST /api/chat/sync Chat sync proxy error', { error, traffic: 'system' })
-    return logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error' }, 'POST /api/chat/sync')
+    // ERR-M1: Use shared error handler
+    handleChatError(res, error, req, 'POST /api/chat/sync', false)
   }
 })
 
