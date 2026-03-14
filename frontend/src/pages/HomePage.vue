@@ -133,8 +133,8 @@
 </template>
 
 <script lang="ts" setup>
-import type { InsertType, ModelTier, ModelInfo } from '@/types'
-defineOptions({ name: 'Home' })
+import type { InsertType, ModelTier, ModelInfo } from '@/types';
+defineOptions({ name: 'Home' });
 import {
   ref,
   computed,
@@ -144,8 +144,8 @@ import {
   onMounted,
   onActivated,
   onDeactivated,
-} from 'vue'
-import { useStorage } from '@vueuse/core'
+} from 'vue';
+import { useStorage } from '@vueuse/core';
 import {
   BookOpen,
   CheckCheck,
@@ -163,50 +163,50 @@ import {
   TrendingUp,
   LineChart,
   Zap,
-} from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+} from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 
-import { useHealthCheck } from '@/composables/useHealthCheck'
-import { provideHomePageContext } from '@/composables/useHomePageContext' // ARCH-H2
-import ChatHeader from '@/components/chat/ChatHeader.vue'
-import ChatInput from '@/components/chat/ChatInput.vue'
-import ChatMessageList from '@/components/chat/ChatMessageList.vue'
-import QuickActionsBar from '@/components/chat/QuickActionsBar.vue'
-import StatsBar from '@/components/chat/StatsBar.vue'
-import { useAgentLoop } from '@/composables/useAgentLoop'
-import { useImageActions } from '@/composables/useImageActions'
-import { useOfficeInsert } from '@/composables/useOfficeInsert'
-import { useSessionManager } from '@/composables/useSessionManager'
+import { useHealthCheck } from '@/composables/useHealthCheck';
+import { provideHomePageContext } from '@/composables/useHomePageContext'; // ARCH-H2
+import ChatHeader from '@/components/chat/ChatHeader.vue';
+import ChatInput from '@/components/chat/ChatInput.vue';
+import ChatMessageList from '@/components/chat/ChatMessageList.vue';
+import QuickActionsBar from '@/components/chat/QuickActionsBar.vue';
+import StatsBar from '@/components/chat/StatsBar.vue';
+import { useAgentLoop } from '@/composables/useAgentLoop';
+import { useImageActions } from '@/composables/useImageActions';
+import { useOfficeInsert } from '@/composables/useOfficeInsert';
+import { useSessionManager } from '@/composables/useSessionManager';
 import type {
   DisplayMessage,
   ExcelQuickAction,
   PowerPointQuickAction,
   OutlookQuickAction,
   QuickAction,
-} from '@/types/chat'
-import { localStorageKey } from '@/utils/enum'
-import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection'
-import { type SavedPrompt } from '@/utils/savedPrompts'
-import { useHomePage } from '@/composables/useHomePage'
-import type { ExcelFormulaLanguage } from '@/utils/constant' // TOOL-M4
+} from '@/types/chat';
+import { localStorageKey } from '@/utils/enum';
+import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
+import { type SavedPrompt } from '@/utils/savedPrompts';
+import { useHomePage } from '@/composables/useHomePage';
+import type { ExcelFormulaLanguage } from '@/utils/constant'; // TOOL-M4
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const savedPrompts = ref<SavedPrompt[]>([])
-const selectedPromptId = ref('')
-const customSystemPrompt = ref('')
-const isDraftFocusGlowing = ref(false)
-const isDeleteConfirmVisible = ref(false)
-const isNewChatConfirmVisible = ref(false)
-const availableModels = ref<Record<string, ModelInfo>>({})
-const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard')
+const savedPrompts = ref<SavedPrompt[]>([]);
+const selectedPromptId = ref('');
+const customSystemPrompt = ref('');
+const isDraftFocusGlowing = ref(false);
+const isDeleteConfirmVisible = ref(false);
+const isNewChatConfirmVisible = ref(false);
+const availableModels = ref<Record<string, ModelInfo>>({});
+const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard');
 
-const { backendOnline } = useHealthCheck(availableModels, selectedModelTier)
+const { backendOnline } = useHealthCheck(availableModels, selectedModelTier);
 
-const hostIsExcel = isExcel()
-const hostIsWord = isWord()
-const hostIsPowerPoint = isPowerPoint()
-const hostIsOutlook = isOutlook()
+const hostIsExcel = isExcel();
+const hostIsWord = isWord();
+const hostIsPowerPoint = isPowerPoint();
+const hostIsOutlook = isOutlook();
 
 const currentHost =
   forHost({
@@ -214,30 +214,33 @@ const currentHost =
     powerpoint: 'powerpoint',
     excel: 'excel',
     word: 'word',
-  }) || 'word'
-const history = ref<DisplayMessage[]>([])
+  }) || 'word';
+const history = ref<DisplayMessage[]>([]);
 
-const sessionManager = useSessionManager(currentHost, history)
-const userInput = ref('')
-const loading = ref(false)
-const imageLoading = ref(false)
-const abortController = ref<AbortController | null>(null)
+const sessionManager = useSessionManager(currentHost, history);
+const userInput = ref('');
+const loading = ref(false);
+const imageLoading = ref(false);
+const abortController = ref<AbortController | null>(null);
 // GEN-L3: Format UI options removed, but keeping logic vars true implicitly in prompt logic
-const agentMaxIterationsRaw = useStorage(localStorageKey.agentMaxIterations, 25)
+const agentMaxIterationsRaw = useStorage(localStorageKey.agentMaxIterations, 25);
 const agentMaxIterations = computed(() => {
-  const val = Number(agentMaxIterationsRaw.value)
-  if (isNaN(val) || val < 1) return 1
-  if (val > 100) return 100
-  return Math.floor(val)
-})
-const userGender = useStorage(localStorageKey.userGender, 'unspecified')
-const userFirstName = useStorage(localStorageKey.userFirstName, '')
-const userLastName = useStorage(localStorageKey.userLastName, '')
-const excelFormulaLanguage = useStorage<ExcelFormulaLanguage>(localStorageKey.excelFormulaLanguage, 'en') // TOOL-M4
-const insertType = ref<InsertType>('replace')
+  const val = Number(agentMaxIterationsRaw.value);
+  if (isNaN(val) || val < 1) return 1;
+  if (val > 100) return 100;
+  return Math.floor(val);
+});
+const userGender = useStorage(localStorageKey.userGender, 'unspecified');
+const userFirstName = useStorage(localStorageKey.userFirstName, '');
+const userLastName = useStorage(localStorageKey.userLastName, '');
+const excelFormulaLanguage = useStorage<ExcelFormulaLanguage>(
+  localStorageKey.excelFormulaLanguage,
+  'en',
+); // TOOL-M4
+const insertType = ref<InsertType>('replace');
 
-const chatInputRef = ref<InstanceType<typeof ChatInput>>()
-const messageListRef = ref<InstanceType<typeof ChatMessageList>>()
+const chatInputRef = ref<InstanceType<typeof ChatInput>>();
+const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
 
 const wordQuickActions = computed<QuickAction[]>(() => [
   {
@@ -271,7 +274,7 @@ const wordQuickActions = computed<QuickAction[]>(() => [
     icon: FileCheck,
     tooltipKey: 'summary_tooltip',
   },
-])
+]);
 const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: 'ingest',
@@ -320,7 +323,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
       'You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.',
     tooltipKey: 'excelDataTrend_tooltip',
   },
-])
+]);
 const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
   {
     key: 'proofread',
@@ -354,7 +357,7 @@ const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
     prefix: t('outlookReplyPrePrompt'),
     tooltipKey: 'outlookReply_tooltip',
   },
-])
+]);
 const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
   {
     key: 'proofread',
@@ -386,7 +389,8 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     mode: 'immediate',
     tooltipKey: 'pptPunchify_tooltip',
     executeWithAgent: true,
-    systemPrompt: "You are a presentation expert. Call `getCurrentSlideIndex` to find the active slide, then use `getShapes` on it. Rewrite the text of all text shapes on this slide to be more impactful, punchy, and concise (max 6-7 bullets, 8-10 words per bullet). Use `insertContent` or `proposeShapeTextRevision` with the shape IDs to apply your changes directly to the slide without asking.",
+    systemPrompt:
+      'You are a presentation expert. Call `getCurrentSlideIndex` to find the active slide, then use `getShapes` on it. Rewrite the text of all text shapes on this slide to be more impactful, punchy, and concise (max 6-7 bullets, 8-10 words per bullet). Use `insertContent` or `proposeShapeTextRevision` with the shape IDs to apply your changes directly to the slide without asking.',
   },
   {
     key: 'visual',
@@ -395,7 +399,7 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     mode: 'immediate',
     tooltipKey: 'pptVisual_tooltip',
   },
-])
+]);
 
 const quickActions = computed(() =>
   forHost({
@@ -404,20 +408,20 @@ const quickActions = computed(() =>
     excel: excelQuickActions.value,
     word: wordQuickActions.value,
   }),
-)
-const selectedModelInfo = computed(() => availableModels.value[selectedModelTier.value])
+);
+const selectedModelInfo = computed(() => availableModels.value[selectedModelTier.value]);
 const firstChatModelTier = computed<ModelTier>(
   () =>
     (Object.entries(availableModels.value).find(
       ([, model]) => model.type !== 'image',
     )?.[0] as ModelTier) || 'standard',
-)
+);
 const inputPlaceholder = computed(() =>
   selectedModelInfo.value?.type === 'image' ? t('describeImage') : t('directTheAgent'),
-)
+);
 
-const imageActions = useImageActions(t)
-const historyWithSegments = computed(() => imageActions.historyWithSegments(history))
+const imageActions = useImageActions(t);
+const historyWithSegments = computed(() => imageActions.historyWithSegments(history));
 
 const officeInsert = useOfficeInsert({
   hostIsOutlook,
@@ -431,12 +435,12 @@ const officeInsert = useOfficeInsert({
   copyImageToClipboard: imageActions.copyImageToClipboard,
   insertImageToWord: imageActions.insertImageToWord,
   insertImageToPowerPoint: imageActions.insertImageToPowerPoint,
-})
+});
 
 function stopGeneration() {
-  abortController.value?.abort()
-  abortController.value = null
-  loading.value = false
+  abortController.value?.abort();
+  abortController.value = null;
+  loading.value = false;
 }
 
 const homePage = useHomePage({
@@ -453,11 +457,11 @@ const homePage = useHomePage({
   resetSessionStats: () => resetSessionStats?.(),
   rebuildSessionFiles: () => rebuildSessionFiles?.(),
   stopGeneration,
-})
+});
 
 watch(userInput, () => {
-  homePage.adjustTextareaHeight()
-})
+  homePage.adjustTextareaHeight();
+});
 
 const {
   adjustTextareaHeight,
@@ -474,66 +478,72 @@ const {
   loadSelectedPrompt,
   handleScroll, // UX-H1 — Smart scroll handler
   isAutoScrollEnabled, // UX-H1 — Auto-scroll state
-} = homePage
+} = homePage;
 
-const { sendMessage, applyQuickAction, currentAction, sessionStats, resetSessionStats, rebuildSessionFiles } =
-  useAgentLoop({
-    t,
-    refs: {
-      history,
-      userInput,
-      loading,
-      imageLoading,
-      backendOnline,
-      abortController,
-      inputTextarea: computed(() => chatInputRef.value?.textareaEl),
-      isDraftFocusGlowing,
-    },
-    models: {
-      availableModels,
-      selectedModelTier,
-      selectedModelInfo,
-      firstChatModelTier,
-    },
-    host: {
-      isOutlook: hostIsOutlook,
-      isPowerPoint: hostIsPowerPoint,
-      isExcel: hostIsExcel,
-      isWord: hostIsWord,
-    },
-    settings: {
-      customSystemPrompt,
-      agentMaxIterations,
-      useSelectedText: ref(true), // GEN-L3: Always true
-      excelFormulaLanguage,
-      userGender,
-      userFirstName,
-      userLastName,
-    },
-    actions: {
-      quickActions,
-      outlookQuickActions,
-      excelQuickActions,
-      powerPointQuickActions,
-    },
-    helpers: {
-      createDisplayMessage: imageActions.createDisplayMessage,
-      adjustTextareaHeight,
-      scrollToBottom,
-      scrollToMessageTop,
-      scrollToVeryBottom,
-    },
-  })
+const {
+  sendMessage,
+  applyQuickAction,
+  currentAction,
+  sessionStats,
+  resetSessionStats,
+  rebuildSessionFiles,
+} = useAgentLoop({
+  t,
+  refs: {
+    history,
+    userInput,
+    loading,
+    imageLoading,
+    backendOnline,
+    abortController,
+    inputTextarea: computed(() => chatInputRef.value?.textareaEl),
+    isDraftFocusGlowing,
+  },
+  models: {
+    availableModels,
+    selectedModelTier,
+    selectedModelInfo,
+    firstChatModelTier,
+  },
+  host: {
+    isOutlook: hostIsOutlook,
+    isPowerPoint: hostIsPowerPoint,
+    isExcel: hostIsExcel,
+    isWord: hostIsWord,
+  },
+  settings: {
+    customSystemPrompt,
+    agentMaxIterations,
+    useSelectedText: ref(true), // GEN-L3: Always true
+    excelFormulaLanguage,
+    userGender,
+    userFirstName,
+    userLastName,
+  },
+  actions: {
+    quickActions,
+    outlookQuickActions,
+    excelQuickActions,
+    powerPointQuickActions,
+  },
+  helpers: {
+    createDisplayMessage: imageActions.createDisplayMessage,
+    adjustTextareaHeight,
+    scrollToBottom,
+    scrollToMessageTop,
+    scrollToVeryBottom,
+  },
+});
 
 function handleRegenerate() {
-  homePage.handleRegenerate(history, sendMessage)
+  homePage.handleRegenerate(history, sendMessage);
 }
 
 function handleEditMessage(message: DisplayMessage) {
-  homePage.handleEditMessage(message)
+  homePage.handleEditMessage(message);
 }
 
-const { insertMessageToDocument, copyMessageToClipboard } = officeInsert
+const { insertMessageToDocument, copyMessageToClipboard } = officeInsert;
 
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
 provideHomePageContext({
@@ -578,37 +588,37 @@ provideHomePageContext({
   adjustTextareaHeight,
   // Computed
   inputPlaceholder,
-})
+});
 
 // Persist session after each agent turn completes
 watch(loading, async (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
-    await sessionManager.persistCurrentSession()
+    await sessionManager.persistCurrentSession();
   }
-})
+});
 
 onBeforeMount(async () => {
-  insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace'
-  loadSavedPrompts()
-  await sessionManager.init()
-  rebuildSessionFiles()
-})
+  insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace';
+  loadSavedPrompts();
+  await sessionManager.init();
+  rebuildSessionFiles();
+});
 
 onActivated(() => {
-  loadSavedPrompts()
-})
+  loadSavedPrompts();
+});
 
 onDeactivated(() => {
-  if (loading.value) stopGeneration()
-})
+  if (loading.value) stopGeneration();
+});
 
 onMounted(() => {
   // On initial load, scroll to the top of the last message so the user
   // can read the most recent exchange from its beginning.
   if (history.value.length > 0) {
     nextTick(() => {
-      scrollToMessageTop()
-    })
+      scrollToMessageTop();
+    });
   }
-})
+});
 </script>

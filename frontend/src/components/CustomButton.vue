@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type Component } from "vue";
+import { computed, type Component } from 'vue';
 
 const {
   text,
@@ -33,11 +33,11 @@ const {
   active = false,
   icon = null,
   iconSize = 16,
-  type = "primary",
-  title = "",
-  iconClass = "",
-  textClass = "",
-  ariaLabel = "",
+  type = 'primary',
+  title = '',
+  iconClass = '',
+  textClass = '',
+  ariaLabel = '',
 } = defineProps<{
   text: string;
   icon?: Component | null;
@@ -53,30 +53,28 @@ const {
 
 const textClassVar = computed(() => {
   switch (type) {
-    case "primary":
-      return "text-white";
-    case "secondary":
-      return "text-main group-not-disabled:group-hover:text-white!";
-    case "tab":
-      return active
-        ? "text-white"
-        : "text-secondary group-not-disabled:group-hover:text-white!";
+    case 'primary':
+      return 'text-white';
+    case 'secondary':
+      return 'text-main group-not-disabled:group-hover:text-white!';
+    case 'tab':
+      return active ? 'text-white' : 'text-secondary group-not-disabled:group-hover:text-white!';
     default:
-      return textClass || "";
+      return textClass || '';
   }
 });
 
 const classVar = computed(() => {
   switch (type) {
-    case "primary":
-      return "bg-accent text-white not-disabled:hover:bg-accent-hover not-disabled:hover:-translate-y-px";
-    case "secondary":
-      return "border border-border bg-bg-secondary text-main not-disabled:hover:bg-accent/30! not-disabled:hover:text-white! not-disabled:hover:-translate-y-px";
-    case "tab":
-      return "flex-1 text-secondary not-disabled:data-[active=false]:hover:bg-accent/30 data-[active=true]:text-white data-[active=true]:bg-accent not-disabled:hover:text-white!";
+    case 'primary':
+      return 'bg-accent text-white not-disabled:hover:bg-accent-hover not-disabled:hover:-translate-y-px';
+    case 'secondary':
+      return 'border border-border bg-bg-secondary text-main not-disabled:hover:bg-accent/30! not-disabled:hover:text-white! not-disabled:hover:-translate-y-px';
+    case 'tab':
+      return 'flex-1 text-secondary not-disabled:data-[active=false]:hover:bg-accent/30 data-[active=true]:text-white data-[active=true]:bg-accent not-disabled:hover:text-white!';
     default:
-      return "";
+      return '';
   }
 });
-const emit = defineEmits<(e: "click") => void>();
+const emit = defineEmits<(e: 'click') => void>();
 </script>

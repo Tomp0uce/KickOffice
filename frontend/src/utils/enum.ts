@@ -14,4 +14,4 @@ export const localStorageKey = {
   litellmUserKey: 'litellmUserKey',
   litellmUserEmail: 'litellmUserEmail',
   rememberCredentials: 'rememberCredentials',
-} as const
+} as const;

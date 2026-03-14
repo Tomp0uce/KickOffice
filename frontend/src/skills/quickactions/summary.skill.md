@@ -1,19 +1,23 @@
 # Summary Quick Action Skill
 
 ## Purpose
+
 Distill long documents or sections into concise summaries that capture key points, main arguments, and essential information.
 
 ## When to Use
+
 - User clicks "Summary" Quick Action in Word
 - Text is lengthy and needs a brief overview
 - Goal: Quick-read version capturing core content
 
 ## Input Contract
+
 - **Selected text**: Long-form content to summarize (articles, reports, chapters, meeting notes)
 - **Language**: Preserve the language of the original text
 - **Context**: Any document requiring condensation
 
 ## Output Requirements
+
 1. **Capture key points**: Include all main ideas, arguments, and conclusions
 2. **Preserve hierarchy**: Maintain the logical structure and flow
 3. **Be concise**: Target 15-25% of original length
@@ -24,12 +28,14 @@ Distill long documents or sections into concise summaries that capture key point
 ## Summary Techniques
 
 ### 1. Identify Core Content
+
 - **Main thesis/argument**: What is the central claim?
 - **Key supporting points**: What evidence supports the thesis?
 - **Conclusions/outcomes**: What are the takeaways?
 - **Critical data**: Include essential numbers, dates, names
 
 ### 2. Discard Non-Essential
+
 - **Examples (unless critical)**: Remove most illustrative examples
 - **Repetition**: Consolidate repeated points
 - **Background context**: Reduce lengthy setup to bare minimum
@@ -39,6 +45,7 @@ Distill long documents or sections into concise summaries that capture key point
 ### 3. Structure Options
 
 **For documents with clear sections:**
+
 ```
 # Summary
 
@@ -52,6 +59,7 @@ Distill long documents or sections into concise summaries that capture key point
 ```
 
 **For narrative/argumentative text:**
+
 ```
 # Summary
 
@@ -63,6 +71,7 @@ Distill long documents or sections into concise summaries that capture key point
 ```
 
 **For reports/research:**
+
 ```
 # Executive Summary
 
@@ -75,12 +84,15 @@ Distill long documents or sections into concise summaries that capture key point
 ```
 
 ## Tool Usage
+
 **DO NOT** call Office.js tools. Return pure summary text.
 
 ## Example Transformations
 
 ### Example 1: Business Report (600 words → 120 words)
+
 **Before**:
+
 ```
 The Q4 2025 sales performance exceeded projections across all regions, driven primarily by strong adoption of our new Enterprise Suite product line. North America led with 45% growth, followed by EMEA at 32% and APAC at 28%. The Enterprise Suite, launched in July, generated $12M in revenue—accounting for 38% of total Q4 sales. Customer feedback indicates high satisfaction (NPS: 72), with particular praise for the AI-powered analytics module.
 
@@ -90,6 +102,7 @@ Looking forward, Q1 2026 strategy focuses on: (1) streamlining onboarding via ne
 ```
 
 **After**:
+
 ```
 # Q4 2025 Executive Summary
 
@@ -103,12 +116,15 @@ Looking forward, Q1 2026 strategy focuses on: (1) streamlining onboarding via ne
 **Reduction**: 600 words → 120 words (80% reduction)
 
 ### Example 2: Academic Article (1200 words → 200 words)
+
 **Before**:
+
 ```
 [Long academic article about social media's impact on adolescent mental health, including literature review, methodology (survey of 500 students), results showing correlation between usage time and anxiety, discussion of mechanisms, limitations, and future research directions]
 ```
 
 **After**:
+
 ```
 # Summary
 
@@ -126,12 +142,15 @@ This study examines the relationship between social media usage and mental healt
 **Reduction**: 1200 words → 200 words (83% reduction)
 
 ### Example 3: Meeting Notes (800 words → 150 words)
+
 **Before**:
+
 ```
 [Detailed meeting transcript covering agenda items: project status updates from 4 teams, budget discussion, timeline adjustments, action items, attendee questions, tangential discussions]
 ```
 
 **After**:
+
 ```
 # Meeting Summary — Product Launch Planning
 **Date**: March 14, 2026 | **Attendees**: 12
@@ -158,12 +177,15 @@ This study examines the relationship between social media usage and mental healt
 **Reduction**: 800 words → 150 words (81% reduction)
 
 ### Example 4: French Document Summary
+
 **Before**:
+
 ```
 [Long French report about renewable energy policy, covering current state, challenges, policy recommendations, economic impact analysis, environmental benefits, and implementation timeline — 1000 words]
 ```
 
 **After**:
+
 ```
 # Résumé — Politique Énergétique Renouvelable
 
@@ -187,21 +209,25 @@ This study examines the relationship between social media usage and mental healt
 ## Summary Types by Content
 
 ### Executive Summary (Business Reports)
+
 - **Length**: 10-15% of original
 - **Focus**: Outcomes, financials, decisions, action items
 - **Structure**: Purpose, Key Findings, Recommendations
 
 ### Abstract (Academic Papers)
+
 - **Length**: 150-250 words (regardless of original length)
 - **Focus**: Research question, methodology, key findings, implications
 - **Structure**: Background, Methods, Results, Conclusion
 
 ### Brief (Legal/Policy Documents)
+
 - **Length**: 15-20% of original
 - **Focus**: Key provisions, obligations, deadlines, stakeholders
 - **Structure**: Overview, Key Terms, Obligations, Next Steps
 
 ### Synopsis (Narrative/Articles)
+
 - **Length**: 15-25% of original
 - **Focus**: Main narrative arc, key arguments, conclusion
 - **Structure**: Thesis, Supporting Points, Conclusion
@@ -209,6 +235,7 @@ This study examines the relationship between social media usage and mental healt
 ## What NOT to Summarize Away
 
 ### Always Include
+
 - **Core thesis/argument**: The main point of the document
 - **Critical data**: Numbers that are central to the content
 - **Decisions made**: Outcomes of meetings or proposals
@@ -217,6 +244,7 @@ This study examines the relationship between social media usage and mental healt
 - **Deadlines**: All time-sensitive information
 
 ## Edge Cases
+
 - **Already concise (<300 words)**: Provide brief overview (2-3 sentences) highlighting main point
 - **Lists/tables**: Convert to prose summary or condensed bullet points
 - **Technical content**: Preserve essential technical terms, explain if critical
@@ -224,7 +252,9 @@ This study examines the relationship between social media usage and mental healt
 - **No clear structure**: Impose logical organization in summary
 
 ## Quality Check
+
 After summarizing, verify:
+
 - ✓ Captures all main points?
 - ✓ Omits unnecessary details?
 - ✓ Maintains logical flow?
@@ -232,6 +262,7 @@ After summarizing, verify:
 - ✓ Target length achieved (15-25% of original)?
 
 ## Summary vs Other Actions
+
 - **Summary** = condense to key points, reduce length by 75-85%
 - **Concise** = tighten writing, reduce length by 30-50%
 - **Bullets** = restructure into bullet format

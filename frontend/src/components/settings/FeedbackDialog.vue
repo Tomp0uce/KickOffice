@@ -66,52 +66,53 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useFocusTrap } from '@vueuse/integrations/useFocusTrap'
-import CustomButton from '@/components/CustomButton.vue'
-import { logService } from '@/utils/logger'
-import { submitFeedback } from '@/api/backend'
-import { getSession } from '@/composables/useSessionDB'
+import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useFocusTrap } from '@vueuse/integrations/useFocusTrap';
+import CustomButton from '@/components/CustomButton.vue';
+import { logService } from '@/utils/logger';
+import { submitFeedback } from '@/api/backend';
+import { getSession } from '@/composables/useSessionDB';
 
-const { t } = useI18n()
-const emit = defineEmits(['close'])
+const { t } = useI18n();
+const emit = defineEmits(['close']);
 
-const dialogRef = ref<HTMLElement>()
-useFocusTrap(dialogRef, { immediate: true })
+const dialogRef = ref<HTMLElement>();
+useFocusTrap(dialogRef, { immediate: true });
 
-const category = ref('bug')
-const comment = ref('')
-const includeLogs = ref(true)
-const submitting = ref(false)
-const success = ref(false)
-const error = ref('')
+const category = ref('bug');
+const comment = ref('');
+const includeLogs = ref(true);
+const submitting = ref(false);
+const success = ref(false);
+const error = ref('');
 
 async function handleSubmit() {
-  if (!comment.value.trim()) return
+  if (!comment.value.trim()) return;
 
-  submitting.value = true
-  error.value = ''
+  submitting.value = true;
+  error.value = '';
 
   try {
-    const ctx = await logService.getContext()
-    const sessionId = ctx.sessionId || 'unknown'
-    const logs = includeLogs.value ? logService.getSessionLogs(sessionId) : []
+    const ctx = await logService.getContext();
+    const sessionId = ctx.sessionId || 'unknown';
+    const logs = includeLogs.value ? logService.getSessionLogs(sessionId) : [];
 
     // Build complete debug bundle: chat history + system context
-    let chatHistory: unknown[] = []
+    let chatHistory: unknown[] = [];
     try {
-      const session = await getSession(sessionId)
+      const session = await getSession(sessionId);
       if (session?.messages) {
         // Strip large base64 image data to keep payload manageable
         chatHistory = session.messages.map(m => ({
           role: m.role,
-          content: typeof m.content === 'string'
-            ? m.content
-            : '[multipart content]',
+          content: typeof m.content === 'string' ? m.content : '[multipart content]',
           timestamp: m.timestamp,
-          toolCalls: m.toolCalls?.map(tc => ({ name: tc.function?.name, args: tc.function?.arguments })),
-        }))
+          toolCalls: m.toolCalls?.map(tc => ({
+            name: tc.function?.name,
+            args: tc.function?.arguments,
+          })),
+        }));
       }
     } catch {
       // Non-blocking — chat history is best-effort
@@ -122,7 +123,7 @@ async function handleSubmit() {
       appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown',
       modelTier: localStorage.getItem('modelTier') || 'standard',
       userAgent: navigator.userAgent,
-    }
+    };
 
     await submitFeedback(sessionId, {
       category: category.value,
@@ -130,17 +131,17 @@ async function handleSubmit() {
       logs,
       chatHistory,
       systemContext,
-    })
+    });
 
-    success.value = true
+    success.value = true;
     setTimeout(() => {
-      emit('close')
-    }, 2000)
+      emit('close');
+    }, 2000);
   } catch (err: any) {
-    error.value = err.message || 'Failed to submit feedback'
-    logService.error('Feedback submission error', err)
+    error.value = err.message || 'Failed to submit feedback';
+    logService.error('Feedback submission error', err);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 </script>

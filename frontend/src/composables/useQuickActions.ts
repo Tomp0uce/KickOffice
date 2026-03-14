@@ -11,66 +11,91 @@
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
-import { type Ref, type ComputedRef, ref, nextTick } from 'vue'
-import type { ModelTier, ModelInfo } from '@/types'
-import type { DisplayMessage, ExcelQuickAction, PowerPointQuickAction, OutlookQuickAction, QuickAction } from '@/types/chat'
-import type { ChatMessage } from '@/api/backend'
+import { type Ref, type ComputedRef, ref, nextTick } from 'vue';
+import type { ModelTier, ModelInfo } from '@/types';
+import type {
+  DisplayMessage,
+  ExcelQuickAction,
+  PowerPointQuickAction,
+  OutlookQuickAction,
+  QuickAction,
+} from '@/types/chat';
+import type { ChatMessage } from '@/api/backend';
 
-import { chatStream, generateImage, categorizeError } from '@/api/backend'
-import { GLOBAL_STYLE_INSTRUCTIONS, getBuiltInPrompt, getExcelBuiltInPrompt, getOutlookBuiltInPrompt, getPowerPointBuiltInPrompt, outlookBuiltInPrompt, powerPointBuiltInPrompt, builtInPrompt, excelBuiltInPrompt } from '@/utils/constant'
-import { message as messageUtil } from '@/utils/message'
-import { powerpointToolDefinitions } from '@/utils/powerpointTools'
-import { extractTextFromHtml, reassembleWithFragments, getPreservationInstruction, type RichContentContext } from '@/utils/richContentPreserver'
-import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown'
-import { areCredentialsConfigured } from '@/utils/credentialStorage'
-import { logService } from '@/utils/logger'
-import { getQuickActionSkill } from '@/skills'
+import { chatStream, generateImage, categorizeError } from '@/api/backend';
+import {
+  GLOBAL_STYLE_INSTRUCTIONS,
+  getBuiltInPrompt,
+  getExcelBuiltInPrompt,
+  getOutlookBuiltInPrompt,
+  getPowerPointBuiltInPrompt,
+  outlookBuiltInPrompt,
+  powerPointBuiltInPrompt,
+  builtInPrompt,
+  excelBuiltInPrompt,
+} from '@/utils/constant';
+import { message as messageUtil } from '@/utils/message';
+import { powerpointToolDefinitions } from '@/utils/powerpointTools';
+import {
+  extractTextFromHtml,
+  reassembleWithFragments,
+  getPreservationInstruction,
+  type RichContentContext,
+} from '@/utils/richContentPreserver';
+import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdown';
+import { areCredentialsConfigured } from '@/utils/credentialStorage';
+import { logService } from '@/utils/logger';
+import { getQuickActionSkill } from '@/skills';
 
 export interface UseQuickActionsOptions {
   // Translation function
-  t: (key: string) => string
+  t: (key: string) => string;
 
   // Refs
-  history: Ref<DisplayMessage[]>
-  userInput: Ref<string>
-  loading: Ref<boolean>
-  imageLoading: Ref<boolean>
-  backendOnline: Ref<boolean>
-  abortController: Ref<AbortController | null>
-  inputTextarea: Ref<HTMLTextAreaElement | undefined>
-  isDraftFocusGlowing: Ref<boolean>
+  history: Ref<DisplayMessage[]>;
+  userInput: Ref<string>;
+  loading: Ref<boolean>;
+  imageLoading: Ref<boolean>;
+  backendOnline: Ref<boolean>;
+  abortController: Ref<AbortController | null>;
+  inputTextarea: Ref<HTMLTextAreaElement | undefined>;
+  isDraftFocusGlowing: Ref<boolean>;
 
   // Models
-  availableModels: Ref<Record<string, ModelInfo>>
-  selectedModelTier: Ref<ModelTier>
-  firstChatModelTier: Ref<ModelTier>
+  availableModels: Ref<Record<string, ModelInfo>>;
+  selectedModelTier: Ref<ModelTier>;
+  firstChatModelTier: Ref<ModelTier>;
 
   // Host detection
-  hostIsOutlook: boolean
-  hostIsPowerPoint: boolean
-  hostIsExcel: boolean
+  hostIsOutlook: boolean;
+  hostIsPowerPoint: boolean;
+  hostIsExcel: boolean;
 
   // Quick Actions
-  quickActions: ComputedRef<QuickAction[] | undefined>
-  outlookQuickActions?: Ref<OutlookQuickAction[]>
-  excelQuickActions: Ref<ExcelQuickAction[]>
-  powerPointQuickActions: Ref<PowerPointQuickAction[]>
+  quickActions: ComputedRef<QuickAction[] | undefined>;
+  outlookQuickActions?: Ref<OutlookQuickAction[]>;
+  excelQuickActions: Ref<ExcelQuickAction[]>;
+  powerPointQuickActions: Ref<PowerPointQuickAction[]>;
 
   // Helper functions
-  createDisplayMessage: (role: DisplayMessage['role'], content: string, imageSrc?: string) => DisplayMessage
-  adjustTextareaHeight: () => void
-  scrollToBottom: () => Promise<void>
-  scrollToMessageTop?: () => Promise<void>
+  createDisplayMessage: (
+    role: DisplayMessage['role'],
+    content: string,
+    imageSrc?: string,
+  ) => DisplayMessage;
+  adjustTextareaHeight: () => void;
+  scrollToBottom: () => Promise<void>;
+  scrollToMessageTop?: () => Promise<void>;
 
   // Office selection helpers
-  getOfficeSelection: (opts?: any) => Promise<string>
-  getOfficeSelectionAsHtml: (opts?: any) => Promise<string>
+  getOfficeSelection: (opts?: any) => Promise<string>;
+  getOfficeSelectionAsHtml: (opts?: any) => Promise<string>;
 
   // Agent loop for executeWithAgent actions
-  runAgentLoop: (messages: ChatMessage[], modelTier: ModelTier) => Promise<void>
+  runAgentLoop: (messages: ChatMessage[], modelTier: ModelTier) => Promise<void>;
 
   // Model tier resolver
-  resolveChatModelTier: () => ModelTier
+  resolveChatModelTier: () => ModelTier;
 }
 
 export function useQuickActions(options: UseQuickActionsOptions) {
@@ -100,21 +125,24 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     getOfficeSelectionAsHtml,
     runAgentLoop,
     resolveChatModelTier,
-  } = options
+  } = options;
 
   async function applyQuickAction(actionKey: string) {
-    if (!backendOnline.value) return messageUtil.error(t('backendOffline'))
+    if (!backendOnline.value) return messageUtil.error(t('backendOffline'));
 
     // BUGFIX: Validate credentials are configured before sending request
-    const hasCredentials = await areCredentialsConfigured()
+    const hasCredentials = await areCredentialsConfigured();
     if (!hasCredentials) {
-      messageUtil.error(t('credentialsRequired'))
-      return
+      messageUtil.error(t('credentialsRequired'));
+      return;
     }
 
     // Prevent quick actions from running while another request is in progress
     if (loading.value || abortController.value) {
-      return messageUtil.warning(t('requestInProgress') || 'A request is already in progress. Please wait or stop the current request.')
+      return messageUtil.warning(
+        t('requestInProgress') ||
+          'A request is already in progress. Please wait or stop the current request.',
+      );
     }
 
     const selectedQuickAction = hostIsExcel
@@ -123,103 +151,133 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         ? powerPointQuickActions.value.find((a: PowerPointQuickAction) => a.key === actionKey)
         : hostIsOutlook && outlookQuickActions?.value
           ? outlookQuickActions.value.find((a: OutlookQuickAction) => a.key === actionKey)
-          : quickActions.value?.find((a: QuickAction) => a.key === actionKey)
+          : quickActions.value?.find((a: QuickAction) => a.key === actionKey);
 
-    const selectedExcelQuickAction = hostIsExcel ? selectedQuickAction as ExcelQuickAction | undefined : undefined
-    const selectedPowerPointQuickAction = hostIsPowerPoint ? selectedQuickAction as PowerPointQuickAction | undefined : undefined
-    const selectedOutlookQuickAction = hostIsOutlook ? selectedQuickAction as OutlookQuickAction | undefined : undefined
+    const selectedExcelQuickAction = hostIsExcel
+      ? (selectedQuickAction as ExcelQuickAction | undefined)
+      : undefined;
+    const selectedPowerPointQuickAction = hostIsPowerPoint
+      ? (selectedQuickAction as PowerPointQuickAction | undefined)
+      : undefined;
+    const selectedOutlookQuickAction = hostIsOutlook
+      ? (selectedQuickAction as OutlookQuickAction | undefined)
+      : undefined;
 
     if (actionKey === 'visual' && hostIsPowerPoint) {
-      const imageModelTier = Object.entries(availableModels.value).find(([_, info]) => info.type === 'image')?.[0] as ModelTier
+      const imageModelTier = Object.entries(availableModels.value).find(
+        ([_, info]) => info.type === 'image',
+      )?.[0] as ModelTier;
       if (!imageModelTier) {
-        return messageUtil.error(t('imageError') || 'No image model configured.')
+        return messageUtil.error(t('imageError') || 'No image model configured.');
       }
 
       // Get current slide text selection
-      let slideText = await getOfficeSelection({ actionKey })
+      let slideText = await getOfficeSelection({ actionKey });
 
       // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
       // to provide richer context for image generation
-      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length
+      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length;
       if (wordCount < 5) {
         try {
-          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({})
-          const screenshot = JSON.parse(screenshotJson)
+          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({});
+          const screenshot = JSON.parse(screenshotJson);
           if (screenshot.base64 && !screenshot.error) {
-            const dataUri = `data:image/png;base64,${screenshot.base64}`
-            let slideDesc = ''
+            const dataUri = `data:image/png;base64,${screenshot.base64}`;
+            let slideDesc = '';
             await chatStream({
-              messages: [{ role: 'user', content: [
-                { type: 'image_url', image_url: { url: dataUri } },
-                { type: 'text', text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.' },
-              ] as any }],
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'image_url', image_url: { url: dataUri } },
+                    {
+                      type: 'text',
+                      text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.',
+                    },
+                  ] as any,
+                },
+              ],
               modelTier: resolveChatModelTier(),
-              onStream: async (text: string) => { slideDesc = text },
-            })
-            if (slideDesc.trim()) slideText = slideDesc.trim()
+              onStream: async (text: string) => {
+                slideDesc = text;
+              },
+            });
+            if (slideDesc.trim()) slideText = slideDesc.trim();
           }
         } catch (err) {
-          logService.warn('[AgentLoop] PPT-M1: screenshot fallback for short selection failed', err)
+          logService.warn(
+            '[AgentLoop] PPT-M1: screenshot fallback for short selection failed',
+            err,
+          );
         }
       }
 
       // Step 1: call standard LLM to generate a proper image description prompt
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-      const visualPrompt = getPowerPointBuiltInPrompt().visual
-      const systemMsg = visualPrompt.system(lang)
-      const userMsg = visualPrompt.user(slideText || '', lang)
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const visualPrompt = getPowerPointBuiltInPrompt().visual;
+      const systemMsg = visualPrompt.system(lang);
+      const userMsg = visualPrompt.user(slideText || '', lang);
 
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`))
-      history.value.push(createDisplayMessage('assistant', t('imageGenerating')))
-      await scrollToMessageTop?.()
+      const actionLabel = selectedQuickAction?.label || t(actionKey);
+      history.value.push(
+        createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`),
+      );
+      history.value.push(createDisplayMessage('assistant', t('imageGenerating')));
+      await scrollToMessageTop?.();
 
-      loading.value = true
-      abortController.value = new AbortController()
+      loading.value = true;
+      abortController.value = new AbortController();
       try {
-        let imagePrompt = ''
+        let imagePrompt = '';
         await chatStream({
-          messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+          messages: [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: userMsg },
+          ],
           modelTier: resolveChatModelTier(),
-          onStream: async (text: string) => { imagePrompt = text },
+          onStream: async (text: string) => {
+            imagePrompt = text;
+          },
           abortSignal: abortController.value?.signal,
-        })
+        });
 
         if (!imagePrompt.trim()) {
-          history.value[history.value.length - 1].content = t('somethingWentWrong')
-          return
+          history.value[history.value.length - 1].content = t('somethingWentWrong');
+          return;
         }
 
         // Step 2: use the generated description to produce the image
-        history.value[history.value.length - 1].content = t('imageGenerating')
-        imageLoading.value = true
-        const imageSrc = await generateImage({ prompt: imagePrompt.trim() })
-        const message = history.value[history.value.length - 1]
-        message.role = 'assistant'; message.content = ''; message.imageSrc = imageSrc
-        await scrollToBottom()
+        history.value[history.value.length - 1].content = t('imageGenerating');
+        imageLoading.value = true;
+        const imageSrc = await generateImage({ prompt: imagePrompt.trim() });
+        const message = history.value[history.value.length - 1];
+        message.role = 'assistant';
+        message.content = '';
+        message.imageSrc = imageSrc;
+        await scrollToBottom();
       } catch (err: unknown) {
         if (!(err instanceof Error) || err.name !== 'AbortError') {
-          logService.error('[AgentLoop] visual quick action failed', err)
-          const errInfo = categorizeError(err)
-          history.value[history.value.length - 1].content = t(errInfo.i18nKey)
+          logService.error('[AgentLoop] visual quick action failed', err);
+          const errInfo = categorizeError(err);
+          history.value[history.value.length - 1].content = t(errInfo.i18nKey);
         }
       } finally {
-        imageLoading.value = false
-        loading.value = false
-        abortController.value = null
+        imageLoading.value = false;
+        loading.value = false;
+        abortController.value = null;
       }
-      return
+      return;
     }
 
     // PPT-H2: "review" — screenshots current slide + gathers overview, then runs agent loop
     // Does NOT require selected text (bypasses the selectedText guard below)
     if (actionKey === 'review' && hostIsPowerPoint) {
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}]`))
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const actionLabel = selectedQuickAction?.label || t(actionKey);
+      history.value.push(createDisplayMessage('user', `[${actionLabel}]`));
 
-      loading.value = true
-      abortController.value = new AbortController()
+      loading.value = true;
+      abortController.value = new AbortController();
       try {
         const systemMsg = `You are an expert presentation coach reviewing a PowerPoint presentation. Respond in ${lang}.
 Instructions:
@@ -228,209 +286,264 @@ Instructions:
 3. Call \`getAllSlidesOverview\` to understand the full presentation context.
 4. Based on the screenshot and the presentation overview, provide 3-5 specific, actionable improvement suggestions for THIS slide only.
 Review areas: content clarity, visual balance (too much/too little text), message impact, consistency with the rest of the presentation.
-Format your response as numbered suggestions. Be concrete and direct. Do NOT suggest changes to other slides.`
+Format your response as numbered suggestions. Be concrete and direct. Do NOT suggest changes to other slides.`;
         await runAgentLoop(
-          [{ role: 'system', content: systemMsg }, { role: 'user', content: 'Review the current slide and provide improvement suggestions.' }],
+          [
+            { role: 'system', content: systemMsg },
+            {
+              role: 'user',
+              content: 'Review the current slide and provide improvement suggestions.',
+            },
+          ],
           resolveChatModelTier(),
-        )
+        );
       } catch (err: unknown) {
         if (!(err instanceof Error) || err.name !== 'AbortError') {
-          logService.error('[AgentLoop] review quick action failed', err)
-          const errInfo = categorizeError(err)
-          const last = history.value[history.value.length - 1]
-          if (last?.role === 'assistant') last.content = t(errInfo.i18nKey)
+          logService.error('[AgentLoop] review quick action failed', err);
+          const errInfo = categorizeError(err);
+          const last = history.value[history.value.length - 1];
+          if (last?.role === 'assistant') last.content = t(errInfo.i18nKey);
         }
       } finally {
-        loading.value = false
-        abortController.value = null
+        loading.value = false;
+        abortController.value = null;
       }
-      return
+      return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'smart-reply') {
-      pendingSmartReply.value = true
-      userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
-      await nextTick()
-      const el = inputTextarea.value
+      pendingSmartReply.value = true;
+      userInput.value = selectedOutlookQuickAction.prefix || '';
+      adjustTextareaHeight();
+      isDraftFocusGlowing.value = true;
+      setTimeout(() => {
+        isDraftFocusGlowing.value = false;
+      }, 1500);
+      await nextTick();
+      const el = inputTextarea.value;
       if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
+        el.focus();
+        const len = userInput.value.length;
+        el.setSelectionRange(len, len);
       }
-      return
+      return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'draft') {
-      userInput.value = selectedOutlookQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1500)
-      await nextTick()
-      const el = inputTextarea.value
+      userInput.value = selectedOutlookQuickAction.prefix || '';
+      adjustTextareaHeight();
+      isDraftFocusGlowing.value = true;
+      setTimeout(() => {
+        isDraftFocusGlowing.value = false;
+      }, 1500);
+      await nextTick();
+      const el = inputTextarea.value;
       if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
+        el.focus();
+        const len = userInput.value.length;
+        el.setSelectionRange(len, len);
       }
-      return
+      return;
     }
 
     if (selectedExcelQuickAction?.mode === 'draft') {
-      userInput.value = selectedExcelQuickAction.prefix || ''
-      adjustTextareaHeight()
-      isDraftFocusGlowing.value = true
-      setTimeout(() => { isDraftFocusGlowing.value = false; }, 1000)
-      await nextTick()
-      const el = inputTextarea.value
+      userInput.value = selectedExcelQuickAction.prefix || '';
+      adjustTextareaHeight();
+      isDraftFocusGlowing.value = true;
+      setTimeout(() => {
+        isDraftFocusGlowing.value = false;
+      }, 1000);
+      await nextTick();
+      const el = inputTextarea.value;
       if (el) {
-        el.focus()
-        const len = userInput.value.length
-        el.setSelectionRange(len, len)
+        el.focus();
+        const len = userInput.value.length;
+        el.setSelectionRange(len, len);
       }
-      return
+      return;
     }
 
-    if (loading.value) return
-    loading.value = true
-    abortController.value = new AbortController()
+    if (loading.value) return;
+    loading.value = true;
+    abortController.value = new AbortController();
 
     try {
-      const selectedText = await getOfficeSelection({ includeOutlookSelectedText: true, actionKey })
+      const selectedText = await getOfficeSelection({
+        includeOutlookSelectedText: true,
+        actionKey,
+      });
       if (!selectedText) {
-        messageUtil.error(t(hostIsOutlook ? 'selectEmailPrompt' : hostIsPowerPoint ? 'selectSlideTextPrompt' : hostIsExcel ? 'selectCellsPrompt' : 'selectTextPrompt'))
-        return
+        messageUtil.error(
+          t(
+            hostIsOutlook
+              ? 'selectEmailPrompt'
+              : hostIsPowerPoint
+                ? 'selectSlideTextPrompt'
+                : hostIsExcel
+                  ? 'selectCellsPrompt'
+                  : 'selectTextPrompt',
+          ),
+        );
+        return;
       }
 
       // F1: Try to get HTML selection for rich content preservation (Word, Outlook)
-      let richContext: RichContentContext | null = null
-      const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel
+      let richContext: RichContentContext | null = null;
+      const isTextModifyingAction = !selectedQuickAction?.executeWithAgent && !hostIsExcel;
       if (isTextModifyingAction) {
         try {
-          const htmlContent = await getOfficeSelectionAsHtml({ includeOutlookSelectedText: true, actionKey })
+          const htmlContent = await getOfficeSelectionAsHtml({
+            includeOutlookSelectedText: true,
+            actionKey,
+          });
           if (htmlContent) {
-            richContext = extractTextFromHtml(htmlContent)
+            richContext = extractTextFromHtml(htmlContent);
           }
         } catch (err) {
-          logService.warn('[AgentLoop] Failed to get HTML selection for rich content preservation', err)
+          logService.warn(
+            '[AgentLoop] Failed to get HTML selection for rich content preservation',
+            err,
+          );
         }
       }
 
       // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
-      const rawTextForLlm = richContext ? richContext.cleanText : selectedText
-      const textForLlm = '\n<document_content>\n' + rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') + '\n<'+'/document_content>\n'
+      const rawTextForLlm = richContext ? richContext.cleanText : selectedText;
+      const textForLlm =
+        '\n<document_content>\n' +
+        rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') +
+        '\n<' +
+        '/document_content>\n';
 
-      let action: { system: (lang: string) => string, user: (text: string, lang: string) => string } | undefined
-      let systemMsg = ''
-      let userMsg = ''
+      let action:
+        | { system: (lang: string) => string; user: (text: string, lang: string) => string }
+        | undefined;
+      let systemMsg = '';
+      let userMsg = '';
 
       // SKILL-L1: Try to load skill file first (priority 1)
-      const skillContent = getQuickActionSkill(actionKey)
+      const skillContent = getQuickActionSkill(actionKey);
       if (skillContent) {
-        systemMsg = skillContent
-        userMsg = textForLlm
+        systemMsg = skillContent;
+        userMsg = textForLlm;
       } else {
         // Priority 2: systemPrompt from Quick Action definition
         if (hostIsOutlook) {
-          action = getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+          action =
+            getOutlookBuiltInPrompt()[actionKey as keyof typeof outlookBuiltInPrompt] ||
+            getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
         } else if (hostIsPowerPoint) {
           if (selectedPowerPointQuickAction?.systemPrompt) {
-            systemMsg = selectedPowerPointQuickAction.systemPrompt
-            userMsg = selectedText || t('applyToCurrentSlide') || 'Apply to the current slide.'
+            systemMsg = selectedPowerPointQuickAction.systemPrompt;
+            userMsg = selectedText || t('applyToCurrentSlide') || 'Apply to the current slide.';
           } else {
-            action = getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] || getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+            action =
+              getPowerPointBuiltInPrompt()[actionKey as keyof typeof powerPointBuiltInPrompt] ||
+              getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
           }
         } else if (hostIsExcel) {
-          if (selectedExcelQuickAction?.mode === 'immediate' && selectedExcelQuickAction.systemPrompt) {
-            systemMsg = selectedExcelQuickAction.systemPrompt
-            userMsg = `Selection:\n${selectedText}`
-          } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt]
-        } else action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
+          if (
+            selectedExcelQuickAction?.mode === 'immediate' &&
+            selectedExcelQuickAction.systemPrompt
+          ) {
+            systemMsg = selectedExcelQuickAction.systemPrompt;
+            userMsg = `Selection:\n${selectedText}`;
+          } else action = getExcelBuiltInPrompt()[actionKey as keyof typeof excelBuiltInPrompt];
+        } else action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
 
         // Priority 3: Fallback to constant.ts prompts
         if (!systemMsg || !userMsg) {
-          if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt]
-          if (!action) return
-          const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
-          systemMsg = action.system(lang)
-          userMsg = action.user(textForLlm, lang)
+          if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
+          if (!action) return;
+          const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+          systemMsg = action.system(lang);
+          userMsg = action.user(textForLlm, lang);
         }
       }
 
       // Enforce global formatting constraints on all Quick Actions
-      systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+      systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
 
       // F1: Add preservation instruction if rich content was detected
       if (richContext?.hasRichContent) {
-        systemMsg += getPreservationInstruction(richContext)
+        systemMsg += getPreservationInstruction(richContext);
       }
 
-      const actionLabel = selectedQuickAction?.label || t(actionKey)
-      history.value.push(createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`))
+      const actionLabel = selectedQuickAction?.label || t(actionKey);
+      history.value.push(
+        createDisplayMessage('user', `[${actionLabel}] ${selectedText.substring(0, 100)}...`),
+      );
 
       if (selectedQuickAction?.executeWithAgent) {
-        await runAgentLoop([{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }], resolveChatModelTier())
+        await runAgentLoop(
+          [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: userMsg },
+          ],
+          resolveChatModelTier(),
+        );
       } else {
-        history.value.push(createDisplayMessage('assistant', ''))
-        await scrollToMessageTop?.() // Scroll to show start of assistant response
+        history.value.push(createDisplayMessage('assistant', ''));
+        await scrollToMessageTop?.(); // Scroll to show start of assistant response
         try {
           await chatStream({
-            messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
+            messages: [
+              { role: 'system', content: systemMsg },
+              { role: 'user', content: userMsg },
+            ],
             modelTier: resolveChatModelTier(),
             onStream: async (text: string) => {
-              const message = history.value[history.value.length - 1]
-              message.role = 'assistant'
-              message.content = text
-              await scrollToBottom()
+              const message = history.value[history.value.length - 1];
+              message.role = 'assistant';
+              message.content = text;
+              await scrollToBottom();
             },
             abortSignal: abortController.value?.signal,
-          })
+          });
           // Check for empty response
-          const lastMessage = history.value[history.value.length - 1]
+          const lastMessage = history.value[history.value.length - 1];
           if (!lastMessage?.content?.trim()) {
-            lastMessage.content = t('noModelResponse')
+            lastMessage.content = t('noModelResponse');
           }
 
           // F1: Reassemble rich content with preserved fragments and inject native styles
           if (lastMessage?.content) {
-            let finalHtml = ''
+            let finalHtml = '';
             if (richContext?.hasRichContent) {
-              finalHtml = reassembleWithFragments(lastMessage.content, richContext)
+              finalHtml = reassembleWithFragments(lastMessage.content, richContext);
             }
             if (richContext?.extractedStyles && hostIsOutlook) {
-              if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content)
-              finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles)
+              if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content);
+              finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles);
             }
             if (finalHtml) {
-              lastMessage.richHtml = finalHtml
+              lastMessage.richHtml = finalHtml;
             }
           }
         } catch (err: any) {
-          if (err.name === 'AbortError') return
-          logService.error('[AgentLoop] Quick action chatStream failed', err)
-          const lastMessage = history.value[history.value.length - 1]
-          const errInfo = categorizeError(err)
+          if (err.name === 'AbortError') return;
+          logService.error('[AgentLoop] Quick action chatStream failed', err);
+          const lastMessage = history.value[history.value.length - 1];
+          const errInfo = categorizeError(err);
           if (errInfo.type === 'auth') {
-            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`
-            messageUtil.warning(t('credentialsRequired'))
+            lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
+            messageUtil.warning(t('credentialsRequired'));
           } else {
-            lastMessage.content = t(errInfo.i18nKey)
-            messageUtil.error(t(errInfo.i18nKey))
+            lastMessage.content = t(errInfo.i18nKey);
+            messageUtil.error(t(errInfo.i18nKey));
           }
         }
       }
     } finally {
-      loading.value = false
-      abortController.value = null
+      loading.value = false;
+      abortController.value = null;
     }
   }
 
   // Dummy ref for pendingSmartReply (used in smart-reply mode)
-  const pendingSmartReply = ref(false)
+  const pendingSmartReply = ref(false);
 
   return {
     applyQuickAction,
-  }
+  };
 }

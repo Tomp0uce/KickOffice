@@ -85,11 +85,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed, onMounted, watch, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-import CustomInput from '@/components/CustomInput.vue'
-import SettingCard from '@/components/SettingCard.vue'
+import CustomInput from '@/components/CustomInput.vue';
+import SettingCard from '@/components/SettingCard.vue';
 import {
   getUserKey,
   setUserKey,
@@ -97,47 +97,47 @@ import {
   setUserEmail,
   getRememberCredentials,
   setRememberCredentials as setRememberCredentialsPersist,
-} from '@/utils/credentialStorage'
-import { isCryptoAvailable } from '@/utils/cryptoPolyfill'
-import { invalidateHeaderCache } from '@/api/backend'
+} from '@/utils/credentialStorage';
+import { isCryptoAvailable } from '@/utils/cryptoPolyfill';
+import { invalidateHeaderCache } from '@/api/backend';
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const litellmUserKey = ref('')
-const litellmUserEmail = ref('')
-const rememberCredentials = ref(getRememberCredentials())
-const cryptoAvailable = ref(isCryptoAvailable())
+const litellmUserKey = ref('');
+const litellmUserEmail = ref('');
+const rememberCredentials = ref(getRememberCredentials());
+const cryptoAvailable = ref(isCryptoAvailable());
 
 const litellmConfigured = computed(() => {
-  return litellmUserKey.value.length > 0 && litellmUserEmail.value.length > 0
-})
+  return litellmUserKey.value.length > 0 && litellmUserEmail.value.length > 0;
+});
 
 watch(litellmUserKey, async value => {
-  await setUserKey(value)
-  invalidateHeaderCache()
-})
+  await setUserKey(value);
+  invalidateHeaderCache();
+});
 
 watch(litellmUserEmail, async value => {
-  await setUserEmail(value)
-  invalidateHeaderCache()
-})
+  await setUserEmail(value);
+  invalidateHeaderCache();
+});
 
 watch(rememberCredentials, async value => {
-  await setRememberCredentialsPersist(value)
-  litellmUserKey.value = await getUserKey()
-  litellmUserEmail.value = await getUserEmail()
-})
+  await setRememberCredentialsPersist(value);
+  litellmUserKey.value = await getUserKey();
+  litellmUserEmail.value = await getUserEmail();
+});
 
 onMounted(async () => {
-  litellmUserKey.value = await getUserKey()
-  litellmUserEmail.value = await getUserEmail()
-})
+  litellmUserKey.value = await getUserKey();
+  litellmUserEmail.value = await getUserEmail();
+});
 
 // Expose so parent can override values after credential migration
 defineExpose({
   setCredentials(key: string, email: string) {
-    litellmUserKey.value = key
-    litellmUserEmail.value = email
+    litellmUserKey.value = key;
+    litellmUserEmail.value = email;
   },
-})
+});
 </script>

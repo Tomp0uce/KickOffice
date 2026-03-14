@@ -6,12 +6,12 @@
  * https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting
  */
 
-const DEFAULT_AUTHOR = 'KickOffice AI'
+const DEFAULT_AUTHOR = 'KickOffice AI';
 
 export interface TrackingState {
-  available: boolean
-  originalMode: any | null
-  changed: boolean
+  available: boolean;
+  originalMode: any | null;
+  changed: boolean;
 }
 
 /**
@@ -26,34 +26,34 @@ export async function setChangeTrackingForAi(
   redlineEnabled: boolean,
   sourceLabel: string = 'AI',
 ): Promise<TrackingState> {
-  let originalMode = null
-  let changed = false
-  let available = false
+  let originalMode = null;
+  let changed = false;
+  let available = false;
 
   try {
-    const doc = context.document
-    doc.load('changeTrackingMode')
-    await context.sync()
+    const doc = context.document;
+    doc.load('changeTrackingMode');
+    await context.sync();
 
-    available = true
-    originalMode = doc.changeTrackingMode
+    available = true;
+    originalMode = doc.changeTrackingMode;
 
     // When redlines are embedded in OOXML → DISABLE native tracking
     // When no redlines → ENABLE tracking so Word tracks our text changes
     const desiredMode = redlineEnabled
-      ? Word.ChangeTrackingMode.off    // OFF because w:ins/w:del are already in the XML
-      : Word.ChangeTrackingMode.off    // OFF for silent replacement too
+      ? Word.ChangeTrackingMode.off // OFF because w:ins/w:del are already in the XML
+      : Word.ChangeTrackingMode.off; // OFF for silent replacement too
 
     if (originalMode !== desiredMode) {
-      doc.changeTrackingMode = desiredMode
-      await context.sync()
-      changed = true
+      doc.changeTrackingMode = desiredMode;
+      await context.sync();
+      changed = true;
     }
   } catch (error) {
-    console.warn(`[ChangeTracking] ${sourceLabel}: unavailable`, error)
+    console.warn(`[ChangeTracking] ${sourceLabel}: unavailable`, error);
   }
 
-  return { available, originalMode, changed }
+  return { available, originalMode, changed };
 }
 
 /**
@@ -67,15 +67,20 @@ export async function restoreChangeTracking(
   trackingState: TrackingState,
   sourceLabel: string = 'AI',
 ): Promise<void> {
-  if (!trackingState || !trackingState.available || !trackingState.changed || trackingState.originalMode === null) {
-    return
+  if (
+    !trackingState ||
+    !trackingState.available ||
+    !trackingState.changed ||
+    trackingState.originalMode === null
+  ) {
+    return;
   }
 
   try {
-    context.document.changeTrackingMode = trackingState.originalMode
-    await context.sync()
+    context.document.changeTrackingMode = trackingState.originalMode;
+    await context.sync();
   } catch (error) {
-    console.warn(`[ChangeTracking] ${sourceLabel}: restore failed`, error)
+    console.warn(`[ChangeTracking] ${sourceLabel}: restore failed`, error);
   }
 }
 
@@ -84,8 +89,8 @@ export async function restoreChangeTracking(
  * Default: true (Track Changes enabled).
  */
 export function loadRedlineSetting(): boolean {
-  const storedSetting = localStorage.getItem('redlineEnabled')
-  return storedSetting !== null ? storedSetting === 'true' : true
+  const storedSetting = localStorage.getItem('redlineEnabled');
+  return storedSetting !== null ? storedSetting === 'true' : true;
 }
 
 /**
@@ -93,9 +98,9 @@ export function loadRedlineSetting(): boolean {
  * Default: "KickOffice AI".
  */
 export function loadRedlineAuthor(): string {
-  const storedAuthor = localStorage.getItem('redlineAuthor')
+  const storedAuthor = localStorage.getItem('redlineAuthor');
   if (storedAuthor && storedAuthor.trim() !== '') {
-    return storedAuthor
+    return storedAuthor;
   }
-  return DEFAULT_AUTHOR
+  return DEFAULT_AUTHOR;
 }

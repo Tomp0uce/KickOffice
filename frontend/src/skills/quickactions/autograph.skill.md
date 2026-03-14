@@ -1,19 +1,23 @@
 # Auto-Graph Quick Action Skill (Excel)
 
 ## Purpose
+
 Analyze selected data, generate derived columns if needed, and automatically insert the most appropriate chart into the Excel workbook.
 
 ## When to Use
+
 - User clicks "Auto-Graph" Quick Action in Excel
 - Selected data represents a dataset suitable for visualization
 - Goal: Create insightful chart directly in the workbook without manual chart configuration
 
 ## Input Contract
+
 - **Selected cells**: Data range (may be table, range, or mixed data)
 - **Context**: Excel worksheet with data to visualize
 - **Expectations**: Chart inserted into workbook, not just recommendations
 
 ## Output Requirements
+
 1. **Analyze data structure**: Identify x-axis, y-axis, categories, time series, etc.
 2. **Generate derived columns if beneficial**: Create calculated fields and highlight them with `setCellRange` formatting parameter
 3. **Select appropriate chart type**: Column, line, scatter, pie based on data characteristics
@@ -24,6 +28,7 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ## Tool Execution Order
 
 **CRITICAL SEQUENCE**:
+
 1. **Inspect Data** — `getSelectedCells` or `getWorksheetData` to understand structure
 2. **Generate Derived Columns (Optional)** — `setCellRange` to add calculated fields with formatting parameter for highlighting (e.g., yellow fill)
 3. **Insert Chart** — `manageObject` with action='create', type='chart', config with proper source address
@@ -31,12 +36,15 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ## Chart Type Selection Guide
 
 ### Column Chart (Vertical Bars)
+
 **Use when**:
+
 - Comparing categories (e.g., sales by region, product performance)
 - Discrete categories on x-axis
 - 2-10 categories ideal
 
 **Data structure**:
+
 ```
 | Region    | Sales |
 |-----------|-------|
@@ -47,12 +55,15 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ```
 
 ### Line Chart
+
 **Use when**:
+
 - Time series data (dates on x-axis)
 - Showing trends over time
 - Continuous data
 
 **Data structure**:
+
 ```
 | Month | Revenue |
 |-------|---------|
@@ -62,12 +73,15 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ```
 
 ### Scatter Plot
+
 **Use when**:
+
 - Showing relationship between two numeric variables
 - Looking for correlations
 - No clear x/y hierarchy
 
 **Data structure**:
+
 ```
 | Height | Weight |
 |--------|--------|
@@ -77,12 +91,15 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ```
 
 ### Pie Chart
+
 **Use when**:
+
 - Showing parts of a whole (percentages)
 - 3-7 categories maximum
 - All values positive
 
 **Data structure**:
+
 ```
 | Category | Percentage |
 |----------|------------|
@@ -92,7 +109,9 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ```
 
 ### Bar Chart (Horizontal Bars)
+
 **Use when**:
+
 - Many categories (>10)
 - Long category names
 - Better for readability than column chart
@@ -100,7 +119,9 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 ## Derived Column Examples
 
 ### Example 1: Add Growth Rate
+
 If data has sales over time:
+
 ```
 Original:
 | Month | Sales |
@@ -116,6 +137,7 @@ Add column:
 Use `setCellRange` with formatting parameter to highlight "Growth %" column (yellow fill)
 
 ### Example 2: Add Running Total
+
 ```
 Original:
 | Day   | Orders |
@@ -129,6 +151,7 @@ Add column:
 ```
 
 ### Example 3: Add Percentage of Total
+
 ```
 Original:
 | Product | Revenue |
@@ -144,25 +167,28 @@ Add column:
 ## Tool Usage
 
 ### Required Tools
+
 - **`getSelectedCells`**: Determine source range for chart
 - **`setCellRange`** (optional): Add derived columns with formatting parameter for highlighting
 - **`manageObject`**: INSERT the chart (MANDATORY)
 
 ### manageObject Parameters
+
 ```typescript
 manageObject({
   action: 'create',
   type: 'chart',
   config: {
-    chartType: 'columnClustered',  // or 'line', 'scatter', 'pie', 'barClustered'
-    source: 'A1:B10',              // Data range INCLUDING HEADERS
-    hasHeaders: true,              // TRUE if first row is headers
-    title: 'Sales by Region'       // Chart title (optional)
-  }
-})
+    chartType: 'columnClustered', // or 'line', 'scatter', 'pie', 'barClustered'
+    source: 'A1:B10', // Data range INCLUDING HEADERS
+    hasHeaders: true, // TRUE if first row is headers
+    title: 'Sales by Region', // Chart title (optional)
+  },
+});
 ```
 
 **Chart Type Values**:
+
 - `columnClustered` — vertical bars
 - `line` — line chart
 - `scatter` — scatter plot (XY)
@@ -172,7 +198,9 @@ manageObject({
 ## Example Executions
 
 ### Example 1: Simple Column Chart
+
 **Data** (A1:B5):
+
 ```
 | Region | Sales |
 |--------|-------|
@@ -183,9 +211,10 @@ manageObject({
 ```
 
 **Execution**:
+
 ```javascript
 // Step 1: Inspect
-getSelectedCells()  // Returns A1:B5
+getSelectedCells(); // Returns A1:B5
 
 // Step 2: Create chart
 manageObject({
@@ -195,13 +224,15 @@ manageObject({
     chartType: 'columnClustered',
     source: 'A1:B5',
     hasHeaders: true,
-    title: 'Sales by Region'
-  }
-})
+    title: 'Sales by Region',
+  },
+});
 ```
 
 ### Example 2: Line Chart with Derived Growth Column
+
 **Original Data** (A1:B6):
+
 ```
 | Month | Revenue |
 |-------|---------|
@@ -213,23 +244,24 @@ manageObject({
 ```
 
 **Execution**:
+
 ```javascript
 // Step 1: Add growth % column with yellow highlighting
 setCellRange({
-  address: "C1:C6",
+  address: 'C1:C6',
   values: [
-    ["Growth %"],
-    [null],           // Jan has no previous month
-    [4.0],            // Feb: (52000-50000)/50000 = 4%
-    [-7.7],           // Mar: (48000-52000)/52000 = -7.7%
-    [14.6],           // Apr
-    [3.6]             // May
+    ['Growth %'],
+    [null], // Jan has no previous month
+    [4.0], // Feb: (52000-50000)/50000 = 4%
+    [-7.7], // Mar: (48000-52000)/52000 = -7.7%
+    [14.6], // Apr
+    [3.6], // May
   ],
   formatting: {
-    fillColor: "#FFFF00",  // Yellow background
-    bold: true
-  }
-})
+    fillColor: '#FFFF00', // Yellow background
+    bold: true,
+  },
+});
 
 // Step 2: Create line chart (Revenue + Growth)
 manageObject({
@@ -239,13 +271,15 @@ manageObject({
     chartType: 'line',
     source: 'A1:C6',
     hasHeaders: true,
-    title: 'Monthly Revenue and Growth'
-  }
-})
+    title: 'Monthly Revenue and Growth',
+  },
+});
 ```
 
 ### Example 3: Scatter Plot
+
 **Data** (A1:C10 — Height, Weight, Age):
+
 ```
 | Height | Weight | Age |
 |--------|--------|-----|
@@ -255,23 +289,26 @@ manageObject({
 ```
 
 **Execution**:
+
 ```javascript
 manageObject({
   action: 'create',
   type: 'chart',
   config: {
     chartType: 'scatter',
-    source: 'A1:B10',  // Height vs Weight
+    source: 'A1:B10', // Height vs Weight
     hasHeaders: true,
-    title: 'Height vs Weight Correlation'
-  }
-})
+    title: 'Height vs Weight Correlation',
+  },
+});
 ```
 
 ## Edge Cases
 
 ### Data has no headers
+
 Set `hasHeaders: false`:
+
 ```javascript
 manageObject({
   action: 'create',
@@ -279,49 +316,62 @@ manageObject({
   config: {
     chartType: 'columnClustered',
     source: 'A1:B5',
-    hasHeaders: false  // Excel will auto-label as Series 1, Series 2, etc.
-  }
-})
+    hasHeaders: false, // Excel will auto-label as Series 1, Series 2, etc.
+  },
+});
 ```
 
 ### Multiple Y-values per X-value
+
 Excel will automatically create grouped/stacked chart:
+
 ```
 | Month | Product A | Product B |
 |-------|-----------|-----------|
 | Jan   | 100       | 150       |
 | Feb   | 120       | 140       |
 ```
+
 → Creates multi-series column chart
 
 ### User selected non-contiguous range
+
 Use the first contiguous block or ask via error message
 
 ### Data is already in a table
+
 `source` should reference table name or explicit range (e.g., "Table1" or "A1:B10")
 
 ## Derived Column Best Practices
 
 ### When to generate derived columns
+
 - Time series → Add growth rates, moving averages
 - Sales data → Add % of total, rank
 - Financial data → Add ratios (profit margin, ROI)
 
 ### How to highlight
+
 ```javascript
 setCellRange({
-  address: "C1:C10",
-  values: [[/* your data */]],
+  address: 'C1:C10',
+  values: [
+    [
+      /* your data */
+    ],
+  ],
   formatting: {
-    fillColor: "#FFFF00",        // Yellow background
+    fillColor: '#FFFF00', // Yellow background
     bold: true,
-    fontColor: "#000000"
-  }
-})
+    fontColor: '#000000',
+  },
+});
 ```
 
 ## Quality Check
+
 After chart creation, verify:
+
 - ✓ Chart appears in Excel workbook?
 - ✓ Correct chart type for data structure?
 - ✓ Headers properly used as axis labels?
@@ -329,6 +379,7 @@ After chart creation, verify:
 - ✓ Chart title descriptive?
 
 ## Auto-Graph vs Other Excel Actions
+
 - **Auto-Graph** = analyze data → generate columns → create chart (visualization)
 - **Ingest** = clean raw data → create table (data structuring)
 - **Explain** = describe formula/data (education)

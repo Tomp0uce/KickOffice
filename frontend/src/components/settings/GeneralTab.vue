@@ -171,78 +171,78 @@
 </template>
 
 <script setup lang="ts">
-import { useStorage } from '@vueuse/core'
-import { watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useStorage } from '@vueuse/core';
+import { watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
-import type { ModelInfo } from '@/types'
-import CustomButton from '@/components/CustomButton.vue'
-import CustomInput from '@/components/CustomInput.vue'
-import SettingCard from '@/components/SettingCard.vue'
-import SingleSelect from '@/components/SingleSelect.vue'
-import { i18n } from '@/i18n'
-import { optionLists } from '@/utils/common'
-import { localStorageKey } from '@/utils/enum'
-import { isExcel } from '@/utils/hostDetection'
+import type { ModelInfo } from '@/types';
+import CustomButton from '@/components/CustomButton.vue';
+import CustomInput from '@/components/CustomInput.vue';
+import SettingCard from '@/components/SettingCard.vue';
+import SingleSelect from '@/components/SingleSelect.vue';
+import { i18n } from '@/i18n';
+import { optionLists } from '@/utils/common';
+import { localStorageKey } from '@/utils/enum';
+import { isExcel } from '@/utils/hostDetection';
 
 const props = defineProps<{
-  backendOnline: boolean
-  availableModels: Record<string, ModelInfo>
-  appVersion: string
-  loadingModels?: boolean
-}>()
+  backendOnline: boolean;
+  availableModels: Record<string, ModelInfo>;
+  appVersion: string;
+  loadingModels?: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'open-feedback'): void
-}>()
+  (e: 'open-feedback'): void;
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const hostIsExcel = isExcel()
+const hostIsExcel = isExcel();
 
-const localLanguage = useStorage(localStorageKey.localLanguage, 'fr')
-const darkMode = useStorage(localStorageKey.darkMode, false)
-const excelFormulaLanguage = useStorage(localStorageKey.excelFormulaLanguage, 'en')
-const userGender = useStorage(localStorageKey.userGender, 'unspecified')
-const userFirstName = useStorage(localStorageKey.userFirstName, '')
-const userLastName = useStorage(localStorageKey.userLastName, '')
-const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25)
+const localLanguage = useStorage(localStorageKey.localLanguage, 'fr');
+const darkMode = useStorage(localStorageKey.darkMode, false);
+const excelFormulaLanguage = useStorage(localStorageKey.excelFormulaLanguage, 'en');
+const userGender = useStorage(localStorageKey.userGender, 'unspecified');
+const userFirstName = useStorage(localStorageKey.userFirstName, '');
+const userLastName = useStorage(localStorageKey.userLastName, '');
+const agentMaxIterations = useStorage(localStorageKey.agentMaxIterations, 25);
 
-const AGENT_MAX_ITERATIONS_MIN = 1
-const AGENT_MAX_ITERATIONS_MAX = 100
+const AGENT_MAX_ITERATIONS_MIN = 1;
+const AGENT_MAX_ITERATIONS_MAX = 100;
 
 function sanitizeAgentMaxIterations(value: unknown): number {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 25
-  const normalized = Math.trunc(parsed)
-  return Math.min(AGENT_MAX_ITERATIONS_MAX, Math.max(AGENT_MAX_ITERATIONS_MIN, normalized))
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 25;
+  const normalized = Math.trunc(parsed);
+  return Math.min(AGENT_MAX_ITERATIONS_MAX, Math.max(AGENT_MAX_ITERATIONS_MIN, normalized));
 }
 
 watch(
   agentMaxIterations,
   value => {
-    const sanitized = sanitizeAgentMaxIterations(value)
+    const sanitized = sanitizeAgentMaxIterations(value);
     if (sanitized !== value) {
-      agentMaxIterations.value = sanitized
+      agentMaxIterations.value = sanitized;
     }
   },
   { immediate: true },
-)
+);
 
 watch(localLanguage, val => {
-  i18n.global.locale.value = val as 'en' | 'fr'
-})
+  i18n.global.locale.value = val as 'en' | 'fr';
+});
 
-const localLanguageOptions = optionLists.localLanguageList
+const localLanguageOptions = optionLists.localLanguageList;
 
 const excelFormulaLanguageOptions = [
   { label: t('excelFormulaLanguageEnglish'), value: 'en' },
   { label: t('excelFormulaLanguageFrench'), value: 'fr' },
-]
+];
 const genderOptions = [
   { label: t('userGenderUnspecified'), value: 'unspecified' },
   { label: t('userGenderFemale'), value: 'female' },
   { label: t('userGenderMale'), value: 'male' },
   { label: t('userGenderNonBinary'), value: 'nonbinary' },
-]
+];
 </script>

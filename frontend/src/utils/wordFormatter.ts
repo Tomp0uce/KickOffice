@@ -1,8 +1,8 @@
-import { Ref } from 'vue'
+import { Ref } from 'vue';
 
-import { detectOfficeHost } from './hostDetection'
-import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './markdown'
-import { normalizeLineEndings } from './common'
+import { detectOfficeHost } from './hostDetection';
+import { renderOfficeCommonApiHtml, stripRichFormattingSyntax } from './markdown';
+import { normalizeLineEndings } from './common';
 
 function insertHtmlWithCommonApi(html: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -11,78 +11,78 @@ function insertHtmlWithCommonApi(html: string): Promise<void> {
       { coercionType: Office.CoercionType.Html },
       result => {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
-          resolve()
+          resolve();
         } else {
-          reject(result.error)
+          reject(result.error);
         }
       },
-    )
-  })
+    );
+  });
 }
 
 class WordFormatter {
   static async insertFormattedResult(result: string, insertType: Ref<string>): Promise<void> {
-    if (!result || !result.trim()) return
+    if (!result || !result.trim()) return;
 
-    const html = renderOfficeCommonApiHtml(result)
-    const host = detectOfficeHost()
+    const html = renderOfficeCommonApiHtml(result);
+    const host = detectOfficeHost();
 
     if (host !== 'Word') {
-      const htmlWithLinePrefix = insertType.value === 'newLine' ? `<br/>${html}` : html
-      await insertHtmlWithCommonApi(htmlWithLinePrefix)
-      return
+      const htmlWithLinePrefix = insertType.value === 'newLine' ? `<br/>${html}` : html;
+      await insertHtmlWithCommonApi(htmlWithLinePrefix);
+      return;
     }
 
     await Word.run(async context => {
-      const selection = context.document.getSelection()
-      if (insertType.value === 'NoAction') return
+      const selection = context.document.getSelection();
+      if (insertType.value === 'NoAction') return;
 
-      let location: any = 'Replace'
-      let finalHtml = html
+      let location: any = 'Replace';
+      let finalHtml = html;
 
       if (insertType.value === 'append') {
-        location = 'End'
+        location = 'End';
       } else if (insertType.value === 'newLine') {
-        location = 'After'
-        finalHtml = `<br/>${html}`
+        location = 'After';
+        finalHtml = `<br/>${html}`;
       }
 
-      selection.insertHtml(finalHtml, location)
-      await context.sync()
-    })
+      selection.insertHtml(finalHtml, location);
+      await context.sync();
+    });
   }
 
   static async insertPlainResult(result: string, insertType: Ref<string>): Promise<void> {
-    const normalizedResult = stripRichFormattingSyntax(normalizeLineEndings(result))
+    const normalizedResult = stripRichFormattingSyntax(normalizeLineEndings(result));
 
-    if (!normalizedResult.trim()) return
+    if (!normalizedResult.trim()) return;
 
     switch (insertType.value) {
       case 'replace':
         await Word.run(async context => {
-          const range = context.document.getSelection()
-          range.insertText(normalizedResult, 'Replace')
-          await context.sync()
-        })
-        break
+          const range = context.document.getSelection();
+          range.insertText(normalizedResult, 'Replace');
+          await context.sync();
+        });
+        break;
       case 'append':
         await Word.run(async context => {
-          const range = context.document.getSelection()
-          range.insertText(normalizedResult, 'End')
-          await context.sync()
-        })
-        break
+          const range = context.document.getSelection();
+          range.insertText(normalizedResult, 'End');
+          await context.sync();
+        });
+        break;
       case 'newLine':
         await Word.run(async context => {
-          const range = context.document.getSelection()
-          range.insertParagraph(normalizedResult, 'After')
-          await context.sync()
-        })
-        break
+          const range = context.document.getSelection();
+          range.insertParagraph(normalizedResult, 'After');
+          await context.sync();
+        });
+        break;
       case 'NoAction':
-        break
+        break;
     }
   }
 }
 
-export { WordFormatter }
+export { WordFormatter };

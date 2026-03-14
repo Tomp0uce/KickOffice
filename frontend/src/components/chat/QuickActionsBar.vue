@@ -22,8 +22,8 @@
       class="max-w-xs! flex-1! bg-surface! text-xs!"
       @update:model-value="
         val => {
-          $emit('update:selectedPromptId', String(val))
-          $emit('load-prompt')
+          $emit('update:selectedPromptId', String(val));
+          $emit('load-prompt');
         }
       "
     >
@@ -35,22 +35,22 @@
 </template>
 
 <script lang="ts" setup>
-import CustomButton from '@/components/CustomButton.vue'
-import SingleSelect from '@/components/SingleSelect.vue'
-import type { QuickAction } from '@/types/chat'
-import type { SavedPrompt } from '@/utils/savedPrompts'
+import CustomButton from '@/components/CustomButton.vue';
+import SingleSelect from '@/components/SingleSelect.vue';
+import type { QuickAction } from '@/types/chat';
+import type { SavedPrompt } from '@/utils/savedPrompts';
 
 defineProps<{
-  quickActions: QuickAction[]
-  loading: boolean
-  savedPrompts: SavedPrompt[]
-  selectedPromptId: string
-  selectPromptTitle: string
-}>()
+  quickActions: QuickAction[];
+  loading: boolean;
+  savedPrompts: SavedPrompt[];
+  selectedPromptId: string;
+  selectPromptTitle: string;
+}>();
 
 defineEmits<{
-  (e: 'apply-action', key: string): void
-  (e: 'update:selectedPromptId', value: string): void
-  (e: 'load-prompt'): void
-}>()
+  (e: 'apply-action', key: string): void;
+  (e: 'update:selectedPromptId', value: string): void;
+  (e: 'load-prompt'): void;
+}>();
 </script>

@@ -79,38 +79,38 @@
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from '@/types'
-import { ArrowLeft, Globe, KeyRound, MessageSquare, Settings, Wrench } from 'lucide-vue-next'
-import { onBeforeMount, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import type { ModelInfo } from '@/types';
+import { ArrowLeft, Globe, KeyRound, MessageSquare, Settings, Wrench } from 'lucide-vue-next';
+import { onBeforeMount, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 
-import { fetchModels, healthCheck } from '@/api/backend'
-import { logService } from '@/utils/logger'
-import CustomButton from '@/components/CustomButton.vue'
-import AccountTab from '@/components/settings/AccountTab.vue'
-import BuiltinPromptsTab from '@/components/settings/BuiltinPromptsTab.vue'
-import FeedbackDialog from '@/components/settings/FeedbackDialog.vue'
-import GeneralTab from '@/components/settings/GeneralTab.vue'
-import PromptsTab from '@/components/settings/PromptsTab.vue'
-import ToolsTab from '@/components/settings/ToolsTab.vue'
-import { migrateFromPlaintext, getUserKey, getUserEmail } from '@/utils/credentialStorage'
+import { fetchModels, healthCheck } from '@/api/backend';
+import { logService } from '@/utils/logger';
+import CustomButton from '@/components/CustomButton.vue';
+import AccountTab from '@/components/settings/AccountTab.vue';
+import BuiltinPromptsTab from '@/components/settings/BuiltinPromptsTab.vue';
+import FeedbackDialog from '@/components/settings/FeedbackDialog.vue';
+import GeneralTab from '@/components/settings/GeneralTab.vue';
+import PromptsTab from '@/components/settings/PromptsTab.vue';
+import ToolsTab from '@/components/settings/ToolsTab.vue';
+import { migrateFromPlaintext, getUserKey, getUserEmail } from '@/utils/credentialStorage';
 
-const { t } = useI18n()
-const router = useRouter()
-const appVersion = __APP_VERSION__
+const { t } = useI18n();
+const router = useRouter();
+const appVersion = __APP_VERSION__;
 
-const currentTab = ref('account')
-const showFeedbackDialog = ref(false)
+const currentTab = ref('account');
+const showFeedbackDialog = ref(false);
 
 // Backend state shared with GeneralTab
-const backendOnline = ref(false)
-const availableModels = ref<Record<string, ModelInfo>>({})
-const loadingModels = ref(true)
-const resolvingConfig = ref(true)
+const backendOnline = ref(false);
+const availableModels = ref<Record<string, ModelInfo>>({});
+const loadingModels = ref(true);
+const resolvingConfig = ref(true);
 
 // Ref to AccountTab to set credentials after migration
-const accountTabRef = ref<InstanceType<typeof AccountTab> | null>(null)
+const accountTabRef = ref<InstanceType<typeof AccountTab> | null>(null);
 
 const tabs = [
   { id: 'account', label: 'account', defaultLabel: 'Account', icon: KeyRound },
@@ -123,41 +123,41 @@ const tabs = [
     icon: Settings,
   },
   { id: 'tools', label: 'tools', defaultLabel: 'Tools', icon: Wrench },
-]
+];
 
 async function checkBackend() {
-  backendOnline.value = await healthCheck()
+  backendOnline.value = await healthCheck();
   if (backendOnline.value) {
     try {
-      loadingModels.value = true
-      availableModels.value = await fetchModels()
+      loadingModels.value = true;
+      availableModels.value = await fetchModels();
     } catch {
-      logService.error('Failed to fetch models')
+      logService.error('Failed to fetch models');
     } finally {
-      loadingModels.value = false
+      loadingModels.value = false;
     }
   } else {
-    loadingModels.value = false
+    loadingModels.value = false;
   }
 }
 
 function backToHome() {
-  router.push('/')
+  router.push('/');
 }
 
 onBeforeMount(() => {
-  checkBackend()
-})
+  checkBackend();
+});
 
 onMounted(async () => {
   // Simulate config resolution time for smooth UX
-  await new Promise(resolve => setTimeout(resolve, 600))
+  await new Promise(resolve => setTimeout(resolve, 600));
   // Migrate old plaintext credentials if needed
-  await migrateFromPlaintext()
+  await migrateFromPlaintext();
   // Load credentials and push them into AccountTab
-  const key = await getUserKey()
-  const email = await getUserEmail()
-  accountTabRef.value?.setCredentials(key, email)
-  resolvingConfig.value = false
-})
+  const key = await getUserKey();
+  const email = await getUserEmail();
+  accountTabRef.value?.setCredentials(key, email);
+  resolvingConfig.value = false;
+});
 </script>

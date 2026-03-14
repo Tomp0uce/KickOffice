@@ -5,12 +5,12 @@
 
 declare module '@ansonlai/docx-redline-js' {
   export interface RedlineOptions {
-    author?: string
-    generateRedlines?: boolean
+    author?: string;
+    generateRedlines?: boolean;
   }
 
   export interface RedlineResult {
-    oxml: string
+    oxml: string;
   }
 
   /**
@@ -27,13 +27,13 @@ declare module '@ansonlai/docx-redline-js' {
     paragraphOoxml: string,
     originalText: string,
     revisedText: string,
-    options?: RedlineOptions
-  ): Promise<RedlineResult>
+    options?: RedlineOptions,
+  ): Promise<RedlineResult>;
 
   /**
    * Set the default author name for track changes revisions.
    *
    * @param authorName - Author name to use for revisions
    */
-  export function setDefaultAuthor(authorName: string): void
+  export function setDefaultAuthor(authorName: string): void;
 }

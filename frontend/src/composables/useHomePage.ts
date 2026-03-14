@@ -9,39 +9,39 @@
  * when the user manually scrolls away from the bottom, and re-enabled when
  * they scroll back near the bottom.
  */
-import { nextTick, ref } from 'vue'
-import type { Ref } from 'vue'
-import { useRouter } from 'vue-router'
-import type ChatInput from '@/components/chat/ChatInput.vue'
-import type ChatMessageList from '@/components/chat/ChatMessageList.vue'
-import type { SavedPrompt } from '@/utils/savedPrompts'
-import { loadSavedPromptsFromStorage } from '@/utils/savedPrompts'
-import { TEXTAREA_MAX_HEIGHT_PX } from '@/constants/limits'
-import type { useSessionManager } from '@/composables/useSessionManager'
+import { nextTick, ref } from 'vue';
+import type { Ref } from 'vue';
+import { useRouter } from 'vue-router';
+import type ChatInput from '@/components/chat/ChatInput.vue';
+import type ChatMessageList from '@/components/chat/ChatMessageList.vue';
+import type { SavedPrompt } from '@/utils/savedPrompts';
+import { loadSavedPromptsFromStorage } from '@/utils/savedPrompts';
+import { TEXTAREA_MAX_HEIGHT_PX } from '@/constants/limits';
+import type { useSessionManager } from '@/composables/useSessionManager';
 
-type SessionManager = ReturnType<typeof useSessionManager>
+type SessionManager = ReturnType<typeof useSessionManager>;
 
-type ScrollMode = 'bottom' | 'message-top' | 'auto'
+type ScrollMode = 'bottom' | 'message-top' | 'auto';
 
 // UX-H1: Threshold in pixels from bottom to consider user "at bottom"
-const SCROLL_BOTTOM_THRESHOLD_PX = 100
+const SCROLL_BOTTOM_THRESHOLD_PX = 100;
 
 export function useHomePage(deps: {
-  chatInputRef: Ref<InstanceType<typeof ChatInput> | undefined>
-  messageListRef: Ref<InstanceType<typeof ChatMessageList> | undefined>
-  savedPrompts: Ref<SavedPrompt[]>
-  userInput: Ref<string>
-  customSystemPrompt: Ref<string>
-  selectedPromptId: Ref<string>
-  loading: Ref<boolean>
-  isDeleteConfirmVisible: Ref<boolean>
-  isNewChatConfirmVisible: Ref<boolean>
-  sessionManager: SessionManager
-  resetSessionStats: () => void
-  rebuildSessionFiles: () => void
-  stopGeneration: () => void
+  chatInputRef: Ref<InstanceType<typeof ChatInput> | undefined>;
+  messageListRef: Ref<InstanceType<typeof ChatMessageList> | undefined>;
+  savedPrompts: Ref<SavedPrompt[]>;
+  userInput: Ref<string>;
+  customSystemPrompt: Ref<string>;
+  selectedPromptId: Ref<string>;
+  loading: Ref<boolean>;
+  isDeleteConfirmVisible: Ref<boolean>;
+  isNewChatConfirmVisible: Ref<boolean>;
+  sessionManager: SessionManager;
+  resetSessionStats: () => void;
+  rebuildSessionFiles: () => void;
+  stopGeneration: () => void;
 }) {
-  const router = useRouter()
+  const router = useRouter();
   const {
     chatInputRef,
     messageListRef,
@@ -56,23 +56,23 @@ export function useHomePage(deps: {
     resetSessionStats,
     rebuildSessionFiles,
     stopGeneration,
-  } = deps
+  } = deps;
 
   // UX-H1 — Smart scroll: auto-scroll enabled by default, disabled when user scrolls up
-  const isAutoScrollEnabled = ref(true)
+  const isAutoScrollEnabled = ref(true);
 
   // ─── Textarea ─────────────────────────────────────────────────────────────
 
   function adjustTextareaHeight() {
-    const candidate = chatInputRef.value?.textareaEl
+    const candidate = chatInputRef.value?.textareaEl;
     const textarea =
       candidate && 'style' in candidate
         ? (candidate as HTMLTextAreaElement)
-        : (candidate as unknown as HTMLTextAreaElement)
+        : (candidate as unknown as HTMLTextAreaElement);
 
     if (textarea && textarea.style) {
-      textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`;
     }
   }
 
@@ -80,55 +80,55 @@ export function useHomePage(deps: {
 
   // UX-H1 — Check if container is scrolled near bottom
   function isNearBottom(container: HTMLElement): boolean {
-    const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-    return scrollBottom <= SCROLL_BOTTOM_THRESHOLD_PX
+    const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return scrollBottom <= SCROLL_BOTTOM_THRESHOLD_PX;
   }
 
   // UX-H1 — Handle scroll event to detect manual user scrolling
   function handleScroll() {
-    const rawContainer = messageListRef.value?.containerEl
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
-    if (!container) return
+    const rawContainer = messageListRef.value?.containerEl;
+    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    if (!container) return;
 
     // If user scrolls near the bottom, re-enable auto-scroll
     // If user scrolls away from the bottom, disable auto-scroll
-    isAutoScrollEnabled.value = isNearBottom(container)
+    isAutoScrollEnabled.value = isNearBottom(container);
   }
 
   async function scrollToBottom(mode: ScrollMode = 'auto', force = false) {
-    await nextTick()
-    const rawContainer = messageListRef.value?.containerEl
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
-    if (!container) return
+    await nextTick();
+    const rawContainer = messageListRef.value?.containerEl;
+    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    if (!container) return;
 
     // UX-H1 — If forced, re-enable auto-scroll
     if (force) {
-      isAutoScrollEnabled.value = true
+      isAutoScrollEnabled.value = true;
     }
 
     // UX-H1 — Respect auto-scroll flag unless forced
-    if (!force && !isAutoScrollEnabled.value) return
+    if (!force && !isAutoScrollEnabled.value) return;
 
-    const messageElements = container.querySelectorAll('[data-message]')
-    const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined
+    const messageElements = container.querySelectorAll('[data-message]');
+    const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined;
 
     if (!lastMessage) {
-      container.scrollTop = container.scrollHeight
-      return
+      container.scrollTop = container.scrollHeight;
+      return;
     }
 
-    const msgTop = lastMessage.offsetTop
-    const padding = 12
+    const msgTop = lastMessage.offsetTop;
+    const padding = 12;
 
     if (mode === 'bottom') {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     } else if (mode === 'message-top') {
-      container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
+      container.scrollTo({ top: msgTop - padding, behavior: 'smooth' });
     } else {
       if (lastMessage.offsetHeight > container.clientHeight) {
-        container.scrollTo({ top: msgTop - padding, behavior: 'smooth' })
+        container.scrollTo({ top: msgTop - padding, behavior: 'smooth' });
       } else {
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
       }
     }
   }
@@ -136,78 +136,78 @@ export function useHomePage(deps: {
   async function scrollToMessageTop() {
     // UX-H1 — scrollToMessageTop is always called when new content arrives,
     // so we always force-enable auto-scroll to ensure the user sees new messages
-    await scrollToBottom('message-top', true)
+    await scrollToBottom('message-top', true);
   }
 
   async function scrollToVeryBottom() {
-    await scrollToBottom('bottom', false)
+    await scrollToBottom('bottom', false);
   }
 
   async function scrollToConversationTop() {
-    await nextTick()
-    const rawContainer = messageListRef.value?.containerEl
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined
-    if (!container) return
+    await nextTick();
+    const rawContainer = messageListRef.value?.containerEl;
+    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    if (!container) return;
     // UX-H1 — Disable auto-scroll when explicitly scrolling to top
-    isAutoScrollEnabled.value = false
-    container.scrollTo({ top: 0, behavior: 'smooth' })
+    isAutoScrollEnabled.value = false;
+    container.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ─── Navigation ────────────────────────────────────────────────────────────
 
   function goToSettings() {
-    router.push('/settings')
+    router.push('/settings');
   }
 
   // ─── Chat lifecycle ────────────────────────────────────────────────────────
 
   async function doNewChat() {
-    if (loading.value) stopGeneration()
-    await sessionManager.newSession()
-    resetSessionStats()
-    userInput.value = ''
-    customSystemPrompt.value = ''
-    selectedPromptId.value = ''
-    await nextTick()
-    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-    el?.focus?.()
-    adjustTextareaHeight()
+    if (loading.value) stopGeneration();
+    await sessionManager.newSession();
+    resetSessionStats();
+    userInput.value = '';
+    customSystemPrompt.value = '';
+    selectedPromptId.value = '';
+    await nextTick();
+    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };
+    el?.focus?.();
+    adjustTextareaHeight();
   }
 
   async function executeNewChat() {
     if (userInput.value.trim()) {
-      isNewChatConfirmVisible.value = true
-      return
+      isNewChatConfirmVisible.value = true;
+      return;
     }
-    await doNewChat()
+    await doNewChat();
   }
 
   async function confirmNewChat() {
-    isNewChatConfirmVisible.value = false
-    await doNewChat()
+    isNewChatConfirmVisible.value = false;
+    await doNewChat();
   }
 
   // ─── Session management ────────────────────────────────────────────────────
 
   async function handleSwitchSession(sessionId: string) {
-    if (loading.value) return
-    await sessionManager.switchSession(sessionId)
-    rebuildSessionFiles()
-    resetSessionStats()
-    await nextTick()
-    scrollToConversationTop()
+    if (loading.value) return;
+    await sessionManager.switchSession(sessionId);
+    rebuildSessionFiles();
+    resetSessionStats();
+    await nextTick();
+    scrollToConversationTop();
   }
 
   function handleDeleteSession() {
-    if (loading.value) return
-    isDeleteConfirmVisible.value = true
+    if (loading.value) return;
+    isDeleteConfirmVisible.value = true;
   }
 
   async function confirmDeleteSession() {
-    isDeleteConfirmVisible.value = false
-    await sessionManager.deleteCurrentSession()
-    await nextTick()
-    scrollToConversationTop()
+    isDeleteConfirmVisible.value = false;
+    await sessionManager.deleteCurrentSession();
+    await nextTick();
+    scrollToConversationTop();
   }
 
   // ─── Message actions ───────────────────────────────────────────────────────
@@ -216,38 +216,36 @@ export function useHomePage(deps: {
     history: Ref<Array<{ role: string; content?: string }>>,
     sendMessage: (content: string, files?: File[]) => void,
   ) {
-    if (loading.value) return
-    const lastUserMsg = [...history.value].reverse().find(m => m.role === 'user')
-    if (!lastUserMsg?.content) return
-    sendMessage(lastUserMsg.content, [])
+    if (loading.value) return;
+    const lastUserMsg = [...history.value].reverse().find(m => m.role === 'user');
+    if (!lastUserMsg?.content) return;
+    sendMessage(lastUserMsg.content, []);
   }
 
-  async function handleEditMessage(
-    message: { content?: string },
-  ) {
-    userInput.value = message.content ?? ''
-    await nextTick()
-    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-    el?.focus?.()
+  async function handleEditMessage(message: { content?: string }) {
+    userInput.value = message.content ?? '';
+    await nextTick();
+    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };
+    el?.focus?.();
   }
 
   // ─── Saved prompts ─────────────────────────────────────────────────────────
 
   function loadSavedPrompts() {
-    savedPrompts.value = loadSavedPromptsFromStorage([])
+    savedPrompts.value = loadSavedPromptsFromStorage([]);
   }
 
   function loadSelectedPrompt() {
-    const prompt = savedPrompts.value.find(p => p.id === selectedPromptId.value)
+    const prompt = savedPrompts.value.find(p => p.id === selectedPromptId.value);
     if (!prompt) {
-      customSystemPrompt.value = ''
-      return
+      customSystemPrompt.value = '';
+      return;
     }
-    customSystemPrompt.value = prompt.systemPrompt
-    userInput.value = prompt.userPrompt
-    adjustTextareaHeight()
-    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void }
-    el?.focus?.()
+    customSystemPrompt.value = prompt.systemPrompt;
+    userInput.value = prompt.userPrompt;
+    adjustTextareaHeight();
+    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };
+    el?.focus?.();
   }
 
   return {
@@ -269,5 +267,5 @@ export function useHomePage(deps: {
     // UX-H1 — Smart scroll exports
     handleScroll,
     isAutoScrollEnabled,
-  }
+  };
 }

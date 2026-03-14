@@ -1,20 +1,24 @@
 # Extract Quick Action Skill
 
 ## Purpose
+
 Extract structured information (action items, deadlines, key points, decisions) from unstructured email content and present it in an organized, scannable format.
 
 ## When to Use
+
 - User clicks "Extract" Quick Action in Outlook
 - Email contains information that needs to be actioned or tracked
 - Goal: Pull out actionable items and key facts from email body
 
 ## Input Contract
+
 - **Selected text**: Email content (may contain action items, dates, decisions, requests buried in prose)
 - **Language**: Preserve the language of the original text
 - **Context**: Email (meeting notes, project updates, requests, discussions)
 - **Rich content**: May contain `{{PRESERVE_N}}` placeholders (Outlook)
 
 ## Output Requirements
+
 1. **Extract action items**: Who needs to do what by when
 2. **Extract deadlines**: All dates and time-sensitive information
 3. **Extract key decisions**: Conclusions reached or approvals given
@@ -26,7 +30,9 @@ Extract structured information (action items, deadlines, key points, decisions) 
 ## Extraction Categories
 
 ### 1. Action Items
+
 Format:
+
 ```
 ## Action Items
 - **[Person Name]**: [Action] — [Deadline if mentioned]
@@ -34,12 +40,15 @@ Format:
 ```
 
 Extract:
+
 - Explicit tasks ("Please send", "Can you review", "You need to")
 - Implicit tasks ("We should", "It would be good to")
 - Delegations ("Sarah will", "The team needs to")
 
 ### 2. Deadlines & Dates
+
 Format:
+
 ```
 ## Deadlines
 - **[Date]**: [What is due]
@@ -47,12 +56,15 @@ Format:
 ```
 
 Extract:
+
 - Explicit dates ("by March 20", "due Friday")
 - Relative dates ("end of week", "next month")
 - Convert relative to absolute when possible (e.g., "tomorrow" → specific date if today's date is known from context)
 
 ### 3. Decisions Made
+
 Format:
+
 ```
 ## Decisions
 - [Decision statement]
@@ -60,12 +72,15 @@ Format:
 ```
 
 Extract:
+
 - Approvals ("approved", "green light", "let's proceed")
 - Rejections ("not moving forward", "declined")
 - Choices made ("we'll go with Option B")
 
 ### 4. Questions / Open Items
+
 Format:
+
 ```
 ## Questions
 - [Question from email]
@@ -73,11 +88,14 @@ Format:
 ```
 
 Extract:
+
 - Direct questions
 - Implicit uncertainties ("not sure if", "we need to clarify")
 
 ### 5. Key Information
+
 Format:
+
 ```
 ## Key Points
 - [Important fact or update]
@@ -85,17 +103,21 @@ Format:
 ```
 
 Extract:
+
 - Budget figures
 - Project status updates
 - Important changes or announcements
 
 ## Tool Usage
+
 **DO NOT** call Office.js tools. Return pure structured text.
 
 ## Example Extractions
 
 ### Example 1: Project Update Email
+
 **Input**:
+
 ```
 Hi team,
 
@@ -111,6 +133,7 @@ Let me know if any issues!
 ```
 
 **Output**:
+
 ```
 ## Action Items
 - **Sarah**: Coordinate with design team for high-fidelity mockups — Due: March 25
@@ -134,7 +157,9 @@ Let me know if any issues!
 ```
 
 ### Example 2: Meeting Follow-up Email
+
 **Input**:
+
 ```
 Hi everyone,
 
@@ -153,6 +178,7 @@ Lisa
 ```
 
 **Output**:
+
 ```
 ## Action Items
 - **Engineering**: Start iOS mobile app build — Target: June release
@@ -181,7 +207,9 @@ Lisa
 ```
 
 ### Example 3: Client Request Email
+
 **Input**:
+
 ```
 Good morning,
 
@@ -200,6 +228,7 @@ Michael
 ```
 
 **Output**:
+
 ```
 ## Action Items
 - **Us**: Extend support period from 6 months to 12 months (calculate additional cost)
@@ -227,7 +256,9 @@ Michael
 ```
 
 ### Example 4: French Email with Image
+
 **Input**:
+
 ```
 Bonjour,
 
@@ -245,6 +276,7 @@ Cordialement,
 ```
 
 **Output**:
+
 ```
 ## Actions
 - **Marie**: Revoir les estimations pour réduire coûts de 10% — Échéance: Vendredi
@@ -270,11 +302,13 @@ Cordialement,
 ```
 
 ## Preservation Rules (Outlook)
+
 - Keep `{{PRESERVE_N}}` placeholders EXACTLY as-is
 - Reference them naturally in extracted content
 - Don't "extract" or describe them
 
 ## Edge Cases
+
 - **No action items**: Still extract decisions, dates, key points if present
 - **Informal email**: Extract even if phrasing is casual ("can u send me...")
 - **Implicit information**: Infer action items from context ("We should..." → action item)
@@ -282,7 +316,9 @@ Cordialement,
 - **FYI emails**: Focus on "Key Points" section if no actions
 
 ## Quality Check
+
 After extracting, verify:
+
 - ✓ All action items identified with owners?
 - ✓ All deadlines captured?
 - ✓ Decisions clearly stated?
@@ -290,6 +326,7 @@ After extracting, verify:
 - ✓ Scannable format (bullets, headings)?
 
 ## Extract vs Other Actions
+
 - **Extract** = pull out structured info (actions, dates, decisions)
 - **Concise** = shorten the entire email text
 - **Summary** = create prose overview

@@ -1,19 +1,23 @@
 # Explain Formula Quick Action Skill (Excel)
 
 ## Purpose
+
 Explain Excel formulas or data in simple, understandable terms—covering what it does, how it works, and potential edge cases or pitfalls.
 
 ## When to Use
+
 - User clicks "Explain Formula" Quick Action in Excel
 - Selected cell(s) contain a formula or complex data structure
 - Goal: Educational explanation for the user
 
 ## Input Contract
+
 - **Selected cells**: Cell(s) with formula or data to explain
 - **Language**: Respond in the UI language (not necessarily document language)
 - **Context**: Excel worksheet
 
 ## Output Requirements
+
 1. **Clear explanation**: What does this formula/data do?
 2. **How it works**: Break down the logic step-by-step
 3. **Edge cases**: Potential errors, limitations, or unusual behaviors
@@ -22,7 +26,9 @@ Explain Excel formulas or data in simple, understandable terms—covering what i
 6. **Return text explanation**: No tool calls needed
 
 ## Tool Usage
+
 **Optional**:
+
 - `getSelectedCells` — If you need to inspect the actual formula/data (usually provided by system)
 
 **DO NOT** modify data or create charts. This is a read-only educational action.
@@ -30,14 +36,17 @@ Explain Excel formulas or data in simple, understandable terms—covering what i
 ## Explanation Structure
 
 ### 1. Summary (What)
+
 One-sentence description of what the formula/data does.
 
 Example: "This formula calculates the total sales for each product category."
 
 ### 2. Breakdown (How)
+
 Step-by-step explanation of the logic.
 
 Example:
+
 ```
 The formula works in three steps:
 1. SUMIF looks at the Category column (B:B)
@@ -46,9 +55,11 @@ The formula works in three steps:
 ```
 
 ### 3. Example (When helpful)
+
 Show a concrete example with sample data.
 
 Example:
+
 ```
 If your data looks like:
 | Product  | Category | Sales |
@@ -60,9 +71,11 @@ And D2 contains "Gadgets", the formula returns 300 (100 + 200)
 ```
 
 ### 4. Edge Cases (Important)
+
 Highlight potential issues or limitations.
 
 Example:
+
 ```
 ⚠️ Edge cases to watch for:
 - If the category name has extra spaces, the match will fail
@@ -73,26 +86,31 @@ Example:
 ## Common Formula Types
 
 ### VLOOKUP
+
 **What**: Searches for a value in the first column of a range and returns a value from another column
 **How**: `VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])`
 **Edge cases**: #N/A if not found, #REF! if col_index exceeds range, requires sorted data if range_lookup=TRUE
 
 ### SUMIF / SUMIFS
+
 **What**: Sums values that meet specific criteria
 **How**: `SUMIF(range, criteria, [sum_range])`
-**Edge cases**: Text criteria need quotes, wildcards (* and ?) supported, case-insensitive
+**Edge cases**: Text criteria need quotes, wildcards (\* and ?) supported, case-insensitive
 
 ### INDEX MATCH
+
 **What**: More flexible alternative to VLOOKUP
 **How**: `INDEX(return_range, MATCH(lookup_value, lookup_range, 0))`
 **Edge cases**: #N/A if no match, can search left unlike VLOOKUP
 
 ### IF / IFS
+
 **What**: Conditional logic
 **How**: `IF(condition, value_if_true, value_if_false)`
 **Edge cases**: Nested IFs can become hard to maintain, consider IFS for multiple conditions
 
 ### CONCATENATE / TEXTJOIN
+
 **What**: Combines text from multiple cells
 **How**: `TEXTJOIN(delimiter, ignore_empty, text1, text2, ...)`
 **Edge cases**: CONCATENATE doesn't skip blanks, TEXTJOIN does if ignore_empty=TRUE
@@ -100,12 +118,15 @@ Example:
 ## Example Explanations
 
 ### Example 1: Complex Nested Formula
+
 **Formula**:
+
 ```
 =IF(AND(B2>10, C2="Yes"), "Approved", IF(B2>5, "Review", "Rejected"))
 ```
 
 **Explanation**:
+
 ```
 # Formula Explanation
 
@@ -131,12 +152,15 @@ Example:
 ```
 
 ### Example 2: VLOOKUP with Common Issues
+
 **Formula**:
+
 ```
 =VLOOKUP(A2, ProductDatabase!A:D, 3, FALSE)
 ```
 
 **Explanation**:
+
 ```
 # VLOOKUP Explanation
 
@@ -164,12 +188,15 @@ The formula returns 29.99 (the value in the 3rd column)
 ```
 
 ### Example 3: Array Formula (SUMPRODUCT)
+
 **Formula**:
+
 ```
 =SUMPRODUCT((Category="Electronics")*(Status="Sold")*Price)
 ```
 
 **Explanation**:
+
 ```
 # SUMPRODUCT Explanation
 
@@ -199,12 +226,15 @@ Total: 150
 ```
 
 ### Example 4: French Explanation
+
 **Formula**:
+
 ```
 =SI(A2>100; "Élevé"; "Normal")
 ```
 
 **Explanation** (in French if UI language is French):
+
 ```
 # Explication de la Formule
 
@@ -229,11 +259,13 @@ Total: 150
 If the selected cells contain data but no formulas:
 
 **Identify pattern**:
+
 - Time series data → "This appears to be monthly sales data showing an upward trend"
 - Categories with values → "This is a breakdown of expenses by department"
 - Table structure → "This is a structured dataset with products, quantities, and prices"
 
 **Provide insights**:
+
 - "The highest value is in row 5 (March) with 15,000"
 - "There's a noticeable drop in Q2"
 - "The data appears to be aggregated by week"
@@ -241,19 +273,25 @@ If the selected cells contain data but no formulas:
 ## Edge Cases
 
 ### No formula in selected cell
+
 Explain the data structure or pattern instead
 
 ### Multiple formulas selected
+
 Explain each unique formula (if 2-3 formulas) or the general pattern (if many similar formulas)
 
 ### Complex array formula
+
 Break down into logical components, use visual aids (step 1, step 2, etc.)
 
 ### Circular reference detected
+
 Explain what a circular reference is and how to fix it
 
 ## Quality Check
+
 After explaining, verify:
+
 - ✓ Explanation is clear and educational?
 - ✓ Technical jargon minimized?
 - ✓ Edge cases mentioned?
@@ -261,6 +299,7 @@ After explaining, verify:
 - ✓ Correct language used (UI language)?
 
 ## Explain vs Other Excel Actions
+
 - **Explain** = educational description (read-only)
 - **Formula Generator** = help user BUILD a new formula
 - **Ingest** = clean and structure raw data

@@ -9,36 +9,36 @@
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
-import { ref, type Ref } from 'vue'
-import type { DisplayMessage } from '@/types/chat'
+import { ref, type Ref } from 'vue';
+import type { DisplayMessage } from '@/types/chat';
 
 export interface SessionFile {
-  filename: string
-  content: string
-  fileId?: string
+  filename: string;
+  content: string;
+  fileId?: string;
 }
 
 export interface UseSessionFilesOptions {
-  history: Ref<DisplayMessage[]>
+  history: Ref<DisplayMessage[]>;
 }
 
 export function useSessionFiles(options: UseSessionFilesOptions) {
-  const { history } = options
+  const { history } = options;
 
   /**
    * Uploaded files for the current session.
    * These are attached to user messages and provided to the LLM as context.
    */
-  const sessionUploadedFiles = ref<SessionFile[]>([])
+  const sessionUploadedFiles = ref<SessionFile[]>([]);
 
   /**
    * Add a file to the session.
    * Automatically deduplicates by filename.
    */
   function addSessionFile(file: SessionFile) {
-    const exists = sessionUploadedFiles.value.some((f) => f.filename === file.filename)
+    const exists = sessionUploadedFiles.value.some(f => f.filename === file.filename);
     if (!exists) {
-      sessionUploadedFiles.value.push(file)
+      sessionUploadedFiles.value.push(file);
     }
   }
 
@@ -50,15 +50,15 @@ export function useSessionFiles(options: UseSessionFilesOptions) {
    * are available for subsequent LLM requests.
    */
   function rebuildSessionFiles() {
-    const seen = new Set<string>()
-    sessionUploadedFiles.value = []
+    const seen = new Set<string>();
+    sessionUploadedFiles.value = [];
 
     for (const msg of history.value) {
       if (msg.attachedFiles) {
         for (const f of msg.attachedFiles) {
           if (!seen.has(f.filename)) {
-            seen.add(f.filename)
-            sessionUploadedFiles.value.push(f)
+            seen.add(f.filename);
+            sessionUploadedFiles.value.push(f);
           }
         }
       }
@@ -70,7 +70,7 @@ export function useSessionFiles(options: UseSessionFilesOptions) {
    * Typically called when starting a new conversation.
    */
   function clearSessionFiles() {
-    sessionUploadedFiles.value = []
+    sessionUploadedFiles.value = [];
   }
 
   /**
@@ -78,7 +78,7 @@ export function useSessionFiles(options: UseSessionFilesOptions) {
    * Returns undefined if no files uploaded (cleaner than empty array for API).
    */
   function getSessionFilesForChat(): SessionFile[] | undefined {
-    return sessionUploadedFiles.value.length > 0 ? [...sessionUploadedFiles.value] : undefined
+    return sessionUploadedFiles.value.length > 0 ? [...sessionUploadedFiles.value] : undefined;
   }
 
   return {
@@ -87,5 +87,5 @@ export function useSessionFiles(options: UseSessionFilesOptions) {
     rebuildSessionFiles,
     clearSessionFiles,
     getSessionFilesForChat,
-  }
+  };
 }

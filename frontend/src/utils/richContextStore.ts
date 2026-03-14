@@ -3,20 +3,20 @@
  * Stores the last extracted rich content context for use in tool execution
  */
 
-import type { RichContentContext } from './richContentPreserver'
-import { ref } from 'vue'
+import type { RichContentContext } from './richContentPreserver';
+import { ref } from 'vue';
 
 // Global reactive store for the last rich context
-const lastRichContext = ref<RichContentContext | null>(null)
+const lastRichContext = ref<RichContentContext | null>(null);
 
 export function setLastRichContext(context: RichContentContext | null): void {
-  lastRichContext.value = context
+  lastRichContext.value = context;
 }
 
 export function getLastRichContext(): RichContentContext | null {
-  return lastRichContext.value
+  return lastRichContext.value;
 }
 
 export function clearLastRichContext(): void {
-  lastRichContext.value = null
+  lastRichContext.value = null;
 }

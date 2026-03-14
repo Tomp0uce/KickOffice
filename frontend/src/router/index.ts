@@ -1,4 +1,4 @@
-import { createWebHistory, createRouter } from 'vue-router'
+import { createWebHistory, createRouter } from 'vue-router';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -18,10 +18,10 @@ const router = createRouter({
       redirect: '/',
     },
   ],
-})
+});
 
 router.onError((error, to) => {
-  const isChunkError = 
+  const isChunkError =
     error.message.includes('Failed to fetch dynamically imported module') ||
     error.message.includes('Importing a module script failed');
 
@@ -35,6 +35,6 @@ router.onError((error, to) => {
     const separator = targetPath.includes('?') ? '&' : '?';
     window.location.href = `${targetPath}${separator}_refresh=${Date.now()}`;
   }
-})
+});
 
-export default router
+export default router;

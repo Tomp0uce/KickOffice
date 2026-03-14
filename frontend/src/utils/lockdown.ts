@@ -1,13 +1,13 @@
-import "ses";
+import 'ses';
 
 /* global lockdown */
 
-const PRESERVE_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
+const PRESERVE_FUNCTION_PROPS = new Set(['length', 'name', 'prototype']);
 const OFFICE_FUNCTION_STUBS = new Set([
-  "_validateParams",
-  "_validateParameterCount",
-  "_validateParameter",
-  "_validateParameterType",
+  '_validateParams',
+  '_validateParameterCount',
+  '_validateParameter',
+  '_validateParameterType',
 ]);
 
 function saveFunctionProperties(): Map<string, unknown> {
@@ -46,10 +46,10 @@ function restoreFunctionProperties(saved: Map<string, unknown>) {
     }
   }
 
-  const desc = Object.getOwnPropertyDescriptor(globalThis, "Function");
+  const desc = Object.getOwnPropertyDescriptor(globalThis, 'Function');
   if (!desc || (!desc.writable && !desc.configurable)) {
     console.warn(
-      "[lockdown] Cannot restore Function properties — Function is neither writable nor configurable",
+      '[lockdown] Cannot restore Function properties — Function is neither writable nor configurable',
     );
     return;
   }
@@ -76,7 +76,7 @@ function restoreFunctionProperties(saved: Map<string, unknown>) {
     },
   });
 
-  Object.defineProperty(globalThis, "Function", {
+  Object.defineProperty(globalThis, 'Function', {
     value: proxy,
     writable: desc.writable ?? false,
     configurable: desc.configurable ?? false,
@@ -91,18 +91,15 @@ export function ensureLockdown() {
     const savedFnProps = saveFunctionProperties();
     // @ts-ignore
     lockdown({
-      errorTaming: "unsafe",
-      consoleTaming: "unsafe",
-      overrideTaming: "severe",
-      stackFiltering: "verbose",
+      errorTaming: 'unsafe',
+      consoleTaming: 'unsafe',
+      overrideTaming: 'severe',
+      stackFiltering: 'verbose',
     });
     locked = true;
     restoreFunctionProperties(savedFnProps);
   } catch (e) {
-    if (
-      e instanceof TypeError &&
-      String(e).includes("SES_ALREADY_LOCKED_DOWN")
-    ) {
+    if (e instanceof TypeError && String(e).includes('SES_ALREADY_LOCKED_DOWN')) {
       locked = true;
     } else {
       throw e;

@@ -9,10 +9,10 @@ async function getJSZip(): Promise<any> {
   try {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore — jszip is an optional dependency; install with: cd frontend && npm install jszip
-    const JSZip = await import('jszip')
-    return JSZip.default
+    const JSZip = await import('jszip');
+    return JSZip.default;
   } catch {
-    throw new Error('JSZip is not installed. Run: cd frontend && npm install jszip')
+    throw new Error('JSZip is not installed. Run: cd frontend && npm install jszip');
   }
 }
 
@@ -26,61 +26,63 @@ async function getJSZip(): Promise<any> {
 export async function withSlideZip(
   context: any,
   slideIndex: number,
-  callback: (zip: any, markDirty: () => void) => Promise<any>
+  callback: (zip: any, markDirty: () => void) => Promise<any>,
 ): Promise<any> {
-  const JSZip = await getJSZip()
+  const JSZip = await getJSZip();
 
-  const slides = context.presentation.slides
-  slides.load('items/id')
-  await context.sync()
+  const slides = context.presentation.slides;
+  slides.load('items/id');
+  await context.sync();
 
   if (slideIndex < 0 || slideIndex >= slides.items.length) {
-    throw new Error(`Slide index ${slideIndex} is out of bounds.`)
+    throw new Error(`Slide index ${slideIndex} is out of bounds.`);
   }
 
-  const targetSlide = slides.items[slideIndex]
-  const slideId = targetSlide.id
+  const targetSlide = slides.items[slideIndex];
+  const slideId = targetSlide.id;
 
   // Export slide as base64
-  const base64Result = (targetSlide as any).exportAsBase64()
-  await context.sync()
+  const base64Result = (targetSlide as any).exportAsBase64();
+  await context.sync();
 
   // Load into JSZip
-  const zip = await JSZip.loadAsync(base64Result.value, { base64: true })
+  const zip = await JSZip.loadAsync(base64Result.value, { base64: true });
 
-  let dirty = false
-  const markDirty = () => { dirty = true }
+  let dirty = false;
+  const markDirty = () => {
+    dirty = true;
+  };
 
   // Run the callback
-  const result = await callback(zip, markDirty)
+  const result = await callback(zip, markDirty);
 
   if (dirty) {
-    const newBase64 = await zip.generateAsync({ type: 'base64' })
+    const newBase64 = await zip.generateAsync({ type: 'base64' });
 
     // Find preceding slide for insertion point
-    slides.load('items/id')
-    await context.sync()
+    slides.load('items/id');
+    await context.sync();
 
-    const prevIndex = slideIndex > 0 ? slideIndex - 1 : undefined
-    const prevSlideId = prevIndex !== undefined ? slides.items[prevIndex].id : undefined
+    const prevIndex = slideIndex > 0 ? slideIndex - 1 : undefined;
+    const prevSlideId = prevIndex !== undefined ? slides.items[prevIndex].id : undefined;
 
     context.presentation.insertSlidesFromBase64(newBase64, {
-      targetSlideId: prevSlideId
-    })
-    await context.sync()
+      targetSlideId: prevSlideId,
+    });
+    await context.sync();
 
     // Delete original (reload to find it)
-    slides.load('items/id')
-    await context.sync()
+    slides.load('items/id');
+    await context.sync();
 
-    const original = slides.items.find((s: any) => s.id === slideId)
+    const original = slides.items.find((s: any) => s.id === slideId);
     if (original) {
-      original.delete()
-      await context.sync()
+      original.delete();
+      await context.sync();
     }
   }
 
-  return result
+  return result;
 }
 
 export function escapeXml(text: string): string {
@@ -89,9 +91,9 @@ export function escapeXml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+    .replace(/'/g, '&apos;');
 }
 
 export function sanitizeXmlAmpersands(xml: string): string {
-  return xml.replace(/&(?!amp;|lt;|gt;|apos;|quot;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
+  return xml.replace(/&(?!amp;|lt;|gt;|apos;|quot;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
 }
