@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/types';
+import { logService } from '@/utils/logger';
 import { getWordToolDefinitions } from '@/utils/wordTools';
 import { getExcelToolDefinitions } from '@/utils/excelTools';
 import { getPowerPointToolDefinitions } from '@/utils/powerpointTools';
@@ -37,7 +38,7 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
   register(hostName: string, provider: ToolProvider): void {
     const normalizedName = hostName.toLowerCase();
     if (this.providers.has(normalizedName)) {
-      console.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`);
+      logService.warn(`[ToolProviderRegistry] Overwriting existing provider for host: ${hostName}`);
     }
     this.providers.set(normalizedName, provider);
   }
@@ -52,7 +53,7 @@ class ToolProviderRegistryImpl implements ToolProviderRegistry {
     const provider = this.providers.get(normalizedName);
 
     if (!provider) {
-      console.warn(
+      logService.warn(
         `[ToolProviderRegistry] No provider registered for host: ${hostName}. Available hosts: ${this.getRegisteredHosts().join(', ')}`,
       );
       return [];

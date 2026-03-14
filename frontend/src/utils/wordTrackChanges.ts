@@ -6,6 +6,8 @@
  * https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting
  */
 
+import { logService } from './logger';
+
 const DEFAULT_AUTHOR = 'KickOffice AI';
 
 export interface TrackingState {
@@ -38,11 +40,10 @@ export async function setChangeTrackingForAi(
     available = true;
     originalMode = doc.changeTrackingMode;
 
-    // When redlines are embedded in OOXML → DISABLE native tracking
-    // When no redlines → ENABLE tracking so Word tracks our text changes
-    const desiredMode = redlineEnabled
-      ? Word.ChangeTrackingMode.off // OFF because w:ins/w:del are already in the XML
-      : Word.ChangeTrackingMode.off; // OFF for silent replacement too
+    // Always disable native tracking during OOXML insertion.
+    // - redlineEnabled=true: w:ins/w:del are already embedded → native tracking would double-record
+    // - redlineEnabled=false: silent replacement → no tracking desired either
+    const desiredMode = Word.ChangeTrackingMode.off;
 
     if (originalMode !== desiredMode) {
       doc.changeTrackingMode = desiredMode;
@@ -50,7 +51,7 @@ export async function setChangeTrackingForAi(
       changed = true;
     }
   } catch (error) {
-    console.warn(`[ChangeTracking] ${sourceLabel}: unavailable`, error);
+    logService.warn(`[ChangeTracking] ${sourceLabel}: unavailable`, error instanceof Error ? error : new Error(String(error)));
   }
 
   return { available, originalMode, changed };
@@ -80,7 +81,7 @@ export async function restoreChangeTracking(
     context.document.changeTrackingMode = trackingState.originalMode;
     await context.sync();
   } catch (error) {
-    console.warn(`[ChangeTracking] ${sourceLabel}: restore failed`, error);
+    logService.warn(`[ChangeTracking] ${sourceLabel}: restore failed`, error instanceof Error ? error : new Error(String(error)));
   }
 }
 

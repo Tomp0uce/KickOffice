@@ -11,6 +11,8 @@
 
 import { applyRedlineToOxml, setDefaultAuthor } from '@ansonlai/docx-redline-js';
 
+import { logService } from './logger';
+import { getErrorMessage } from './common';
 import {
   setChangeTrackingForAi,
   restoreChangeTracking,
@@ -95,12 +97,12 @@ export async function applyRevisionToSelection(
       generateRedlines: enableTrackChanges,
     });
     resultOoxml = redlineResult.oxml;
-  } catch (error: any) {
-    console.error('[WordDiff] docx-redline-js error:', error);
+  } catch (error: unknown) {
+    logService.error('[WordDiff] docx-redline-js error:', error instanceof Error ? error : new Error(String(error)));
     return {
       success: false,
       strategy: 'none',
-      message: `Error generating revision markup: ${error.message || String(error)}`,
+      message: `Error generating revision markup: ${getErrorMessage(error)}`,
     };
   }
 
@@ -116,17 +118,17 @@ export async function applyRevisionToSelection(
     // w:ins/w:del survive because native tracking is OFF
     selection.insertOoxml(resultOoxml, 'Replace');
     await context.sync();
-  } catch (insertError: any) {
+  } catch (insertError: unknown) {
     // Fallback: if insertOoxml fails (Word Online), use direct text replacement
-    console.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError);
+    logService.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError instanceof Error ? insertError : new Error(String(insertError)));
     try {
       selection.insertText(revisedText, 'Replace');
       await context.sync();
-    } catch (fallbackError: any) {
+    } catch (fallbackError: unknown) {
       return {
         success: false,
         strategy: 'none',
-        message: `Error applying revision: ${fallbackError.message || String(fallbackError)}`,
+        message: `Error applying revision: ${getErrorMessage(fallbackError)}`,
       };
     }
     return {
@@ -232,17 +234,15 @@ export async function applyRevisionToDocument(
         await context.sync();
         details.push(`[${paraIndex}] OK`);
         applied++;
-      } catch (insertError: any) {
+      } catch (insertError: unknown) {
         // Fallback: direct text replacement (Word Online may not support insertOoxml on paragraphs)
         try {
           para.insertText(revisedText, 'Replace');
           await context.sync();
           details.push(`[${paraIndex}] OK (direct-replace fallback)`);
           applied++;
-        } catch (fallbackError: any) {
-          details.push(
-            `[${paraIndex}] ERROR (insert): ${(fallbackError as any).message || String(fallbackError)}`,
-          );
+        } catch (fallbackError: unknown) {
+          details.push(`[${paraIndex}] ERROR (insert): ${getErrorMessage(fallbackError)}`);
           failed++;
         }
       }

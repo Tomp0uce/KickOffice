@@ -1,6 +1,8 @@
 import type { InsertType } from '@/types';
 import { type Ref, ref } from 'vue';
 
+import { logService } from '@/utils/logger';
+
 import type { DisplayMessage } from '@/types/chat';
 import { insertFormattedResult, insertResult } from '@/api/wordApi';
 import { message as messageUtil } from '@/utils/message';
@@ -44,7 +46,7 @@ async function doOutlookInsert(
       await copyToClipboard(content, true);
     }
   } catch (err) {
-    console.warn('[useOfficeInsert] Outlook error/fallback to clipboard', err);
+    logService.warn('[useOfficeInsert] Outlook error/fallback to clipboard', err);
     await copyToClipboard(content, true);
   }
 }
@@ -58,7 +60,7 @@ async function doPowerPointInsert(
     await insertIntoPowerPoint(content);
     messageUtil.success(t('insertedToSlide'));
   } catch (err) {
-    console.warn('[useOfficeInsert] PowerPoint error/fallback to clipboard', err);
+    logService.warn('[useOfficeInsert] PowerPoint error/fallback to clipboard', err);
     await copyToClipboard(content, true);
   }
 }
@@ -77,7 +79,7 @@ async function doExcelInsert(
     });
     messageUtil.success(t('insertedToCell'));
   } catch (err) {
-    console.warn('[useOfficeInsert] Excel error/fallback to clipboard', err);
+    logService.warn('[useOfficeInsert] Excel error/fallback to clipboard', err);
     await copyToClipboard(content, true);
   }
 }
@@ -107,7 +109,7 @@ async function doWordInsert(
       messageUtil.success(t('inserted'));
     }
   } catch (err) {
-    console.warn('[useOfficeInsert] Word error/fallback to clipboard', err);
+    logService.warn('[useOfficeInsert] Word error/fallback to clipboard', err);
     await copyToClipboard(content, true);
   }
 }
@@ -155,7 +157,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       notifySuccess();
       return;
     } catch (err) {
-      console.warn('Clipboard API writeText failed, trying fallback:', err);
+      logService.warn('Clipboard API writeText failed, trying fallback:', err);
     }
     try {
       const textarea = document.createElement('textarea');

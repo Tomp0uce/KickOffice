@@ -1,4 +1,5 @@
 import type { ToolInputSchema, ToolCategory } from '@/types';
+import { getErrorMessage } from './common';
 import { evaluate } from 'mathjs';
 import { getBash, writeFile as vfsWrite, readFile as vfsRead, listUploads } from '@/utils/vfs';
 
@@ -93,8 +94,8 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
         }
 
         return `${expression} = ${result}`;
-      } catch (error: any) {
-        return `Error evaluating expression: ${error.message}`;
+      } catch (error: unknown) {
+        return `Error evaluating expression: ${getErrorMessage(error)}`;
       }
     },
   },
@@ -121,8 +122,8 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
         const result = await shell.exec(command);
         const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
         return output || '(no output)';
-      } catch (error: any) {
-        return `Shell error: ${error.message}`;
+      } catch (error: unknown) {
+        return `Shell error: ${getErrorMessage(error)}`;
       }
     },
   },
@@ -151,8 +152,8 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
         await vfsWrite(path, content);
         const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
         return `File written successfully to ${fullPath}`;
-      } catch (error: any) {
-        return `Error writing file: ${error.message}`;
+      } catch (error: unknown) {
+        return `Error writing file: ${getErrorMessage(error)}`;
       }
     },
   },
@@ -174,8 +175,8 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
       const { path } = args as { path: string };
       try {
         return await vfsRead(path);
-      } catch (error: any) {
-        return `Error reading file: ${error.message}`;
+      } catch (error: unknown) {
+        return `Error reading file: ${getErrorMessage(error)}`;
       }
     },
   },
@@ -193,8 +194,8 @@ const generalToolDefinitions: GeneralToolDefinition[] = [
         const files = await listUploads();
         if (files.length === 0) return 'No files in VFS uploads directory.';
         return `Files in /home/user/uploads/:\n${files.map(f => `  - ${f}`).join('\n')}`;
-      } catch (error: any) {
-        return `Error listing files: ${error.message}`;
+      } catch (error: unknown) {
+        return `Error listing files: ${getErrorMessage(error)}`;
       }
     },
   },

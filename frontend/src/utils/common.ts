@@ -145,11 +145,11 @@ export function buildExecuteWrapper<TTemplate extends Record<string, any>>(
 
       try {
         return await runner((context: any) => hostExecute(context, args));
-      } catch (error: any) {
+      } catch (error: unknown) {
         return JSON.stringify(
           {
             success: false,
-            error: error.message || String(error),
+            error: getErrorMessage(error),
             tool: def.name || 'unknown',
             suggestion: 'Fix the error parameters or context and try again.',
           },

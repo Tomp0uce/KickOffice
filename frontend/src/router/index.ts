@@ -1,5 +1,7 @@
 import { createMemoryHistory, createRouter } from 'vue-router';
 
+import { logService } from '@/utils/logger';
+
 const router = createRouter({
   // Office Add-ins run inside iframes with URLs controlled by Office.
   // createMemoryHistory avoids manipulating the browser URL entirely,
@@ -32,7 +34,7 @@ router.onError((error, to) => {
   if (isChunkError) {
     // Prevent infinite reload loops
     if (to?.query?._refresh) {
-      console.error('Failed to load chunk even after refresh.', error);
+      logService.error('Failed to load chunk even after refresh.', error instanceof Error ? error : new Error(String(error)));
       return;
     }
     const targetPath = to?.fullPath || '/';
