@@ -1,7 +1,7 @@
-# DESIGN_REVIEW.md — Code Audit v11.0
+# DESIGN_REVIEW.md — Code Audit v11.1
 
 **Date**: 2026-03-14
-**Version**: 11.0
+**Version**: 11.1
 **Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
@@ -10,11 +10,11 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 13 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1 |
+| ✅ **FIXED** | 16 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
 | 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
-| 🆕 **NEW (v11.0)** | 20 | 2 Critical + 9 High + 7 Medium + 2 Low — see sections 11–13 |
+| 🆕 **NEW (v11.0)** | 17 | 0 Critical (both fixed) + 9 High + 7 Medium + 2 Low — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
 | 🚀 **DEFERRED** (Phase 4) | 18 | 11 functional improvements + 4 legacy (v7/v8) + 2 architectural + 1 dynamic tooling |
 
@@ -27,6 +27,8 @@ All previous critical and major items from v9.x–v10.x have been resolved or de
 **v10.x sessions (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items. Fixed ERR-H1 (all 4 backend routes standardized), ERR-H2 (27+ console.warn/error → logService across 14 files), USR-M1 (scroll behavior), USR-L1 (upload failure warning done).
 
 **v11.0 session (2026-03-14)**: Added 20 new items — confirmed implementation status of all OFFICE_AGENTS_ANALYSIS features, added user-reported bugs (PPT-C1, PPT-C2, IMG-H1, PPT-H1, OUT-H1, UX-H1, LANG-H1), and new improvement items (LOG-H1, PPT-H2, WORD-H1, PPT-M1, XL-M1, CLIP-M1, TOKEN-M1, OXML-M1, FB-M1, SKILL-L1, DYNTOOL-D1).
+
+**v11.1 session (Phase 1A — 2026-03-14)**: ✅ **Phase 1A complete** — Fixed PPT-C1 (`getAllSlidesOverview`: per-slide try/catch + textSyncOk flag to isolate OLE/chart shape failures), fixed PPT-C2 (`insertImageOnSlide` + `insertIcon`: `slides.getItemAt(index)` → `slides.items[index]` to avoid post-sync proxy issue), implemented TOOL-M3 (`searchAndFormatInPresentation` tool: manual slide→shape→paragraph→textRun iteration with 4-sync batch pattern, supports bold/italic/underline/fontColor/fontSize/fontName).
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
@@ -228,13 +230,13 @@ The `values` parameter description says items are "string", but Excel cells acce
 
 ---
 
-### TOOL-M3 — No PowerPoint equivalent to Word's `searchAndFormat` [MEDIUM]
+### TOOL-M3 — No PowerPoint equivalent to Word's `searchAndFormat` [MEDIUM] ✅ FIXED (Phase 1A)
 
 **File**: `frontend/src/utils/powerpointTools.ts`
 
-PowerPoint has no tool for applying formatting to specific text within existing shapes (unlike Word's `searchAndFormat`). The only workaround is `eval_powerpointjs`, which is error-prone for the LLM.
+PowerPoint has no native `body.search()` API like Word. Implemented `searchAndFormatInPresentation` tool that manually iterates slides → shapes (filtering pictures/OLE) → paragraphs → textRuns using 4-sync batch pattern per slide. Supports bold, italic, underline, fontColor, fontSize, fontName.
 
-**Impact**: Agent cannot reliably bold, color, or resize specific words in PowerPoint slides.
+**Impact**: ✅ Agent can now reliably bold, color, or resize specific words in PowerPoint slides.
 
 ---
 
@@ -1052,37 +1054,19 @@ Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could
 
 ## 11. USER-REPORTED BUGS (v11.0) — 🔴 Critical & 🟠 High
 
-### PPT-C1 — `getAllSlidesOverview` returns InvalidArgument on "resume a slide" request [CRITICAL]
+### PPT-C1 — `getAllSlidesOverview` returns InvalidArgument on "resume a slide" request [CRITICAL] ✅ FIXED (Phase 1A)
 
-**File**: `frontend/src/utils/powerpointTools.ts:1076-1117`
+**File**: `frontend/src/utils/powerpointTools.ts`
 
-The tool iterates all slides and loads `items/type` on shapes, then calls `shape.textFrame.textRange.load('text')` in a `try {}` block. On certain slide types (e.g., slides with linked objects or charts-only), PowerPoint API throws an `InvalidArgument` error that escapes the try/catch because the `await context.sync()` on line 1097 is outside the try block. The error propagates as "I don't have access to your presentation."
-
-**Root cause**: The `await context.sync()` that loads `textFrame.textRange.text` is outside the inner try/catch. A malformed shape causes the entire sync to fail.
-
-**Action**:
-1. Move `await context.sync()` (line 1097) inside the per-shape try/catch, OR use a separate sync per shape group
-2. Add explicit null-checks for `shape.textFrame` before calling `.load()`
-3. Add fallback to return partial overview if some slides fail
+**Fix**: Wrapped the entire per-slide processing block in an outer `try/catch` (returns `"Slide N: [Error reading content]"` on failure). Added `textSyncOk` flag — the text `await context.sync()` is wrapped in its own `try/catch`, and if it fails, text extraction is skipped gracefully for that slide. OLE/chart/SmartArt shapes that cause `InvalidArgument` no longer crash the entire function.
 
 ---
 
-### PPT-C2 — `insertImageOnSlide` crashes: "addImage is not a function" when using UUID [CRITICAL]
+### PPT-C2 — `insertImageOnSlide` crashes: "addImage is not a function" when using UUID [CRITICAL] ✅ FIXED (Phase 1A)
 
-**File**: `frontend/src/utils/powerpointTools.ts:626-638`
+**File**: `frontend/src/utils/powerpointTools.ts`
 
-When the user provides an uploaded file UUID as `base64Data`, the tool resolves it via `powerpointImageRegistry.get(rawValue)`. If the registry returns the base64 correctly, `slide.shapes.addImage(base64)` should work. However the error `"a.getItemAt(...).shapes.addImage is not a function"` indicates that the slide object returned by `slides.getItemAt(index)` is a proxied object that loses its `.shapes.addImage` method in certain contexts.
-
-**Example args that trigger the bug**: `{"slideNumber": 7, "base64Data": "uuid...", "left": 100, "top": 150, "width": 400, "height": 300}`
-
-**Possible root causes**:
-1. `slides.load('items')` + `await context.sync()` then `slides.getItemAt(index)` — the slide proxy may not have `shapes.addImage` loaded if called after sync in this pattern
-2. `addImage` requires `PowerPointApi 1.4` — check is done but may need to also verify slide context is fresh
-
-**Action**:
-1. Replace `slides.getItemAt(index)` post-sync with direct access: load items, then use `slides.items[index]` OR re-request the slide after load
-2. Alternatively, use the approach from `screenshotSlide` where `slide` is fetched from `slides.items[i]` directly
-3. Add defensive check: if `typeof slide.shapes?.addImage !== 'function'`, throw a meaningful error instead of crashing
+**Fix**: Replaced `slides.getItemAt(index)` (returns a proxy post-sync lacking `.shapes.addImage`) with `slides.items[index]` (direct access to the already-loaded slide object). Applied to both `insertImageOnSlide` and `insertIcon` which had the same pattern.
 
 ---
 
@@ -1418,14 +1402,14 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 ---
 
-### Phase 1A — 🔴 PPT Bugs Critiques + qualité outil PPT
+### Phase 1A — 🔴 PPT Bugs Critiques + qualité outil PPT ✅ DONE
 **Fichiers clés** : `frontend/src/utils/powerpointTools.ts`
 
-| Item | Description | Priorité |
-|------|-------------|----------|
-| PPT-C1 | Fix `getAllSlidesOverview` → InvalidArgument sur certaines slides | 🔴 Critical |
-| PPT-C2 | Fix `insertImageOnSlide` → crash "addImage is not a function" avec UUID | 🔴 Critical |
-| TOOL-M3 | Ajouter un équivalent de `searchAndFormat` pour PowerPoint | 🟡 Medium |
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| PPT-C1 | Fix `getAllSlidesOverview` → InvalidArgument sur certaines slides | 🔴 Critical | ✅ FIXED |
+| PPT-C2 | Fix `insertImageOnSlide` → crash "addImage is not a function" avec UUID | 🔴 Critical | ✅ FIXED |
+| TOOL-M3 | Ajouter un équivalent de `searchAndFormat` pour PowerPoint | 🟡 Medium | ✅ IMPLEMENTED |
 
 **Contexte à lire** : `powerpointTools.ts` (sections `getAllSlidesOverview`, `insertImageOnSlide`, fin du fichier pour ajout d'outil)
 
@@ -1675,7 +1659,7 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 | Severity | Count | Status | Items |
 |----------|-------|--------|-------|
-| 🔴 **Critical (v11 actif)** | 2 | 📋 Phase 1A | PPT-C1, PPT-C2 |
+| 🔴 **Critical (v11 actif)** | 2 | ✅ Phase 1A DONE | PPT-C1 ✅, PPT-C2 ✅ |
 | 🔴 **Critical (v10)** | 0 | ✅ All fixed | Phase 0 complete |
 | 🟠 **High (déféré v10)** | 5 + 1 prospectif | ⏳ Pending | TOOL-C1 (doc re-send), TOOL-H2 (Word screenshot), USR-H1 (empty shapes), USR-H2 (context bloat), PROSP-H2 |
 | 🟡 **Medium (déféré v10)** | 3 | — | TOKEN-M1 (nouveau), PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
@@ -1689,7 +1673,7 @@ The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **f
 
 | Phase | Zone de code principale | Items actifs | Priorité max |
 |-------|------------------------|-------------|-------------|
-| **1A** | `powerpointTools.ts` | PPT-C1, PPT-C2, TOOL-M3 | 🔴 Critical |
+| **1A** ✅ | `powerpointTools.ts` | PPT-C1 ✅, PPT-C2 ✅, TOOL-M3 ✅ | 🔴 Critical |
 | **1B** | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1, PPT-H1, PPT-M1 | 🟠 High |
 | **1C** | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2, TOOL-L2, TOOL-L3 | 🟠 High |
 | **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
