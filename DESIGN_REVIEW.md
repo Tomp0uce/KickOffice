@@ -1,7 +1,7 @@
-# DESIGN_REVIEW.md — Code Audit v10.1
+# DESIGN_REVIEW.md — Code Audit v11.3
 
-**Date**: 2026-03-09
-**Version**: 10.1
+**Date**: 2026-03-14
+**Version**: 11.3
 **Scope**: Full design review — Architecture, tool/prompt quality, error handling, UX/UI, dead code, code quality, user-reported issues & prospective improvements
 
 ---
@@ -10,33 +10,45 @@
 
 | Status | Count | Items |
 |--------|-------|-------|
-| ✅ **FIXED** | 13 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1 |
+| ✅ **FIXED** | 22 | TOOL-C1 images+toast, TOOL-H1, TOOL-H2 screenshot guidance, USR-C1, USR-H1 bullets, USR-H1 prompt, USR-H2 elapsed timer+ctx%, context% indicator, ERR-H1, ERR-H2, USR-M1, USR-L1, **PPT-C1, PPT-C2, TOOL-M3** (Phase 1A), **IMG-H1, PPT-H1, PPT-M1** (Phase 1B), **PPT-H2, TOOL-L2, TOOL-L3** (Phase 1C) |
 | 🟠 **PARTIALLY FIXED** (deferred sub-items remain) | 3 | TOOL-C1 (doc re-send), TOOL-H2 (no Word screenshot), USR-H1 (empty shapes) |
 | ⏳ **IN PROGRESS** | 2 | DUP-H1, QUAL-H1 + PROSP-H2 context optimization |
-| 📋 **BACKLOG** | 9 | Phase 2 Medium items |
+| 📋 **BACKLOG** | 9 | Phase 2 Medium items (v10.x) |
+| 🆕 **NEW (v11.0)** | 11 | 0 Critical + 6 High (3 fixed) + 6 Medium (1 fixed) + 0 Low (both fixed) — see sections 11–13 |
 | 🎯 **PLANNED** | 5 | Phase 3 Low items |
-| 🚀 **DEFERRED** (Phase 4) | 17 | 11 functional improvements + 4 legacy infrastructure (v7/v8) + 2 architectural |
+| 🚀 **DEFERRED** (Phase 4) | 18 | 11 functional improvements + 4 legacy (v7/v8) + 2 architectural + 1 dynamic tooling |
 
 ---
 
-## Health Summary (v10.1)
+## Health Summary (v11.0)
 
-All previous critical and major items from v9.x have been resolved. This v10.1 review is a comprehensive deep-dive across 8 axes + user-reported issues + prospective improvements, identifying new improvement opportunities after recent large-scale changes (OOXML editing, chart extraction, image registry, session persistence, header auto-detect).
+All previous critical and major items from v9.x–v10.x have been resolved or deferred. This v11.0 review adds 20 new items from user-reported bugs + planned improvements audit. All OFFICE_AGENTS_ANALYSIS.md items have been confirmed implemented (screenshotRange, screenshotSlide, getRangeAsCsv, modifyWorkbookStructure, hide/freeze, duplicateSlide, verifySlides, editSlideXml, insertIcon, findData pagination, pptxZipUtils) — OFFICE_AGENTS_ANALYSIS.md deleted.
 
-**Latest session (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items with deferred actions documented. Fixed ERR-H1 (all 4 backend routes standardized), ERR-H2 (27+ console.warn/error → logService across 14 files), USR-M1 (scroll behavior), USR-L1 (upload failure warning already done).
+**v10.x sessions (2026-03-09)**: Fixed 4 items (TOOL-H1, USR-H1, USR-C1, TOOL-C1 logging), partially fixed 3 items. Fixed ERR-H1 (all 4 backend routes standardized), ERR-H2 (27+ console.warn/error → logService across 14 files), USR-M1 (scroll behavior), USR-L1 (upload failure warning done).
+
+**v11.0 session (2026-03-14)**: Added 20 new items — confirmed implementation status of all OFFICE_AGENTS_ANALYSIS features, added user-reported bugs (PPT-C1, PPT-C2, IMG-H1, PPT-H1, OUT-H1, UX-H1, LANG-H1), and new improvement items (LOG-H1, PPT-H2, WORD-H1, PPT-M1, XL-M1, CLIP-M1, TOKEN-M1, OXML-M1, FB-M1, SKILL-L1, DYNTOOL-D1).
+
+**v11.1 session (Phase 1A — 2026-03-14)**: ✅ **Phase 1A complete** — Fixed PPT-C1 (`getAllSlidesOverview`: per-slide try/catch + textSyncOk flag to isolate OLE/chart shape failures), fixed PPT-C2 (`insertImageOnSlide` + `insertIcon`: `slides.getItemAt(index)` → `slides.items[index]` to avoid post-sync proxy issue), implemented TOOL-M3 (`searchAndFormatInPresentation` tool: manual slide→shape→paragraph→textRun iteration with 4-sync batch pattern, supports bold/italic/underline/fontColor/fontSize/fontName).
+
+**v11.2 session (Phase 1B — 2026-03-14)**: ✅ **Phase 1B complete** — IMG-H1: strengthened `FRAMING_INSTRUCTION` in `image.js` (explicit rules: fit entire subject, 4-side padding, no edge clipping, landscape composition) + changed default size to `1536x1024` in `backend.ts`. PPT-H1: rewrote `powerPointBuiltInPrompt.visual` to generate content-specific representative images (explicit requirement to illustrate the exact topic, not generic stock, style guidance per content type, text allowed if useful). PPT-M1: in `useAgentLoop.ts` visual handler, if selection < 5 words → call `screenshotSlide`, send image to LLM for slide description, use description as context for the visual prompt.
+
+**v11.3 session (Phase 1C — 2026-03-14)**: ✅ **Phase 1C complete** — PPT-H2: replaced `speakerNotes` with `review` Quick Action — new early handler in `useAgentLoop.ts` (no selection required) runs agent loop with `getCurrentSlideIndex` → `screenshotSlide` → `getAllSlidesOverview` → numbered improvement suggestions; `constant.ts` updated, `ScanSearch` icon in `HomePage.vue`, i18n keys added. TOOL-L2: all 10 `slideNumber` descriptions clarified to "1-based (1 = first slide, not 0-based)". TOOL-L3: em-dash/semicolon ban extracted from `GLOBAL_STYLE_INSTRUCTIONS` into `PPT_STYLE_RULES`, applied only in `bullets` and `punchify` PPT prompts — formal Word/Outlook documents unaffected.
 
 | Category | 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low |
 |----------|----------|------|--------|-----|
 | Architecture | 0 | 2 | 3 | 1 |
 | Tool/Prompt Quality | 0 | 2 | 4 | 3 |
 | Error Handling | 0 | 2 | 2 | 1 |
-| UX/UI | 0 | 1 | 3 | 3 |
+| UX/UI | 0 | 2 | 3 | 3 |
 | Dead Code | 0 | 0 | 2 | 1 |
 | Code Duplication | 0 | 1 | 2 | 0 |
 | Code Quality | 0 | 1 | 3 | 2 |
 | User-Reported Issues | 0 | 2 | 2 | 1 |
-| **Total** | **0** | **11** | **21** | **12** |
-| **Status** | ✅ All critical items fixed or deferred | 6 active, 5 deferred | 21 items | 12 items |
+| **v10 Subtotal** | **0** | **12** | **21** | **12** |
+| **NEW v11 — Bugs** | **2** | **5** | **0** | **0** |
+| **NEW v11 — Improvements** | **0** | **4** | **6** | **2** |
+| **GRAND TOTAL** | **2** | **21** | **27** | **14** |
+| **Status** | 2 new critical bugs | 12 active v10 + 9 new | 27 items | 14 items |
 
 ---
 
@@ -222,13 +234,13 @@ The `values` parameter description says items are "string", but Excel cells acce
 
 ---
 
-### TOOL-M3 — No PowerPoint equivalent to Word's `searchAndFormat` [MEDIUM]
+### TOOL-M3 — No PowerPoint equivalent to Word's `searchAndFormat` [MEDIUM] ✅ FIXED (Phase 1A)
 
 **File**: `frontend/src/utils/powerpointTools.ts`
 
-PowerPoint has no tool for applying formatting to specific text within existing shapes (unlike Word's `searchAndFormat`). The only workaround is `eval_powerpointjs`, which is error-prone for the LLM.
+PowerPoint has no native `body.search()` API like Word. Implemented `searchAndFormatInPresentation` tool that manually iterates slides → shapes (filtering pictures/OLE) → paragraphs → textRuns using 4-sync batch pattern per slide. Supports bold, italic, underline, fontColor, fontSize, fontName.
 
-**Impact**: Agent cannot reliably bold, color, or resize specific words in PowerPoint slides.
+**Impact**: ✅ Agent can now reliably bold, color, or resize specific words in PowerPoint slides.
 
 ---
 
@@ -250,21 +262,19 @@ No description of the CSV format returned (delimiter, quoting, header handling).
 
 ---
 
-### TOOL-L2 — PowerPoint `slideNumber` should clarify 1-based indexing [LOW]
+### TOOL-L2 — PowerPoint `slideNumber` should clarify 1-based indexing [LOW] ✅ FIXED (Phase 1C)
 
-**File**: `frontend/src/utils/powerpointTools.ts:769-770`
+**File**: `frontend/src/utils/powerpointTools.ts`
 
-Parameter says "1 = first slide" but could be clearer: "1-based index (1 = first slide, not 0-based)."
+**Fix**: Updated all 10 `slideNumber` parameter descriptions from `"1 = first slide"` to `"1-based (1 = first slide, not 0-based)"` using a targeted sed replacement across the file.
 
 ---
 
-### TOOL-L3 — Style rules ban em-dashes globally [LOW]
+### TOOL-L3 — Style rules ban em-dashes globally [LOW] ✅ FIXED (Phase 1C)
 
-**File**: `frontend/src/utils/constant.ts:20-22`
+**File**: `frontend/src/utils/constant.ts`
 
-Global style instructions prohibit em-dashes and semicolons, but these are standard in professional English typography. This may produce unnatural output in formal documents.
-
-**Recommendation**: Restrict this rule to PowerPoint/bullet contexts only, not all content generation.
+**Fix**: Extracted em-dash/semicolon ban into a new `PPT_STYLE_RULES` constant. Removed these rules from `GLOBAL_STYLE_INSTRUCTIONS` (which applies to all hosts). Added `PPT_STYLE_RULES` directly to the `bullets` and `punchify` prompt constraints in `powerPointBuiltInPrompt` only — formal Word/Outlook documents can now use em-dashes normally.
 
 ---
 
@@ -1035,12 +1045,615 @@ Real DuckDNS domain `https://kickoffice.duckdns.org` hardcoded in example. Could
 
 | Severity | Count | Status | Items |
 |----------|-------|--------|-------|
-| 🔴 **Critical** | 0 | ✅ All fixed or deferred | None — Phase 0 complete |
+| 🔴 **Critical** | 0 | ✅ All v10 critical fixed or deferred | None from v10 — 2 new critical in active backlog (PPT-C1, PPT-C2) |
 | 🟠 **High** | 5 + 1 prospective | ⏳ Pending | TOOL-C1 (3), TOOL-H2 (3), USR-H1 (2), USR-H2 (3), PROSP-H2 (context opt.) |
 | 🟡 **Medium** | 2 prospective | — | PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
 | 🟢 **Low** | 4 legacy + 3 prospective | — | IC2, IH2, IH3, UM10 (v7/v8) + PROSP-1/3/4 |
-| **TOTAL DEFERRED** | **17** | | 11 functional (from partial fixes + PROSP-H2) + 6 architectural/legacy |
+| 🚀 **DYNTOOL-D1** | 1 | — | Dynamic Tooling (new, detailed plan) |
+| **TOTAL DEFERRED** | **18** | | 11 functional (from partial fixes + PROSP-H2) + 6 architectural/legacy + 1 new (DYNTOOL) |
 
 ---
 
-*This review covers the full codebase as of 2026-03-09. Line numbers reference the current state of the repository on the `review/design-review-v10` branch.*
+## 11. USER-REPORTED BUGS (v11.0) — 🔴 Critical & 🟠 High
+
+### PPT-C1 — `getAllSlidesOverview` returns InvalidArgument on "resume a slide" request [CRITICAL] ✅ FIXED (Phase 1A)
+
+**File**: `frontend/src/utils/powerpointTools.ts`
+
+**Fix**: Wrapped the entire per-slide processing block in an outer `try/catch` (returns `"Slide N: [Error reading content]"` on failure). Added `textSyncOk` flag — the text `await context.sync()` is wrapped in its own `try/catch`, and if it fails, text extraction is skipped gracefully for that slide. OLE/chart/SmartArt shapes that cause `InvalidArgument` no longer crash the entire function.
+
+---
+
+### PPT-C2 — `insertImageOnSlide` crashes: "addImage is not a function" when using UUID [CRITICAL] ✅ FIXED (Phase 1A)
+
+**File**: `frontend/src/utils/powerpointTools.ts`
+
+**Fix**: Replaced `slides.getItemAt(index)` (returns a proxy post-sync lacking `.shapes.addImage`) with `slides.items[index]` (direct access to the already-loaded slide object). Applied to both `insertImageOnSlide` and `insertIcon` which had the same pattern.
+
+---
+
+### IMG-H1 — Image generation cropped with gpt-image-1 / gpt-image-1.5 [HIGH] ✅ FIXED (Phase 1B)
+
+**Files**: `backend/src/routes/image.js`, `frontend/src/api/backend.ts`
+
+**Fix**:
+1. Strengthened `FRAMING_INSTRUCTION` in `image.js` — explicit 4-rule composition mandate: fit entire subject, visible padding on all four sides, no clipping of heads/limbs/text/edges, landscape 16:9 composition.
+2. Changed default size from `1024x1024` → `1536x1024` in `backend.ts` — landscape format matches PowerPoint slide dimensions and prevents side-cropping of wide subjects.
+
+---
+
+### PPT-H1 — Quick Action "Image" : l'image générée n'est pas représentative du contenu [HIGH] ✅ FIXED (Phase 1B)
+
+**File**: `frontend/src/utils/constant.ts` — `powerPointBuiltInPrompt.visual`
+
+**Fix**: Rewrote `visual.system` and `visual.user` prompts. New prompt explicitly requires: (1) visual must represent the SPECIFIC topic — no generic stock images, (2) style selection adapted to content type (photo-realistic, flat vector, isometric, infographic, etc.), (3) text in image explicitly allowed and requested when useful, (4) composition details: foreground/background/focal elements, (5) landscape 16:9 format, (6) output only the prompt with no preamble.
+
+---
+
+### OUT-H1 — Outlook translation deletes embedded images from email body [HIGH]
+
+**File**: `frontend/src/utils/outlookTools.ts` — `setBody` tool usage
+
+When the agent translates an email body, it reads the HTML content, sends it to the LLM for translation, then calls `setBody` with the translated HTML. Inline images (embedded as `cid:` references or `data:` URIs) are lost because the LLM does not reproduce the `<img>` tags in its translation output.
+
+**Tool description** (`outlookTools.ts:154`) says "automatically preserves images from the original email" — this guarantee is currently NOT enforced at the code level, only in the description.
+
+**Action**:
+1. Before calling the LLM for translation, extract all `<img>` tags from the original HTML and store them with their positions/anchors
+2. After translation, re-inject the extracted images at their original positions (or at least at the end)
+3. Alternatively: strip `<img>` tags before sending to LLM, then merge them back after translation using a dedicated merging function
+4. Add explicit prompt instruction: "Preserve all `<img>` tags EXACTLY as-is from the original HTML."
+5. Consider reading the email via `getBody({ coercionType: 'html' })` and post-processing the LLM response to re-inject images
+
+---
+
+### UX-H1 — Chat scroll "yoyo" effect during streaming; no smart-scroll interrupt [HIGH]
+
+**File**: `frontend/src/composables/useHomePage.ts:71-107`, `frontend/src/composables/useAgentStream.ts`
+
+**Context**: USR-M1 was previously "fixed" by implementing scroll-to-message-top behavior. However the current implementation still causes a "yoyo" effect during streaming: the container scrolls to the bottom on send, then jumps to the top of the response when the stream starts, creating a disorienting experience. There is also no mechanism to interrupt auto-scroll if the user scrolls up manually.
+
+**Expected behavior (ChatGPT-style):**
+- **On initial load / session switch**: `scrollTop = scrollHeight` (instant, no animation)
+- **On message send**: smooth scroll to bottom
+- **During stream**: auto-scroll to bottom on each new chunk; if user scrolls up manually → pause auto-scroll; if user scrolls back to bottom → resume auto-scroll
+
+**Implementation details:**
+- Add `isAutoScrollEnabled: Ref<boolean>` (default `true`, reset to `true` on each new request)
+- Add `@scroll` listener on `containerEl` in ChatMessageList or HomePage: if user scrolls up (delta < 0 and not at bottom) → set `isAutoScrollEnabled = false`
+- If `scrollTop + clientHeight >= scrollHeight - 10` (within 10px of bottom) → set `isAutoScrollEnabled = true`
+- During stream: call `scrollToBottom()` only if `isAutoScrollEnabled === true`
+- `scrollToBottom(smooth=true)` for send, `scrollToBottom(smooth=false)` for initial load
+- Use `nextTick()` or `MutationObserver` before reading `scrollHeight` to ensure DOM is updated
+
+**Target files:**
+- `frontend/src/pages/HomePage.vue` or `frontend/src/composables/useHomePage.ts` — scroll helpers
+- `frontend/src/composables/useAgentStream.ts` — stream chunk handler (add scroll call)
+- `frontend/src/components/chat/ChatMessageList.vue` — expose `containerEl`, add `@scroll` listener
+
+---
+
+### LANG-H1 — LLM responds in UI language but should use document language for generated text [HIGH]
+
+**File**: `frontend/src/composables/useAgentPrompts.ts:119, 181, 232`
+
+**Problem**: All agent prompts include `"Language: Communicate entirely in ${lang}."` where `lang` is the UI language (user's interface setting, e.g., French). When the user works on a document in a different language (e.g., an English PowerPoint) and asks to improve text, the LLM generates the improvement proposals in French instead of English.
+
+**Expected behavior**:
+- The LLM should **converse with the user** (explanations, questions, commentary) in the **UI language**
+- The LLM should **generate document content / propose text for the document** in the **language of the document or selected text**
+
+**Example** (exact case reported): User selects English text "Possible warning from the team ambiance, to be checked" and asks in French "comment améliorer cette phrase" → LLM should respond in French for the discussion but provide the alternative phrases in **English** since the selected text was in English.
+
+**Current Outlook exception**: Outlook agent already has `"Reply Language: ALWAYS reply in the SAME language as the original email"` — this is the correct pattern to generalize.
+
+**Action**:
+1. Add language detection for selected text / document content. Detect language of `[Selected text]` block if present (can use the LLM or a light heuristic)
+2. Update agent prompts to differentiate: `"Communicate (conversation, explanations) in ${uiLang}. When generating or proposing text FOR the document, always use the language of the selected text or document content."`
+3. Add a rule in `common.skill.md` and all host-specific skill.md files: when the user's selection is in language X ≠ UI language, proposed text must be in language X
+4. Generalize to all hosts (Word, Excel, PowerPoint, Outlook)
+
+---
+
+## 12. NEW IMPROVEMENTS (v11.0) — 🟠 High & 🟡 Medium & 🟢 Low
+
+### LOG-H1 — No tool usage counting system per platform [HIGH]
+
+**Files**: `backend/src/routes/chat.js`, `backend/logs/` (does not exist yet)
+
+**Problem**: There is no persistent log tracking which tools are called, per Office host (Word/Excel/PPT/Outlook), per user, per day. This data is needed to:
+1. Identify the "Core Set" of most-used tools for the Dynamic Tooling optimization (DYNTOOL-D1)
+2. Monitor usage trends and detect anomalies
+3. Support the feedback system with usage context
+
+**Action**:
+1. Create `backend/logs/` directory (shared with feedback logs from USR-C1)
+2. Create `backend/logs/tool-usage.jsonl` — append-only JSONL log with entries:
+   ```json
+   {"ts":"2026-03-14T10:00:00Z","user":"john","host":"PowerPoint","tool":"screenshotSlide","count":1}
+   ```
+3. In `backend/src/routes/chat.js`, after each tool call (or from streaming events), extract tool names from the `tools` array and log usage
+4. Alternatively, parse tool calls from the assistant response stream and log each `tool_use` event
+5. Create a summary endpoint `GET /api/logs/tool-stats` that returns aggregated counts per host per tool (for admin/debug use)
+6. Store in `backend/logs/` alongside feedback directory
+
+---
+
+### PPT-H2 — New Quick Action "Review": replace Speaker Notes action [HIGH] ✅ FIXED (Phase 1C)
+
+**Files**: `frontend/src/utils/constant.ts`, `frontend/src/composables/useAgentLoop.ts`, `frontend/src/pages/HomePage.vue`, `frontend/src/i18n/locales/*.json`
+
+**Fix**:
+1. `constant.ts`: Replaced `speakerNotes` with `review` in `powerPointBuiltInPrompt`. The `review` prompt instructs the LLM to provide 3-5 numbered improvement suggestions for the current slide only.
+2. `useAgentLoop.ts`: Added a special `review` early handler (like `visual`) that bypasses the `selectedText` guard — no selection required. The handler runs `runAgentLoop` with a system prompt instructing the agent to call `getCurrentSlideIndex` → `screenshotSlide` → `getAllSlidesOverview`, then provide slide-specific review. Removed the `speakerNotes` post-processing block. Removed unused `setCurrentSlideSpeakerNotes` import.
+3. `HomePage.vue`: Replaced `speakerNotes` quick action with `review` using `ScanSearch` icon. Added `ScanSearch` to lucide imports.
+4. `i18n/locales/en.json` + `fr.json`: Added `pptReview` and `pptReview_tooltip` keys. `getSpeakerNotes`/`setSpeakerNotes` tools remain available to the agent.
+
+---
+
+### WORD-H1 — Track Changes via OOXML (replace office-word-diff approach) [HIGH]
+
+**Files**: `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts:1379-1391`
+
+**Problem**: The current `proposeRevision` tool uses `office-word-diff` (npm package) to compute word-level diffs and apply changes. This approach can break complex Word formatting (`<w:rPr>`, colors, font sizes) because it reconstructs runs from scratch rather than performing surgical XML edits.
+
+The ideal approach (inspired by `docx-redline-js` and the `Gemini-AI-for-Office` add-in) is to inject real OOXML revision markup (`<w:ins>` / `<w:del>`) directly into the paragraph XML, preserving all existing formatting.
+
+**Proposed implementation**:
+1. Add a **configurable "Redline Author" field** in Settings (under Account or a new Editing tab): default `"KickOffice AI"`, user-editable
+2. Create `frontend/src/utils/wordOoxmlUtils.ts` — utility to:
+   - Read paragraph XML via `paragraph.getOoxml()`
+   - Compute diff between original and revised text at run level
+   - Inject `<w:ins w:author="{author}" w:date="{date}" w:id="{id}">` for insertions
+   - Inject `<w:del w:author="{author}" w:date="{date}" w:id="{id}">` + `<w:delText>` for deletions
+   - Write back via `paragraph.insertOoxml(xml, 'Replace')`
+3. Update `proposeRevision` tool to use this new approach when the document is a `.docx` (not `.doc`)
+4. Keep `office-word-diff` as a fallback for simple cases or when OOXML is unavailable
+5. **If switching completely**: Remove `office-word-diff` npm dependency, update `Dockerfile`, update README to remove references
+6. **OXML evaluation prerequisite**: This task depends on OXML-M1 (evaluate current OOXML integration across all hosts before making changes)
+
+---
+
+### PPT-M1 — Quick Action "Image": handle <5 words selection case [MEDIUM] ✅ FIXED (Phase 1B)
+
+**File**: `frontend/src/composables/useAgentLoop.ts` — `visual` quick action handler
+
+**Fix**: In the `visual` handler, before Step 1 (image prompt generation), check word count of `slideText`. If `< 5 words`: call `powerpointToolDefinitions.screenshotSlide.execute({})`, parse the base64 result, send the slide image to the LLM as a vision message requesting a 2-3 sentence description of the slide content and visual concept, use that description as `slideText` for Step 1. Errors in the screenshot/description step are caught gracefully and fall back to the original (possibly empty) `slideText`.
+
+---
+
+### XL-M1 — Chart extraction: support multiple curves [MEDIUM]
+
+**File**: `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts:1829-1928`
+
+**Problem**: The current `extract_chart_data` tool can only extract a single data series from a chart image. Multi-curve charts (e.g., 3 lines with different colors) produce incorrect data because only one curve's pixels are detected.
+
+**Proposed approach** (LLM-assisted multi-curve detection):
+1. **First LLM call** (existing step): Analyze the chart image to understand structure — but extend to also return:
+   - Number of data series
+   - RGB color of each series (approximate, e.g., `[255, 0, 0]` for red, `[0, 0, 255]` for blue)
+2. **Iteration**: For each detected series, run the plotDigitizer extraction with the specific RGB color filter
+3. **Merge results**: Return all series as separate columns/arrays
+
+**Implementation details**:
+- Modify `plotDigitizerService.js` to accept an optional `rgbColor` parameter for filtering pixels by color
+- Update the `extract_chart_data` tool schema to support `seriesIndex` / `rgbColor` input
+- Update `excel.skill.md` extraction workflow to describe the multi-curve process
+- The first LLM call already exists for chart type detection — extend its response schema to include series colors
+
+---
+
+### CLIP-M1 — Paste images from clipboard into chat [MEDIUM]
+
+**File**: `frontend/src/components/chat/ChatInput.vue`
+
+**Problem**: Users cannot paste images (Ctrl+V / Cmd+V) directly into the chat input area. They must save the image as a file first and then attach it. This is a significant UX friction point, especially when the user has just copied a screenshot.
+
+**Action**:
+1. Add a `@paste` event listener on the chat textarea (or its container) in `ChatInput.vue`
+2. On paste, check `event.clipboardData.items` for items with `type.startsWith('image/')`
+3. If an image is found, read it as a `Blob`, create an `object URL` or convert to base64, and add it to the attached files list (same flow as file upload)
+4. Show a preview thumbnail in the file list with the filename "pasted-image.png"
+5. Process the pasted image through the same upload pipeline as dragged/selected files
+
+---
+
+### TOKEN-M1 — Token coherence: display vs actual + raise max limit [MEDIUM]
+
+**Files**: `backend/src/middleware/validate.js:40-41`, `backend/src/config/models.js:44, 53`, `frontend/src/utils/tokenManager.ts`
+
+**Problem**:
+1. The `validateMaxTokens()` function allows `maxTokens` up to `128000`, but the default model config uses `32000` (standard) and `65000` (reasoning). The limit displayed in the UI (context %) may not reflect actual LLM billing — the token count is client-side estimated, not server-confirmed.
+2. `32000` output tokens may be too restrictive for complex document generation tasks.
+
+**Action**:
+1. **Verify coherence**: Add server-side token count from LLM response (`usage.completion_tokens`) to the `/api/chat` streaming response headers or a final SSE event. Log the discrepancy between estimated and actual token counts.
+2. **Raise default limit**: Increase `MODEL_STANDARD_MAX_TOKENS` default from `32000` to `64000` (or make configurable via env)
+3. **Document the gap**: Add a comment in `tokenManager.ts` noting that client-side estimation is approximate and actual usage comes from the LLM response
+4. **Display actual tokens**: Once server confirms actual usage, update the stats bar to show confirmed vs estimated
+
+---
+
+### OXML-M1 — OXML integration evaluation and improvement across all Office hosts [MEDIUM]
+
+**Files**: `frontend/src/utils/wordTools.ts`, `frontend/src/utils/excelTools.ts`, `frontend/src/utils/powerpointTools.ts`, `frontend/src/utils/outlookTools.ts`
+
+**Problem**: OOXML is used selectively (PowerPoint has `editSlideXml` via JSZip; Word has `proposeRevision` via `office-word-diff`; Excel and Outlook have minimal direct OOXML manipulation). No comprehensive evaluation of what's possible/useful via OOXML per host.
+
+**Evaluation tasks per host**:
+1. **Word**: Can `insertOoxml` be used for more precision edits? Evaluate replacing `office-word-diff` with direct OOXML revision markup (see WORD-H1). Can complex formatting (tables, styles, headers) be better preserved via OOXML?
+2. **Excel**: Does any tool benefit from OOXML access? Chart XML? Conditional format XML? Evaluate `Workbook.getOoxml()` availability.
+3. **PowerPoint**: `editSlideXml` is implemented. Evaluate: can slide masters be edited? Animations? SmartArt? What are the API limits?
+4. **Outlook**: Can email body be manipulated via MIME/OOXML for richer formatting? Evaluate `body.setAsync` vs HTML OOXML approach.
+
+**Action**: Produce a concise per-host evaluation report and update this section with findings. Use findings to prioritize WORD-H1 and other OOXML improvements.
+
+---
+
+### FB-M1 — Feedback system: include last 4 requests + tool usage context [MEDIUM]
+
+**Files**: `frontend/src/components/settings/FeedbackDialog.vue`, `backend/src/routes/feedback.js`, `backend/logs/`
+
+**Context**: USR-C1 was fixed — the feedback now includes chat history, system context, and frontend logs. But the following are still missing:
+
+1. **Backend request logs for last 4 requests by this user**: The feedback bundle should include the last 4 backend request logs (with correlation IDs) for the user who submitted the feedback, so developers can trace what happened server-side
+2. **Tool usage summary at feedback time**: Include a snapshot of this user's recent tool usage (from LOG-H1 log file) — helps understand what the user was doing
+3. **Central feedback index**: `backend/logs/feedback-index.jsonl` — one entry per feedback with: username, datetime, category (Bug/Feature/Other), feedback text (truncated), pending=true. Count pending items for triage dashboard.
+
+**Dependencies**: Requires LOG-H1 (tool usage log) to be implemented first.
+
+**Action**:
+1. Add a backend endpoint to retrieve last N request logs for a given user/session ID
+2. Include this in the feedback payload from `FeedbackDialog.vue`
+3. Create `feedback-index.jsonl` in `backend/logs/` and update it on each feedback submission
+4. Add `pendingCount` field that decrements when feedback is marked as processed
+
+---
+
+### SKILL-L1 — skill.md system for Quick Actions [LOW]
+
+**Files**: `frontend/src/skills/`, `frontend/src/composables/useAgentLoop.ts:888-1110`
+
+**Context**: The existing `*.skill.md` files provide context for the **agent loop** (Chat Libre / free chat mode). Quick Actions (`applyQuickAction`) currently use hardcoded prompts from `constant.ts`.
+
+**Proposal** (inspired by Claude Code skill.md system): For each Quick Action, define its behavior via a dedicated markdown file that specifies:
+- The system prompt
+- Which tools to call and in what order
+- Input/output contract
+- Fallback behavior
+
+**Benefits**:
+- Quick action prompts become user-customizable (power users)
+- Consistent with existing skill.md architecture
+- Easier to test and iterate without code changes
+
+**Implementation approach** (based on https://support.claude.com/en/articles/12512198-how-to-create-custom-skills):
+1. Add quick-action-specific skill files: e.g., `frontend/src/skills/ppt-image.skill.md`, `frontend/src/skills/ppt-bullets.skill.md`
+2. Update `applyQuickAction` to load the corresponding skill file and inject it as system context
+3. Quick action prompts in `constant.ts` become defaults (loaded if no skill file overrides them)
+4. Document the skill file format for power users
+
+---
+
+## 13. OFFICE-AGENTS INTEGRATION — ✅ ALL IMPLEMENTED (v11.0)
+
+The following items from `OFFICE_AGENTS_ANALYSIS.md` (now deleted) have been **fully implemented** and verified in the codebase:
+
+| Feature | Tool Name | File | Status |
+|---------|-----------|------|--------|
+| Screenshot Excel range | `screenshotRange` | `excelTools.ts:1604` | ✅ Done |
+| Screenshot PowerPoint slide | `screenshotSlide` | `powerpointTools.ts:1119` | ✅ Done |
+| CSV export for ranges | `getRangeAsCsv` | `excelTools.ts:1626` | ✅ Done |
+| Paginated search | `findData` (maxResults, offset) | `excelTools.ts:1375` | ✅ Done |
+| Workbook structure (create/delete/rename/duplicate sheet) | `modifyWorkbookStructure` | `excelTools.ts:1664` | ✅ Done |
+| Sheet structure (hide/unhide/freeze/unfreeze) | `modifyStructure` | `excelTools.ts:267` | ✅ Done |
+| Duplicate slide | `duplicateSlide` | `powerpointTools.ts:1149` | ✅ Done |
+| Verify slides (overlaps, overflows) | `verifySlides` | `powerpointTools.ts:1175` | ✅ Done |
+| Edit slide OOXML via JSZip | `editSlideXml` | `powerpointTools.ts:1228` | ✅ Done |
+| Insert icon (Iconify) | `insertIcon` | `powerpointTools.ts:1293` | ✅ Done |
+| ZIP/XML utilities for PPTX | `pptxZipUtils.ts` | `utils/pptxZipUtils.ts` | ✅ Done |
+
+**Excluded by design (per OFFICE_AGENTS_ANALYSIS.md section 4)**:
+- Web Search, Web Fetch → DEFERRED (no `webSearch` / `webFetch` to be implemented now)
+
+---
+
+## 14. IMPLEMENTATION PHASES (v11.0 — Optimised)
+
+> **Principe de groupement** : chaque phase regroupe des items qui touchent les mêmes fichiers ou la même zone de code, pour minimiser la lecture de contexte. Maximum 3 items actifs par phase pour respecter la limite de tokens toutes les 4h.
+
+---
+
+### Phase 1A — 🔴 PPT Bugs Critiques + qualité outil PPT ✅ DONE
+**Fichiers clés** : `frontend/src/utils/powerpointTools.ts`
+
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| PPT-C1 | Fix `getAllSlidesOverview` → InvalidArgument sur certaines slides | 🔴 Critical | ✅ FIXED |
+| PPT-C2 | Fix `insertImageOnSlide` → crash "addImage is not a function" avec UUID | 🔴 Critical | ✅ FIXED |
+| TOOL-M3 | Ajouter un équivalent de `searchAndFormat` pour PowerPoint | 🟡 Medium | ✅ IMPLEMENTED |
+
+**Contexte à lire** : `powerpointTools.ts` (sections `getAllSlidesOverview`, `insertImageOnSlide`, fin du fichier pour ajout d'outil)
+
+---
+
+### Phase 1B — 🖼️ Génération d'image + Quick Action Image ✅ DONE
+**Fichiers clés** : `backend/src/routes/image.js`, `frontend/src/api/backend.ts`, `frontend/src/utils/constant.ts` (section `visual`), `frontend/src/composables/useAgentLoop.ts` (handler image QA)
+
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| IMG-H1 | Fix crop gpt-image-1.5 : renforcer framing instruction + taille landscape par défaut | 🟠 High | ✅ FIXED |
+| PPT-H1 | Améliorer le prompt de génération d'image pour produire des visuels réellement représentatifs du texte/slide (illustration adaptée, pas forcément sans texte) | 🟠 High | ✅ FIXED |
+| PPT-M1 | Quick Action Image : si < 5 mots sélectionnés → screenshot de la slide + description via LLM avant génération | 🟡 Medium | ✅ IMPLEMENTED |
+
+**Contexte à lire** : `image.js` (FRAMING_INSTRUCTION), `backend.ts` (generateImage, size default), `constant.ts` (prompt `visual`), `useAgentLoop.ts` (handler image quick action ~l.700–720)
+
+---
+
+### Phase 1C — 🎯 Nouvelle Quick Action "Review" PPT + nettoyage prompts ✅ DONE
+**Fichiers clés** : `frontend/src/utils/constant.ts` (section PPT), `frontend/src/composables/useAgentLoop.ts` (applyQuickAction), `frontend/src/components/chat/QuickActionsBar.vue`, `frontend/src/components/settings/BuiltinPromptsTab.vue`
+
+| Item | Description | Priorité | Statut |
+|------|-------------|----------|--------|
+| PPT-H2 | Nouvelle Quick Action "Review" qui remplace "Speaker Notes" | 🟠 High | ✅ DONE |
+| TOOL-L2 | Clarifier l'indexation 1-based du paramètre `slideNumber` dans les descriptions | 🟢 Low | ✅ DONE |
+| TOOL-L3 | Restreindre la règle anti em-dash/point-virgule aux contextes PPT/bullets uniquement | 🟢 Low | ✅ DONE |
+
+**Contexte à lire** : `constant.ts` (sections `speakerNotes`, `visual`, `punchify`), `useAgentLoop.ts` (lignes 888–1110), `QuickActionsBar.vue`, `BuiltinPromptsTab.vue`
+
+---
+
+### Phase 2A — 📜 Scroll Intelligent + Architecture HomePage
+**Fichiers clés** : `frontend/src/composables/useHomePage.ts`, `frontend/src/composables/useAgentStream.ts`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/pages/HomePage.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| UX-H1 | Smart scroll avec interruption manuelle (yoyo fix, isAutoScrollEnabled) | 🟠 High |
+| ARCH-H2 | Réduire le prop drilling de HomePage.vue via provide/inject (~44 bindings) | 🟠 High |
+
+**Contexte à lire** : `useHomePage.ts` (helpers scroll), `useAgentStream.ts` (stream handler), `ChatMessageList.vue` (containerEl, @scroll), `HomePage.vue` (props passées aux enfants)
+
+---
+
+### Phase 2B — 🌐 Support Multilingue + locale formules
+**Fichiers clés** : `frontend/src/composables/useAgentPrompts.ts`, `frontend/src/skills/*.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| LANG-H1 | Discussion en langue UI, propositions de texte dans la langue du document | 🟠 High |
+| TOOL-M4 | Étendre la détection de locale formule Excel à toutes les langues (10 langues dans constant.ts) | 🟡 Medium |
+
+**Contexte à lire** : `useAgentPrompts.ts` (section `lang`, instruction formule), `constant.ts` (language map), tous les `*.skill.md` (règles de langue)
+
+---
+
+### Phase 2C — 📧 Outlook : traduction + qualité code
+**Fichiers clés** : `frontend/src/utils/outlookTools.ts`, `frontend/src/skills/outlook.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| OUT-H1 | Empêcher la suppression des images lors de la traduction d'un email | 🟠 High |
+| QUAL-L2 | Documenter le pattern `resolveAsyncResult()` (mélange async/await et callbacks Outlook API) | 🟢 Low |
+
+**Contexte à lire** : `outlookTools.ts` (outil `setBody`, `getBody`, `resolveAsyncResult()`), `outlook.skill.md`
+
+---
+
+### Phase 3A — 📊 Logging Backend + Error Handling
+**Fichiers clés** : `backend/src/routes/chat.js`, `backend/src/routes/feedback.js`, `backend/src/routes/logs.js`, nouveau dossier `backend/logs/`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| LOG-H1 | Comptage des outils utilisés par plateforme dans `logs/tool-usage.jsonl` | 🟠 High |
+| FB-M1 | Feedback enrichi : 4 dernières requêtes backend + snapshot usage outils | 🟡 Medium |
+| ERR-M1 | Extraire un handler d'erreur partagé pour `/api/chat` et `/api/chat/sync` (~80% de code dupliqué) | 🟡 Medium |
+
+**Contexte à lire** : `chat.js` (blocs d'erreur des deux routes), `feedback.js`, `logs.js`, structure existante `backend/logs/`
+
+---
+
+### Phase 3B — 📈 Excel : extraction multi-courbes + qualité outils
+**Fichiers clés** : `backend/src/services/plotDigitizerService.js`, `frontend/src/utils/excelTools.ts`, `frontend/src/skills/excel.skill.md`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| XL-M1 | Extraction de plusieurs courbes : 1er call LLM détecte RGB de chaque série → itération | 🟡 Medium |
+| TOOL-M1 | Mettre à jour la description du paramètre `values` pour documenter les types acceptés (nombre, booléen, null…) | 🟡 Medium |
+| TOOL-M2 | Fusionner `getWorksheetData` et `getDataFromSheet` (outils redondants) | 🟡 Medium |
+
+**Contexte à lire** : `plotDigitizerService.js` (extractChartData), `excelTools.ts` (extract_chart_data, getWorksheetData, getDataFromSheet), `excel.skill.md`
+
+---
+
+### Phase 3C — 🖱️ Presse-papier + UX input
+**Fichiers clés** : `frontend/src/components/chat/ChatInput.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| CLIP-M1 | Coller une image depuis le presse-papier (Ctrl+V) directement dans le chat | 🟡 Medium |
+| UX-M1 | Restaurer les indicateurs de focus (focus:ring) sur tous les éléments interactifs | 🟡 Medium |
+| UX-L1 | Déplacer les styles d'animation inline de ChatInput.vue vers `<style scoped>` | 🟢 Low |
+
+**Contexte à lire** : `ChatInput.vue` (textarea, upload, animation, focus)
+
+---
+
+### Phase 4A — 📝 Word : Track Changes OOXML
+**Fichiers clés** : `frontend/src/utils/wordDiffUtils.ts`, `frontend/src/utils/wordTools.ts`, nouveau `frontend/src/utils/wordOoxmlUtils.ts`, composant Settings
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| OXML-M1 | Évaluation OOXML sur tous les hosts (prérequis, phase lecture/analyse) | 🟡 Medium |
+| WORD-H1 | Implémenter `<w:ins>` / `<w:del>` + auteur configurable, remplacer office-word-diff | 🟠 High |
+| DUP-M1 | Extraire `truncateString(str, maxLen)` dans `common.ts` (4 occurrences dans wordTools + outlookTools) | 🟡 Medium |
+
+**Ordre** : OXML-M1 d'abord (lecture), puis WORD-H1 (implémentation), DUP-M1 en profiter pour les fichiers déjà ouverts
+**Contexte à lire** : `wordDiffUtils.ts`, `wordTools.ts` (proposeRevision, eval_wordjs), `wordOoxmlUtils.ts` à créer, `common.ts`, Settings component (champ auteur Redline)
+
+---
+
+### Phase 4B — 🔧 Architecture AgentLoop + Skill System
+**Fichiers clés** : `frontend/src/composables/useAgentLoop.ts`, `frontend/src/skills/` (nouveaux fichiers)
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| ARCH-H1 | Découper `useAgentLoop.ts` (1145 lignes) en composables focalisés | 🟠 High |
+| SKILL-L1 | Système skill.md pour les Quick Actions (comportement déclaratif, type skill.md) | 🟢 Low |
+
+**Contexte à lire** : `useAgentLoop.ts` (entier), `index.ts` du dossier skills, `useToolExecutor.ts`, `useAgentStream.ts`
+
+---
+
+### Phase 5A — 🏗️ Qualité types + Dead Code (tous les *Tools.ts)
+**Fichiers clés** : `frontend/src/utils/common.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| DUP-H1 | Créer `OfficeToolTemplate<THost>` générique et `buildExecuteWrapper` partagé dans `common.ts` | 🟠 High |
+| QUAL-H1 | Remplacer les 128 `: any` critiques par des types Office.js propres | 🟠 High |
+| DEAD-M1 | Supprimer les exports alias `getToolDefinitions()` redondants dans les 4 fichiers tools | 🟡 Medium |
+
+**Contexte à lire** : `common.ts` (createOfficeTools, factories existantes), les 4 `*Tools.ts` (sections type + export)
+
+---
+
+### Phase 5B — 🧹 Dead Code Excel + Nettoyage erreurs backend
+**Fichiers clés** : `frontend/src/utils/excelTools.ts`, `frontend/src/utils/common.ts`, `backend/src/routes/files.js`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| DEAD-M2 | Déprécier `formatRange` (redondant avec `setCellRange`) | 🟡 Medium |
+| DUP-M2 | Standardiser le format d'erreur retourné par tous les outils (3 formats différents aujourd'hui) | 🟡 Medium |
+| ERR-M2 | Sanitiser le message d'erreur raw exposé dans `files.js:79` | 🟡 Medium |
+
+**Contexte à lire** : `excelTools.ts` (formatRange vs setCellRange), `common.ts` (buildExecute), `files.js:79`
+
+---
+
+### Phase 5C — 🏛️ Architecture Backend
+**Fichiers clés** : `backend/src/middleware/validate.js`, `frontend/src/utils/credentialStorage.ts`, `frontend/src/composables/useAgentLoop.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| ARCH-M1 | Créer un `ToolProviderRegistry` pour rendre l'agent loop host-agnostique | 🟡 Medium |
+| ARCH-M2 | Découper `validate.js` (236 lignes) en validators par domaine | 🟡 Medium |
+| ARCH-M3 | Simplifier la migration dual-storage credentials (6 fallback paths → 1 migration au startup) | 🟡 Medium |
+
+**Contexte à lire** : `validate.js` (validateTools, validateChat), `credentialStorage.ts`, `useAgentLoop.ts` (imports tools)
+
+---
+
+### Phase 6A — 🎨 Qualité code Vue + Console logs
+**Fichiers clés** : `frontend/src/pages/HomePage.vue`, `frontend/src/components/chat/ChatMessageList.vue`, `frontend/src/components/chat/ChatInput.vue`, `frontend/src/utils/credentialCrypto.ts`, `frontend/src/utils/credentialStorage.ts`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| QUAL-M3 | Découper les composants > 300 lignes : extraire `AttachedFilesList`, `MessageItem`, `ConfirmationDialogs` | 🟡 Medium |
+| QUAL-M2 | Remplacer les 12 `console.log` restants dans credentialCrypto/Storage/Polyfill par `logService` | 🟡 Medium |
+| QUAL-M1 | Déplacer les magic numbers (255, 20_000, 1000/2000…) dans `constants/limits.ts` | 🟡 Medium |
+
+**Contexte à lire** : `HomePage.vue`, `ChatMessageList.vue`, `ChatInput.vue`, `credentialCrypto.ts`, `credentialStorage.ts`, `constant.ts`
+
+---
+
+### Phase 6B — 💅 UX Polish & i18n
+**Fichiers clés** : `frontend/src/components/chat/StatsBar.vue`, `frontend/src/components/chat/ToolCallBlock.vue`, `frontend/src/components/settings/AccountTab.vue`, `frontend/src/components/chat/ChatMessageList.vue`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| UX-M2 | Traduire les tooltips hardcodés en anglais (StatsBar, ToolCallBlock) via `t()` | 🟡 Medium |
+| UX-M3 | Ajouter un tooltip/notification quand le contexte dépasse 80% | 🟡 Medium |
+| UX-L2 | Remplacer l'URL brute par un texte descriptif dans AccountTab.vue | 🟢 Low |
+| UX-L3 | Revoir `max-w-[95%]` sur les bulles de message pour mobile | 🟢 Low |
+
+**Contexte à lire** : `StatsBar.vue`, `ToolCallBlock.vue`, `AccountTab.vue`, `ChatMessageList.vue`, fichiers i18n
+
+---
+
+### Phase 6C — 🔩 Infrastructure + Sécurité
+**Fichiers clés** : `backend/Dockerfile`, `frontend/Dockerfile`, `.env.example`, `scripts/generate-manifests.js`
+
+| Item | Description | Priorité |
+|------|-------------|----------|
+| ARCH-L1 | Passer de `npm install` à `npm ci` dans le Dockerfile frontend | 🟢 Low |
+| ARCH-L2 | Évaluer déplacement des manifests vers `frontend/public/assets/` pour SaaS | 🟢 Low |
+| IC2 | Ajouter directive `USER` non-root dans les deux Dockerfiles | 🟢 Low |
+| IH2 | Remplacer l'IP privée `192.168.50.10` par un placeholder dans `.env.example` | 🟢 Low |
+| IH3 | Remplacer le domaine DuckDNS réel par un placeholder dans `.env.example` | 🟢 Low |
+
+**Contexte à lire** : `backend/Dockerfile`, `frontend/Dockerfile`, `.env.example`, `generate-manifests.js`
+
+---
+
+### 🚀 DEFERRED — Phase 7+
+
+**TOKEN-M1** (🟡 Medium — déféré) : Cohérence tokens affiché vs réel + augmenter limite max. Attendre d'avoir LOG-H1 actif pour mesurer l'écart réel.
+- Fichiers : `validate.js`, `models.js`, `tokenManager.ts`
+
+#### DYNTOOL-D1: Dynamic Tooling — Intent-Based Tool Loading 🚀 DEFERRED
+
+**Prerequisite**: LOG-H1 (tool usage counting) must be implemented and data collected for at least 2 weeks before this work begins.
+
+**Why deferred**: Without real usage data, we cannot identify the correct "Core Set" of tools. Quick Actions will NOT use dynamic tooling — they will be powered by skill.md files (SKILL-L1).
+
+**Plan (3 phases)**:
+
+**Phase 1 — Analysis (depends on LOG-H1 data)**:
+- Use `backend/logs/tool-usage.jsonl` to identify, per Office host, the 5–7 tools representing 80% of usage ("Core Set")
+- Document the Core Set and Extended Set per host
+
+**Phase 2 — Tool Schema Separation**:
+- Divide tool definitions into two tiers per host in `*Tools.ts`:
+  - `getCoreToolDefinitions()` — always loaded in Chat Libre
+  - `getExtendedToolDefinitions()` — available on-demand
+- No breaking changes to existing tool execution logic
+
+**Phase 3 — Routing / RAG (Chat Libre only)**:
+- When a user request arrives in Chat Libre mode, run a lightweight intent classifier (keyword matching or LLM call) to determine if Extended Set tools are needed
+- If yes, inject the relevant extended tool schemas for that turn only
+- Alternative: expose a `getAdvancedTools(category: string)` meta-tool that the LLM can call to request additional tools
+
+**Isolation from Quick Actions**: Quick Actions must never use dynamic loading. They will use the skill.md system (SKILL-L1) where tool calls are explicitly declared.
+
+---
+
+## Deferred Items Summary by Severity (v11.0)
+
+| Severity | Count | Status | Items |
+|----------|-------|--------|-------|
+| 🔴 **Critical (v11 actif)** | 2 | ✅ Phase 1A DONE | PPT-C1 ✅, PPT-C2 ✅ |
+| 🔴 **Critical (v10)** | 0 | ✅ All fixed | Phase 0 complete |
+| 🟠 **High (déféré v10)** | 5 + 1 prospectif | ⏳ Pending | TOOL-C1 (doc re-send), TOOL-H2 (Word screenshot), USR-H1 (empty shapes), USR-H2 (context bloat), PROSP-H2 |
+| 🟡 **Medium (déféré v10)** | 3 | — | TOKEN-M1 (nouveau), PROSP-2 (Claude.md), PROSP-5 (intent profiles) |
+| 🟢 **Low (déféré v10)** | 1 + 3 prospectifs | — | UM10 (PPT HTML reconstruction — fermé, ne pas implémenter) + PROSP-1/3/4 |
+| 🚀 **New deferred** | 1 | — | DYNTOOL-D1 (dynamic tooling, besoin données LOG-H1 d'abord) |
+| **TOTAL DEFERRED** | **18** | | 11 fonctionnel + 5 architectural/legacy + 2 nouveaux (TOKEN-M1, DYNTOOL-D1) |
+
+---
+
+## Résumé des phases v11.0
+
+| Phase | Zone de code principale | Items actifs | Priorité max |
+|-------|------------------------|-------------|-------------|
+| **1A** ✅ | `powerpointTools.ts` | PPT-C1 ✅, PPT-C2 ✅, TOOL-M3 ✅ | 🔴 Critical |
+| **1B** ✅ | `image.js` + `constant.ts` (visual) + `useAgentLoop` (image) | IMG-H1 ✅, PPT-H1 ✅, PPT-M1 ✅ | 🟠 High |
+| **1C** ✅ | `constant.ts` (PPT QA) + `useAgentLoop` + `QuickActionsBar` | PPT-H2 ✅, TOOL-L2 ✅, TOOL-L3 ✅ | 🟠 High |
+| **2A** | `useHomePage.ts` + `useAgentStream.ts` + `ChatMessageList.vue` + `HomePage.vue` | UX-H1, ARCH-H2 | 🟠 High |
+| **2B** | `useAgentPrompts.ts` + tous `*.skill.md` | LANG-H1, TOOL-M4 | 🟠 High |
+| **2C** | `outlookTools.ts` + `outlook.skill.md` | OUT-H1, QUAL-L2 | 🟠 High |
+| **3A** | `chat.js` + `feedback.js` + `logs/` | LOG-H1, FB-M1, ERR-M1 | 🟠 High |
+| **3B** | `plotDigitizerService.js` + `excelTools.ts` + `excel.skill.md` | XL-M1, TOOL-M1, TOOL-M2 | 🟡 Medium |
+| **3C** | `ChatInput.vue` | CLIP-M1, UX-M1, UX-L1 | 🟡 Medium |
+| **4A** | `wordDiffUtils.ts` + `wordTools.ts` + `wordOoxmlUtils.ts` | OXML-M1, WORD-H1, DUP-M1 | 🟠 High |
+| **4B** | `useAgentLoop.ts` + `skills/` | ARCH-H1, SKILL-L1 | 🟠 High |
+| **5A** | `common.ts` + tous `*Tools.ts` (types + exports) | DUP-H1, QUAL-H1, DEAD-M1 | 🟠 High |
+| **5B** | `excelTools.ts` + `common.ts` + `files.js` | DEAD-M2, DUP-M2, ERR-M2 | 🟡 Medium |
+| **5C** | `validate.js` + `credentialStorage.ts` + `useAgentLoop.ts` (registry) | ARCH-M1, ARCH-M2, ARCH-M3 | 🟡 Medium |
+| **6A** | `HomePage.vue` + `ChatMessageList.vue` + `credentialCrypto.ts` | QUAL-M3, QUAL-M2, QUAL-M1 | 🟡 Medium |
+| **6B** | `StatsBar.vue` + `ToolCallBlock.vue` + `AccountTab.vue` | UX-M2, UX-M3, UX-L2, UX-L3 | 🟡 Medium |
+| **6C** | `Dockerfile` × 2 + `.env.example` | ARCH-L1, ARCH-L2, IC2, IH2, IH3 | 🟢 Low |
+| **Déféré 7+** | — | TOKEN-M1, DYNTOOL-D1, PROSP-H2, PROSP-1–5, TOOL-C1↗, TOOL-H2↗, USR-H1↗, USR-H2↗ | 🚀 |
+
+---
+
+*Ce document couvre le codebase au 2026-03-14. Les numéros de ligne référencent l'état courant sur la branche `claude/design-review-planning-UcBZi`.*

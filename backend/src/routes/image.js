@@ -18,7 +18,8 @@ imageRouter.post('/', async (req, res) => {
 
   const imageModel = models.image
 
-  const FRAMING_INSTRUCTION = 'Always fit the entire subject inside the frame with visible padding margins. Do not crop the left or right edges.'
+  // IMG-H1: Reinforce framing to prevent subject clipping, especially on landscape output
+  const FRAMING_INSTRUCTION = 'IMPORTANT COMPOSITION RULES: (1) Fit the ENTIRE subject fully inside the frame — no cropping of any part of the subject. (2) Leave visible padding/margins on all four sides. (3) Never cut off heads, limbs, objects, text, or edges. (4) Compose for a wide landscape format (16:9). Center the subject with breathing room around it.'
 
   try {
     const response = await imageGeneration({

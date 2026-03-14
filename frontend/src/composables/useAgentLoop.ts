@@ -7,7 +7,7 @@ import { getExcelToolDefinitions } from '@/utils/excelTools'
 import { getGeneralToolDefinitions } from '@/utils/generalTools'
 import { message as messageUtil } from '@/utils/message'
 import { getOutlookToolDefinitions } from '@/utils/outlookTools'
-import { getPowerPointToolDefinitions, setCurrentSlideSpeakerNotes, powerpointImageRegistry } from '@/utils/powerpointTools'
+import { getPowerPointToolDefinitions, powerpointImageRegistry, powerpointToolDefinitions } from '@/utils/powerpointTools'
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager'
 import { getWordToolDefinitions } from '@/utils/wordTools'
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage'
@@ -918,7 +918,32 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
       }
 
       // Get current slide text selection
-      const slideText = await getOfficeSelection({ actionKey })
+      let slideText = await getOfficeSelection({ actionKey })
+
+      // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
+      // to provide richer context for image generation
+      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length
+      if (wordCount < 5) {
+        try {
+          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({})
+          const screenshot = JSON.parse(screenshotJson)
+          if (screenshot.base64 && !screenshot.error) {
+            const dataUri = `data:image/png;base64,${screenshot.base64}`
+            let slideDesc = ''
+            await chatStream({
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: dataUri } },
+                { type: 'text', text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.' },
+              ] as any }],
+              modelTier: resolveChatModelTier(),
+              onStream: async (text: string) => { slideDesc = text },
+            })
+            if (slideDesc.trim()) slideText = slideDesc.trim()
+          }
+        } catch (err) {
+          logService.warn('[AgentLoop] PPT-M1: screenshot fallback for short selection failed', err)
+        }
+      }
 
       // Step 1: call standard LLM to generate a proper image description prompt
       const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
@@ -962,6 +987,42 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
         }
       } finally {
         imageLoading.value = false
+        loading.value = false
+        abortController.value = null
+      }
+      return
+    }
+
+    // PPT-H2: "review" — screenshots current slide + gathers overview, then runs agent loop
+    // Does NOT require selected text (bypasses the selectedText guard below)
+    if (actionKey === 'review' && hostIsPowerPoint) {
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français'
+      const actionLabel = selectedQuickAction?.label || t(actionKey)
+      history.value.push(createDisplayMessage('user', `[${actionLabel}]`))
+
+      loading.value = true
+      abortController.value = new AbortController()
+      try {
+        const systemMsg = `You are an expert presentation coach reviewing a PowerPoint presentation. Respond in ${lang}.
+Instructions:
+1. Call \`getCurrentSlideIndex\` to find the current slide number.
+2. Call \`screenshotSlide\` with that slide number to see the visual layout.
+3. Call \`getAllSlidesOverview\` to understand the full presentation context.
+4. Based on the screenshot and the presentation overview, provide 3-5 specific, actionable improvement suggestions for THIS slide only.
+Review areas: content clarity, visual balance (too much/too little text), message impact, consistency with the rest of the presentation.
+Format your response as numbered suggestions. Be concrete and direct. Do NOT suggest changes to other slides.`
+        await runAgentLoop(
+          [{ role: 'system', content: systemMsg }, { role: 'user', content: 'Review the current slide and provide improvement suggestions.' }],
+          resolveChatModelTier(),
+        )
+      } catch (err: unknown) {
+        if (!(err instanceof Error) || err.name !== 'AbortError') {
+          logService.error('[AgentLoop] review quick action failed', err)
+          const errInfo = categorizeError(err)
+          const last = history.value[history.value.length - 1]
+          if (last?.role === 'assistant') last.content = t(errInfo.i18nKey)
+        }
+      } finally {
         loading.value = false
         abortController.value = null
       }
@@ -1098,14 +1159,6 @@ async function runAgentLoop(messages: ChatMessage[], modelTier: ModelTier) {
           const lastMessage = history.value[history.value.length - 1]
           if (!lastMessage?.content?.trim()) {
             lastMessage.content = t('noModelResponse')
-          }
-
-          // PPT-M2: For speakerNotes action, directly insert the generated text into the slide notes
-          if (hostIsPowerPoint && actionKey === 'speakerNotes' && lastMessage?.content?.trim()) {
-            const inserted = await setCurrentSlideSpeakerNotes(lastMessage.content.trim())
-            if (inserted) {
-              lastMessage.content += '\n\n_✓ Notes insérées dans la diapositive._'
-            }
           }
 
           // F1: Reassemble rich content with preserved fragments and inject native styles

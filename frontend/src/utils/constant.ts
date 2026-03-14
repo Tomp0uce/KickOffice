@@ -16,10 +16,12 @@ export const languageMap: IStringKeyMap = {
   ru: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439',
 }
 
+/// TOOL-L3: em-dash/semicolon ban is PPT/bullet-only — applied per-prompt, not globally
+export const PPT_STYLE_RULES = `- NEVER use em-dashes (—).
+- NEVER use semicolons (;).`
+
 export const GLOBAL_STYLE_INSTRUCTIONS = `
 CRITICAL INSTRUCTIONS FOR ALL GENERATIONS:
-- NEVER use em-dashes (—).
-- NEVER use semicolons (;).
 - Keep the sentence structure natural and highly human-like.
 - When creating bullet lists, use standard Markdown syntax:
   - Use "-" for unordered lists (not "*" or "+")
@@ -255,23 +257,26 @@ export const powerPointBuiltInPrompt = {
       Constraints:
       1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
+      3. ${PPT_STYLE_RULES}
 
       Text: ${text}`,
   },
 
-  speakerNotes: {
-    system: (_language: string) =>
-      `You are an expert presenter. Your task is to write engaging, strictly-concise speaker notes that can be instantly read while glancing at a screen during a presentation.`,
-    user: (text: string, _language: string) =>
-      `Task: Generate highly concise speaker notes based on the following slide content.
-      Requirements:
-      - Write in a natural, conversational tone.
-      - Expand briefly on the points with context or transitions.
-      - Keep the notes extremely short (under 100 words total).
-      - Use short, punch-able sentences and visual cues.
+  // PPT-H2: replaced speakerNotes with review — takes screenshot + overview, reviews current slide only
+  review: {
+    system: (language: string) =>
+      `You are an expert presentation coach reviewing a PowerPoint presentation. Your task is to analyze the CURRENT slide only and provide specific, actionable improvement suggestions in ${language}.`,
+    user: (text: string, language: string) =>
+      `Based on the following slide content, provide 3-5 specific improvement suggestions for THIS slide only.
+      Review areas:
+      - Content clarity: Is the message clear and concise?
+      - Visual balance: Too much/too little text? Is the layout effective?
+      - Message impact: Does the slide communicate its key point effectively?
+      - Consistency: Does it align with the overall presentation tone?
       Constraints:
-      1. ${LANGUAGE_MATCH_INSTRUCTION}
-      2. OUTPUT ONLY the speaker notes. No meta-commentary.
+      1. Respond in ${language}.
+      2. Be specific and actionable. Format as numbered suggestions.
+      3. Do NOT suggest changes to other slides.
 
       Slide content: ${text}`,
   },
@@ -295,6 +300,7 @@ export const powerPointBuiltInPrompt = {
       1. ${LANGUAGE_MATCH_INSTRUCTION}
       2. OUTPUT ONLY the bullet-point list. No introduction or commentary.
       3. Keep the meaning accurate but dramatically improved in style.
+      4. ${PPT_STYLE_RULES}
 
       Text: ${text}`,
   },
@@ -318,19 +324,25 @@ export const powerPointBuiltInPrompt = {
       Text: ${text}`,
   },
 
+  // PPT-H1: improved prompt — generate images that truly illustrate the slide content
   visual: {
     system: (language: string) =>
-      `You are a visual communication expert and creative director. Your task is to generate detailed image prompts for presentation visuals based on slide content in ${language}.`,
+      `You are a visual communication expert and creative director specializing in presentation design. Your task is to generate detailed image generation prompts that produce visuals which directly illustrate and represent the given slide content in ${language}. The image must feel like it was created specifically for this slide — not a generic stock photo.`,
     user: (text: string, language: string) =>
-      `Task: Based on the following slide content, generate a detailed image generation prompt.
+      `Task: Based on the following slide content, write a detailed prompt for an image generation model that will produce a visual directly illustrating this specific content.
+
       Requirements:
-      - Describe a professional, clean visual that would complement the slide content.
-      - Include style direction (e.g., flat illustration, photo-realistic, infographic style).
-      - Specify colors, mood, and composition.
-      - Keep it suitable for a professional presentation context.
+      - The image must visually represent the SPECIFIC topic, concept, or data from the slide — not a generic illustration.
+      - Choose the most appropriate visual style for the content: photo-realistic scene, flat vector illustration, isometric diagram, infographic, conceptual metaphor, data visualization, etc.
+      - If the concept benefits from including labels or short text in the image (e.g., a diagram with annotations), explicitly request it.
+      - Describe composition: what is in the foreground, background, key focal elements.
+      - Specify color palette, mood, and lighting that match the slide's tone (e.g., professional, energetic, calm, technical).
+      - Wide landscape format (16:9), high resolution, suitable for professional presentation slides.
+      - No generic filler images (e.g., no random handshakes or abstract blobs unless directly relevant).
+
       Constraints:
       1. Respond in ${language}.
-      2. OUTPUT ONLY the image prompt, ready to be used with an image generation tool.
+      2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.
 
       Slide content: ${text}`,
   },

@@ -52,6 +52,7 @@ export type PowerPointToolName =
   | 'editSlideXml'
   | 'searchIcons'
   | 'insertIcon'
+  | 'searchAndFormatInPresentation'
 
 /**
  * Returns the 1-based slide number of the currently active/selected slide.
@@ -530,7 +531,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -562,7 +563,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         notes: { type: 'string', description: 'The new speaker notes text (plain text).' },
       },
       required: ['slideNumber', 'notes'],
@@ -596,7 +597,7 @@ PARAMETERS:
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         base64Data: { type: 'string', description: 'The base64-encoded image data, a data URI (data:image/...;base64,...), OR the image ID returned when the user uploaded a file (UUID format). The tool resolves registry IDs automatically.' },
         left: { type: 'number', description: 'Left position in points from the left edge of the slide. Default: 100.' },
         top: { type: 'number', description: 'Top position in points from the top edge of the slide. Default: 100.' },
@@ -629,7 +630,9 @@ PARAMETERS:
       const index = Math.trunc(slideNumber) - 1
       if (index >= slides.items.length) throw new Error(`Error: slide ${slideNumber} does not exist.`)
 
-      const slide = slides.getItemAt(index)
+      // PPT-C2 fix: use slides.items[index] (already loaded) instead of
+      // slides.getItemAt(index) which returns a proxy lacking .shapes.addImage()
+      const slide = slides.items[index]
       const shape = slide.shapes.addImage(base64)
       shape.left = typeof args.left === 'number' ? args.left : 100
       shape.top = typeof args.top === 'number' ? args.top : 100
@@ -767,7 +770,7 @@ try {
         },
         slideNumber: {
           type: 'number',
-          description: 'Target slide number (1 = first slide). Required when shapeIdOrName is provided.',
+          description: 'Target slide number, 1-based (1 = first slide, not 0-based). Required when shapeIdOrName is provided.',
         },
         shapeIdOrName: {
           type: 'string',
@@ -994,7 +997,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -1020,7 +1023,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
       },
       required: ['slideNumber'],
     },
@@ -1081,37 +1084,46 @@ try {
 
       const overview: string[] = []
       for (let i = 0; i < slides.items.length; i++) {
-        const slide = slides.items[i]
-        slide.load(['id', 'layout'])
-        const shapes = slide.shapes
-        // Load shape type together with items to filter out non-text shapes (images, pictures)
-        shapes.load('items,items/type')
-        await context.sync()
+        try {
+          const slide = slides.items[i]
+          slide.load(['id', 'layout'])
+          const shapes = slide.shapes
+          // Load shape type together with items to filter out non-text shapes (images, pictures)
+          shapes.load('items,items/type')
+          await context.sync()
 
-        for (let j = 0; j < shapes.items.length; j++) {
-          const shape = shapes.items[j]
-          const shapeType = String(shape.type || '').toLowerCase()
-          if (shapeType.includes('picture') || shapeType === '13') continue // keep skipping text load for images
-          try { shape.textFrame.textRange.load('text') } catch {}
+          for (let j = 0; j < shapes.items.length; j++) {
+            const shape = shapes.items[j]
+            const shapeType = String(shape.type || '').toLowerCase()
+            if (shapeType.includes('picture') || shapeType === '13') continue // keep skipping text load for images
+            try { shape.textFrame.textRange.load('text') } catch {}
+          }
+
+          // PPT-C1 fix: OLE/chart/SmartArt shapes can cause InvalidArgument on sync;
+          // catch the error so a single bad shape doesn't crash the entire overview.
+          let textSyncOk = true
+          try { await context.sync() } catch { textSyncOk = false }
+
+          const lines = shapes.items
+            .map((s: any) => {
+              const t = String(s.type || '').toLowerCase()
+              if (t.includes('picture') || t === '13') {
+                return `[Image ${s.width}x${s.height}]`
+              }
+              if (!textSyncOk) return ''
+              let text = ''
+              try { text = s.textFrame.textRange.text } catch {}
+              return text.trim()
+            })
+            .filter(Boolean)
+
+          let slideText = lines.join(' | ')
+          if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...'
+
+          overview.push(`Slide ${i + 1} (Layout: ${slide?.layout || 'unknown'}): ${slideText || '<No Text>'}`)
+        } catch {
+          overview.push(`Slide ${i + 1}: [Error reading content]`)
         }
-        await context.sync()
-
-        const lines = shapes.items
-          .map((s: any) => {
-            const t = String(s.type || '').toLowerCase()
-            if (t.includes('picture') || t === '13') {
-               return `[Image ${s.width}x${s.height}]`
-            }
-            let text = ''
-            try { text = s.textFrame.textRange.text } catch {}
-            return text.trim()
-          })
-          .filter(Boolean)
-
-        let slideText = lines.join(' | ')
-        if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...'
-
-        overview.push(`Slide ${i + 1} (Layout: ${slide?.layout || 'unknown'}): ${slideText || '<No Text>'}`)
       }
       return overview.join('\n')
     },
@@ -1123,7 +1135,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide). Defaults to current slide.' }
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based). Defaults to current slide.' }
       },
       required: [],
     },
@@ -1153,7 +1165,7 @@ try {
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Source slide number (1 = first slide).' }
+        slideNumber: { type: 'number', description: 'Source slide number, 1-based (1 = first slide, not 0-based).' }
       },
       required: ['slideNumber'],
     },
@@ -1239,7 +1251,7 @@ ALWAYS call markDirty() after modifying the zip.`,
     inputSchema: {
       type: 'object',
       properties: {
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         code: { type: 'string', description: 'Async JS code with access to: zip, markDirty, escapeXml, DOMParser, XMLSerializer.' },
         explanation: { type: 'string', description: 'What this code does (required for audit trail).' },
       },
@@ -1298,7 +1310,7 @@ ALWAYS call markDirty() after modifying the zip.`,
       type: 'object',
       properties: {
         iconId: { type: 'string', description: 'Icon identifier in format "prefix:name", e.g. "mdi:home".' },
-        slideNumber: { type: 'number', description: 'Target slide number (1 = first slide).' },
+        slideNumber: { type: 'number', description: 'Target slide number, 1-based (1 = first slide, not 0-based).' },
         left: { type: 'number', description: 'Left position in points. Default: 100.' },
         top: { type: 'number', description: 'Top position in points. Default: 100.' },
         width: { type: 'number', description: 'Width in points. Default: 72 (1 inch).' },
@@ -1329,7 +1341,8 @@ ALWAYS call markDirty() after modifying the zip.`,
       const index = Math.trunc(slideNumber) - 1
       if (index >= slides.items.length) throw new Error(`Slide ${slideNumber} does not exist.`)
 
-      const slide = slides.getItemAt(index)
+      // PPT-C2 fix: use slides.items[index] (already loaded) instead of proxy
+      const slide = slides.items[index]
       const shape = slide.shapes.addImage(base64)
       shape.left = typeof args.left === 'number' ? args.left : 100
       shape.top = typeof args.top === 'number' ? args.top : 100
@@ -1338,6 +1351,131 @@ ALWAYS call markDirty() after modifying the zip.`,
       await context.sync()
 
       return `Icon "${args.iconId}" inserted on slide ${slideNumber}.`
+    },
+  },
+
+  searchAndFormatInPresentation: {
+    name: 'searchAndFormatInPresentation',
+    category: 'write',
+    description: 'Search for text across all slides and apply font formatting (bold, italic, underline, color, size, font name) to every matching run. Case-sensitive by default.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        searchText: { type: 'string', description: 'Text to search for.' },
+        matchCase: { type: 'boolean', description: 'Case-sensitive match. Default: true.' },
+        bold: { type: 'boolean', description: 'Set bold.' },
+        italic: { type: 'boolean', description: 'Set italic.' },
+        underline: { type: 'boolean', description: 'Set underline.' },
+        fontColor: { type: 'string', description: 'Font color as hex, e.g. "#FF0000".' },
+        fontSize: { type: 'number', description: 'Font size in points.' },
+        fontName: { type: 'string', description: 'Font family name.' },
+      },
+      required: ['searchText'],
+    },
+    executePowerPoint: async (context: any, args: Record<string, any>) => {
+      ensurePowerPointRunAvailable()
+
+      const searchText: string = String(args.searchText)
+      const matchCase: boolean = args.matchCase !== false
+      const needle = matchCase ? searchText : searchText.toLowerCase()
+
+      const hasBold = args.bold !== undefined
+      const hasItalic = args.italic !== undefined
+      const hasUnderline = args.underline !== undefined
+      const hasFontColor = typeof args.fontColor === 'string'
+      const hasFontSize = typeof args.fontSize === 'number'
+      const hasFontName = typeof args.fontName === 'string'
+
+      if (!hasBold && !hasItalic && !hasUnderline && !hasFontColor && !hasFontSize && !hasFontName) {
+        return 'Error: at least one formatting property (bold, italic, underline, fontColor, fontSize, fontName) must be specified.'
+      }
+
+      const slides = context.presentation.slides
+      slides.load('items')
+      await context.sync()
+
+      let totalMatches = 0
+
+      for (let si = 0; si < slides.items.length; si++) {
+        const slide = slides.items[si]
+        const shapes = slide.shapes
+        shapes.load('items,items/type')
+        await context.sync()
+
+        // Phase A: load textRange.text for non-picture shapes to find candidates
+        const candidateShapes: any[] = []
+        for (let j = 0; j < shapes.items.length; j++) {
+          const shape = shapes.items[j]
+          const shapeType = String(shape.type || '').toLowerCase()
+          // Skip pictures and non-text shape types
+          if (shapeType.includes('picture') || shapeType === '13') continue
+          try {
+            shape.textFrame.textRange.load('text')
+            candidateShapes.push(shape)
+          } catch { /* shape has no textFrame */ }
+        }
+
+        if (candidateShapes.length === 0) continue
+
+        let textSyncOk = true
+        try { await context.sync() } catch { textSyncOk = false }
+        if (!textSyncOk) continue
+
+        // Phase B: filter shapes containing the search text, then load paragraphs
+        const matchingShapes: any[] = []
+        for (const shape of candidateShapes) {
+          let shapeText = ''
+          try { shapeText = shape.textFrame.textRange.text || '' } catch { continue }
+          const haystack = matchCase ? shapeText : shapeText.toLowerCase()
+          if (!haystack.includes(needle)) continue
+          try {
+            shape.textFrame.textRange.paragraphs.load('items')
+            matchingShapes.push(shape)
+          } catch { /* skip */ }
+        }
+
+        if (matchingShapes.length === 0) continue
+        await context.sync()
+
+        // Phase C: load textRuns for each paragraph of matching shapes
+        for (const shape of matchingShapes) {
+          try {
+            for (const para of shape.textFrame.textRange.paragraphs.items) {
+              para.textRange.textRuns.load('items')
+            }
+          } catch { /* skip */ }
+        }
+        await context.sync()
+
+        // Phase D: apply formatting to runs containing the search text
+        for (const shape of matchingShapes) {
+          try {
+            for (const para of shape.textFrame.textRange.paragraphs.items) {
+              for (const run of para.textRange.textRuns.items) {
+                let runText = ''
+                try { runText = run.textRange.text || '' } catch { continue }
+                const haystack = matchCase ? runText : runText.toLowerCase()
+                if (!haystack.includes(needle)) continue
+
+                totalMatches++
+                if (hasBold) run.textRange.font.bold = args.bold
+                if (hasItalic) run.textRange.font.italic = args.italic
+                if (hasUnderline) run.textRange.font.underline = args.underline ? 'Single' : 'None'
+                if (hasFontColor) run.textRange.font.color = args.fontColor
+                if (hasFontSize) run.textRange.font.size = args.fontSize
+                if (hasFontName) run.textRange.font.name = args.fontName
+              }
+            }
+          } catch { /* skip malformed shape */ }
+        }
+
+        if (matchingShapes.length > 0) {
+          try { await context.sync() } catch { /* non-fatal */ }
+        }
+      }
+
+      if (totalMatches === 0) return `No occurrences of "${searchText}" found in the presentation.`
+      return `Applied formatting to ${totalMatches} run(s) matching "${searchText}" across the presentation.`
     },
   },
 
