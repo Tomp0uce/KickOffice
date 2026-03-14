@@ -1,7 +1,11 @@
-import { createWebHistory, createRouter } from 'vue-router';
+import { createMemoryHistory, createRouter } from 'vue-router';
 
 const router = createRouter({
-  history: createWebHistory(),
+  // Office Add-ins run inside iframes with URLs controlled by Office.
+  // createMemoryHistory avoids manipulating the browser URL entirely,
+  // which prevents redirect loops caused by catch-all routes or
+  // history.pushState conflicts with the Office iframe host.
+  history: createMemoryHistory(),
   routes: [
     {
       path: '/',
