@@ -196,6 +196,8 @@
   "excelExplain_tooltip": "Sélectionnez une formule ou une plage de données. L'IA expliquera son fonctionnement en langage simple.",
   "excelFormulaGenerator_tooltip": "Décrivez la formule dont vous avez besoin. L'IA générera la formule Excel correcte pour votre cas d'usage.",
   "excelDataTrend_tooltip": "Sélectionnez une plage de données. L'IA identifiera les tendances, patterns et anomalies.",
+  "excelPixelArt": "Pixel Art",
+  "excelPixelArt_tooltip": "Uploadez une image. L'IA la convertira en pixel art directement dans les cellules Excel en utilisant les couleurs d'arrière-plan.",
   "outlookProofread_tooltip": "Aucune sélection requise. Corrige la grammaire, l'orthographe et la ponctuation de votre brouillon de réponse en préservant les images et la mise en forme.",
   "outlookConcise_tooltip": "Sélection optionnelle. L'IA condensera votre brouillon de réponse en supprimant les répétitions et les tournures creuses.",
   "outlookExtract_tooltip": "Aucune sélection requise. Extrait les tâches, décisions, échéances et questions en suspens de l'email.",

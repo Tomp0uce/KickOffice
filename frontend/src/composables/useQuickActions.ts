@@ -489,16 +489,22 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
             const imageContext =
               `<uploaded_images>\nThe following images are available in session memory:\n` +
               `- [${result.filename}]${imageIdTag}\n` +
-              `To extract chart data into Excel, use extract_chart_data with the imageId.\n` +
+              (actionKey === 'pixelArt'
+                ? `Use the imageToSheet tool with the uploaded image to generate pixel art in Excel.\n`
+                : `To extract chart data into Excel, use extract_chart_data with the imageId.\n`) +
               `</uploaded_images>`;
 
             const userText =
               `[UI language: ${lang}]\n\n` +
-              `Digitize this chart image: extract the data and write it to Excel, then create a matching chart.\n\n` +
+              (actionKey === 'pixelArt'
+                ? `Convert this image into pixel art in Excel using the imageToSheet tool.\n\n`
+                : `Digitize this chart image: extract the data and write it to Excel, then create a matching chart.\n\n`) +
               imageContext;
 
             // Build multipart user message (text + image)
-            const imageUrl = fileId ?? `data:${file.type};base64,${result.imageBase64}`;
+            // NOTE: result.imageBase64 is already a full data URI (data:mime;base64,...)
+            // returned by the backend — do NOT wrap it again with data:${file.type};base64,...
+            const imageUrl = fileId ?? result.imageBase64;
             const userMessage: ChatMessage = {
               role: 'user',
               content: [
