@@ -103,6 +103,16 @@
       <!-- ARCH-H2 — Props removed, uses context via provide/inject -->
       <ChatMessageList ref="messageListRef" />
 
+      <StatsBar
+        v-model:selected-model-tier="selectedModelTier"
+        :session-stats="sessionStats"
+        :model-name="selectedModelInfo?.id ?? selectedModelTier"
+        :current-action="currentAction"
+        :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
+        :loading="loading"
+        :available-models="availableModels"
+      />
+
       <ChatInput
         ref="chatInputRef"
         v-model="userInput"
@@ -117,15 +127,6 @@
         :draft-focus-glow="isDraftFocusGlowing"
         @submit="sendMessage"
         @stop="stopGeneration"
-      />
-      <StatsBar
-        v-model:selected-model-tier="selectedModelTier"
-        :session-stats="sessionStats"
-        :model-name="selectedModelInfo?.id ?? selectedModelTier"
-        :current-action="currentAction"
-        :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
-        :loading="loading"
-        :available-models="availableModels"
       />
     </div>
   </div>

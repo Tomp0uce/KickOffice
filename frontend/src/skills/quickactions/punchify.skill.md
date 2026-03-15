@@ -13,37 +13,18 @@ Make every text shape on the active slide more impactful, concise, and engaging 
 
 Call `getCurrentSlideIndex` to get the current 1-based slide number.
 
-### Step 2 — Read every text shape on the slide
+### Step 2 — Read the slide content
 
-Use `eval_powerpointjs` to enumerate the shapes and retrieve their text.
-This is required to avoid `InvalidArgument` errors on OLE or chart shapes.
+Use `getSlideContent` to get the text of all shapes on the slide (this is the most reliable method
+and works on all shape types including Placeholders):
 
-Example code to pass to `eval_powerpointjs`:
-
-```javascript
-const slide = context.presentation.slides.getItemAt(SLIDE_INDEX); // 0-based
-slide.shapes.load('items/id,items/name,items/type');
-await context.sync();
-const result = [];
-for (const shape of slide.shapes.items) {
-  const t = (shape.type || '').toString().toLowerCase();
-  if (t === '13' || t.includes('picture') || t === 'ole' || t === 'chart') continue;
-  try {
-    shape.textFrame.textRange.paragraphs.load('items/textRange/text');
-    await context.sync();
-    const paragraphs = shape.textFrame.textRange.paragraphs.items.map((p, i) => ({
-      index: i,
-      text: p.textRange.text,
-    }));
-    result.push({ id: shape.id, name: shape.name, paragraphs });
-  } catch (e) {
-    // skip shapes with no text frame
-  }
-}
-return JSON.stringify(result);
+```json
+{ "slideNumber": <1-based slide number> }
 ```
 
-Replace `SLIDE_INDEX` with `slideNumber - 1` (0-based).
+`getSlideContent` returns shapes as `[Shape N] <id>/<name>\n<text>` blocks. Parse each block to get:
+- The shape's ID or name (use the ID, e.g. `36`)
+- The text lines (each line = one paragraph)
 
 ### Step 3 — Generate punchified text
 
@@ -56,43 +37,67 @@ For each paragraph in each text shape, produce a punchified version:
 - **Language**: MUST match the original language exactly — never translate
 - **Already short / punchy text**: Leave unchanged (return identical text)
 
-### Step 4 — Apply changes with `replaceShapeParagraphs`
+Only produce punchified replacements for paragraphs that actually changed.
 
-For **each shape that has at least one changed paragraph**, call `replaceShapeParagraphs` once,
-passing only the paragraphs whose text actually changed.
+### Step 4 — Apply changes with `searchAndReplaceInShape`
+
+For **each paragraph whose text changed**, call `searchAndReplaceInShape` once with:
+- `searchText`: the original paragraph text (exact match)
+- `replaceText`: the punchified version
 
 ```json
 {
   "slideNumber": <1-based slide number>,
-  "shapeIdOrName": "<shape ID or name>",
-  "paragraphReplacements": [
-    { "paragraphIndex": 0, "newText": "punchified text here" },
-    { "paragraphIndex": 2, "newText": "another punchified bullet" }
-  ]
+  "shapeIdOrName": "<shape ID>",
+  "searchText": "original paragraph text here",
+  "replaceText": "punchified bullet"
 }
 ```
 
-`replaceShapeParagraphs` preserves font name, size, bold, italic and color for each paragraph.
+**One call per changed paragraph.** Do NOT batch multiple paragraphs into a single call.
+
+`searchAndReplaceInShape` has an automatic XML fallback for Placeholder shapes (GeneralException)
+— just call it normally; formatting is preserved in all cases.
+
+**Do NOT call `replaceShapeParagraphs`** — it fails with GeneralException on Placeholder shapes.
 **Do NOT call `proposeShapeTextRevision`** — it destroys all formatting.
 **Do NOT call `insertContent`** — it inserts new content instead of replacing existing text.
 
 ### Step 5 — Report
 
-After all `replaceShapeParagraphs` calls succeed, output a brief summary of what was changed.
+After all replacements succeed, output a brief summary of what was changed.
 Do NOT ask for confirmation before applying — apply directly.
 
 ---
 
 ## Example transformation
 
-**Before** (paragraph text):
-> "We are going to make improvements to the customer experience by implementing a new feedback system"
+**`getSlideContent` returns:**
+```
+[Shape 4] 36/Content Placeholder 35
+Besoin client
+Stago souhaite explorer le potentiel des outils d'IA générative pour automatiser la génération de documents d'architecture logicielle de leurs instruments médicaux.
+Proposition Kickmaker
+Fort de son expérience en intégration d'outils IA de pointe dans un environnement sécurisé, Kickmaker propose de réaliser une première étude.
+```
 
-**After**:
-> "Improve customer experience with new feedback system"
+**Punchified replacements for shape 36:**
+- "Stago souhaite explorer le potentiel des outils d'IA générative pour automatiser la génération de documents d'architecture logicielle de leurs instruments médicaux." → "Stago veut exploiter l'IA générative pour auto-générer ses documents d'architecture logicielle."
+- "Fort de son expérience en intégration d'outils IA de pointe dans un environnement sécurisé, Kickmaker propose de réaliser une première étude." → "Kickmaker mène une 1re étude : comprendre et documenter des logiciels complexes grâce à l'IA générative."
 
-**Before**:
-> "Notre équipe a travaillé très dur pour essayer d'augmenter les performances commerciales"
+**Calls:**
+```json
+{ "slideNumber": 5, "shapeIdOrName": "36", "searchText": "Stago souhaite explorer le potentiel des outils d'IA générative pour automatiser la génération de documents d'architecture logicielle de leurs instruments médicaux.", "replaceText": "Stago veut exploiter l'IA générative pour auto-générer ses documents d'architecture logicielle." }
+```
+```json
+{ "slideNumber": 5, "shapeIdOrName": "36", "searchText": "Fort de son expérience en intégration d'outils IA de pointe dans un environnement sécurisé, Kickmaker propose de réaliser une première étude.", "replaceText": "Kickmaker mène une 1re étude : comprendre et documenter des logiciels complexes grâce à l'IA générative." }
+```
 
-**After**:
-> "Booster les performances commerciales grâce à l'équipe"
+---
+
+## Edge cases
+
+- **Title shapes** (short text): Leave unchanged if already punchy.
+- **Footer / date shapes**: Leave unchanged.
+- **Single word / number paragraphs**: Leave unchanged.
+- **Empty paragraphs**: Skip (do not replace).
