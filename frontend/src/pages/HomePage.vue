@@ -105,16 +105,13 @@
 
       <ChatInput
         ref="chatInputRef"
-        v-model:selected-model-tier="selectedModelTier"
         v-model="userInput"
         :use-word-formatting="true"
         :use-selected-text="true"
-        :available-models="availableModels"
         :input-placeholder="inputPlaceholder"
         :loading="loading"
         :backend-online="backendOnline"
         :show-word-formatting="false"
-        :task_type_label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
         :draft-focus-glow="isDraftFocusGlowing"
@@ -122,11 +119,13 @@
         @stop="stopGeneration"
       />
       <StatsBar
+        v-model:selected-model-tier="selectedModelTier"
         :session-stats="sessionStats"
         :model-name="selectedModelInfo?.id ?? selectedModelTier"
         :current-action="currentAction"
         :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
         :loading="loading"
+        :available-models="availableModels"
       />
     </div>
   </div>

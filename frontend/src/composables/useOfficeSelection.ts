@@ -233,7 +233,9 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText();
         if (selected) return selected;
-        return getOutlookMailReplyOnly();
+        // Reply-only fallback only for proofread (text-editing the reply);
+        // other actions (extract, etc.) need the full email for context.
+        if (selectionOptions?.actionKey === 'proofread') return getOutlookMailReplyOnly();
       }
       return getOutlookMailBody();
     }
@@ -313,8 +315,12 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selectedHtml = await getOutlookSelectedHtml();
         if (selectedHtml) return selectedHtml;
-        const replyHtml = await getOutlookMailReplyOnlyAsHtml();
-        return replyHtml || getOutlookMailReplyOnly();
+        // Reply-only fallback only for proofread (text-editing the reply);
+        // other actions (extract, etc.) need the full email for context.
+        if (selectionOptions?.actionKey === 'proofread') {
+          const replyHtml = await getOutlookMailReplyOnlyAsHtml();
+          return replyHtml || getOutlookMailReplyOnly();
+        }
       }
 
       const html = await getOutlookMailBodyAsHtml();

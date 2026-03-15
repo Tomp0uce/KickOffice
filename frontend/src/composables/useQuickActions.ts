@@ -407,8 +407,9 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         }
       }
 
-      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
-      const rawTextForLlm = richContext ? richContext.cleanText : selectedText;
+      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection.
+      // Also fall back when cleanText is empty (e.g. HTML coercion unavailable in some Outlook modes).
+      const rawTextForLlm = richContext?.cleanText || selectedText;
       const textForLlm =
         '\n<document_content>\n' +
         rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') +

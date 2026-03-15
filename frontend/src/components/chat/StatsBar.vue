@@ -36,14 +36,26 @@
       </div>
     </div>
 
-    <!-- Model name -->
-    <div v-if="modelName" class="truncate ml-2 text-secondary/80">
-      {{ modelName }}
+    <!-- Model selector + model name -->
+    <div class="flex items-center gap-1.5 ml-2 shrink-0">
+      <select
+        v-if="availableModels && selectedModelTier !== undefined"
+        :value="selectedModelTier"
+        class="h-5 cursor-pointer rounded border border-border bg-surface px-1 text-[9px] text-secondary hover:border-accent focus:outline-none focus:ring-1 focus:ring-primary/50"
+        style="font-family: inherit"
+        @change="handleModelTierChange"
+      >
+        <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
+          {{ info.label }}
+        </option>
+      </select>
+      <span v-if="modelName" class="truncate text-secondary/80">{{ modelName }}</span>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
+import type { ModelInfo } from '@/types';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -61,7 +73,17 @@ const props = defineProps<{
   contextWindowTokens?: number;
   currentAction?: string;
   loading?: boolean;
+  availableModels?: Record<string, ModelInfo>;
+  selectedModelTier?: string;
 }>();
+
+const emit = defineEmits<{
+  (e: 'update:selectedModelTier', value: string): void;
+}>();
+
+const handleModelTierChange = (event: Event) => {
+  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value);
+};
 
 const hasStats = computed(
   () => props.sessionStats.inputTokens > 0 || props.sessionStats.outputTokens > 0,
