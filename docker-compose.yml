@@ -1,4 +1,6 @@
 services:
+  # One-shot init container: generates Office manifest XMLs from templates
+  # and ensures backend log directories exist with the correct ownership.
   manifest-gen:
     image: node:22-slim
     container_name: kickoffice-manifest-gen
@@ -44,6 +46,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    volumes:
+      # Persist all backend log files to the host filesystem.
+      # Feedback JSON, frontend error logs, tool-usage JSONL, rotating daily
+      # server logs — everything in /app/logs/ survives container restarts.
+      - ./backend/logs:/app/logs
     depends_on:
       manifest-gen:
         condition: service_completed_successfully

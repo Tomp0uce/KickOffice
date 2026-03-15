@@ -33,6 +33,8 @@ export interface ExcelQuickAction extends QuickAction {
   mode: 'immediate' | 'draft';
   prefix?: string;
   systemPrompt?: string;
+  /** If true, the action opens a file picker for an image before running the agent */
+  imageUpload?: boolean;
 }
 
 export interface PowerPointQuickAction extends QuickAction {
@@ -41,7 +43,7 @@ export interface PowerPointQuickAction extends QuickAction {
 }
 
 export interface OutlookQuickAction extends QuickAction {
-  mode?: 'immediate' | 'draft' | 'smart-reply';
+  mode?: 'immediate' | 'draft' | 'smart-reply' | 'mom';
   prefix?: string;
 }
 

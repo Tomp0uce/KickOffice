@@ -103,6 +103,16 @@
       <!-- ARCH-H2 — Props removed, uses context via provide/inject -->
       <ChatMessageList ref="messageListRef" />
 
+      <StatsBar
+        v-model:selected-model-tier="selectedModelTier"
+        :session-stats="sessionStats"
+        :model-name="selectedModelInfo?.id ?? selectedModelTier"
+        :current-action="currentAction"
+        :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
+        :loading="loading"
+        :available-models="availableModels"
+      />
+
       <ChatInput
         ref="chatInputRef"
         v-model="userInput"
@@ -117,15 +127,6 @@
         :draft-focus-glow="isDraftFocusGlowing"
         @submit="sendMessage"
         @stop="stopGeneration"
-      />
-      <StatsBar
-        v-model:selected-model-tier="selectedModelTier"
-        :session-stats="sessionStats"
-        :model-name="selectedModelInfo?.id ?? selectedModelTier"
-        :current-action="currentAction"
-        :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
-        :loading="loading"
-        :available-models="availableModels"
       />
     </div>
   </div>
@@ -155,12 +156,11 @@ import {
   ListTodo,
   Mail,
   MessageSquare,
+  NotebookPen,
   ScanSearch,
-  Scissors,
   Sparkle,
   Table,
   TrendingUp,
-  LineChart,
   Zap,
 } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
@@ -243,16 +243,17 @@ const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
 
 const wordQuickActions = computed<QuickAction[]>(() => [
   {
-    key: 'proofread',
+    key: 'word-proofread',
     label: t('proofread'),
     icon: CheckCheck,
     executeWithAgent: true,
     tooltipKey: 'proofread_tooltip',
   },
   {
-    key: 'translate',
+    key: 'word-translate',
     label: t('translate'),
     icon: Globe,
+    executeWithAgent: true,
     tooltipKey: 'translate_tooltip',
   },
   {
@@ -262,10 +263,11 @@ const wordQuickActions = computed<QuickAction[]>(() => [
     tooltipKey: 'polish_tooltip',
   },
   {
-    key: 'academic',
-    label: t('academic'),
+    key: 'word-review',
+    label: t('wordReview', 'Review'),
     icon: BookOpen,
-    tooltipKey: 'academic_tooltip',
+    executeWithAgent: true,
+    tooltipKey: 'wordReview_tooltip',
   },
   {
     key: 'summary',
@@ -280,19 +282,17 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     label: t('excelIngest', 'Smart Ingestion'),
     icon: Table,
     mode: 'immediate',
-    systemPrompt:
-      "You are a data cleaning expert. Silently correct locales (like replacing wrong decimal dots or commas) using 'setCellRange' to modify cells, then FORCE conversion of the raw pasted data into a formatted Excel table using 'createTable'.",
+    executeWithAgent: true,
     tooltipKey: 'excelIngest_tooltip',
   },
   {
-    key: 'autograph',
-    label: t('excelAutoGraph', 'Auto-Graph'),
-    icon: LineChart,
+    key: 'digitizeChart',
+    label: t('excelDigitizeChart', 'Digitize Chart'),
+    icon: ScanSearch,
     mode: 'immediate',
     executeWithAgent: true,
-    systemPrompt:
-      "You are a data visualization expert. Analyze the selected data. Generate new columns if necessary (and visually highlight them with 'setCellRange' formatting parameter). YOU MUST insert the recommended chart directly into the Excel workbook using the 'manageObject' tool with hasHeaders: true when the first row/column contains labels. Infer the current address via 'getSelectedCells' if needed as 'source' is required.",
-    tooltipKey: 'excelAutoGraph_tooltip',
+    imageUpload: true,
+    tooltipKey: 'excelDigitizeChart_tooltip',
   },
   {
     key: 'explain',
@@ -337,10 +337,12 @@ const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
     tooltipKey: 'translate_tooltip',
   },
   {
-    key: 'concise',
-    label: t('outlookConcise'),
-    icon: Scissors,
-    tooltipKey: 'outlookConcise_tooltip',
+    key: 'reply',
+    label: t('outlookReply'),
+    icon: Mail,
+    mode: 'smart-reply',
+    prefix: t('outlookReplyPrePrompt'),
+    tooltipKey: 'outlookReply_tooltip',
   },
   {
     key: 'extract',
@@ -349,12 +351,12 @@ const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
     tooltipKey: 'outlookExtract_tooltip',
   },
   {
-    key: 'reply',
-    label: t('outlookReply'),
-    icon: Mail,
-    mode: 'smart-reply',
-    prefix: t('outlookReplyPrePrompt'),
-    tooltipKey: 'outlookReply_tooltip',
+    key: 'mom',
+    label: t('outlookMoM', 'MoM'),
+    icon: NotebookPen,
+    mode: 'mom',
+    prefix: t('outlookMoMPrefix', 'Génère moi un compte rendu de réunion pour ces notes de réunion : '),
+    tooltipKey: 'outlookMoM_tooltip',
   },
 ]);
 const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
@@ -367,10 +369,11 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     tooltipKey: 'ppt_proofread_tooltip',
   },
   {
-    key: 'translate',
+    key: 'ppt-translate',
     label: t('translate'),
     icon: Globe,
     mode: 'immediate',
+    executeWithAgent: true,
     tooltipKey: 'translate_tooltip',
   },
   {

@@ -14,26 +14,39 @@ if (!fs.existsSync(LOGS_DIR)) {
 
 const isProduction = process.env.NODE_ENV === 'production'
 
+// Visual traffic prefix for console output
+function trafficPrefix(traffic) {
+  switch (traffic) {
+    case 'llm':    return '⇄ LLM'
+    case 'user':   return '→ USER'
+    case 'system': return '⚙  SYS'
+    case 'auto':   return '∿ POLL'
+    default:       return '·     '
+  }
+}
+
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
-  winston.format.timestamp(),
-  winston.format.printf(({ timestamp, level, message, traffic, source, host, sessionId, userId, reqId, ...meta }) => {
-    let msg = `[${timestamp}] [${level}] `
+  winston.format.timestamp({ format: 'HH:mm:ss' }),
+  winston.format.printf(({ timestamp, level, message, traffic, source, host, userId, reqId, body, responseContent, ...meta }) => {
+    const prefix = trafficPrefix(traffic)
     const ctx = []
-    if (traffic) ctx.push(`traffic:${traffic}`)
-    if (host) ctx.push(`host:${host}`)
-    if (userId) ctx.push(`user:${userId}`)
-    if (reqId) ctx.push(`reqId:${reqId}`)
-    
+    if (host && host !== 'unknown') ctx.push(host)
+    if (userId && userId !== 'anonymous') ctx.push(userId.split('@')[0]) // short user
+    if (reqId) ctx.push(reqId.slice(0, 8)) // first 8 chars of UUID
+
+    let msg = `[${timestamp}] [${level}] ${prefix}  `
     if (ctx.length) msg += `(${ctx.join('|')}) `
     msg += message
-    
+
     // Avoid double logging of error stacks if present in meta
     if (meta.error && meta.error.stack) {
-       msg += `\n${meta.error.stack}`
-       delete meta.error
+      msg += `\n${meta.error.stack}`
+      delete meta.error
     }
-    
+
+    // Omit full LLM request/response bodies from console (too verbose)
+    // They are still written to file logs in full JSON
     const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : ''
     return msg + (metaStr ? ` ${metaStr}` : '')
   })

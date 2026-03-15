@@ -48,10 +48,14 @@ Output (French):
 
 ## Language Detection & Target
 
-- **English UI → French target**: Translate English/other languages to French
-- **French UI → English target**: Translate French/other languages to English
-- **Auto-detect source**: Identify the source language automatically
+**Detect the language of the selected text** — do NOT rely on the `[UI language]` header for direction.
+
+- If the text is **primarily in French** → translate to **English**
+- If the text is **primarily in English** → translate to **French**
+- If the text is in another language → translate to **French** (default)
 - **Preserve untranslatable**: Keep proper nouns, brand names, technical terms as-is when appropriate
+
+**OUTPUT**: Return ONLY the translated text. No explanations, no preambles, no language labels.
 
 ## Formatting Preservation
 

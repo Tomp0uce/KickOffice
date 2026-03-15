@@ -24,6 +24,10 @@ import formalizeSkill from './quickactions/formalize.skill.md?raw';
 import conciseSkill from './quickactions/concise.skill.md?raw';
 import proofreadSkill from './quickactions/proofread.skill.md?raw';
 import pptProofreadSkill from './quickactions/ppt-proofread.skill.md?raw';
+import pptTranslateSkill from './quickactions/ppt-translate.skill.md?raw';
+import wordTranslateSkill from './quickactions/word-translate.skill.md?raw';
+import wordProofreadSkill from './quickactions/word-proofread.skill.md?raw';
+import wordReviewSkill from './quickactions/word-review.skill.md?raw';
 import polishSkill from './quickactions/polish.skill.md?raw';
 import academicSkill from './quickactions/academic.skill.md?raw';
 import summarySkill from './quickactions/summary.skill.md?raw';
@@ -31,6 +35,7 @@ import extractSkill from './quickactions/extract.skill.md?raw';
 import replySkill from './quickactions/reply.skill.md?raw';
 import ingestSkill from './quickactions/ingest.skill.md?raw';
 import autographSkill from './quickactions/autograph.skill.md?raw';
+import chartDigitizerSkill from './quickactions/chart-digitizer.skill.md?raw';
 import explainExcelSkill from './quickactions/explain-excel.skill.md?raw';
 import formulaGeneratorSkill from './quickactions/formula-generator.skill.md?raw';
 import dataTrendSkill from './quickactions/data-trend.skill.md?raw';
@@ -103,7 +108,15 @@ const quickActionSkillMap: Record<string, string> = {
   // PowerPoint proofread (surgical — uses searchAndReplaceInShape)
   'ppt-proofread': pptProofreadSkill,
 
-  // Word
+  // PowerPoint translate (agent-based — injects translation directly into the slide)
+  'ppt-translate': pptTranslateSkill,
+
+  // Word (agent-based, chirurgical)
+  'word-translate': wordTranslateSkill,
+  'word-proofread': wordProofreadSkill,
+  'word-review': wordReviewSkill,
+
+  // Word / Outlook (non-agent)
   translate: translateSkill,
   formalize: formalizeSkill,
   concise: conciseSkill,
@@ -119,6 +132,7 @@ const quickActionSkillMap: Record<string, string> = {
   // Excel
   ingest: ingestSkill,
   autograph: autographSkill,
+  digitizeChart: chartDigitizerSkill,
   explain: explainExcelSkill,
   formulaGenerator: formulaGeneratorSkill,
   dataTrend: dataTrendSkill,

@@ -622,6 +622,81 @@ PARAMETERS:
         const { slideNumber, shapeIdOrName, searchText, replaceText } = args;
         const replaceAll = args.replaceAll !== false;
 
+        // Helper: XML-based surgical replacement via OOXML ZIP (truly preserves all formatting)
+        const tryXmlReplacement = async (): Promise<{
+          success: boolean;
+          replacements: number;
+          error?: string;
+        }> => {
+          if (!isPowerPointApiSupported('1.5')) {
+            return { success: false, replacements: 0, error: 'PowerPointApi 1.5 not supported' };
+          }
+          const slideIndex = Math.trunc(Number(slideNumber)) - 1;
+          let replacements = 0;
+          try {
+            await withSlideZip(context, slideIndex, async (zip: any, markDirty: () => void) => {
+              const slideXmlStr = await zip.file('ppt/slides/slide1.xml')?.async('string');
+              if (!slideXmlStr) throw new Error('Could not read slide XML');
+
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(slideXmlStr, 'application/xml');
+
+              // Locate the target shape by id or name within the XML
+              const nsP = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+              const spElements = doc.getElementsByTagNameNS(nsP, 'sp');
+              let targetSp: Element | null = null;
+              for (let i = 0; i < spElements.length; i++) {
+                const sp = spElements[i];
+                const nvSpPr = sp.getElementsByTagNameNS(nsP, 'nvSpPr')[0];
+                if (nvSpPr) {
+                  const cNvPr = nvSpPr.getElementsByTagNameNS(nsP, 'cNvPr')[0];
+                  if (cNvPr) {
+                    const spId = cNvPr.getAttribute('id');
+                    const spName = cNvPr.getAttribute('name');
+                    if (
+                      spId === String(shapeIdOrName) ||
+                      spName === String(shapeIdOrName)
+                    ) {
+                      targetSp = sp;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              // If not found by id/name, search all shapes (best-effort)
+              const searchRoot: Element = targetSp ?? doc.documentElement;
+
+              // Replace text content within <a:t> elements
+              const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+              const textNodes = searchRoot.getElementsByTagNameNS(nsA, 't');
+              for (let i = 0; i < textNodes.length; i++) {
+                const node = textNodes[i];
+                const text = node.textContent ?? '';
+                if (text.includes(searchText)) {
+                  const newText = replaceAll
+                    ? text.split(searchText).join(replaceText)
+                    : text.replace(searchText, replaceText);
+                  if (newText !== text) {
+                    node.textContent = newText;
+                    replacements++;
+                    markDirty();
+                    if (!replaceAll) break;
+                  }
+                }
+              }
+
+              if (replacements > 0) {
+                const serializer = new XMLSerializer();
+                zip.file('ppt/slides/slide1.xml', serializer.serializeToString(doc));
+              }
+            });
+            return { success: true, replacements };
+          } catch (xmlErr: unknown) {
+            return { success: false, replacements: 0, error: getErrorMessage(xmlErr) };
+          }
+        };
+
         try {
           const { shape: targetShape, error } = await findShapeOnSlide(
             context,
@@ -696,8 +771,34 @@ PARAMETERS:
             2,
           );
         } catch (error: unknown) {
+          // textRuns approach failed (e.g. GeneralException on certain Placeholder types)
+          // Fall back to OOXML XML editing — truly surgical, no formatting loss
+          logService.warn(
+            '[searchAndReplaceInShape] textRuns API failed, trying XML fallback:',
+            error,
+          );
+          const xmlResult = await tryXmlReplacement();
+          if (xmlResult.success) {
+            return JSON.stringify(
+              {
+                success: true,
+                replacements: xmlResult.replacements,
+                method: 'xml-fallback',
+                message:
+                  xmlResult.replacements > 0
+                    ? `Replaced "${searchText}" → "${replaceText}" in ${xmlResult.replacements} text run(s) via XML. Formatting preserved.`
+                    : `Text "${searchText}" not found in shape. No changes made.`,
+              },
+              null,
+              2,
+            );
+          }
           return JSON.stringify(
-            { success: false, error: getErrorMessage(error) },
+            {
+              success: false,
+              error: getErrorMessage(error),
+              xmlFallbackError: xmlResult.error,
+            },
             null,
             2,
           );

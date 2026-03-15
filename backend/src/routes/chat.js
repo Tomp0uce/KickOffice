@@ -102,7 +102,9 @@ chatRouter.post('/', async (req, res) => {
     req.logger.info(`POST /api/chat upstream request initiated`, {
       traffic: 'llm',
       url: '/v1/chat/completions',
-      body,
+      model: body.model,
+      messageCount: body.messages?.length || 0,
+      tools: body.tools?.map(t => t.function?.name) || [],
     })
 
     const response = await chatCompletion({
@@ -220,7 +222,7 @@ chatRouter.post('/', async (req, res) => {
       req.logger.info('POST /api/chat stream completed successfully', {
         traffic: 'llm',
         responseLength: streamContent.length,
-        responseContent: streamContent
+        toolCallCount: toolCalls.length,
       })
 
       // LOG-H1: Log tool usage if tool calls were detected in stream

@@ -63,7 +63,47 @@ range.formulas = [['=RECHERCHEV(A1;B:C;2;FAUX)']];
 
 **IMPORTANT**: Check the `excelFormulaLanguage` setting in the agent context.
 
-### Rule 3b: Charts — detect headers first, then always specify seriesBy and hasHeaders
+### Rule 3b: Charts — source range MUST contain numeric data
+
+**The `source` range for `manageObject` is interpreted as: first column = category labels (X-axis), subsequent columns = numeric series values.**
+
+**WRONG — text-only or non-numeric columns produce an empty chart:**
+```
+source: "B1:C21"  // B=date strings, C=region strings → nothing to plot!
+source: "C1:C21"  // C=region text only → pie chart will be empty
+```
+
+**CORRECT — at least one numeric data column adjacent to the label column:**
+```
+source: "B1:C21"  // B=date labels, C=numeric revenue → valid line chart
+source: "A1:B5"   // A=category labels, B=numeric counts → valid pie/column chart
+```
+
+**Non-contiguous data (label column and data column are not adjacent):**
+If the X-axis labels and Y-axis values are in non-adjacent columns (e.g., dates in column B, revenue in column F), you CANNOT use them directly. Create a **helper range** first:
+```javascript
+// Copy the two needed columns to empty space (e.g., end of data)
+setCellRange({ sheetName: 'data', address: 'M1:N21', values: [
+  ['date', 'revenue'],
+  ['2024-01-31', 10000],
+  // ... (all 20 rows)
+]});
+// Then chart the helper range
+manageObject({ source: 'M1:N21', chartType: 'Line', ... });
+```
+
+**Pie / categorical charts — aggregate first:**
+Pie charts need numeric values. If you only have a text column (e.g., "region"), you CANNOT use it directly. First write a summary table with counts or sums:
+```javascript
+// Write a 2-column summary: labels + numeric values
+setCellRange({ sheetName: 'data', address: 'M1:N6', values: [
+  ['Region', 'Count'],
+  ['Nord', 5], ['Sud', 5], ['Est', 5], ['Ouest', 5]
+]});
+manageObject({ source: 'M1:N6', chartType: 'Pie', ... });
+```
+
+### Rule 3c: Charts — detect headers first, then always specify seriesBy and hasHeaders
 
 Before creating a chart from user data, **always call `detectDataHeaders`** first to determine if the range has column/row headers:
 
@@ -368,3 +408,19 @@ If significant discrepancies exist (wrong trend, missing data), adjust the data 
 - **imageId** is found in the `<uploaded_images>` context block — do NOT fabricate it
 - The pixel extraction works best on clean charts with distinct colors
 - For pie/donut charts, extract_chart_data is not suitable — use vision to read percentages and enter data manually
+
+## CHART CREATION — POST-VERIFICATION RULE
+
+**After ANY `manageObject` chart creation (not just image reproduction), ALWAYS call `screenshotRange` on the area where the chart was placed.**
+
+Inspect the screenshot with vision:
+- Is the chart visible and non-empty?
+- Does the chart type match the request?
+- Are there data points plotted (not just empty axes with "0" or single "1" in legend)?
+
+If the chart is empty or broken (typical signs: Y-axis shows only 0–1 range, only "1" in legend, no data points visible), **the source range contained no numeric data**. Fix it:
+1. Identify which columns in the source range are numeric
+2. Either use only those columns, or create a helper range (see Rule 3b above)
+3. Delete the bad chart with `manageObject` (operation: "delete") and recreate with the corrected range
+
+**When creating multiple charts in one task**, take a single screenshot covering all chart areas at the end to verify the batch, rather than one screenshot per chart.

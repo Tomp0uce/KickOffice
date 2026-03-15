@@ -433,16 +433,24 @@ export interface ImageGenerateOptions {
   prompt: string;
   size?: string;
   quality?: string;
+  abortSignal?: AbortSignal;
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
   // IMG-H1: default to landscape 1536x1024 to match PPT slide format and reduce cropping
-  const payload = { ...options, size: options.size || '1536x1024' };
-  const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/image`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
-    body: JSON.stringify(payload),
-  });
+  const { abortSignal, ...rest } = options;
+  const payload = { ...rest, size: options.size || '1536x1024' };
+  // IMG-H2: use 'reasoning' tier timeout (10 min) — image generation can take 2-5 min
+  const res = await fetchWithTimeoutAndRetry(
+    `${BACKEND_URL}/api/image`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
+      body: JSON.stringify(payload),
+      signal: abortSignal,
+    },
+    'reasoning',
+  );
 
   if (!res.ok) {
     const err = await res.text();

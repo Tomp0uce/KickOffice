@@ -9,8 +9,13 @@ RUN npm ci --omit=dev
 
 COPY src/ ./src/
 
+# Pre-create log directories so they exist at startup whether or not a volume
+# is mounted.  Done as root (before USER switch) then chown'd to the node user
+# (UID 1000) so the app can write to them without privilege escalation.
+RUN mkdir -p /app/logs/feedback /app/logs/frontend \
+    && chown -R node:node /app
+
 # IC2: Run as non-root user for security (node user exists in official Node.js images)
-RUN chown -R node:node /app
 USER node
 
 CMD ["node", "src/server.js"]

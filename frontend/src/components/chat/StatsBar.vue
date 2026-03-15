@@ -101,6 +101,7 @@ interface TokenStats {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  lastCallInputTokens?: number;
 }
 
 const props = defineProps<{
@@ -135,7 +136,9 @@ const hasStats = computed(
 
 const contextPctNum = computed(() => {
   if (!props.contextWindowTokens || props.contextWindowTokens === 0) return 0;
-  return (props.sessionStats.inputTokens / props.contextWindowTokens) * 100;
+  // Use the most recent call's input tokens (not cumulative) so the bar stays meaningful
+  const tokensForBar = props.sessionStats.lastCallInputTokens ?? props.sessionStats.inputTokens;
+  return (tokensForBar / props.contextWindowTokens) * 100;
 });
 
 const contextPct = computed(() => contextPctNum.value.toFixed(1));

@@ -22,7 +22,7 @@ import type {
 } from '@/types/chat';
 import type { ChatMessage } from '@/api/backend';
 
-import { chatStream, generateImage, categorizeError } from '@/api/backend';
+import { chatStream, generateImage, categorizeError, uploadFile, uploadFileToPlatform } from '@/api/backend';
 import {
   GLOBAL_STYLE_INSTRUCTIONS,
   getBuiltInPrompt,
@@ -96,6 +96,9 @@ export interface UseQuickActionsOptions {
 
   // Model tier resolver
   resolveChatModelTier: () => ModelTier;
+
+  // Pending MoM flag (set to true when MoM mode is activated, checked by useAgentLoop)
+  pendingMoM?: Ref<boolean>;
 }
 
 export function useQuickActions(options: UseQuickActionsOptions) {
@@ -125,6 +128,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     getOfficeSelectionAsHtml,
     runAgentLoop,
     resolveChatModelTier,
+    pendingMoM,
   } = options;
 
   async function applyQuickAction(actionKey: string) {
@@ -171,83 +175,139 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         return messageUtil.error(t('imageError') || 'No image model configured.');
       }
 
-      // Get current slide text:
-      // 1. Try explicit text selection first via getCurrentSlideIndex + getSlideContent so we always
-      //    scope to the active slide (Office.context.document.getSelectedDataAsync(Text) can
-      //    return the full presentation text when nothing is selected on some Office versions).
-      // 2. Only fall back to getOfficeSelection if the dedicated tools fail.
-      let slideText = '';
+      // PPT-IMG: Determine context source:
+      // 1. If selected text has >= 10 words → illustrate the selection
+      // 2. Otherwise → illustrate the full slide
+      // In both cases we try to capture a screenshot so the vision LLM can match
+      // the slide's visual style/colours/tone even when illustrating selected text.
+      const MIN_SELECTION_WORDS = 10;
+      let imageContext = '';
+      let imageContextMode: 'selection' | 'slide' = 'slide';
+
+      // Step A: Try to get selected text
       try {
-        const slideNumStr = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-        const slideNum = parseInt(slideNumStr, 10);
-        if (slideNum >= 1) {
-          slideText = await powerpointToolDefinitions.getSlideContent.execute({
-            slideNumber: slideNum,
-          });
+        const selectedText = (await getOfficeSelection({ actionKey })) || '';
+        const selWordCount = selectedText.trim().split(/\s+/).filter(Boolean).length;
+        if (selWordCount >= MIN_SELECTION_WORDS) {
+          imageContext = selectedText.trim();
+          imageContextMode = 'selection';
         }
       } catch {
-        // Fallback to generic selection helper
-        slideText = await getOfficeSelection({ actionKey });
-      }
-      if (!slideText) {
-        slideText = await getOfficeSelection({ actionKey });
+        /* no selection — fall through to slide screenshot */
       }
 
-      // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
-      // to provide richer context for image generation
-      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length;
-      if (wordCount < 5) {
+      // Step B: Always try to screenshot the current slide.
+      // - selection mode: screenshot provides visual style context alongside the text
+      // - slide mode: screenshot is the primary source, passed directly via vision
+      let slideScreenshotUri: string | null = null;
+      let currentSlideNum = 1;
+      try {
+        const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+        currentSlideNum = parseInt(sn, 10) || 1;
+      } catch {}
+      try {
+        const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
+          slideNumber: currentSlideNum,
+        });
+        const screenshot = JSON.parse(screenshotJson);
+        if (screenshot.base64 && !screenshot.error) {
+          slideScreenshotUri = `data:image/png;base64,${screenshot.base64}`;
+        }
+      } catch (err) {
+        logService.warn('[AgentLoop] PPT-IMG: slide screenshot failed', err);
+      }
+
+      // Last resort when slide mode and no screenshot: fall back to raw slide text
+      if (imageContextMode === 'slide' && !slideScreenshotUri) {
         try {
-          // Resolve current slide number to pass explicitly (screenshotSlide defaults to slide 1)
-          let currentSlideNum = 1;
-          try {
-            const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-            currentSlideNum = parseInt(sn, 10) || 1;
-          } catch {}
-          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
+          imageContext = await powerpointToolDefinitions.getSlideContent.execute({
             slideNumber: currentSlideNum,
           });
-          const screenshot = JSON.parse(screenshotJson);
-          if (screenshot.base64 && !screenshot.error) {
-            const dataUri = `data:image/png;base64,${screenshot.base64}`;
-            let slideDesc = '';
-            await chatStream({
-              messages: [
-                {
-                  role: 'user',
-                  content: [
-                    { type: 'image_url', image_url: { url: dataUri } },
-                    {
-                      type: 'text',
-                      text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.',
-                    },
-                  ] as any,
-                },
-              ],
-              modelTier: resolveChatModelTier(),
-              onStream: async (text: string) => {
-                slideDesc = text;
-              },
-            });
-            if (slideDesc.trim()) slideText = slideDesc.trim();
-          }
-        } catch (err) {
-          logService.warn(
-            '[AgentLoop] PPT-M1: screenshot fallback for short selection failed',
-            err,
-          );
-        }
+        } catch {}
+        if (!imageContext) imageContext = await getOfficeSelection({ actionKey });
       }
 
-      // Step 1: call standard LLM to generate a proper image description prompt
+      // Build user-facing label indicating which mode was used
       const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const modeLabel =
+        imageContextMode === 'selection'
+          ? lang === 'English'
+            ? '📝 Illustrating selected text'
+            : '📝 Illustration du texte sélectionné'
+          : lang === 'English'
+            ? '🖼️ Illustrating the full slide'
+            : '🖼️ Illustration de la slide complète';
+
+      // Step 1: call LLM to generate a proper image generation prompt
+      // - If we have a screenshot: pass image directly (vision) — one LLM call, most accurate
+      // - Otherwise: pass text content through the visual prompt template
       const visualPrompt = getPowerPointBuiltInPrompt().visual;
       const systemMsg = visualPrompt.system(lang);
-      const userMsg = visualPrompt.user(slideText || '', lang);
+
+      // Build user message: vision (screenshot) or text (selection/fallback)
+      const visualRequirements = `Requirements for the image generation prompt:
+- The image must visually represent the SPECIFIC topic, concept, or data from this slide — not a generic illustration.
+- Choose the most appropriate visual style: photo-realistic scene, flat vector illustration, isometric diagram, infographic, conceptual metaphor, data visualization, etc.
+- If the concept benefits from labels or short text in the image, explicitly request it.
+- Describe composition: foreground, background, key focal elements.
+- Specify color palette, mood, and lighting that match the slide's tone (professional, energetic, calm, technical).
+- Wide landscape format (16:9), high resolution, suitable for professional presentation slides.
+- No generic filler images (e.g., no random handshakes or abstract blobs unless directly relevant).
+
+Constraints:
+1. Respond in ${lang}.
+2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.`;
+
+      type ChatMessage = { role: string; content: any };
+      // Build vision user message when we have a screenshot.
+      // - selection mode: include both the screenshot (style/tone) and the selected text (what to illustrate)
+      // - slide mode: screenshot alone is the source
+      const buildVisionUserMessage = () => {
+        const imagePart = { type: 'image_url', image_url: { url: slideScreenshotUri! } };
+        if (imageContextMode === 'selection') {
+          return {
+            role: 'user',
+            content: [
+              imagePart,
+              {
+                type: 'text',
+                text: `Task: Write a detailed prompt for an image generation model to illustrate the selected text below.
+
+PRIORITY RULES (strictly follow this weighting):
+1. [HIGHEST WEIGHT] The image MUST illustrate the selected text — this is the sole subject of the image. Every visual element must directly serve this text.
+2. [MEDIUM WEIGHT] Borrow the slide's visual style from the screenshot: colour palette, graphic style (flat, realistic, technical, etc.), mood and tone.
+3. [IGNORE] All other text visible on the slide that is NOT the selected text must be completely ignored — do not let it influence the subject or composition of the image.
+
+Selected text to illustrate:
+"${imageContext}"
+
+${visualRequirements}`,
+              },
+            ],
+          };
+        }
+        return {
+          role: 'user',
+          content: [
+            imagePart,
+            {
+              type: 'text',
+              text: `Task: Based on this presentation slide image, write a detailed prompt for an image generation model that will produce a visual directly illustrating this slide's content.\n\n${visualRequirements}`,
+            },
+          ],
+        };
+      };
+
+      const promptMessages: ChatMessage[] = slideScreenshotUri
+        ? [{ role: 'system', content: systemMsg }, buildVisionUserMessage()]
+        : [{ role: 'system', content: systemMsg }, { role: 'user', content: visualPrompt.user(imageContext || '', lang) }];
 
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(
-        createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`),
+        createDisplayMessage(
+          'user',
+          `[${actionLabel}] ${modeLabel}\n${(imageContext || '').substring(0, 100)}...`,
+        ),
       );
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')));
       await scrollToMessageTop?.();
@@ -257,10 +317,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
       try {
         let imagePrompt = '';
         await chatStream({
-          messages: [
-            { role: 'system', content: systemMsg },
-            { role: 'user', content: userMsg },
-          ],
+          messages: promptMessages as any,
           modelTier: resolveChatModelTier(),
           onStream: async (text: string) => {
             imagePrompt = text;
@@ -276,7 +333,10 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         // Step 2: use the generated description to produce the image
         history.value[history.value.length - 1].content = t('imageGenerating');
         imageLoading.value = true;
-        const imageSrc = await generateImage({ prompt: imagePrompt.trim() });
+        const imageSrc = await generateImage({
+          prompt: imagePrompt.trim(),
+          abortSignal: abortController.value?.signal,
+        });
         const message = history.value[history.value.length - 1];
         message.role = 'assistant';
         message.content = '';
@@ -356,6 +416,24 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       return;
     }
 
+    if (selectedOutlookQuickAction?.mode === 'mom') {
+      if (pendingMoM) pendingMoM.value = true;
+      userInput.value = selectedOutlookQuickAction.prefix || '';
+      adjustTextareaHeight();
+      isDraftFocusGlowing.value = true;
+      setTimeout(() => {
+        isDraftFocusGlowing.value = false;
+      }, 1500);
+      await nextTick();
+      const el = inputTextarea.value;
+      if (el) {
+        el.focus();
+        const len = userInput.value.length;
+        el.setSelectionRange(len, len);
+      }
+      return;
+    }
+
     if (selectedOutlookQuickAction?.mode === 'draft') {
       userInput.value = selectedOutlookQuickAction.prefix || '';
       adjustTextareaHeight();
@@ -371,6 +449,86 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         el.setSelectionRange(len, len);
       }
       return;
+    }
+
+    // IMAGE-UPLOAD actions: open file picker, upload image, then run agent with chart digitizer skill
+    if (hostIsExcel && selectedExcelQuickAction?.imageUpload) {
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      return new Promise<void>(resolve => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp';
+
+        fileInput.onchange = async () => {
+          const file = fileInput.files?.[0];
+          if (!file) { resolve(); return; }
+
+          const actionLabel = selectedExcelQuickAction.label || t(actionKey);
+          history.value.push(createDisplayMessage('user', `[${actionLabel}] ${file.name}`));
+
+          if (loading.value) { resolve(); return; }
+          loading.value = true;
+          abortController.value = new AbortController();
+
+          try {
+            // Upload image to backend to get base64 + imageId
+            const result = await uploadFile(file);
+            if (!result.imageBase64) {
+              messageUtil.error(t('errorImageUploadFailed') || 'Image upload failed.');
+              return;
+            }
+
+            // Optionally upload to provider for caching
+            let fileId: string | undefined;
+            try {
+              const platformResult = await uploadFileToPlatform(file, 'vision');
+              if (platformResult.fileId) fileId = platformResult.fileId;
+            } catch { /* inline fallback */ }
+
+            const imageIdTag = result.imageId ? ` (imageId: ${result.imageId})` : '';
+            const imageContext =
+              `<uploaded_images>\nThe following images are available in session memory:\n` +
+              `- [${result.filename}]${imageIdTag}\n` +
+              `To extract chart data into Excel, use extract_chart_data with the imageId.\n` +
+              `</uploaded_images>`;
+
+            const userText =
+              `[UI language: ${lang}]\n\n` +
+              `Digitize this chart image: extract the data and write it to Excel, then create a matching chart.\n\n` +
+              imageContext;
+
+            // Build multipart user message (text + image)
+            const imageUrl = fileId ?? `data:${file.type};base64,${result.imageBase64}`;
+            const userMessage: ChatMessage = {
+              role: 'user',
+              content: [
+                { type: 'text', text: userText },
+                { type: 'image_url', image_url: { url: imageUrl } },
+              ] as any,
+            };
+
+            const skillContent = getQuickActionSkill(actionKey);
+            const systemMsg = skillContent
+              ? skillContent + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+              : `You are an expert chart data extractor. ${GLOBAL_STYLE_INSTRUCTIONS}`;
+
+            await runAgentLoop(
+              [{ role: 'system', content: systemMsg }, userMessage],
+              resolveChatModelTier(),
+            );
+          } catch (err) {
+            logService.error('[QuickActions] digitizeChart error', err);
+            messageUtil.error(t('errorGeneric') || 'An error occurred.');
+          } finally {
+            loading.value = false;
+            abortController.value = null;
+            resolve();
+          }
+        };
+
+        fileInput.oncancel = () => resolve();
+        fileInput.click();
+      });
     }
 
     if (selectedExcelQuickAction?.mode === 'draft') {
@@ -449,11 +607,16 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       let systemMsg = '';
       let userMsg = '';
 
+      // Resolve UI language once — used for skill injection and fallback prompts
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+
       // SKILL-L1: Try to load skill file first (priority 1)
       const skillContent = getQuickActionSkill(actionKey);
       if (skillContent) {
         systemMsg = skillContent;
-        userMsg = textForLlm;
+        // Inject UI language so skills can respond in the correct language.
+        // Translation DIRECTION is determined by the skill from the text content itself.
+        userMsg = `[UI language: ${lang}]\n\n${textForLlm}`;
       } else {
         // Priority 2: systemPrompt from Quick Action definition
         if (hostIsOutlook) {
@@ -483,10 +646,17 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         if (!systemMsg || !userMsg) {
           if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
           if (!action) return;
-          const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
           systemMsg = action.system(lang);
           userMsg = action.user(textForLlm, lang);
         }
+      }
+
+      // LANG-UNIVERSAL: Inject UI language tag into ALL quick-action user messages.
+      // Skill-based actions already have it (from SKILL-L1 above); this covers
+      // built-in prompts and hardcoded systemPrompt paths so every host (Word,
+      // Excel, PowerPoint, Outlook) respects the interface language.
+      if (userMsg && !userMsg.startsWith('[UI language:')) {
+        userMsg = `[UI language: ${lang}]\n\n${userMsg}`;
       }
 
       // Enforce global formatting constraints on all Quick Actions
@@ -540,7 +710,7 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
             if (richContext?.hasRichContent) {
               finalHtml = reassembleWithFragments(lastMessage.content, richContext);
             }
-            if (richContext?.extractedStyles && hostIsOutlook) {
+            if (richContext?.extractedStyles) {
               if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content);
               finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles);
             }

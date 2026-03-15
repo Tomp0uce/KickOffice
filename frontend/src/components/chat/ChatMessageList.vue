@@ -4,7 +4,7 @@
     role="log"
     aria-live="polite"
     aria-relevant="additions text"
-    class="card flex flex-1 flex-col gap-4 overflow-y-auto min-h-0"
+    class="card flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden min-h-0"
     @scroll="handleScrollEvent"
   >
     <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
