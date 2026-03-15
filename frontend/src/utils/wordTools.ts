@@ -1428,16 +1428,20 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         required: [],
       },
       executeWord: async context => {
-        const selection = context.document.getSelection();
-        const htmlResult = selection.getHtml();
-        await context.sync();
+        try {
+          const selection = context.document.getSelection();
+          const htmlResult = selection.getHtml();
+          await context.sync();
 
-        if (!htmlResult.value || htmlResult.value.trim() === '') {
-          return 'No text selected or selection is empty.';
+          if (!htmlResult.value || htmlResult.value.trim() === '') {
+            return 'No text selected. Use getDocumentContent to read the full document, then use searchAndFormat to apply formatting to specific words or passages.';
+          }
+
+          const markdown = htmlToMarkdown(htmlResult.value);
+          return markdown || 'Selection contains no convertible content.';
+        } catch {
+          return 'No text selected. Use getDocumentContent to read the full document, then use searchAndFormat to apply formatting to specific words or passages.';
         }
-
-        const markdown = htmlToMarkdown(htmlResult.value);
-        return markdown || 'Selection contains no convertible content.';
       },
     },
 

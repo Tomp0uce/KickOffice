@@ -1253,38 +1253,58 @@ try {
             shapes.load('items,items/type');
             await context.sync();
 
+            const textShapes: any[] = [];
             for (let j = 0; j < shapes.items.length; j++) {
               const shape = shapes.items[j];
               const shapeType = String(shape.type || '').toLowerCase();
               if (shapeType.includes('picture') || shapeType === '13') continue; // keep skipping text load for images
               try {
                 shape.textFrame.textRange.load('text');
+                textShapes.push(shape);
               } catch {}
             }
 
             // PPT-C1 fix: OLE/chart/SmartArt shapes can cause InvalidArgument on sync;
-            // catch the error so a single bad shape doesn't crash the entire overview.
-            let textSyncOk = true;
+            // when batch fails, fall back to reading each text shape individually so a
+            // single bad shape doesn't silence all text on the slide.
+            let batchSyncOk = true;
             try {
               await context.sync();
             } catch {
-              textSyncOk = false;
+              batchSyncOk = false;
             }
 
-            const lines = shapes.items
-              .map((s: any) => {
-                const t = String(s.type || '').toLowerCase();
-                if (t.includes('picture') || t === '13') {
-                  return `[Image ${s.width}x${s.height}]`;
-                }
-                if (!textSyncOk) return '';
-                let text = '';
+            const lines: string[] = [];
+
+            // Image placeholders (type already loaded, unaffected by text sync failure)
+            for (const s of shapes.items) {
+              const t = String(s.type || '').toLowerCase();
+              if (t.includes('picture') || t === '13') {
+                lines.push(`[Image ${s.width}x${s.height}]`);
+              }
+            }
+
+            if (batchSyncOk) {
+              for (const shape of textShapes) {
                 try {
-                  text = s.textFrame.textRange.text;
+                  const text = (shape.textFrame.textRange.text || '').trim();
+                  if (text) lines.push(text);
                 } catch {}
-                return text.trim();
-              })
-              .filter(Boolean);
+              }
+            } else {
+              // Fallback: reload and read each text shape individually
+              for (let j = 0; j < shapes.items.length; j++) {
+                const shape = shapes.items[j];
+                const shapeType = String(shape.type || '').toLowerCase();
+                if (shapeType.includes('picture') || shapeType === '13') continue;
+                try {
+                  shape.textFrame.textRange.load('text');
+                  await context.sync();
+                  const text = (shape.textFrame.textRange.text || '').trim();
+                  if (text) lines.push(text);
+                } catch {}
+              }
+            }
 
             let slideText = lines.join(' | ');
             if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...';
@@ -1785,12 +1805,14 @@ export async function getSlideContentStandalone(
 
   const slide = slides.getItemAt(index);
   const shapes = slide.shapes;
-  shapes.load('items');
+  shapes.load('items,items/type');
   await context.sync();
 
   const shapeEntries: { shape: any; idx: number }[] = [];
   for (let i = 0; i < shapes.items.length; i++) {
     const shape = shapes.items[i];
+    const shapeType = String(shape.type || '').toLowerCase();
+    if (shapeType.includes('picture') || shapeType === '13') continue;
     try {
       shape.textFrame.textRange.load('text');
       shapeEntries.push({ shape, idx: i + 1 });
@@ -1801,14 +1823,35 @@ export async function getSlideContentStandalone(
 
   if (shapeEntries.length === 0) return '';
 
-  await context.sync();
+  // PPT-C1 fix: when batch sync fails due to OLE/chart/SmartArt, fall back to
+  // reading each shape individually so one bad shape doesn't silence all text.
+  let batchSyncOk = true;
+  try {
+    await context.sync();
+  } catch {
+    batchSyncOk = false;
+  }
 
-  const lines = shapeEntries
-    .map(({ shape, idx }) => {
-      const text = (shape.textFrame.textRange.text || '').trim();
-      return text ? `[Shape ${idx}] ${text}` : '';
-    })
-    .filter(Boolean);
+  const lines: string[] = [];
+
+  if (batchSyncOk) {
+    for (const { shape, idx } of shapeEntries) {
+      try {
+        const text = (shape.textFrame.textRange.text || '').trim();
+        if (text) lines.push(`[Shape ${idx}] ${text}`);
+      } catch {}
+    }
+  } else {
+    // Fallback: reload and read each shape individually
+    for (const { shape, idx } of shapeEntries) {
+      try {
+        shape.textFrame.textRange.load('text');
+        await context.sync();
+        const text = (shape.textFrame.textRange.text || '').trim();
+        if (text) lines.push(`[Shape ${idx}] ${text}`);
+      } catch {}
+    }
+  }
 
   return lines.join('\n');
 }
