@@ -14,6 +14,7 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 
 - **Selected cells**: Data range (may be table, range, or mixed data)
 - **Context**: Excel worksheet with data to visualize
+- **Language**: **ALWAYS respond in the UI language specified at the start of the user message as `[UI language: ...]`.** Conversation and chart titles should follow this language.
 - **Expectations**: Chart inserted into workbook, not just recommendations
 
 ## Output Requirements

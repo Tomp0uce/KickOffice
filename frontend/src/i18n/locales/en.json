@@ -42,6 +42,7 @@
   "excelHighlight_tooltip": "Highlight important data using colors.",
   "excelFormula_tooltip": "The AI will generate an Excel formula tailored to your request.",
   "excelFormulaPrefix": "Generate an Excel formula for: ",
+  "excelFormulaGeneratorPrefix": "Help me build a formula",
   "excelTransformPrefix": "Transform the selection to: ",
   "excelHighlightPrefix": "Highlight (with color) the cells that: ",
   "excelToolsDescription": "Tools that AI agents can use to interact with your Excel spreadsheet.",

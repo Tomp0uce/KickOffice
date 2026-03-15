@@ -114,6 +114,8 @@ export interface SessionStats {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Input tokens for the most recent API call only — used for context-window bar */
+  lastCallInputTokens: number;
 }
 
 export function useAgentLoop(options: UseAgentLoopOptions) {
@@ -186,16 +188,19 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     inputTokens: 0,
     outputTokens: 0,
     totalTokens: 0,
+    lastCallInputTokens: 0,
   });
 
   function resetSessionStats() {
-    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0, lastCallInputTokens: 0 };
   }
 
   function accumulateUsage(usage: TokenUsage) {
     sessionStats.value.inputTokens += usage.promptTokens;
     sessionStats.value.outputTokens += usage.completionTokens;
     sessionStats.value.totalTokens += usage.totalTokens;
+    // Track the last individual call for the context-window bar (cumulative inflates past 100%)
+    sessionStats.value.lastCallInputTokens = usage.promptTokens;
   }
 
   const getActionLabelForCategory = (category?: ToolCategory) => {

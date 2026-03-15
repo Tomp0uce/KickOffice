@@ -13,7 +13,7 @@ Analyze trends in selected data, identify patterns, outliers, growth rates, and 
 ## Input Contract
 
 - **Selected cells**: Numeric data (ideally with labels/dates)
-- **Language**: Respond in UI language
+- **Language**: **ALWAYS respond in the UI language specified at the start of the user message as `[UI language: ...]`.** If it says `[UI language: Français]`, your entire response must be in French. This is mandatory regardless of the spreadsheet content language.
 - **Context**: Excel worksheet with data to analyze
 - **Mode**: Immediate execution (agent loop)
 

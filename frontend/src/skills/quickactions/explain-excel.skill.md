@@ -13,7 +13,7 @@ Explain Excel formulas or data in simple, understandable terms—covering what i
 ## Input Contract
 
 - **Selected cells**: Cell(s) with formula or data to explain
-- **Language**: Respond in the UI language (not necessarily document language)
+- **Language**: **ALWAYS respond in the UI language specified at the start of the user message as `[UI language: ...]`.** If it says `[UI language: Français]`, respond entirely in French. This is mandatory — ignore the language of the spreadsheet content for the conversation language.
 - **Context**: Excel worksheet
 
 ## Output Requirements
@@ -23,13 +23,19 @@ Explain Excel formulas or data in simple, understandable terms—covering what i
 3. **Edge cases**: Potential errors, limitations, or unusual behaviors
 4. **Examples**: Show example inputs/outputs if helpful
 5. **Conversational tone**: Friendly, educational (not overly technical)
-6. **Return text explanation**: No tool calls needed
+6. **Return text explanation**: No tool calls needed beyond the initial getSelectedCells
 
 ## Tool Usage
 
-**Optional**:
+**STEP 1 — MANDATORY before explaining:**
+Call `getSelectedCells` to get the **actual formula** of the selected cell(s). Do NOT skip this step. The user message context may contain data values, but the formula (if any) is only returned by `getSelectedCells`.
 
-- `getSelectedCells` — If you need to inspect the actual formula/data (usually provided by system)
+```json
+{}
+```
+
+- If the returned cell has a formula (starts with `=`), focus the explanation on **that formula only** — do NOT explain the surrounding table data.
+- If the returned cell has no formula (plain value or the selection is a data range with no formulas), then explain the data structure/pattern.
 
 **DO NOT** modify data or create charts. This is a read-only educational action.
 
