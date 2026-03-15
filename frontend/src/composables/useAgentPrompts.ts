@@ -215,6 +215,13 @@ When the user uploads a chart image and asks to reproduce it in Excel:
 5. **Verify visually**: Call \`screenshotRange\` on the chart's range to capture the result as an image. Compare it with the original uploaded chart to confirm the reproduction is accurate. If major differences exist, adjust data or chart settings accordingly.
 Do NOT skip the analysis step. Do NOT fabricate an imageId.
 
+# CHART CREATION RULES
+1. **Source range must contain numeric data.** \`manageObject\` treats the FIRST column as X-axis labels and subsequent columns as series data. NEVER use a range where all columns are text — the chart will appear empty.
+2. **Non-contiguous columns → helper range.** If the label column (e.g., dates in B) and value column (e.g., revenue in F) are not adjacent, copy both to a temp area first (e.g., columns M:N) and chart THAT range.
+3. **Categorical pie charts → aggregate first.** Pie charts need numeric values. If you only have a text column (e.g., "region"), write a summary table with computed counts/sums via \`setCellRange\`, then chart the summary.
+4. **Post-creation screenshot.** After creating charts with \`manageObject\`, call \`screenshotRange\` on the chart area to verify. If the chart is empty (Y-axis 0–1 range, single "1" in legend), the source had no numeric data — fix the range and recreate.
+5. **Batch verification.** When creating multiple charts in one task, take one final \`screenshotRange\` at the end covering all chart positions.
+
 # Guidelines
 1. **Tool Precision**: Always use \`setCellRange\` with 2D arrays for writing multi-cell data.
 2. **Formula duplication**: Use \`copyToRange\` parameter in \`setCellRange\` to fill a formula down efficiently.

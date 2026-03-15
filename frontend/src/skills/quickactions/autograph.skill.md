@@ -30,8 +30,47 @@ Analyze selected data, generate derived columns if needed, and automatically ins
 **CRITICAL SEQUENCE**:
 
 1. **Inspect Data** — `getSelectedCells` or `getWorksheetData` to understand structure
-2. **Generate Derived Columns (Optional)** — `setCellRange` to add calculated fields with formatting parameter for highlighting (e.g., yellow fill)
-3. **Insert Chart** — `manageObject` with action='create', type='chart', config with proper source address
+2. **Prepare chart range** — Verify the range contains numeric data (see Chart Data Rules below)
+3. **Generate Derived Columns (Optional)** — `setCellRange` to add calculated fields with formatting parameter for highlighting (e.g., yellow fill)
+4. **Insert Chart** — `manageObject` with proper source address
+5. **Verify with screenshot** — `screenshotRange` on the chart area; fix and recreate if empty
+
+## Chart Data Rules (CRITICAL)
+
+### Rule: Source range must contain numeric data
+`manageObject` treats the **first column as X-axis labels** and **subsequent columns as the series data values**. If the subsequent columns are text-only, the chart will appear empty.
+
+**WRONG:**
+```
+source: "B1:C21"  // B=date text, C=region text → no numeric data → empty chart!
+source: "C1:C21"  // C=region text only → pie will be empty
+```
+
+**CORRECT:**
+```
+source: "A1:B5"   // A=category labels, B=numeric values → valid chart
+```
+
+### Rule: Non-contiguous data → create a helper range first
+If the X-axis labels and the numeric values are in non-adjacent columns, copy both to a temporary area first:
+```javascript
+// Example: dates in column B, revenue in column F (non-adjacent)
+setCellRange({ address: 'M1:N21', values: [
+  ['date', 'revenue'],
+  ['2024-01-31', 10000], // ... all rows
+]});
+manageObject({ source: 'M1:N21', chartType: 'Line', ... });
+```
+
+### Rule: Pie charts need aggregate data
+You cannot use a raw text column (e.g., "region") as a pie chart source. First compute counts or sums:
+```javascript
+setCellRange({ address: 'M1:N5', values: [
+  ['Region', 'Count'],
+  ['Nord', 5], ['Sud', 5], ['Est', 5], ['Ouest', 5],
+]});
+manageObject({ source: 'M1:N5', chartType: 'Pie', ... });
+```
 
 ## Chart Type Selection Guide
 
@@ -370,13 +409,16 @@ setCellRange({
 
 ## Quality Check
 
-After chart creation, verify:
+After chart creation, call `screenshotRange` on the chart area and verify with vision:
 
-- ✓ Chart appears in Excel workbook?
+- ✓ Chart visible and non-empty (not just empty axes or single "1" in legend)?
 - ✓ Correct chart type for data structure?
+- ✓ Data points visible (not all zeros, not 0–1 Y-axis range)?
 - ✓ Headers properly used as axis labels?
 - ✓ Derived columns highlighted (if added)?
 - ✓ Chart title descriptive?
+
+If the chart is empty or broken → the source range had no numeric data. Fix the range (see Chart Data Rules above) and recreate.
 
 ## Auto-Graph vs Other Excel Actions
 
