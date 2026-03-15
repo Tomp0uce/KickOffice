@@ -173,7 +173,9 @@ export function useQuickActions(options: UseQuickActionsOptions) {
 
       // PPT-IMG: Determine context source:
       // 1. If selected text has >= 10 words → illustrate the selection
-      // 2. Otherwise → screenshot the current slide and describe it via LLM
+      // 2. Otherwise → illustrate the full slide
+      // In both cases we try to capture a screenshot so the vision LLM can match
+      // the slide's visual style/colours/tone even when illustrating selected text.
       const MIN_SELECTION_WORDS = 10;
       let imageContext = '';
       let imageContextMode: 'selection' | 'slide' = 'slide';
@@ -190,40 +192,35 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         /* no selection — fall through to slide screenshot */
       }
 
-      // Step B: If no sufficient selection, screenshot + describe the current slide
-      // Step B: If no sufficient selection, screenshot the current slide and use it directly
-      // for image prompt generation (vision → imagePrompt in one LLM call, no intermediate description)
+      // Step B: Always try to screenshot the current slide.
+      // - selection mode: screenshot provides visual style context alongside the text
+      // - slide mode: screenshot is the primary source, passed directly via vision
       let slideScreenshotUri: string | null = null;
-      if (imageContextMode === 'slide') {
-        let currentSlideNum = 1;
+      let currentSlideNum = 1;
+      try {
+        const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+        currentSlideNum = parseInt(sn, 10) || 1;
+      } catch {}
+      try {
+        const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
+          slideNumber: currentSlideNum,
+        });
+        const screenshot = JSON.parse(screenshotJson);
+        if (screenshot.base64 && !screenshot.error) {
+          slideScreenshotUri = `data:image/png;base64,${screenshot.base64}`;
+        }
+      } catch (err) {
+        logService.warn('[AgentLoop] PPT-IMG: slide screenshot failed', err);
+      }
+
+      // Last resort when slide mode and no screenshot: fall back to raw slide text
+      if (imageContextMode === 'slide' && !slideScreenshotUri) {
         try {
-          const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-          currentSlideNum = parseInt(sn, 10) || 1;
-        } catch {}
-        try {
-          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
+          imageContext = await powerpointToolDefinitions.getSlideContent.execute({
             slideNumber: currentSlideNum,
           });
-          const screenshot = JSON.parse(screenshotJson);
-          if (screenshot.base64 && !screenshot.error) {
-            slideScreenshotUri = `data:image/png;base64,${screenshot.base64}`;
-          }
-        } catch (err) {
-          logService.warn('[AgentLoop] PPT-IMG: slide screenshot failed', err);
-        }
-        // Last resort: fall back to raw slide text
-        if (!slideScreenshotUri) {
-          try {
-            const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-            const slideNum = parseInt(sn, 10);
-            if (slideNum >= 1) {
-              imageContext = await powerpointToolDefinitions.getSlideContent.execute({
-                slideNumber: slideNum,
-              });
-            }
-          } catch {}
-          if (!imageContext) imageContext = await getOfficeSelection({ actionKey });
-        }
+        } catch {}
+        if (!imageContext) imageContext = await getOfficeSelection({ actionKey });
       }
 
       // Build user-facing label indicating which mode was used
@@ -258,25 +255,38 @@ Constraints:
 2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.`;
 
       type ChatMessage = { role: string; content: any };
-      const promptMessages: ChatMessage[] =
-        slideScreenshotUri
-          ? [
-              { role: 'system', content: systemMsg },
+      // Build vision user message when we have a screenshot.
+      // - selection mode: include both the screenshot (style/tone) and the selected text (what to illustrate)
+      // - slide mode: screenshot alone is the source
+      const buildVisionUserMessage = () => {
+        const imagePart = { type: 'image_url', image_url: { url: slideScreenshotUri! } };
+        if (imageContextMode === 'selection') {
+          return {
+            role: 'user',
+            content: [
+              imagePart,
               {
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: slideScreenshotUri } },
-                  {
-                    type: 'text',
-                    text: `Task: Based on this presentation slide image, write a detailed prompt for an image generation model that will produce a visual directly illustrating this slide's content.\n\n${visualRequirements}`,
-                  },
-                ],
+                type: 'text',
+                text: `Task: Write a detailed prompt for an image generation model that will produce a visual directly illustrating the selected text below. Use the slide screenshot only as a visual reference for colour palette, style and tone — the image must represent the selected text specifically, not the entire slide.\n\nSelected text to illustrate:\n"${imageContext}"\n\n${visualRequirements}`,
               },
-            ]
-          : [
-              { role: 'system', content: systemMsg },
-              { role: 'user', content: visualPrompt.user(imageContext || '', lang) },
-            ];
+            ],
+          };
+        }
+        return {
+          role: 'user',
+          content: [
+            imagePart,
+            {
+              type: 'text',
+              text: `Task: Based on this presentation slide image, write a detailed prompt for an image generation model that will produce a visual directly illustrating this slide's content.\n\n${visualRequirements}`,
+            },
+          ],
+        };
+      };
+
+      const promptMessages: ChatMessage[] = slideScreenshotUri
+        ? [{ role: 'system', content: systemMsg }, buildVisionUserMessage()]
+        : [{ role: 'system', content: systemMsg }, { role: 'user', content: visualPrompt.user(imageContext || '', lang) }];
 
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(
