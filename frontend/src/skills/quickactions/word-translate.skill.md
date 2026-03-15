@@ -36,7 +36,7 @@ Call `getSelectedTextWithFormatting` to get the selected text with its Markdown 
   - Preserve paragraph structure (bullets stay bullets, numbered lists stay numbered)
   - Preserve tone and formality level (formal → formal, casual → casual)
   - Keep proper nouns, brand names, and technical terms as-is
-  - Preserve inline formatting: **bold**, *italic* are preserved in `revisedText`
+  - Preserve inline formatting: **bold**, *italic*, __underline__ MUST be preserved in `revisedText` — if the original has `**mot**`, the translation must have `**word**`
 
 ### Step 3 — Inject translations using Track Changes
 

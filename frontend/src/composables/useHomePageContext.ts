@@ -26,6 +26,7 @@ export interface HomePageContext {
   loading: Ref<boolean>;
   imageLoading: Ref<boolean>;
   backendOnline: Ref<boolean>;
+  backendChecked: Ref<boolean>;
   currentAction: Ref<string>;
   userInput: Ref<string>;
   customSystemPrompt: Ref<string>;
@@ -58,6 +59,8 @@ export interface HomePageContext {
   handleEditMessage: (message: DisplayMessage) => void;
   insertMessageToDocument: (message: DisplayMessage, type: 'replace' | 'append') => void;
   copyMessageToClipboard: (message: DisplayMessage) => void;
+  undoLastInsert: () => Promise<boolean>;
+  canUndo: Ref<boolean>;
   goToSettings: () => void;
   executeNewChat: () => Promise<void>;
   handleSwitchSession: (sessionId: string) => Promise<void>;

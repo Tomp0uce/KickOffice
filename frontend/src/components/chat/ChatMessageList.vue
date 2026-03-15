@@ -17,7 +17,9 @@
       <Sparkles :size="32" />
       <p class="font-semibold text-main">{{ emptyTitle }}</p>
       <p class="text-xs font-semibold text-secondary">{{ emptySubtitle }}</p>
+      <!-- Status: hide entirely until first check resolves to avoid false negative flash -->
       <div
+        v-if="context.backendChecked.value"
         role="status"
         class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
         :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
@@ -166,6 +168,17 @@
             :icon-size="12"
             @click="context.handleRegenerate()"
           />
+          <!-- Undo: only on last assistant message when undo is available -->
+          <CustomButton
+            v-if="item.key === lastAssistantKey && context.canUndo.value && !loading"
+            :title="undoLabel"
+            text=""
+            :icon="Undo2"
+            type="secondary"
+            class="bg-surface! p-1.5! text-amber-600!"
+            :icon-size="12"
+            @click="context.undoLastInsert()"
+          />
         </div>
         <!-- User message edit button: hidden until hover (U-L2) -->
         <div
@@ -224,6 +237,7 @@ import {
   RotateCcw,
   Sparkles,
   Terminal,
+  Undo2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
@@ -307,6 +321,7 @@ const thoughtProcessLabel = computed(
 );
 const regenerateLabel = computed(() => props.regenerateLabel ?? context.t('regenerate'));
 const editMessageLabel = computed(() => props.editMessageLabel ?? context.t('editMessage'));
+const undoLabel = computed(() => context.t('undoLastInsert', 'Undo'));
 
 // UX-H1 — Delegate scroll event to context or prop handler
 function handleScrollEvent() {

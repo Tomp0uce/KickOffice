@@ -59,11 +59,15 @@ Output (French):
 
 ## Formatting Preservation
 
-- **Bold**: `**text**` → `**texte**`
-- **Italic**: `*text*` → `*texte*`
+- **Bold**: `**text**` → `**texte**` — keep the `**` markers around the translated word
+- **Italic**: `*text*` → `*texte*` — keep the `*` markers around the translated word
+- **Underline**: `__text__` → `__texte__` — keep the `__` markers
+- **Color**: `[color:#CC0000]text[/color]` → `[color:#CC0000]texte[/color]` — keep the `[color:...]...[/color]` tags and translate only the inner text
 - **Lists**: Maintain bullet/number structure
 - **Tables**: Translate cell content, keep table structure
 - **Links**: Translate link text, keep URL unchanged
+
+**CRITICAL**: Every formatting marker (`**`, `*`, `__`, `[color:...]...[/color]`) that wraps a word in the input MUST wrap the corresponding translated word in the output. Never drop or strip these markers.
 
 ## Tone Matching
 

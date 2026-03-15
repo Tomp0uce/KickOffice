@@ -20,8 +20,9 @@ const ErrorCodes = Object.freeze({
   // Rate limit (429)
   RATE_LIMITED: 'RATE_LIMITED',
 
-  // LLM upstream (502)
+  // LLM upstream (502 / 400)
   LLM_UPSTREAM_ERROR: 'LLM_UPSTREAM_ERROR',
+  LLM_BAD_REQUEST: 'LLM_BAD_REQUEST', // 4xx from LiteLLM — carries user-readable detail in `detail` field
   LLM_EMPTY_RESPONSE: 'LLM_EMPTY_RESPONSE',
   LLM_INVALID_JSON: 'LLM_INVALID_JSON',
   LLM_NO_CHOICES: 'LLM_NO_CHOICES',

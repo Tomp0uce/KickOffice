@@ -362,7 +362,9 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         if (errInfo.type === 'auth') {
           currentAssistantMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
         } else {
-          currentAssistantMessage.content = t(errInfo.i18nKey);
+          currentAssistantMessage.content = errInfo.rawDetail
+            ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
+            : t(errInfo.i18nKey);
         }
         currentAction.value = '';
         break;
@@ -555,7 +557,9 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (errInfo.type === 'auth') {
         lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
       } else {
-        lastMessage.content = t(errInfo.i18nKey);
+        lastMessage.content = errInfo.rawDetail
+          ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
+          : t(errInfo.i18nKey);
       }
     }
   }
@@ -601,7 +605,9 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (errInfo.type === 'auth') {
         lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
       } else {
-        lastMessage.content = t(errInfo.i18nKey);
+        lastMessage.content = errInfo.rawDetail
+          ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
+          : t(errInfo.i18nKey);
       }
     }
   }

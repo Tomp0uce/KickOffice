@@ -9,10 +9,13 @@ export function useHealthCheck(
   selectedModelTier: Ref<ModelTier>,
 ) {
   const backendOnline = ref(false);
+  /** True once the first health check response has been received (online or offline). */
+  const backendChecked = ref(false);
   let intervalId: number | null = null;
 
   async function runCheck() {
     backendOnline.value = await healthCheck();
+    backendChecked.value = true;
     if (!backendOnline.value) return;
     try {
       availableModels.value = await fetchModels();
@@ -58,5 +61,5 @@ export function useHealthCheck(
     document.removeEventListener('visibilitychange', onVisibilityChange);
   });
 
-  return { backendOnline, checkBackend };
+  return { backendOnline, backendChecked, checkBackend };
 }

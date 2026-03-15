@@ -12,9 +12,9 @@
         @delete-session="handleDeleteSession"
       />
 
-      <!-- Persistent Offline Indicator -->
+      <!-- Persistent Offline Indicator — only shown after first check to avoid false negative flash -->
       <div
-        v-if="!backendOnline"
+        v-if="backendChecked && !backendOnline"
         class="flex items-center justify-center bg-red-500/10 py-1.5 px-3 rounded-md border border-red-500/20 shadow-xs mx-4 mt-2"
       >
         <span class="text-xs text-red-500 font-medium flex items-center gap-2">
@@ -148,6 +148,7 @@ import {
 import { useStorage } from '@vueuse/core';
 import {
   BookOpen,
+  ChartBarBig,
   CheckCheck,
   FileCheck,
   FunctionSquare,
@@ -200,7 +201,7 @@ const isNewChatConfirmVisible = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard');
 
-const { backendOnline } = useHealthCheck(availableModels, selectedModelTier);
+const { backendOnline, backendChecked } = useHealthCheck(availableModels, selectedModelTier);
 
 const hostIsExcel = isExcel();
 const hostIsWord = isWord();
@@ -257,17 +258,17 @@ const wordQuickActions = computed<QuickAction[]>(() => [
     tooltipKey: 'translate_tooltip',
   },
   {
-    key: 'polish',
-    label: t('polish'),
-    icon: Sparkle,
-    tooltipKey: 'polish_tooltip',
-  },
-  {
     key: 'word-review',
     label: t('wordReview', 'Review'),
     icon: BookOpen,
     executeWithAgent: true,
     tooltipKey: 'wordReview_tooltip',
+  },
+  {
+    key: 'polish',
+    label: t('polish'),
+    icon: Sparkle,
+    tooltipKey: 'polish_tooltip',
   },
   {
     key: 'summary',
@@ -288,7 +289,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: 'digitizeChart',
     label: t('excelDigitizeChart', 'Digitize Chart'),
-    icon: ScanSearch,
+    icon: ChartBarBig,
     mode: 'immediate',
     executeWithAgent: true,
     imageUpload: true,
@@ -552,7 +553,7 @@ function handleEditMessage(message: DisplayMessage) {
   homePage.handleEditMessage(message);
 }
 
-const { insertMessageToDocument, copyMessageToClipboard } = officeInsert;
+const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
 provideHomePageContext({
@@ -562,6 +563,7 @@ provideHomePageContext({
   loading,
   imageLoading,
   backendOnline,
+  backendChecked,
   currentAction,
   userInput,
   customSystemPrompt,
@@ -589,6 +591,8 @@ provideHomePageContext({
   handleEditMessage,
   insertMessageToDocument,
   copyMessageToClipboard,
+  undoLastInsert,
+  canUndo,
   goToSettings,
   executeNewChat,
   handleSwitchSession,

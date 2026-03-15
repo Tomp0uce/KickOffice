@@ -114,7 +114,16 @@ chatRouter.post('/', async (req, res) => {
     })
 
     if (!response.ok) {
-      await handleErrorResponse(response, '/api/chat')
+      const { status: upstreamStatus, rawMessage } = await handleErrorResponse(response, '/api/chat')
+      // For 4xx errors from LiteLLM (e.g. invalid image data, bad model), forward the
+      // sanitized detail so the UI can display a specific actionable message.
+      if (upstreamStatus >= 400 && upstreamStatus < 500) {
+        return logAndRespond(res, 400, {
+          code: ErrorCodes.LLM_BAD_REQUEST,
+          error: 'The AI service rejected the request.',
+          detail: rawMessage,
+        }, 'POST /api/chat')
+      }
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_UPSTREAM_ERROR,
         error: 'The AI service returned an error. Please try again later.',
@@ -317,7 +326,14 @@ chatRouter.post('/sync', async (req, res) => {
     })
 
     if (!response.ok) {
-      await handleErrorResponse(response, '/api/chat/sync')
+      const { status: upstreamStatus, rawMessage } = await handleErrorResponse(response, '/api/chat/sync')
+      if (upstreamStatus >= 400 && upstreamStatus < 500) {
+        return logAndRespond(res, 400, {
+          code: ErrorCodes.LLM_BAD_REQUEST,
+          error: 'The AI service rejected the request.',
+          detail: rawMessage,
+        }, 'POST /api/chat/sync')
+      }
       return logAndRespond(res, 502, {
         code: ErrorCodes.LLM_UPSTREAM_ERROR,
         error: 'The AI service returned an error. Please try again later.',

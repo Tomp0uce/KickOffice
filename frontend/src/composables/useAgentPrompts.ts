@@ -222,6 +222,9 @@ Do NOT skip the analysis step. Do NOT fabricate an imageId.
 4. **Post-creation screenshot.** After creating charts with \`manageObject\`, call \`screenshotRange\` on the chart area to verify. If the chart is empty (Y-axis 0–1 range, single "1" in legend), the source had no numeric data — fix the range and recreate.
 5. **Batch verification.** When creating multiple charts in one task, take one final \`screenshotRange\` at the end covering all chart positions.
 
+# TABLE CONVERSION RULE
+When you generate tabular data (headers + rows) via \`setCellRange\`, **ALWAYS** follow up with \`createTable\` on that same range to convert it into a proper Excel table (ListObject). This gives the user auto-filters, structured references, banded rows, and a professional look. Only skip this step when appending data to an existing table or when the user explicitly asks for plain cells.
+
 # Guidelines
 1. **Tool Precision**: Always use \`setCellRange\` with 2D arrays for writing multi-cell data.
 2. **Formula duplication**: Use \`copyToRange\` parameter in \`setCellRange\` to fill a formula down efficiently.

@@ -14,6 +14,7 @@ import {
 } from '@/utils/officeOutlook';
 import { insertIntoPowerPoint } from '@/utils/powerpointTools';
 import { renderOfficeCommonApiHtml } from '@/utils/markdown';
+import { useDocumentUndo } from './useDocumentUndo';
 import DOMPurify from 'dompurify';
 
 const VERBOSE_LOGGING_ENABLED = import.meta.env.VITE_VERBOSE_LOGGING === 'true';
@@ -145,6 +146,8 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     insertImageToPowerPoint,
   } = options;
 
+  const documentUndo = useDocumentUndo({ hostIsWord, hostIsOutlook, hostIsExcel, hostIsPowerPoint });
+
   function normalizeInsertionContent(rawContent: string): string {
     return rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   }
@@ -194,18 +197,24 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       hasRichHtml: !!richHtml,
     });
 
+    // Capture selection state before insert for undo support
+    const savedSnapshot = await documentUndo.captureBeforeInsert();
+
     if (hostIsOutlook) {
       await doOutlookInsert(normalizedContent, richHtml, copyToClipboard, t);
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
     if (hostIsPowerPoint) {
       await doPowerPointInsert(normalizedContent, copyToClipboard, t);
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
     if (hostIsExcel) {
       await doExcelInsert(normalizedContent, copyToClipboard, t);
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
@@ -217,6 +226,12 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       copyToClipboard,
       t,
     );
+
+    // After Word insert, wrap in content control for undo targeting
+    if (hostIsWord && savedSnapshot) {
+      const tag = await documentUndo.wrapInsertedContentInWord();
+      if (tag) documentUndo.saveSnapshot(savedSnapshot, tag);
+    }
   }
 
   async function copyMessageToClipboard(message: DisplayMessage, fallback = false) {
@@ -259,5 +274,23 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     await insertToDocument(getMessageActionPayload(message), type, message.richHtml);
   }
 
-  return { copyToClipboard, copyMessageToClipboard, insertToDocument, insertMessageToDocument };
+  async function undoLastInsert() {
+    const success = await documentUndo.undoLastInsert();
+    if (success) {
+      messageUtil.success(t('undoSuccess'));
+    } else {
+      messageUtil.error(t('undoFailed'));
+    }
+    return success;
+  }
+
+  return {
+    copyToClipboard,
+    copyMessageToClipboard,
+    insertToDocument,
+    insertMessageToDocument,
+    undoLastInsert,
+    canUndo: documentUndo.canUndo,
+    clearUndo: documentUndo.clearUndo,
+  };
 }
