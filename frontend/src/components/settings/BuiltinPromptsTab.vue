@@ -120,7 +120,8 @@ type OutlookBuiltinPromptKey =
   | 'translate_formalize'
   | 'concise'
   | 'proofread'
-  | 'extract';
+  | 'extract'
+  | 'mom';
 type BuiltinPromptKey =
   | WordBuiltinPromptKey
   | ExcelBuiltinPromptKey
@@ -162,6 +163,7 @@ const outlookBuiltInPromptsData: Record<OutlookBuiltinPromptKey, BuiltinPromptCo
   concise: { ...outlookBuiltInPrompt.concise },
   proofread: { ...outlookBuiltInPrompt.proofread },
   extract: { ...outlookBuiltInPrompt.extract },
+  mom: { ...outlookBuiltInPrompt.mom },
 };
 
 const selectedBuiltInPromptsData = forHost({

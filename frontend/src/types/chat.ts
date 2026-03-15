@@ -43,7 +43,7 @@ export interface PowerPointQuickAction extends QuickAction {
 }
 
 export interface OutlookQuickAction extends QuickAction {
-  mode?: 'immediate' | 'draft' | 'smart-reply';
+  mode?: 'immediate' | 'draft' | 'smart-reply' | 'mom';
   prefix?: string;
 }
 

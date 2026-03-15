@@ -183,6 +183,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   const currentAction = ref('');
   const pendingSmartReply = ref(false);
+  const pendingMoM = ref(false);
 
   const sessionStats = ref({
     inputTokens: 0,
@@ -559,6 +560,52 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     }
   }
 
+  async function handleMoM(userMessage: string) {
+    pendingMoM.value = false;
+
+    const storedLang = localStorage.getItem('localLanguage');
+    const validLangs = ['en', 'fr'];
+    const langKey = validLangs.includes(storedLang || '') ? storedLang : 'fr';
+    const lang = langKey === 'en' ? 'English' : 'Français';
+
+    const momPrompt = getOutlookBuiltInPrompt()['mom'];
+    const systemMsg = momPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
+    const userMsg = momPrompt.user(userMessage, lang);
+
+    history.value.push(createDisplayMessage('assistant', ''));
+    await scrollToMessageTop();
+    try {
+      await chatStream({
+        messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: userMsg },
+        ],
+        modelTier: resolveChatModelTier(),
+        onStream: (text: string) => {
+          const message = history.value[history.value.length - 1];
+          message.role = 'assistant';
+          message.content = text;
+        },
+        onUsage: accumulateUsage,
+        abortSignal: abortController.value?.signal,
+      });
+      const lastMessage = history.value[history.value.length - 1];
+      if (!lastMessage?.content?.trim()) {
+        lastMessage.content = t('noModelResponse');
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      logService.error('[AgentLoop] MoM chatStream failed', err);
+      const lastMessage = history.value[history.value.length - 1];
+      const errInfo = categorizeError(err);
+      if (errInfo.type === 'auth') {
+        lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
+      } else {
+        lastMessage.content = t(errInfo.i18nKey);
+      }
+    }
+  }
+
   async function fetchSelectionWithTimeout() {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let localSelectedText = '';
@@ -736,6 +783,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     getOfficeSelectionAsHtml,
     runAgentLoop,
     resolveChatModelTier,
+    pendingMoM,
   });
 
   async function sendMessage(payload?: string, files?: File[]) {
@@ -877,6 +925,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       // Smart reply interception: when user sends after clicking "Reply" quick action
       if (pendingSmartReply.value && hostIsOutlook) {
         await handleSmartReply(userMessage);
+        return;
+      }
+
+      // MoM interception: when user sends notes after clicking "MoM" quick action
+      if (pendingMoM.value && hostIsOutlook) {
+        await handleMoM(userMessage);
         return;
       }
 

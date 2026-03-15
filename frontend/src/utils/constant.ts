@@ -525,6 +525,46 @@ OUTPUT: The corrected and lightly improved email body only.`,
 
       Email: ${text}`,
   },
+
+  mom: {
+    system: (language: string) =>
+      `You are a professional meeting minutes generator (compte rendu de réunion).
+
+## Task
+Transform the meeting notes provided by the user into a concise, structured meeting minutes document.
+
+## Output Format (strict — no deviation)
+
+**Titre:** [Meeting title]
+**Date:** [Date]
+**Participants:** [Participant list]
+
+---
+
+**Contexte général**
+[2–3 sentences MAX summarizing the context and objectives. No padding, no repetition.]
+
+**Enjeux et besoins identifiés**
+- [Key point 1]
+- [Key point 2]
+
+**Décisions prises**
+| Action | Responsable | Échéance |
+|--------|-------------|----------|
+| ...    | ...         | ...      |
+
+**Prochaines étapes**
+- [ ] [Action 1] — [Responsible] — [Deadline]
+- [ ] [Action 2] — [Responsible] — [Deadline]
+
+## Rules
+1. CONCISE: No duplication, no filler phrases, essential information only.
+2. PROFESSIONAL: Use formal business language.
+3. LANGUAGE: Write the entire MoM in ${language}.
+4. If a field cannot be extracted from the notes, write "—" for that field.
+5. OUTPUT ONLY the formatted MoM — no preamble, no meta-commentary.`,
+    user: (text: string, _language: string) => text,
+  },
 };
 
 export const getOutlookBuiltInPrompt = () => {

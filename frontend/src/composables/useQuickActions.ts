@@ -96,6 +96,9 @@ export interface UseQuickActionsOptions {
 
   // Model tier resolver
   resolveChatModelTier: () => ModelTier;
+
+  // Pending MoM flag (set to true when MoM mode is activated, checked by useAgentLoop)
+  pendingMoM?: Ref<boolean>;
 }
 
 export function useQuickActions(options: UseQuickActionsOptions) {
@@ -125,6 +128,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     getOfficeSelectionAsHtml,
     runAgentLoop,
     resolveChatModelTier,
+    pendingMoM,
   } = options;
 
   async function applyQuickAction(actionKey: string) {
@@ -396,6 +400,24 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
     if (selectedOutlookQuickAction?.mode === 'smart-reply') {
       pendingSmartReply.value = true;
+      userInput.value = selectedOutlookQuickAction.prefix || '';
+      adjustTextareaHeight();
+      isDraftFocusGlowing.value = true;
+      setTimeout(() => {
+        isDraftFocusGlowing.value = false;
+      }, 1500);
+      await nextTick();
+      const el = inputTextarea.value;
+      if (el) {
+        el.focus();
+        const len = userInput.value.length;
+        el.setSelectionRange(len, len);
+      }
+      return;
+    }
+
+    if (selectedOutlookQuickAction?.mode === 'mom') {
+      if (pendingMoM) pendingMoM.value = true;
       userInput.value = selectedOutlookQuickAction.prefix || '';
       adjustTextareaHeight();
       isDraftFocusGlowing.value = true;
