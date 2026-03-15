@@ -13,6 +13,19 @@ import { applyRedlineToOxml, setDefaultAuthor } from '@ansonlai/docx-redline-js'
 
 import { logService } from './logger';
 import { getErrorMessage } from './common';
+
+/**
+ * Strip unsupported formatting annotations from revisedText before diffing.
+ * docx-redline-js does not understand custom [color:#XXXXXX]...[/color] tags
+ * and would insert them literally as text. Remove them, keeping the inner text.
+ * Standard Markdown bold (**…**) and italic (*…*) are left intact as
+ * docx-redline-js handles those natively.
+ */
+function stripColorAnnotations(text: string): string {
+  return text
+    .replace(/\[color:[^\]]*\]/g, '') // remove opening [color:#XXXXXX] tag
+    .replace(/\[\/color\]/g, ''); // remove closing [/color] tag
+}
 import {
   setChangeTrackingForAi,
   restoreChangeTracking,
@@ -90,9 +103,13 @@ export async function applyRevisionToSelection(
   // 3. Generate revision markup via docx-redline-js
   setDefaultAuthor(redlineAuthor);
 
+  // Strip [color:#XXXXXX]...[/color] annotations — docx-redline-js doesn't
+  // understand them and would insert the tags literally as text.
+  const cleanedRevisedText = stripColorAnnotations(revisedText);
+
   let resultOoxml: string;
   try {
-    const redlineResult = await applyRedlineToOxml(ooxml, originalText, revisedText, {
+    const redlineResult = await applyRedlineToOxml(ooxml, originalText, cleanedRevisedText, {
       author: enableTrackChanges ? redlineAuthor : undefined,
       generateRedlines: enableTrackChanges,
     });
@@ -202,7 +219,9 @@ export async function applyRevisionToDocument(
         continue;
       }
 
-      if (originalText.trim() === revisedText.trim()) {
+      const cleanedRevisedText = stripColorAnnotations(revisedText);
+
+      if (originalText.trim() === cleanedRevisedText.trim()) {
         details.push(`[${paraIndex}] SKIPPED: text identical`);
         skipped++;
         continue;
@@ -216,7 +235,7 @@ export async function applyRevisionToDocument(
       setDefaultAuthor(redlineAuthor);
       let resultOoxml: string;
       try {
-        const redlineResult = await applyRedlineToOxml(ooxml, para.text, revisedText, {
+        const redlineResult = await applyRedlineToOxml(ooxml, para.text, cleanedRevisedText, {
           author: enableTrackChanges ? redlineAuthor : undefined,
           generateRedlines: enableTrackChanges,
         });

@@ -1460,7 +1460,11 @@ visible in the Track Changes panel, distinguishable from human edits.
 **Output**: The selection is replaced with tracked insertions/deletions.
 
 **Requirements**: Text must be selected in the document before calling.
-**Track Changes**: Enabled by default. Set enableTrackChanges=false for silent replacement.`,
+**Track Changes**: Enabled by default. Set enableTrackChanges=false for silent replacement.
+
+**Supported inline formatting in revisedText**: *italic* and **bold** Markdown.
+**NOT supported**: color annotations such as [color:#CC0000]...[/color] — they will be stripped automatically.
+To apply font color to specific words, use \`searchAndFormat\` AFTER the revision is applied.`,
 
       inputSchema: {
         type: 'object',
