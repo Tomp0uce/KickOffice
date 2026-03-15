@@ -171,39 +171,33 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         return messageUtil.error(t('imageError') || 'No image model configured.');
       }
 
-      // Get current slide text:
-      // 1. Try explicit text selection first via getCurrentSlideIndex + getSlideContent so we always
-      //    scope to the active slide (Office.context.document.getSelectedDataAsync(Text) can
-      //    return the full presentation text when nothing is selected on some Office versions).
-      // 2. Only fall back to getOfficeSelection if the dedicated tools fail.
-      let slideText = '';
+      // PPT-IMG: Determine context source:
+      // 1. If selected text has >= 10 words → illustrate the selection
+      // 2. Otherwise → screenshot the current slide and describe it via LLM
+      const MIN_SELECTION_WORDS = 10;
+      let imageContext = '';
+      let imageContextMode: 'selection' | 'slide' = 'slide';
+
+      // Step A: Try to get selected text
       try {
-        const slideNumStr = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-        const slideNum = parseInt(slideNumStr, 10);
-        if (slideNum >= 1) {
-          slideText = await powerpointToolDefinitions.getSlideContent.execute({
-            slideNumber: slideNum,
-          });
+        const selectedText = (await getOfficeSelection({ actionKey })) || '';
+        const selWordCount = selectedText.trim().split(/\s+/).filter(Boolean).length;
+        if (selWordCount >= MIN_SELECTION_WORDS) {
+          imageContext = selectedText.trim();
+          imageContextMode = 'selection';
         }
       } catch {
-        // Fallback to generic selection helper
-        slideText = await getOfficeSelection({ actionKey });
-      }
-      if (!slideText) {
-        slideText = await getOfficeSelection({ actionKey });
+        /* no selection — fall through to slide screenshot */
       }
 
-      // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
-      // to provide richer context for image generation
-      const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length;
-      if (wordCount < 5) {
+      // Step B: If no sufficient selection, screenshot + describe the current slide
+      if (imageContextMode === 'slide') {
+        let currentSlideNum = 1;
         try {
-          // Resolve current slide number to pass explicitly (screenshotSlide defaults to slide 1)
-          let currentSlideNum = 1;
-          try {
-            const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
-            currentSlideNum = parseInt(sn, 10) || 1;
-          } catch {}
+          const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+          currentSlideNum = parseInt(sn, 10) || 1;
+        } catch {}
+        try {
           const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
             slideNumber: currentSlideNum,
           });
@@ -229,25 +223,48 @@ export function useQuickActions(options: UseQuickActionsOptions) {
                 slideDesc = text;
               },
             });
-            if (slideDesc.trim()) slideText = slideDesc.trim();
+            if (slideDesc.trim()) imageContext = slideDesc.trim();
           }
         } catch (err) {
-          logService.warn(
-            '[AgentLoop] PPT-M1: screenshot fallback for short selection failed',
-            err,
-          );
+          logService.warn('[AgentLoop] PPT-IMG: slide screenshot/describe failed', err);
+        }
+        // Last resort: fall back to raw slide text
+        if (!imageContext) {
+          try {
+            const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+            const slideNum = parseInt(sn, 10);
+            if (slideNum >= 1) {
+              imageContext = await powerpointToolDefinitions.getSlideContent.execute({
+                slideNumber: slideNum,
+              });
+            }
+          } catch {}
+          if (!imageContext) imageContext = await getOfficeSelection({ actionKey });
         }
       }
 
-      // Step 1: call standard LLM to generate a proper image description prompt
+      // Build user-facing label indicating which mode was used
       const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const modeLabel =
+        imageContextMode === 'selection'
+          ? lang === 'English'
+            ? '📝 Illustrating selected text'
+            : '📝 Illustration du texte sélectionné'
+          : lang === 'English'
+            ? '🖼️ Illustrating the full slide'
+            : '🖼️ Illustration de la slide complète';
+
+      // Step 1: call standard LLM to generate a proper image description prompt
       const visualPrompt = getPowerPointBuiltInPrompt().visual;
       const systemMsg = visualPrompt.system(lang);
-      const userMsg = visualPrompt.user(slideText || '', lang);
+      const userMsg = visualPrompt.user(imageContext || '', lang);
 
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(
-        createDisplayMessage('user', `[${actionLabel}] ${(slideText || '').substring(0, 100)}...`),
+        createDisplayMessage(
+          'user',
+          `[${actionLabel}] ${modeLabel}\n${(imageContext || '').substring(0, 100)}...`,
+        ),
       );
       history.value.push(createDisplayMessage('assistant', t('imageGenerating')));
       await scrollToMessageTop?.();
@@ -276,7 +293,10 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         // Step 2: use the generated description to produce the image
         history.value[history.value.length - 1].content = t('imageGenerating');
         imageLoading.value = true;
-        const imageSrc = await generateImage({ prompt: imagePrompt.trim() });
+        const imageSrc = await generateImage({
+          prompt: imagePrompt.trim(),
+          abortSignal: abortController.value?.signal,
+        });
         const message = history.value[history.value.length - 1];
         message.role = 'assistant';
         message.content = '';

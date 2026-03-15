@@ -90,6 +90,7 @@ For **each typo or grammar error found**, call `searchAndReplaceInShape` once pe
 - **Skip non-text shapes**: charts, images, OLE objects — they have no editable text.
 - **Preserve everything else**: do not change wording, structure, or formatting.
 - **Match language**: French text stays French, English stays English.
+- **XML fallback is automatic**: `searchAndReplaceInShape` now automatically falls back to OOXML XML editing when the `textRuns` API fails (GeneralException on Placeholder shapes). This is fully transparent — just call the tool normally. If it returns `"method": "xml-fallback"` in the result, the correction succeeded via XML (formatting still preserved).
 
 ## What counts as an error to fix
 

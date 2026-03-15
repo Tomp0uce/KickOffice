@@ -1,18 +1,5 @@
 <template>
   <div class="flex w-full flex-wrap items-center justify-center gap-2 rounded-md">
-    <CustomButton
-      v-for="action in quickActions"
-      :key="action.key"
-      :title="$t(action.tooltipKey || action.key + '_tooltip')"
-      text=""
-      :icon="action.icon"
-      type="secondary"
-      :icon-size="16"
-      class="shrink-0! bg-surface! p-1.5!"
-      :disabled="loading"
-      :aria-label="action.label"
-      @click="$emit('apply-action', action.key)"
-    />
     <SingleSelect
       :model-value="selectedPromptId"
       :key-list="savedPrompts.map(prompt => prompt.id)"
@@ -31,6 +18,19 @@
         {{ savedPrompts.find(prompt => prompt.id === item)?.name || item }}
       </template>
     </SingleSelect>
+    <CustomButton
+      v-for="action in quickActions"
+      :key="action.key"
+      :title="$t(action.tooltipKey || action.key + '_tooltip')"
+      text=""
+      :icon="action.icon"
+      type="secondary"
+      :icon-size="16"
+      class="shrink-0! bg-surface! p-1.5!"
+      :disabled="loading"
+      :aria-label="action.label"
+      @click="$emit('apply-action', action.key)"
+    />
   </div>
 </template>
 
