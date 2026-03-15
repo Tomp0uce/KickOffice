@@ -95,6 +95,84 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
     );
   };
 
+  const isOutlookComposeMode = (): boolean => {
+    try {
+      const mailbox = getOutlookMailbox();
+      return typeof mailbox?.item?.body?.setAsync === 'function';
+    } catch {
+      return false;
+    }
+  };
+
+  const extractReplyOnlyHtml = (fullHtml: string): string => {
+    const separators = ['<div id="divRplyFwdMsg">', '<hr tabindex="-1"', '<hr '];
+    let cutPos = -1;
+    for (const sep of separators) {
+      const pos = fullHtml.indexOf(sep);
+      if (pos !== -1 && (cutPos === -1 || pos < cutPos)) cutPos = pos;
+    }
+    return cutPos !== -1 ? fullHtml.substring(0, cutPos) : fullHtml;
+  };
+
+  const htmlToPlainText = (html: string): string => {
+    try {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      return doc.body?.innerText || doc.body?.textContent || '';
+    } catch {
+      return html;
+    }
+  };
+
+  /** In compose mode, returns only the reply text (before thread separator) as plain text. */
+  const getOutlookMailReplyOnly = (): Promise<string> => {
+    if (!isOutlookComposeMode()) return getOutlookMailBody();
+    return withTimeout(
+      new Promise<string>(resolve => {
+        try {
+          const mailbox = getOutlookMailbox();
+          if (!mailbox?.item) return resolve('');
+          const htmlType = getOfficeHtmlCoercionType();
+          if (!htmlType) {
+            getOutlookMailBody().then(resolve).catch(() => resolve(''));
+            return;
+          }
+          mailbox.item.body.getAsync(htmlType, (result: OfficeAsyncResult<string>) => {
+            if (!isOfficeAsyncSucceeded(result.status)) return resolve('');
+            const replyHtml = extractReplyOnlyHtml(result.value || '');
+            resolve(htmlToPlainText(replyHtml).trim());
+          });
+        } catch {
+          resolve('');
+        }
+      }),
+      3000,
+      '',
+    );
+  };
+
+  /** In compose mode, returns only the reply HTML (before thread separator). */
+  const getOutlookMailReplyOnlyAsHtml = (): Promise<string> => {
+    if (!isOutlookComposeMode()) return getOutlookMailBodyAsHtml();
+    return withTimeout(
+      new Promise<string>(resolve => {
+        try {
+          const mailbox = getOutlookMailbox();
+          if (!mailbox?.item) return resolve('');
+          const htmlType = getOfficeHtmlCoercionType();
+          if (!htmlType) return resolve('');
+          mailbox.item.body.getAsync(htmlType, (result: OfficeAsyncResult<string>) => {
+            if (!isOfficeAsyncSucceeded(result.status)) return resolve('');
+            resolve(extractReplyOnlyHtml(result.value || ''));
+          });
+        } catch {
+          resolve('');
+        }
+      }),
+      3000,
+      '',
+    );
+  };
+
   const getOutlookSelectedText = (): Promise<string> => {
     return withTimeout(
       new Promise<string>(resolve => {
@@ -155,6 +233,7 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selected = await getOutlookSelectedText();
         if (selected) return selected;
+        return getOutlookMailReplyOnly();
       }
       return getOutlookMailBody();
     }
@@ -234,6 +313,8 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
       if (selectionOptions?.includeOutlookSelectedText) {
         const selectedHtml = await getOutlookSelectedHtml();
         if (selectedHtml) return selectedHtml;
+        const replyHtml = await getOutlookMailReplyOnlyAsHtml();
+        return replyHtml || getOutlookMailReplyOnly();
       }
 
       const html = await getOutlookMailBodyAsHtml();

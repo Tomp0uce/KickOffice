@@ -60,6 +60,8 @@ export function useHomePage(deps: {
 
   // UX-H1 — Smart scroll: auto-scroll enabled by default, disabled when user scrolls up
   const isAutoScrollEnabled = ref(true);
+  // Timestamp of the last programmatic scroll — handleScroll ignores events within 300ms of it
+  let programmaticScrollTs = 0;
 
   // ─── Textarea ─────────────────────────────────────────────────────────────
 
@@ -86,6 +88,9 @@ export function useHomePage(deps: {
 
   // UX-H1 — Handle scroll event to detect manual user scrolling
   function handleScroll() {
+    // Ignore scroll events fired by our own programmatic scrolls
+    if (Date.now() - programmaticScrollTs < 300) return;
+
     const rawContainer = messageListRef.value?.containerEl;
     const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
     if (!container) return;
@@ -108,6 +113,9 @@ export function useHomePage(deps: {
 
     // UX-H1 — Respect auto-scroll flag unless forced
     if (!force && !isAutoScrollEnabled.value) return;
+
+    // Mark this as a programmatic scroll so handleScroll ignores the resulting event
+    programmaticScrollTs = Date.now();
 
     const messageElements = container.querySelectorAll('[data-message]');
     const lastMessage = messageElements[messageElements.length - 1] as HTMLElement | undefined;
