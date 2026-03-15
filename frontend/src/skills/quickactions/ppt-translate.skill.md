@@ -6,13 +6,13 @@ Translate the selected text on the current PowerPoint slide and inject the trans
 
 ## Target Language
 
-The first line of the user message contains the language context:
+**Detect the language of the selected text** — do NOT rely on the `[UI language]` header for direction.
 
-```
-[UI language: French → Target language: English]
-```
+- If the text is **primarily in French** → translate to **English**
+- If the text is **primarily in English** → translate to **French**
+- If in another language → translate to **French** (default)
 
-Read this line to determine the target language. Translate ALL translatable text TO the target language.
+The `[UI language: X]` header tells you which language to use for your chat confirmation message.
 
 ## Required Workflow
 

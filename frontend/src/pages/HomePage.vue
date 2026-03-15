@@ -244,16 +244,17 @@ const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
 
 const wordQuickActions = computed<QuickAction[]>(() => [
   {
-    key: 'proofread',
+    key: 'word-proofread',
     label: t('proofread'),
     icon: CheckCheck,
     executeWithAgent: true,
     tooltipKey: 'proofread_tooltip',
   },
   {
-    key: 'translate',
+    key: 'word-translate',
     label: t('translate'),
     icon: Globe,
+    executeWithAgent: true,
     tooltipKey: 'translate_tooltip',
   },
   {

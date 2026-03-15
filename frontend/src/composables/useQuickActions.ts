@@ -507,14 +507,14 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
       // Resolve UI language once — used for skill injection and fallback prompts
       const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
-      const targetLang = lang === 'English' ? 'French' : 'English';
 
       // SKILL-L1: Try to load skill file first (priority 1)
       const skillContent = getQuickActionSkill(actionKey);
       if (skillContent) {
         systemMsg = skillContent;
-        // Inject language context so skills like translate know the direction
-        userMsg = `[UI language: ${lang} → Target language: ${targetLang}]\n\n${textForLlm}`;
+        // Inject UI language so skills can respond in the correct language.
+        // Translation DIRECTION is determined by the skill from the text content itself.
+        userMsg = `[UI language: ${lang}]\n\n${textForLlm}`;
       } else {
         // Priority 2: systemPrompt from Quick Action definition
         if (hostIsOutlook) {
@@ -600,7 +600,7 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
             if (richContext?.hasRichContent) {
               finalHtml = reassembleWithFragments(lastMessage.content, richContext);
             }
-            if (richContext?.extractedStyles && hostIsOutlook) {
+            if (richContext?.extractedStyles) {
               if (!finalHtml) finalHtml = renderOfficeCommonApiHtml(lastMessage.content);
               finalHtml = applyInheritedStyles(finalHtml, richContext.extractedStyles);
             }
