@@ -482,8 +482,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     if (Date.now() - startTime >= timeoutMs) messageUtil.warning(t('recursionLimitExceeded'));
     currentAction.value = '';
 
-    await nextTick();
-    await scrollToMessageTop(); // Scroll to top of assistant response
   }
 
   async function handleSmartReply(userMessage: string) {

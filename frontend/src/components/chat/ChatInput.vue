@@ -6,28 +6,6 @@
     @dragleave.prevent="handleDragLeave"
     @drop.prevent="handleDrop"
   >
-    <div class="flex items-center justify-between gap-2 overflow-hidden">
-      <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-        <label
-          :id="modelTierLabelId"
-          :for="modelTierSelectId"
-          class="shrink-0 text-xs font-medium text-secondary"
-          >{{ taskTypeLabel }}</label
-        >
-        <select
-          :id="modelTierSelectId"
-          :value="selectedModelTier"
-          :aria-labelledby="modelTierLabelId"
-          class="h-7 max-w-full min-w-0 cursor-pointer rounded-md border border-border bg-surface p-1 text-xs text-secondary hover:border-accent focus:outline-none focus:ring-2 focus:ring-primary/50"
-          @change="handleModelTierChange"
-        >
-          <option v-for="(info, tier) in availableModels" :key="tier" :value="tier">
-            {{ $te(`modelTier.${tier}`) ? $t(`modelTier.${tier}`) : info.label }}
-          </option>
-        </select>
-      </div>
-    </div>
-
     <!-- Zone d'affichage des fichiers attachés -->
     <div v-if="attachedFiles.length > 0" class="flex flex-wrap gap-2 px-1">
       <div
@@ -56,9 +34,9 @@
         ref="textareaEl"
         :value="modelValue"
         :aria-label="inputPlaceholder"
-        class="placeholder:text-secondary block max-h-30 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs focus:ring-2 focus:ring-primary/50"
+        class="placeholder:text-secondary block max-h-36 flex-1 resize-none overflow-y-auto border-none bg-transparent py-2 text-xs leading-normal text-main outline-none placeholder:text-xs focus:ring-2 focus:ring-primary/50"
         :placeholder="inputPlaceholder"
-        rows="1"
+        rows="2"
         @keydown.enter.exact.prevent="triggerSubmit()"
         @input="handleInput"
         @focus="handleFocus"
@@ -120,7 +98,6 @@
 </template>
 
 <script lang="ts" setup>
-import type { ModelInfo } from '@/types';
 import { Send, Square, Paperclip, Loader2 } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -130,8 +107,6 @@ import { ICON_SIZE_MD, MAX_UPLOAD_BYTES } from '@/constants/limits';
 const { t } = useI18n();
 
 const props = defineProps<{
-  availableModels: Record<string, ModelInfo>;
-  selectedModelTier: string;
   modelValue: string;
   inputPlaceholder: string;
   loading: boolean;
@@ -141,14 +116,12 @@ const props = defineProps<{
   useSelectedText: boolean;
   useWordFormattingLabel: string;
   includeSelectionLabel: string;
-  taskTypeLabel: string;
   sendLabel: string;
   stopLabel: string;
   isDraftFocusGlowing?: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:selectedModelTier', value: string): void;
   (e: 'update:modelValue', value: string): void;
   (e: 'submit', value: string, files?: File[]): void;
   (e: 'stop'): void;
@@ -159,10 +132,6 @@ const dragCounter = ref(0);
 const attachedFiles = ref<File[]>([]);
 const fileInputEl = ref<HTMLInputElement>();
 const isFocused = ref(false);
-
-const handleModelTierChange = (event: Event) => {
-  emit('update:selectedModelTier', (event.target as HTMLSelectElement).value);
-};
 
 const handleInput = (event: Event) => {
   const val = (event.target as HTMLTextAreaElement).value;
@@ -340,8 +309,6 @@ const handleStop = () => {
 };
 
 const textareaEl = ref<HTMLTextAreaElement>();
-const modelTierSelectId = 'chat-model-tier-select';
-const modelTierLabelId = 'chat-model-tier-label';
 defineExpose({ textareaEl });
 </script>
 

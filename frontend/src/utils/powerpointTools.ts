@@ -62,7 +62,23 @@ export type PowerPointToolName =
   | 'editSlideXml'
   | 'searchIcons'
   | 'insertIcon'
-  | 'searchAndFormatInPresentation';
+  | 'searchAndFormatInPresentation'
+  | 'searchAndReplaceInShape'
+  | 'replaceShapeParagraphs';
+
+/**
+ * Returns true for shape types that have no text frame and cause InvalidArgument
+ * errors when Office.js tries to load textFrame.textRange (OLE objects, charts, etc.).
+ */
+function isNonTextShape(shapeType: string): boolean {
+  const t = shapeType.toLowerCase();
+  return (
+    t === '13' ||            // numeric picture type
+    t.includes('picture') || // picture / image
+    t === 'ole' ||           // OLE embedded objects (Excel charts, Word docs, etc.)
+    t === 'chart'            // native PowerPoint charts
+  );
+}
 
 /**
  * Returns the 1-based slide number of the currently active/selected slide.
@@ -563,6 +579,261 @@ PARAMETERS:
             null,
             2,
           );
+        }
+      },
+    },
+
+    searchAndReplaceInShape: {
+      name: 'searchAndReplaceInShape',
+      category: 'write',
+      description: `Surgically replace a specific word or phrase in a shape's text WITHOUT destroying formatting.
+
+Unlike proposeShapeTextRevision (which replaces ALL text and loses all formatting), this tool
+replaces ONLY the matching text runs, preserving bold, italic, font size, color and other
+formatting on every other run.
+
+USE THIS for: typo corrections, spell-check fixes, word substitutions.
+DO NOT use proposeShapeTextRevision for spell-checking — it destroys formatting.
+
+PARAMETERS:
+- slideNumber: 1-based slide number
+- shapeIdOrName: Shape ID (number string) or name — use getShapes to discover
+- searchText: The exact text to find (case-sensitive by default)
+- replaceText: The replacement text
+- replaceAll: If true, replaces all occurrences (default: true)`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          slideNumber: { type: 'number', description: 'Slide number (1-based)' },
+          shapeIdOrName: {
+            type: 'string',
+            description: 'Shape ID or name. Use getShapes to discover.',
+          },
+          searchText: { type: 'string', description: 'Exact text to search for' },
+          replaceText: { type: 'string', description: 'Replacement text' },
+          replaceAll: {
+            type: 'boolean',
+            description: 'Replace all occurrences (default true)',
+          },
+        },
+        required: ['slideNumber', 'shapeIdOrName', 'searchText', 'replaceText'],
+      },
+      executePowerPoint: async (context, args: Record<string, any>) => {
+        const { slideNumber, shapeIdOrName, searchText, replaceText } = args;
+        const replaceAll = args.replaceAll !== false;
+
+        try {
+          const { shape: targetShape, error } = await findShapeOnSlide(
+            context,
+            slideNumber,
+            shapeIdOrName,
+          );
+          if (!targetShape) {
+            return JSON.stringify({ success: false, error }, null, 2);
+          }
+
+          // Load paragraphs
+          const textRange = targetShape.textFrame.textRange;
+          textRange.paragraphs.load('items');
+          await context.sync();
+
+          // Load textRuns for all paragraphs
+          for (const para of textRange.paragraphs.items) {
+            try {
+              para.textRange.textRuns.load('items');
+            } catch {
+              /* paragraph has no runs */
+            }
+          }
+          await context.sync();
+
+          // Load text for all runs
+          for (const para of textRange.paragraphs.items) {
+            try {
+              if (para.textRange.textRuns?.items) {
+                for (const run of para.textRange.textRuns.items) {
+                  run.load('text');
+                }
+              }
+            } catch {
+              /* skip */
+            }
+          }
+          await context.sync();
+
+          // Replace matching text in runs, preserving all formatting
+          let replacements = 0;
+          for (const para of textRange.paragraphs.items) {
+            try {
+              if (!para.textRange.textRuns?.items) continue;
+              for (const run of para.textRange.textRuns.items) {
+                if (run.text && run.text.includes(searchText)) {
+                  const newText = replaceAll
+                    ? run.text.split(searchText).join(replaceText)
+                    : run.text.replace(searchText, replaceText);
+                  if (newText !== run.text) {
+                    run.text = newText;
+                    replacements++;
+                  }
+                }
+              }
+            } catch {
+              /* skip non-editable runs */
+            }
+          }
+          await context.sync();
+
+          return JSON.stringify(
+            {
+              success: true,
+              replacements,
+              message:
+                replacements > 0
+                  ? `Replaced "${searchText}" → "${replaceText}" in ${replacements} run(s). Formatting preserved.`
+                  : `Text "${searchText}" not found in shape. No changes made.`,
+            },
+            null,
+            2,
+          );
+        } catch (error: unknown) {
+          return JSON.stringify(
+            { success: false, error: getErrorMessage(error) },
+            null,
+            2,
+          );
+        }
+      },
+    },
+
+    replaceShapeParagraphs: {
+      name: 'replaceShapeParagraphs',
+      category: 'write',
+      description: `Replace the text of specific paragraphs in a shape while preserving formatting (font name, size, bold, italic, color).
+
+Use this for Punchify-style rewrites where whole paragraph text changes but the visual style must be kept.
+Each paragraph is identified by its 0-based index within the shape.
+
+PARAMETERS:
+- slideNumber: 1-based slide number
+- shapeIdOrName: Shape ID or name (from eval_powerpointjs or getShapes)
+- paragraphReplacements: Array of { paragraphIndex: number, newText: string }
+
+The tool reads each paragraph's first run font properties (name, size, bold, italic, color),
+replaces the paragraph text, then re-applies those font properties so style is fully preserved.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          slideNumber: { type: 'number', description: 'Slide number (1-based)' },
+          shapeIdOrName: {
+            type: 'string',
+            description: 'Shape ID or name. Use eval_powerpointjs to discover.',
+          },
+          paragraphReplacements: {
+            type: 'array',
+            description: 'List of paragraph replacements',
+            items: {
+              type: 'object',
+              properties: {
+                paragraphIndex: {
+                  type: 'number',
+                  description: '0-based index of the paragraph within the shape',
+                },
+                newText: { type: 'string', description: 'New text content for the paragraph' },
+              },
+              required: ['paragraphIndex', 'newText'],
+            },
+          },
+        },
+        required: ['slideNumber', 'shapeIdOrName', 'paragraphReplacements'],
+      },
+      executePowerPoint: async (context, args: Record<string, any>) => {
+        const { slideNumber, shapeIdOrName, paragraphReplacements } = args;
+
+        try {
+          const { shape: targetShape, error } = await findShapeOnSlide(
+            context,
+            slideNumber,
+            shapeIdOrName,
+          );
+          if (!targetShape) {
+            return JSON.stringify({ success: false, error }, null, 2);
+          }
+
+          // Load paragraphs
+          const textRange = targetShape.textFrame.textRange;
+          textRange.paragraphs.load('items');
+          await context.sync();
+
+          const paragraphs = textRange.paragraphs.items;
+          const results: { paragraphIndex: number; status: string }[] = [];
+
+          for (const replacement of paragraphReplacements as {
+            paragraphIndex: number;
+            newText: string;
+          }[]) {
+            const { paragraphIndex, newText } = replacement;
+
+            if (paragraphIndex < 0 || paragraphIndex >= paragraphs.length) {
+              results.push({
+                paragraphIndex,
+                status: `skipped — index out of range (shape has ${paragraphs.length} paragraphs)`,
+              });
+              continue;
+            }
+
+            const para = paragraphs[paragraphIndex];
+
+            // Read the first run's font properties to preserve them
+            let savedFont: {
+              name: string | null;
+              size: number | null;
+              bold: boolean | null;
+              italic: boolean | null;
+              color: string | null;
+            } = { name: null, size: null, bold: null, italic: null, color: null };
+
+            try {
+              para.textRange.textRuns.load('items');
+              await context.sync();
+
+              if (para.textRange.textRuns.items.length > 0) {
+                const firstRun = para.textRange.textRuns.items[0];
+                firstRun.font.load('name,size,bold,italic,color');
+                await context.sync();
+                savedFont = {
+                  name: firstRun.font.name,
+                  size: firstRun.font.size,
+                  bold: firstRun.font.bold,
+                  italic: firstRun.font.italic,
+                  color: firstRun.font.color,
+                };
+              }
+            } catch {
+              /* could not read font — will replace text only */
+            }
+
+            // Replace the paragraph text (collapses to single run)
+            para.textRange.text = newText;
+            await context.sync();
+
+            // Re-apply saved font properties to restore formatting
+            try {
+              if (savedFont.name !== null) para.textRange.font.name = savedFont.name;
+              if (savedFont.size !== null) para.textRange.font.size = savedFont.size;
+              if (savedFont.bold !== null) para.textRange.font.bold = savedFont.bold;
+              if (savedFont.italic !== null) para.textRange.font.italic = savedFont.italic;
+              if (savedFont.color !== null) para.textRange.font.color = savedFont.color;
+              await context.sync();
+            } catch {
+              /* font restore failed — text was still replaced */
+            }
+
+            results.push({ paragraphIndex, status: 'replaced' });
+          }
+
+          return JSON.stringify({ success: true, results }, null, 2);
+        } catch (error: unknown) {
+          return JSON.stringify({ success: false, error: getErrorMessage(error) }, null, 2);
         }
       },
     },
@@ -1253,38 +1524,58 @@ try {
             shapes.load('items,items/type');
             await context.sync();
 
+            const textShapes: any[] = [];
             for (let j = 0; j < shapes.items.length; j++) {
               const shape = shapes.items[j];
               const shapeType = String(shape.type || '').toLowerCase();
-              if (shapeType.includes('picture') || shapeType === '13') continue; // keep skipping text load for images
+              if (isNonTextShape(shapeType)) continue;
               try {
                 shape.textFrame.textRange.load('text');
+                textShapes.push(shape);
               } catch {}
             }
 
             // PPT-C1 fix: OLE/chart/SmartArt shapes can cause InvalidArgument on sync;
-            // catch the error so a single bad shape doesn't crash the entire overview.
-            let textSyncOk = true;
+            // when batch fails, fall back to reading each text shape individually so a
+            // single bad shape doesn't silence all text on the slide.
+            let batchSyncOk = true;
             try {
               await context.sync();
             } catch {
-              textSyncOk = false;
+              batchSyncOk = false;
             }
 
-            const lines = shapes.items
-              .map((s: any) => {
-                const t = String(s.type || '').toLowerCase();
-                if (t.includes('picture') || t === '13') {
-                  return `[Image ${s.width}x${s.height}]`;
-                }
-                if (!textSyncOk) return '';
-                let text = '';
+            const lines: string[] = [];
+
+            // Image placeholders (type already loaded, unaffected by text sync failure)
+            for (const s of shapes.items) {
+              const t = String(s.type || '').toLowerCase();
+              if (t.includes('picture') || t === '13') {
+                lines.push(`[Image ${s.width}x${s.height}]`);
+              }
+            }
+
+            if (batchSyncOk) {
+              for (const shape of textShapes) {
                 try {
-                  text = s.textFrame.textRange.text;
+                  const text = (shape.textFrame.textRange.text || '').trim();
+                  if (text) lines.push(text);
                 } catch {}
-                return text.trim();
-              })
-              .filter(Boolean);
+              }
+            } else {
+              // Fallback: reload and read each text shape individually
+              for (let j = 0; j < shapes.items.length; j++) {
+                const shape = shapes.items[j];
+                const shapeType = String(shape.type || '').toLowerCase();
+                if (isNonTextShape(shapeType)) continue;
+                try {
+                  shape.textFrame.textRange.load('text');
+                  await context.sync();
+                  const text = (shape.textFrame.textRange.text || '').trim();
+                  if (text) lines.push(text);
+                } catch {}
+              }
+            }
 
             let slideText = lines.join(' | ');
             if (slideText.length > 2000) slideText = slideText.substring(0, 2000) + '...';
@@ -1652,7 +1943,7 @@ ALWAYS call markDirty() after modifying the zip.`,
             const shape = shapes.items[j];
             const shapeType = String(shape.type || '').toLowerCase();
             // Skip pictures and non-text shape types
-            if (shapeType.includes('picture') || shapeType === '13') continue;
+            if (isNonTextShape(shapeType)) continue;
             try {
               shape.textFrame.textRange.load('text');
               candidateShapes.push(shape);
@@ -1785,12 +2076,14 @@ export async function getSlideContentStandalone(
 
   const slide = slides.getItemAt(index);
   const shapes = slide.shapes;
-  shapes.load('items');
+  shapes.load('items,items/type');
   await context.sync();
 
   const shapeEntries: { shape: any; idx: number }[] = [];
   for (let i = 0; i < shapes.items.length; i++) {
     const shape = shapes.items[i];
+    const shapeType = String(shape.type || '').toLowerCase();
+    if (isNonTextShape(shapeType)) continue;
     try {
       shape.textFrame.textRange.load('text');
       shapeEntries.push({ shape, idx: i + 1 });
@@ -1801,14 +2094,35 @@ export async function getSlideContentStandalone(
 
   if (shapeEntries.length === 0) return '';
 
-  await context.sync();
+  // PPT-C1 fix: when batch sync fails due to OLE/chart/SmartArt, fall back to
+  // reading each shape individually so one bad shape doesn't silence all text.
+  let batchSyncOk = true;
+  try {
+    await context.sync();
+  } catch {
+    batchSyncOk = false;
+  }
 
-  const lines = shapeEntries
-    .map(({ shape, idx }) => {
-      const text = (shape.textFrame.textRange.text || '').trim();
-      return text ? `[Shape ${idx}] ${text}` : '';
-    })
-    .filter(Boolean);
+  const lines: string[] = [];
+
+  if (batchSyncOk) {
+    for (const { shape, idx } of shapeEntries) {
+      try {
+        const text = (shape.textFrame.textRange.text || '').trim();
+        if (text) lines.push(`[Shape ${idx}] ${text}`);
+      } catch {}
+    }
+  } else {
+    // Fallback: reload and read each shape individually
+    for (const { shape, idx } of shapeEntries) {
+      try {
+        shape.textFrame.textRange.load('text');
+        await context.sync();
+        const text = (shape.textFrame.textRange.text || '').trim();
+        if (text) lines.push(`[Shape ${idx}] ${text}`);
+      } catch {}
+    }
+  }
 
   return lines.join('\n');
 }

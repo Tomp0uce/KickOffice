@@ -171,15 +171,42 @@ export function useQuickActions(options: UseQuickActionsOptions) {
         return messageUtil.error(t('imageError') || 'No image model configured.');
       }
 
-      // Get current slide text selection
-      let slideText = await getOfficeSelection({ actionKey });
+      // Get current slide text:
+      // 1. Try explicit text selection first via getCurrentSlideIndex + getSlideContent so we always
+      //    scope to the active slide (Office.context.document.getSelectedDataAsync(Text) can
+      //    return the full presentation text when nothing is selected on some Office versions).
+      // 2. Only fall back to getOfficeSelection if the dedicated tools fail.
+      let slideText = '';
+      try {
+        const slideNumStr = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+        const slideNum = parseInt(slideNumStr, 10);
+        if (slideNum >= 1) {
+          slideText = await powerpointToolDefinitions.getSlideContent.execute({
+            slideNumber: slideNum,
+          });
+        }
+      } catch {
+        // Fallback to generic selection helper
+        slideText = await getOfficeSelection({ actionKey });
+      }
+      if (!slideText) {
+        slideText = await getOfficeSelection({ actionKey });
+      }
 
       // PPT-M1: if selection is < 5 words, screenshot the current slide and describe it via LLM
       // to provide richer context for image generation
       const wordCount = (slideText || '').trim().split(/\s+/).filter(Boolean).length;
       if (wordCount < 5) {
         try {
-          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({});
+          // Resolve current slide number to pass explicitly (screenshotSlide defaults to slide 1)
+          let currentSlideNum = 1;
+          try {
+            const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
+            currentSlideNum = parseInt(sn, 10) || 1;
+          } catch {}
+          const screenshotJson = await powerpointToolDefinitions.screenshotSlide.execute({
+            slideNumber: currentSlideNum,
+          });
           const screenshot = JSON.parse(screenshotJson);
           if (screenshot.base64 && !screenshot.error) {
             const dataUri = `data:image/png;base64,${screenshot.base64}`;
@@ -407,8 +434,9 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         }
       }
 
-      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection
-      const rawTextForLlm = richContext ? richContext.cleanText : selectedText;
+      // Use Markdown text if HTML was parsed successfully, otherwise fallback to plain text selection.
+      // Also fall back when cleanText is empty (e.g. HTML coercion unavailable in some Outlook modes).
+      const rawTextForLlm = richContext?.cleanText || selectedText;
       const textForLlm =
         '\n<document_content>\n' +
         rawTextForLlm.replace(new RegExp('</?document_content>', 'g'), '') +

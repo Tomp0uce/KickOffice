@@ -105,16 +105,13 @@
 
       <ChatInput
         ref="chatInputRef"
-        v-model:selected-model-tier="selectedModelTier"
         v-model="userInput"
         :use-word-formatting="true"
         :use-selected-text="true"
-        :available-models="availableModels"
         :input-placeholder="inputPlaceholder"
         :loading="loading"
         :backend-online="backendOnline"
         :show-word-formatting="false"
-        :task_type_label="t('taskTypeLabel')"
         :send-label="t('send')"
         :stop-label="t('stop')"
         :draft-focus-glow="isDraftFocusGlowing"
@@ -122,11 +119,13 @@
         @stop="stopGeneration"
       />
       <StatsBar
+        v-model:selected-model-tier="selectedModelTier"
         :session-stats="sessionStats"
         :model-name="selectedModelInfo?.id ?? selectedModelTier"
         :current-action="currentAction"
         :context-window-tokens="selectedModelInfo?.contextWindow ?? 400_000"
         :loading="loading"
+        :available-models="availableModels"
       />
     </div>
   </div>
@@ -360,12 +359,12 @@ const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
 ]);
 const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
   {
-    key: 'proofread',
+    key: 'ppt-proofread',
     label: t('proofread'),
     icon: CheckCheck,
     mode: 'immediate',
     executeWithAgent: true,
-    tooltipKey: 'proofread_tooltip',
+    tooltipKey: 'ppt_proofread_tooltip',
   },
   {
     key: 'translate',
@@ -389,8 +388,6 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     mode: 'immediate',
     tooltipKey: 'pptPunchify_tooltip',
     executeWithAgent: true,
-    systemPrompt:
-      'You are a presentation expert. Call `getCurrentSlideIndex` to find the active slide, then use `getShapes` on it. Rewrite the text of all text shapes on this slide to be more impactful, punchy, and concise (max 6-7 bullets, 8-10 words per bullet). Use `insertContent` or `proposeShapeTextRevision` with the shape IDs to apply your changes directly to the slide without asking.',
   },
   {
     key: 'visual',

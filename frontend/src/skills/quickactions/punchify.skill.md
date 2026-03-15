@@ -1,105 +1,98 @@
-# Punchify Quick Action Skill
+# Punchify Quick Action Skill (PowerPoint Agent)
 
 ## Purpose
 
-Make text more impactful, concise, and engaging while preserving key information. Optimize for presentation delivery and audience retention.
+Make every text shape on the active slide more impactful, concise, and engaging while
+**preserving all visual formatting** (font size, font name, bold, italic, color).
 
-## When to Use
+---
 
-- User clicks the "Punchify" Quick Action in PowerPoint
-- Text is bland, wordy, or lacks impact
-- Goal: Transform into memorable, punchy statements
+## Workflow — MUST follow these steps in order
 
-## Input Contract
+### Step 1 — Identify the active slide
 
-- **Selected text**: Bullet points, paragraphs, or slide titles
-- **Language**: Preserve the language of the original text
-- **Context**: PowerPoint presentation (optimize for verbal delivery)
+Call `getCurrentSlideIndex` to get the current 1-based slide number.
 
-## Output Requirements
+### Step 2 — Read every text shape on the slide
 
-1. **Conciseness**: Reduce word count by 30-50% when possible
-2. **Impact**: Use power words, active voice, concrete nouns
-3. **Structure**: Maintain original format (bullets stay bullets, paragraphs stay paragraphs)
-4. **Clarity**: Never sacrifice clarity for brevity
-5. **Language**: MUST match the original text language exactly
+Use `eval_powerpointjs` to enumerate the shapes and retrieve their text.
+This is required to avoid `InvalidArgument` errors on OLE or chart shapes.
 
-## Transformation Techniques
+Example code to pass to `eval_powerpointjs`:
 
-1. **Remove redundancy**: "in order to" → "to", "at this point in time" → "now"
-2. **Use strong verbs**: "make improvements to" → "improve", "provide assistance" → "help"
-3. **Eliminate weak modifiers**: "very", "really", "quite", "somewhat"
-4. **Choose concrete over abstract**: "customer satisfaction metrics" → "happy customers"
-5. **Apply parallelism**: Ensure bullets follow consistent grammatical structure
+```javascript
+const slide = context.presentation.slides.getItemAt(SLIDE_INDEX); // 0-based
+slide.shapes.load('items/id,items/name,items/type');
+await context.sync();
+const result = [];
+for (const shape of slide.shapes.items) {
+  const t = (shape.type || '').toString().toLowerCase();
+  if (t === '13' || t.includes('picture') || t === 'ole' || t === 'chart') continue;
+  try {
+    shape.textFrame.textRange.paragraphs.load('items/textRange/text');
+    await context.sync();
+    const paragraphs = shape.textFrame.textRange.paragraphs.items.map((p, i) => ({
+      index: i,
+      text: p.textRange.text,
+    }));
+    result.push({ id: shape.id, name: shape.name, paragraphs });
+  } catch (e) {
+    // skip shapes with no text frame
+  }
+}
+return JSON.stringify(result);
+```
 
-## Style Guidelines (PPT_STYLE_RULES)
+Replace `SLIDE_INDEX` with `slideNumber - 1` (0-based).
 
-- **NO em-dashes (—) or semicolons (;)** — split into separate bullets or use commas
-- **Active voice only**: "was implemented by the team" → "team implemented"
-- **Present tense when possible**: More immediate and engaging
+### Step 3 — Generate punchified text
+
+For each paragraph in each text shape, produce a punchified version:
+
+- **Conciseness**: Reduce word count by 30–50% when possible
+- **Impact**: Active voice, strong verbs, concrete nouns
+- **No em-dashes (—) or semicolons (;)** — use commas or split into separate bullets
 - **Numbers over words**: "three benefits" → "3 benefits"
+- **Language**: MUST match the original language exactly — never translate
+- **Already short / punchy text**: Leave unchanged (return identical text)
 
-## Tool Usage
+### Step 4 — Apply changes with `replaceShapeParagraphs`
 
-**DO NOT** call any Office.js tools. Return pure text output that will be inserted via `proposeRevision`.
+For **each shape that has at least one changed paragraph**, call `replaceShapeParagraphs` once,
+passing only the paragraphs whose text actually changed.
 
-## Example Transformations
-
-### Example 1: Wordy bullet → Punchy bullet
-
-**Before**:
-
+```json
+{
+  "slideNumber": <1-based slide number>,
+  "shapeIdOrName": "<shape ID or name>",
+  "paragraphReplacements": [
+    { "paragraphIndex": 0, "newText": "punchified text here" },
+    { "paragraphIndex": 2, "newText": "another punchified bullet" }
+  ]
+}
 ```
-- We are going to make improvements to the customer experience by implementing a new feedback system
-```
+
+`replaceShapeParagraphs` preserves font name, size, bold, italic and color for each paragraph.
+**Do NOT call `proposeShapeTextRevision`** — it destroys all formatting.
+**Do NOT call `insertContent`** — it inserts new content instead of replacing existing text.
+
+### Step 5 — Report
+
+After all `replaceShapeParagraphs` calls succeed, output a brief summary of what was changed.
+Do NOT ask for confirmation before applying — apply directly.
+
+---
+
+## Example transformation
+
+**Before** (paragraph text):
+> "We are going to make improvements to the customer experience by implementing a new feedback system"
 
 **After**:
-
-```
-- Improve customer experience with new feedback system
-```
-
-### Example 2: Weak paragraph → Strong paragraph
+> "Improve customer experience with new feedback system"
 
 **Before**:
-
-```
-Our team has been working very hard to try to increase sales performance. We think that by focusing on customer relationships, we can really make a difference in our quarterly results.
-```
+> "Notre équipe a travaillé très dur pour essayer d'augmenter les performances commerciales"
 
 **After**:
-
-```
-Focus on customer relationships to boost quarterly sales. Direct engagement drives measurable results.
-```
-
-### Example 3: Bland title → Impactful title
-
-**Before**:
-
-```
-An Overview of Our Strategic Planning Process
-```
-
-**After**:
-
-```
-Strategy That Works: Our Planning Process
-```
-
-## Language Preservation
-
-**CRITICAL**: Output language MUST match input language. Never translate.
-
-French example:
-
-```
-Before: "Nous allons essayer de faire des améliorations au niveau de l'expérience client"
-After: "Améliorer l'expérience client via un nouveau système de feedback"
-```
-
-## Edge Cases
-
-- **Already punchy text**: Make minimal changes, focus on polish
-- **Technical jargon**: Preserve necessary technical terms, simplify surrounding text
-- **Bullet lists**: May reorder for logical flow if it improves impact
+> "Booster les performances commerciales grâce à l'équipe"

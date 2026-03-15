@@ -36,15 +36,63 @@
       </div>
     </div>
 
-    <!-- Model name -->
-    <div v-if="modelName" class="truncate ml-2 text-secondary/80">
+    <!-- Model selector (custom, opens upward) + model name -->
+    <div
+      v-if="availableModels && selectedModelTier !== undefined"
+      class="relative flex items-center gap-1.5 ml-2 shrink-0"
+      @click.stop
+    >
+      <!-- Trigger button -->
+      <button
+        type="button"
+        class="flex items-center gap-0.5 h-5 cursor-pointer rounded border border-border bg-surface px-1 text-[9px] text-secondary hover:border-accent focus:outline-none focus:ring-1 focus:ring-primary/50"
+        style="font-family: inherit"
+        @click="dropdownOpen = !dropdownOpen"
+      >
+        {{ currentLabel }}
+        <svg
+          class="w-2.5 h-2.5 opacity-60 transition-transform"
+          :class="{ 'rotate-180': dropdownOpen }"
+          viewBox="0 0 10 6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path d="M1 1l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+
+      <!-- Dropdown list — opens UPWARD -->
+      <ul
+        v-if="dropdownOpen"
+        class="absolute right-0 bottom-full mb-1 z-50 min-w-full rounded border border-border bg-surface shadow-md text-[9px] text-secondary overflow-hidden"
+        style="font-family: inherit"
+      >
+        <li
+          v-for="(info, tier) in availableModels"
+          :key="tier"
+          class="cursor-pointer px-2 py-1 hover:bg-accent/10"
+          :class="{ 'font-semibold text-accent': tier === selectedModelTier }"
+          @click="selectTier(String(tier))"
+        >
+          {{ info.label }}
+        </li>
+      </ul>
+
+      <span v-if="modelName" class="truncate text-secondary/80">{{ modelName }}</span>
+    </div>
+    <div v-else-if="modelName" class="truncate ml-2 text-secondary/80">
       {{ modelName }}
     </div>
   </div>
+
+  <!-- Click-outside overlay to close dropdown -->
+  <div v-if="dropdownOpen" class="fixed inset-0 z-40" @click="dropdownOpen = false" />
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import type { ModelInfo } from '@/types';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -61,7 +109,25 @@ const props = defineProps<{
   contextWindowTokens?: number;
   currentAction?: string;
   loading?: boolean;
+  availableModels?: Record<string, ModelInfo>;
+  selectedModelTier?: string;
 }>();
+
+const emit = defineEmits<{
+  (e: 'update:selectedModelTier', value: string): void;
+}>();
+
+const dropdownOpen = ref(false);
+
+const currentLabel = computed(() => {
+  if (!props.availableModels || !props.selectedModelTier) return '';
+  return props.availableModels[props.selectedModelTier]?.label ?? props.selectedModelTier;
+});
+
+const selectTier = (tier: string) => {
+  emit('update:selectedModelTier', tier);
+  dropdownOpen.value = false;
+};
 
 const hasStats = computed(
   () => props.sessionStats.inputTokens > 0 || props.sessionStats.outputTokens > 0,

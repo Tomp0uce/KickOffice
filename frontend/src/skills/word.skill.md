@@ -175,6 +175,8 @@ Other:
 - Changes are attributed to a configurable author (default: "KickOffice AI")
 - Users can accept/reject each change in Word's Review pane
 - Formatting is preserved during edits
+- ⚠️ **Color is NOT supported in `revisedText`**: `[color:#CC0000]...[/color]` tags will be stripped. To apply color to corrected words, call `searchAndFormat` on each corrected word AFTER the revision.
+- Example: user asks "corrige les erreurs en rouge" → 1) `proposeRevision` with plain corrected text, 2) `searchAndFormat` on each corrected word with `"color": "#CC0000"`
 
 **Use editDocumentXml when:**
 

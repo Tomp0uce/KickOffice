@@ -131,7 +131,12 @@ export function extractTextFromHtml(html: string): RichContentContext {
 
     // Instead of stripping all formatting via textContent, explicitly convert tags to Markdown
     // so the LLM knows what styling to re-apply.
-    const cleanText = htmlToMarkdown(doc.body.innerHTML) || '';
+    // Strip [color:#XXXXXX]...[/color] annotations — they come from inline email styles and are
+    // irrelevant to the LLM. Keeping them causes the LLM to reproduce them literally in output.
+    const rawMarkdown = htmlToMarkdown(doc.body.innerHTML) || '';
+    const cleanText = rawMarkdown
+      .replace(/\[color:[^\]]*\]/g, '')
+      .replace(/\[\/color\]/g, '');
 
     return {
       cleanText,

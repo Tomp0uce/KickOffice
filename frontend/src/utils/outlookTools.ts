@@ -186,7 +186,7 @@ const outlookToolDefinitions = createOfficeTools<
       name: 'writeEmailBody',
       category: 'write',
       description:
-        'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists) and automatically preserves images from the original email. Can replace the whole body, append to the end, or insert at the cursor. Only works in compose mode. CRITICAL: When replying/forwarding, ALWAYS use mode "Append" to preserve email history. NEVER use "Replace" on replies as it deletes the conversation thread. When improving/modifying existing email content, use mode "Replace" to update the email body while preserving images.',
+        'The PREFERRED tool for modifying the email body. Supports Markdown (bold, italic, lists) and automatically preserves images from the original email. Can replace the whole body, prepend/append, or insert at the cursor. Only works in compose mode. CRITICAL: When replying/forwarding, ALWAYS use mode "Prepend" — it inserts the reply BEFORE the quoted history (standard email convention). NEVER use "Append" for replies (it puts the reply after the thread). NEVER use "Replace" on replies as it deletes the conversation thread. When improving/modifying existing email content, use mode "Replace" to update the email body while preserving images.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -197,8 +197,8 @@ const outlookToolDefinitions = createOfficeTools<
           mode: {
             type: 'string',
             description:
-              'How to write the content: "Replace" (full overwrite), "Append" (add to end), or "Insert" (add at cursor). Default: "Append".',
-            enum: ['Replace', 'Append', 'Insert'],
+              'How to write the content: "Replace" (full overwrite), "Prepend" (add BEFORE thread history — USE THIS FOR REPLIES), "Append" (add to end), or "Insert" (add at cursor). Default: "Prepend".',
+            enum: ['Replace', 'Prepend', 'Append', 'Insert'],
           },
           diffTracking: {
             type: 'boolean',
@@ -213,7 +213,7 @@ const outlookToolDefinitions = createOfficeTools<
         required: ['content'],
       },
       executeOutlook: async (mailbox, args: Record<string, any>) => {
-        const { content, mode = 'Append', diffTracking = false, originalText = '' } = args;
+        const { content, mode = 'Prepend', diffTracking = false, originalText = '' } = args;
         if (!mailbox?.item?.body || typeof mailbox.item.body.setAsync !== 'function') {
           return 'Cannot write email body: compose mode is not available.';
         }
@@ -268,6 +268,50 @@ const outlookToolDefinitions = createOfficeTools<
               body.setAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
                 resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'));
               });
+            });
+          } else if (mode === 'Prepend') {
+            // Insert reply BEFORE the quoted thread history — standard email convention.
+            // Detects Outlook thread separators and places new content before them.
+            body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
+              if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
+                resolve('Error: Could not read body to prepend.');
+                return;
+              }
+              const existing = getResult.value || '';
+              // Common Outlook web/desktop thread history markers
+              const separators = [
+                '<div id="divRplyFwdMsg">',
+                '<hr tabindex="-1"',
+                '<hr ',
+              ];
+              let insertPos = -1;
+              for (const sep of separators) {
+                const pos = existing.indexOf(sep);
+                if (pos !== -1 && (insertPos === -1 || pos < insertPos)) insertPos = pos;
+              }
+              let newBody: string;
+              if (insertPos !== -1) {
+                // Insert new reply before thread history
+                newBody =
+                  existing.substring(0, insertPos) +
+                  sanitizeHtml(html) +
+                  '<br/><br/>' +
+                  existing.substring(insertPos);
+              } else {
+                // No history found — prepend to body
+                newBody = sanitizeHtml(html) + (existing.trim() ? '<br/><br/>' + existing : '');
+              }
+              body.setAsync(
+                newBody,
+                { coercionType: getOfficeCoercionType().Html },
+                (setResult: any) => {
+                  resolve(
+                    resolveAsyncResult(setResult, () =>
+                      'Successfully prepended reply before email history.',
+                    ),
+                  );
+                },
+              );
             });
           } else if (mode === 'Append') {
             body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
