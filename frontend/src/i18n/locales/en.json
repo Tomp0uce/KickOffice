@@ -109,6 +109,7 @@
   "warningFileFallbackInline": "File sent inline (provider does not support /v1/files). Larger files may slow down responses.",
   "proofread": "Proofreading",
   "proofread_tooltip": "Select text first. The AI will proofread for grammar, spelling, agreements, structure, and provide suggestions via comments.",
+  "ppt_proofread_tooltip": "Surgically corrects spelling and grammar on the active slide without touching any formatting.",
   "translate_tooltip": "Select text first. The AI will translate the text into the configured language.",
   "polish_tooltip": "Select text first. The AI will polish and refine the tone of your text.",
   "academic_tooltip": "Select text first. The AI will rewrite your text to meet academic standards.",

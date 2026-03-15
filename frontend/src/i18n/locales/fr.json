@@ -109,6 +109,7 @@
   "warningFileFallbackInline": "Fichier envoyé en ligne (le fournisseur ne supporte pas /v1/files). Les fichiers volumineux peuvent ralentir les réponses.",
   "proofread": "Relecture",
   "proofread_tooltip": "Sélectionnez du texte. L'IA corrigera la grammaire, l'orthographe, les accords, le style, et fera des suggestions via des commentaires.",
+  "ppt_proofread_tooltip": "Corrige les fautes directement sur la diapositive active, de manière chirurgicale sans toucher à la mise en forme.",
   "translate_tooltip": "Sélectionnez du texte. L'IA traduira le texte dans la langue configurée.",
   "polish_tooltip": "Sélectionnez du texte. L'IA affinera et améliorera le ton de votre texte.",
   "academic_tooltip": "Sélectionnez du texte. L'IA réécrira votre texte pour répondre aux standards académiques.",

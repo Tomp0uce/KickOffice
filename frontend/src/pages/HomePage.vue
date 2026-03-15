@@ -364,7 +364,7 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     icon: CheckCheck,
     mode: 'immediate',
     executeWithAgent: true,
-    tooltipKey: 'proofread_tooltip',
+    tooltipKey: 'ppt_proofread_tooltip',
   },
   {
     key: 'translate',
