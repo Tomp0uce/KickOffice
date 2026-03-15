@@ -144,14 +144,16 @@ app.use((req, res, next) => {
   const start = Date.now()
   res.on('finish', () => {
     const duration = Date.now() - start
-    const isHealth = req.path.startsWith('/api/health')
-    const traffic = isHealth ? 'auto' : 
-                   (req.path.startsWith('/api/chat') || req.path.startsWith('/api/image')) ? 'llm' : 'user'
-    
+    // Silent polling endpoints (health, models) — skip logging entirely unless error
+    const isSilentPoll = req.path === '/health' || req.path.startsWith('/api/models')
+    if (isSilentPoll && res.statusCode < 400) return
+
+    const traffic = (req.path.startsWith('/api/chat') || req.path.startsWith('/api/image')) ? 'llm' : 'user'
+
     // Fall back to main logger if req.logger isn't available
     const reqLogger = req.logger || logger
-    const logLevel = isHealth ? 'debug' : 'http'
-    
+    const logLevel = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'http'
+
     reqLogger.log(logLevel, `${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`, {
       traffic,
       method: req.method,

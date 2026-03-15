@@ -282,8 +282,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
     label: t('excelIngest', 'Smart Ingestion'),
     icon: Table,
     mode: 'immediate',
-    systemPrompt:
-      "You are a data cleaning expert. Silently correct locales (like replacing wrong decimal dots or commas) using 'setCellRange' to modify cells, then FORCE conversion of the raw pasted data into a formatted Excel table using 'createTable'.",
+    executeWithAgent: true,
     tooltipKey: 'excelIngest_tooltip',
   },
   {
