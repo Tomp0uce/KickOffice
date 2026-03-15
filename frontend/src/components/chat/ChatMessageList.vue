@@ -328,7 +328,7 @@ function hasContent(item: { message: DisplayMessage; segments: RenderSegment[] }
 }
 
 const lastAssistantKey = computed(() => {
-  const items = props.historyWithSegments.filter(item => item.message.role === 'assistant');
+  const items = historyWithSegments.value.filter(item => item.message.role === 'assistant');
   return items[items.length - 1]?.key ?? null;
 });
 
@@ -357,11 +357,11 @@ function formatTime(timestamp: number): string {
 }
 
 watch(
-  () => props.history.length,
+  () => history.value.length,
   (nextLength, previousLength = 0) => {
     // Clean up expandedThoughts for removed messages to prevent memory leaks (PM11)
     if (nextLength < previousLength) {
-      const currentKeys = new Set(props.historyWithSegments.map(item => item.key));
+      const currentKeys = new Set(historyWithSegments.value.map(item => item.key));
       for (const key of Object.keys(expandedThoughts.value)) {
         const itemKey = key.split('-')[0];
         if (!currentKeys.has(itemKey)) {
@@ -371,7 +371,7 @@ watch(
     }
 
     if (nextLength <= previousLength || nextLength === 0) return;
-    const latestMessage = props.history[nextLength - 1];
+    const latestMessage = history.value[nextLength - 1];
     if (!latestMessage) return;
 
     if (latestMessage.role === 'assistant') {
