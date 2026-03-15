@@ -11,8 +11,7 @@ export function useHealthCheck(
   const backendOnline = ref(false);
   let intervalId: number | null = null;
 
-  async function checkBackend() {
-    if (document.visibilityState === 'hidden') return;
+  async function runCheck() {
     backendOnline.value = await healthCheck();
     if (!backendOnline.value) return;
     try {
@@ -26,8 +25,21 @@ export function useHealthCheck(
     }
   }
 
+  // Interval polls are skipped when the document is hidden to avoid
+  // unnecessary requests. The initial check and visibility-change handler
+  // always run regardless so Office add-ins (where visibilityState can
+  // remain 'hidden' inside a WebView2 iframe) still get an accurate status.
+  async function checkBackend() {
+    if (document.visibilityState === 'hidden') return;
+    await runCheck();
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState !== 'hidden') runCheck();
+  }
+
   function startPolling() {
-    checkBackend();
+    runCheck(); // Initial check always runs, ignoring visibility state
     intervalId = window.setInterval(checkBackend, HEALTH_CHECK_INTERVAL_MS);
   }
 
@@ -35,8 +47,15 @@ export function useHealthCheck(
     if (intervalId !== null) window.clearInterval(intervalId);
   }
 
-  onMounted(startPolling);
-  onUnmounted(stopPolling);
+  onMounted(() => {
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+  });
+
+  onUnmounted(() => {
+    stopPolling();
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  });
 
   return { backendOnline, checkBackend };
 }
