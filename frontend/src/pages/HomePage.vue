@@ -148,6 +148,7 @@ import {
 import { useStorage } from '@vueuse/core';
 import {
   BookOpen,
+  ChartBarBig,
   CheckCheck,
   FileCheck,
   FunctionSquare,
@@ -288,7 +289,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: 'digitizeChart',
     label: t('excelDigitizeChart', 'Digitize Chart'),
-    icon: ScanSearch,
+    icon: ChartBarBig,
     mode: 'immediate',
     executeWithAgent: true,
     imageUpload: true,
