@@ -62,7 +62,22 @@ export type PowerPointToolName =
   | 'editSlideXml'
   | 'searchIcons'
   | 'insertIcon'
-  | 'searchAndFormatInPresentation';
+  | 'searchAndFormatInPresentation'
+  | 'searchAndReplaceInShape';
+
+/**
+ * Returns true for shape types that have no text frame and cause InvalidArgument
+ * errors when Office.js tries to load textFrame.textRange (OLE objects, charts, etc.).
+ */
+function isNonTextShape(shapeType: string): boolean {
+  const t = shapeType.toLowerCase();
+  return (
+    t === '13' ||            // numeric picture type
+    t.includes('picture') || // picture / image
+    t === 'ole' ||           // OLE embedded objects (Excel charts, Word docs, etc.)
+    t === 'chart'            // native PowerPoint charts
+  );
+}
 
 /**
  * Returns the 1-based slide number of the currently active/selected slide.
@@ -560,6 +575,128 @@ PARAMETERS:
               success: false,
               error: getErrorMessage(error),
             },
+            null,
+            2,
+          );
+        }
+      },
+    },
+
+    searchAndReplaceInShape: {
+      name: 'searchAndReplaceInShape',
+      category: 'write',
+      description: `Surgically replace a specific word or phrase in a shape's text WITHOUT destroying formatting.
+
+Unlike proposeShapeTextRevision (which replaces ALL text and loses all formatting), this tool
+replaces ONLY the matching text runs, preserving bold, italic, font size, color and other
+formatting on every other run.
+
+USE THIS for: typo corrections, spell-check fixes, word substitutions.
+DO NOT use proposeShapeTextRevision for spell-checking — it destroys formatting.
+
+PARAMETERS:
+- slideNumber: 1-based slide number
+- shapeIdOrName: Shape ID (number string) or name — use getShapes to discover
+- searchText: The exact text to find (case-sensitive by default)
+- replaceText: The replacement text
+- replaceAll: If true, replaces all occurrences (default: true)`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          slideNumber: { type: 'number', description: 'Slide number (1-based)' },
+          shapeIdOrName: {
+            type: 'string',
+            description: 'Shape ID or name. Use getShapes to discover.',
+          },
+          searchText: { type: 'string', description: 'Exact text to search for' },
+          replaceText: { type: 'string', description: 'Replacement text' },
+          replaceAll: {
+            type: 'boolean',
+            description: 'Replace all occurrences (default true)',
+          },
+        },
+        required: ['slideNumber', 'shapeIdOrName', 'searchText', 'replaceText'],
+      },
+      executePowerPoint: async (context, args: Record<string, any>) => {
+        const { slideNumber, shapeIdOrName, searchText, replaceText } = args;
+        const replaceAll = args.replaceAll !== false;
+
+        try {
+          const { shape: targetShape, error } = await findShapeOnSlide(
+            context,
+            slideNumber,
+            shapeIdOrName,
+          );
+          if (!targetShape) {
+            return JSON.stringify({ success: false, error }, null, 2);
+          }
+
+          // Load paragraphs
+          const textRange = targetShape.textFrame.textRange;
+          textRange.paragraphs.load('items');
+          await context.sync();
+
+          // Load textRuns for all paragraphs
+          for (const para of textRange.paragraphs.items) {
+            try {
+              para.textRange.textRuns.load('items');
+            } catch {
+              /* paragraph has no runs */
+            }
+          }
+          await context.sync();
+
+          // Load text for all runs
+          for (const para of textRange.paragraphs.items) {
+            try {
+              if (para.textRange.textRuns?.items) {
+                for (const run of para.textRange.textRuns.items) {
+                  run.load('text');
+                }
+              }
+            } catch {
+              /* skip */
+            }
+          }
+          await context.sync();
+
+          // Replace matching text in runs, preserving all formatting
+          let replacements = 0;
+          for (const para of textRange.paragraphs.items) {
+            try {
+              if (!para.textRange.textRuns?.items) continue;
+              for (const run of para.textRange.textRuns.items) {
+                if (run.text && run.text.includes(searchText)) {
+                  const newText = replaceAll
+                    ? run.text.split(searchText).join(replaceText)
+                    : run.text.replace(searchText, replaceText);
+                  if (newText !== run.text) {
+                    run.text = newText;
+                    replacements++;
+                  }
+                }
+              }
+            } catch {
+              /* skip non-editable runs */
+            }
+          }
+          await context.sync();
+
+          return JSON.stringify(
+            {
+              success: true,
+              replacements,
+              message:
+                replacements > 0
+                  ? `Replaced "${searchText}" → "${replaceText}" in ${replacements} run(s). Formatting preserved.`
+                  : `Text "${searchText}" not found in shape. No changes made.`,
+            },
+            null,
+            2,
+          );
+        } catch (error: unknown) {
+          return JSON.stringify(
+            { success: false, error: getErrorMessage(error) },
             null,
             2,
           );
@@ -1257,7 +1394,7 @@ try {
             for (let j = 0; j < shapes.items.length; j++) {
               const shape = shapes.items[j];
               const shapeType = String(shape.type || '').toLowerCase();
-              if (shapeType.includes('picture') || shapeType === '13') continue; // keep skipping text load for images
+              if (isNonTextShape(shapeType)) continue;
               try {
                 shape.textFrame.textRange.load('text');
                 textShapes.push(shape);
@@ -1296,7 +1433,7 @@ try {
               for (let j = 0; j < shapes.items.length; j++) {
                 const shape = shapes.items[j];
                 const shapeType = String(shape.type || '').toLowerCase();
-                if (shapeType.includes('picture') || shapeType === '13') continue;
+                if (isNonTextShape(shapeType)) continue;
                 try {
                   shape.textFrame.textRange.load('text');
                   await context.sync();
@@ -1672,7 +1809,7 @@ ALWAYS call markDirty() after modifying the zip.`,
             const shape = shapes.items[j];
             const shapeType = String(shape.type || '').toLowerCase();
             // Skip pictures and non-text shape types
-            if (shapeType.includes('picture') || shapeType === '13') continue;
+            if (isNonTextShape(shapeType)) continue;
             try {
               shape.textFrame.textRange.load('text');
               candidateShapes.push(shape);
@@ -1812,7 +1949,7 @@ export async function getSlideContentStandalone(
   for (let i = 0; i < shapes.items.length; i++) {
     const shape = shapes.items[i];
     const shapeType = String(shape.type || '').toLowerCase();
-    if (shapeType.includes('picture') || shapeType === '13') continue;
+    if (isNonTextShape(shapeType)) continue;
     try {
       shape.textFrame.textRange.load('text');
       shapeEntries.push({ shape, idx: i + 1 });

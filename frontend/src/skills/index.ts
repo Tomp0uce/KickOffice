@@ -23,6 +23,7 @@ import translateSkill from './quickactions/translate.skill.md?raw';
 import formalizeSkill from './quickactions/formalize.skill.md?raw';
 import conciseSkill from './quickactions/concise.skill.md?raw';
 import proofreadSkill from './quickactions/proofread.skill.md?raw';
+import pptProofreadSkill from './quickactions/ppt-proofread.skill.md?raw';
 import polishSkill from './quickactions/polish.skill.md?raw';
 import academicSkill from './quickactions/academic.skill.md?raw';
 import summarySkill from './quickactions/summary.skill.md?raw';
@@ -98,6 +99,9 @@ const quickActionSkillMap: Record<string, string> = {
   bullets: bulletsSkill,
   punchify: punchifySkill,
   review: reviewSkill,
+
+  // PowerPoint proofread (surgical — uses searchAndReplaceInShape)
+  'ppt-proofread': pptProofreadSkill,
 
   // Word
   translate: translateSkill,

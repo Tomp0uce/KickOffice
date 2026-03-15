@@ -125,16 +125,20 @@ export function useHomePage(deps: {
       return;
     }
 
-    const msgTop = lastMessage.offsetTop;
+    // Compute position relative to the scroll container using getBoundingClientRect,
+    // NOT offsetTop (which is relative to offsetParent, not the scroll container).
+    const containerRect = container.getBoundingClientRect();
+    const msgRect = lastMessage.getBoundingClientRect();
+    const msgTopRelative = msgRect.top - containerRect.top + container.scrollTop;
     const padding = 12;
 
     if (mode === 'bottom') {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     } else if (mode === 'message-top') {
-      container.scrollTo({ top: msgTop - padding, behavior: 'smooth' });
+      container.scrollTo({ top: msgTopRelative - padding, behavior: 'smooth' });
     } else {
       if (lastMessage.offsetHeight > container.clientHeight) {
-        container.scrollTo({ top: msgTop - padding, behavior: 'smooth' });
+        container.scrollTo({ top: msgTopRelative - padding, behavior: 'smooth' });
       } else {
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
       }

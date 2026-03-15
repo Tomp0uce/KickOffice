@@ -359,7 +359,7 @@ const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
 ]);
 const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
   {
-    key: 'proofread',
+    key: 'ppt-proofread',
     label: t('proofread'),
     icon: CheckCheck,
     mode: 'immediate',
