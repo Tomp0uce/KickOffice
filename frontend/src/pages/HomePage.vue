@@ -322,6 +322,15 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
       'You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.',
     tooltipKey: 'excelDataTrend_tooltip',
   },
+  {
+    key: 'pixelArt',
+    label: t('excelPixelArt', 'Pixel Art'),
+    icon: Image,
+    mode: 'immediate',
+    executeWithAgent: true,
+    imageUpload: true,
+    tooltipKey: 'excelPixelArt_tooltip',
+  },
 ]);
 const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
   {

@@ -215,7 +215,10 @@ export function getOutlookDocumentContext(): Promise<string> {
 }
 
 /**
- * Word — document stats: page count, word count, paragraph count, table count, has images.
+ * Word — enriched document metadata.
+ * Ported and extended from Office Agents adapter.tsx getDocumentMetadata().
+ * Includes: page/word count, paragraph/table counts, heading outline,
+ * content controls, run-level formatting detection, and style info.
  */
 export async function getWordDocumentContext(): Promise<string> {
   try {
@@ -239,17 +242,112 @@ export async function getWordDocumentContext(): Promise<string> {
 
         await context.sync();
 
-        return JSON.stringify(
-          {
-            pageCount: props.pageCount,
-            wordCount: props.wordCount,
-            paragraphCount: paragraphs.items.length,
-            tableCount: tables.items.length,
-            hasImages: inlinePictures.items.length > 0,
-          },
-          null,
-          2,
-        );
+        // Load paragraph details for heading outline and formatting sample
+        // Sample first 30 paragraphs for run-level override detection
+        const sampleSize = Math.min(paragraphs.items.length, 30);
+        for (let i = 0; i < sampleSize; i++) {
+          const para = paragraphs.items[i];
+          para.load('text,style,alignment');
+          try {
+            para.font.load('name,size,color,bold,italic');
+          } catch {
+            // font load may fail in some contexts
+          }
+        }
+
+        // Load content controls if available
+        let contentControls: any = null;
+        try {
+          contentControls = body.contentControls;
+          contentControls.load('items/title,items/tag,items/type');
+        } catch {
+          // contentControls may not be available
+        }
+
+        await context.sync();
+
+        // Build heading outline — ported from Office Agents get_document_structure
+        const headings: { level: number; text: string; paragraphIndex: number }[] = [];
+        let hasRunLevelOverrides = false;
+        const formatSample: { index: number; style: string; font?: string; size?: number }[] = [];
+
+        for (let i = 0; i < sampleSize; i++) {
+          const para = paragraphs.items[i];
+          const styleName = para.style || '';
+          const text = (para.text || '').trim();
+
+          // Detect headings
+          const headingMatch = styleName.match(/[Hh]eading\s*(\d)/);
+          if (headingMatch) {
+            headings.push({
+              level: parseInt(headingMatch[1], 10),
+              text: text.substring(0, 80),
+              paragraphIndex: i,
+            });
+          }
+
+          // Detect run-level formatting overrides
+          // If a paragraph has direct font formatting different from its style,
+          // it means OOXML-based editing is needed to preserve formatting
+          try {
+            const fontName = para.font?.name;
+            const fontSize = para.font?.size;
+            if (fontName || fontSize) {
+              formatSample.push({
+                index: i,
+                style: styleName,
+                font: fontName,
+                size: fontSize,
+              });
+              // If we see direct formatting on non-heading paragraphs, flag it
+              if (!styleName.match(/[Hh]eading/) && (fontName || fontSize)) {
+                hasRunLevelOverrides = true;
+              }
+            }
+          } catch {
+            // font properties may not be loaded
+          }
+        }
+
+        // Content control info
+        let contentControlInfo: { title: string; tag: string; type: string }[] = [];
+        try {
+          if (contentControls?.items?.length > 0) {
+            contentControlInfo = contentControls.items.map((cc: any) => ({
+              title: cc.title || '',
+              tag: cc.tag || '',
+              type: cc.type || '',
+            }));
+          }
+        } catch {
+          // ignore
+        }
+
+        const result: Record<string, any> = {
+          pageCount: props.pageCount,
+          wordCount: props.wordCount,
+          paragraphCount: paragraphs.items.length,
+          tableCount: tables.items.length,
+          hasImages: inlinePictures.items.length > 0,
+        };
+
+        // Only include enriched metadata if there's meaningful content
+        if (headings.length > 0) {
+          result.headingOutline = headings;
+        }
+        if (contentControlInfo.length > 0) {
+          result.contentControls = contentControlInfo;
+        }
+        if (hasRunLevelOverrides) {
+          result.hasRunLevelOverrides = true;
+          result.formattingHint =
+            'Document has direct run-level formatting. Use getDocumentOoxml + editDocumentXml for edits that must preserve formatting.';
+        }
+        if (formatSample.length > 0) {
+          result.formatSample = formatSample.slice(0, 10); // First 10 to keep context small
+        }
+
+        return JSON.stringify(result, null, 2);
       });
     });
   } catch {

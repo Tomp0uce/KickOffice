@@ -74,6 +74,47 @@ export function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Extract detailed error info from Office.js OfficeExtension.Error objects.
+ * Provides errorLocation, failing statement, and surrounding context for LLM auto-correction.
+ * Ported from Office Agents error handling pattern.
+ * Falls back to getErrorMessage() for non-Office errors.
+ */
+export function getDetailedOfficeError(error: unknown): string {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'debugInfo' in error &&
+    'message' in error
+  ) {
+    const officeError = error as {
+      message: string;
+      code?: string;
+      debugInfo?: {
+        errorLocation?: string;
+        statement?: string;
+        surroundingStatements?: string[];
+      };
+    };
+
+    const parts = [officeError.message];
+    if (officeError.code) parts.push(`Code: ${officeError.code}`);
+
+    if (officeError.debugInfo) {
+      const { errorLocation, statement, surroundingStatements } = officeError.debugInfo;
+      if (errorLocation) parts.push(`Location: ${errorLocation}`);
+      if (statement) parts.push(`Failing statement: ${statement}`);
+      if (surroundingStatements?.length) {
+        parts.push(`Surrounding context: ${surroundingStatements.join('; ')}`);
+      }
+    }
+
+    return parts.join('\n');
+  }
+
+  return getErrorMessage(error);
+}
+
+/**
  * Generic Office Tool Template.
  * Defines the structure for host-specific tool definitions before wrapping with execute().
  *

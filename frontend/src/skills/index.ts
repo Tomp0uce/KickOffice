@@ -36,6 +36,7 @@ import replySkill from './quickactions/reply.skill.md?raw';
 import ingestSkill from './quickactions/ingest.skill.md?raw';
 import autographSkill from './quickactions/autograph.skill.md?raw';
 import chartDigitizerSkill from './quickactions/chart-digitizer.skill.md?raw';
+import pixelArtSkill from './quickactions/pixel-art.skill.md?raw';
 import explainExcelSkill from './quickactions/explain-excel.skill.md?raw';
 import formulaGeneratorSkill from './quickactions/formula-generator.skill.md?raw';
 import dataTrendSkill from './quickactions/data-trend.skill.md?raw';
@@ -133,6 +134,7 @@ const quickActionSkillMap: Record<string, string> = {
   ingest: ingestSkill,
   autograph: autographSkill,
   digitizeChart: chartDigitizerSkill,
+  pixelArt: pixelArtSkill,
   explain: explainExcelSkill,
   formulaGenerator: formulaGeneratorSkill,
   dataTrend: dataTrendSkill,

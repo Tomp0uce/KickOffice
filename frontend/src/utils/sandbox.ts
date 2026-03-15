@@ -37,6 +37,10 @@ export function sandboxedEval(
       Number,
       Boolean,
       Promise,
+      // Base64 utilities — ported from Office Agents VFS integration
+      // Needed for image insertion, binary data handling in eval_* tools
+      btoa: typeof btoa !== 'undefined' ? btoa : undefined,
+      atob: typeof atob !== 'undefined' ? atob : undefined,
       // Explicitly blocked
       Function: undefined,
       Reflect: undefined,

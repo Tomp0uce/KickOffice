@@ -9,11 +9,11 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 89 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 93 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane
-- **Multi-Host Support** — Word (30 tools), Excel (24 tools), PowerPoint (21 tools), Outlook (8 tools)
+- **Multi-Host Support** — Word (31 tools), Excel (27 tools), PowerPoint (21 tools), Outlook (8 tools)
 - **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
 - **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
@@ -113,12 +113,12 @@ Native Word revision markup via `docx-redline-js`:
 
 | Host           | Tools  | Highlights                                                                                    |
 | -------------- | ------ | --------------------------------------------------------------------------------------------- |
-| **Word**       | 30     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `eval_wordjs`, Track Changes |
-| **Excel**      | 24     | `eval_officejs`, formulas, charts, screenshots, CSV export, header detection                  |
+| **Word**       | 31     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
+| **Excel**      | 27     | `eval_officejs`, formulas, charts, screenshots with headers, CSV import/export, pixel art, header detection       |
 | **PowerPoint** | 21     | `editSlideXml`, slides, shapes, speaker notes, screenshots, icons (Iconify)                   |
 | **Outlook**    | 8      | `eval_outlookjs`, email body/subject, recipients, rich content preservation                   |
 | **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
-| **Total**      | **89** |                                                                                               |
+| **Total**      | **93** |                                                                                               |
 
 ---
 
@@ -284,6 +284,20 @@ npm run build         # Production build
 ---
 
 ## Credits & Inspirations
+
+### [Office Agents](https://github.com/nicepkg/office-agents) (MIT License)
+
+Major source of features and patterns ported into KickOffice. The following capabilities were adapted from Office Agents:
+
+- **Excel screenshot with row/column headers** — Canvas-based compositing that draws column letters (A, B, C…) and row numbers (1, 2, 3…) around range screenshots, dramatically improving vision model cell targeting accuracy. Ported from `packages/excel/src/lib/tools/screenshot-range.ts`.
+- **Enriched Office.js error feedback** — Extracts `debugInfo.errorLocation`, `debugInfo.statement`, and `debugInfo.surroundingStatements` from `OfficeExtension.Error` objects for precise auto-correction by the LLM agent. Inspired by error handling patterns across all Office Agents tool executors.
+- **Static mutation tracker** — Regex-based detection of write operations (`.values =`, `.delete()`, `.insert()`, etc.) in `eval_*` tool code, returning `hasMutated` flags and applying visual cell highlights for user awareness. Adapted from `packages/excel/src/lib/dirty-tracker.ts`.
+- **VFS injection in sandbox** — Exposes `btoa`, `atob`, `readFile()`, `readFileBuffer()`, `writeFile()` inside the SES sandboxed eval, enabling LLM-generated code to handle images, CSV data, and binary files. Ported from the Office Agents SDK sandbox pattern.
+- **CSV-to-sheet / sheet-to-CSV bash commands** — Custom VFS bash commands for importing CSV files into Excel sheets (with type coercion) and exporting sheet data to CSV. Adapted from `packages/excel/src/lib/vfs/custom-commands.ts`.
+- **Image-to-sheet (pixel art)** — Converts uploaded images into Excel cell colors (pixel art), with downsampling, run-length encoding, and batched color assignments. Ported from `packages/excel/src/lib/vfs/custom-commands.ts`.
+- **OOXML extraction for Word (`getDocumentOoxml`)** — Extracts document OOXML structure with body-child summaries, referenced styles, and numbering definitions. Adapted from `packages/word/src/lib/tools/get-ooxml.ts`.
+- **Enriched Word document metadata** — Run-level formatting detection (`hasRunLevelOverrides`), heading outline, content control info, and style sampling for intelligent editing strategy selection. Inspired by `packages/word/src/lib/adapter.tsx` metadata collection.
+- **Search data improvements** — Formula search capability added to Excel's `findData` tool. Inspired by `packages/excel/src/lib/tools/search-data.ts`.
 
 ### [word-GPT-Plus](https://github.com/Kuingsmile/word-GPT-Plus) (MIT License)
 
