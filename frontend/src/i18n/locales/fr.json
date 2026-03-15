@@ -190,6 +190,8 @@
   "summary_tooltip": "Sélectionnez du texte. L'IA générera un résumé concis du contenu sélectionné.",
   "excelIngest_tooltip": "Sélectionnez des données collées. L'IA les nettoiera et les convertira en tableau Excel formaté.",
   "excelAutoGraph_tooltip": "Sélectionnez des données avec en-têtes. L'IA analysera et insérera automatiquement le graphique le plus approprié.",
+  "excelDigitizeChart": "Digitiser Graphique",
+  "excelDigitizeChart_tooltip": "Uploadez une image de graphique. L'IA extraira automatiquement les données et les importera dans Excel avec un graphique correspondant (équivalent WebPlotDigitizer).",
   "excelExplain_tooltip": "Sélectionnez une formule ou une plage de données. L'IA expliquera son fonctionnement en langage simple.",
   "excelFormulaGenerator_tooltip": "Décrivez la formule dont vous avez besoin. L'IA générera la formule Excel correcte pour votre cas d'usage.",
   "excelDataTrend_tooltip": "Sélectionnez une plage de données. L'IA identifiera les tendances, patterns et anomalies.",

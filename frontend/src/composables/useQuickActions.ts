@@ -22,7 +22,7 @@ import type {
 } from '@/types/chat';
 import type { ChatMessage } from '@/api/backend';
 
-import { chatStream, generateImage, categorizeError } from '@/api/backend';
+import { chatStream, generateImage, categorizeError, uploadFile, uploadFileToPlatform } from '@/api/backend';
 import {
   GLOBAL_STYLE_INSTRUCTIONS,
   getBuiltInPrompt,
@@ -427,6 +427,86 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         el.setSelectionRange(len, len);
       }
       return;
+    }
+
+    // IMAGE-UPLOAD actions: open file picker, upload image, then run agent with chart digitizer skill
+    if (hostIsExcel && selectedExcelQuickAction?.imageUpload) {
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      return new Promise<void>(resolve => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/jpg,image/gif,image/webp';
+
+        fileInput.onchange = async () => {
+          const file = fileInput.files?.[0];
+          if (!file) { resolve(); return; }
+
+          const actionLabel = selectedExcelQuickAction.label || t(actionKey);
+          history.value.push(createDisplayMessage('user', `[${actionLabel}] ${file.name}`));
+
+          if (loading.value) { resolve(); return; }
+          loading.value = true;
+          abortController.value = new AbortController();
+
+          try {
+            // Upload image to backend to get base64 + imageId
+            const result = await uploadFile(file);
+            if (!result.imageBase64) {
+              messageUtil.error(t('errorImageUploadFailed') || 'Image upload failed.');
+              return;
+            }
+
+            // Optionally upload to provider for caching
+            let fileId: string | undefined;
+            try {
+              const platformResult = await uploadFileToPlatform(file, 'vision');
+              if (platformResult.fileId) fileId = platformResult.fileId;
+            } catch { /* inline fallback */ }
+
+            const imageIdTag = result.imageId ? ` (imageId: ${result.imageId})` : '';
+            const imageContext =
+              `<uploaded_images>\nThe following images are available in session memory:\n` +
+              `- [${result.filename}]${imageIdTag}\n` +
+              `To extract chart data into Excel, use extract_chart_data with the imageId.\n` +
+              `</uploaded_images>`;
+
+            const userText =
+              `[UI language: ${lang}]\n\n` +
+              `Digitize this chart image: extract the data and write it to Excel, then create a matching chart.\n\n` +
+              imageContext;
+
+            // Build multipart user message (text + image)
+            const imageUrl = fileId ?? `data:${file.type};base64,${result.imageBase64}`;
+            const userMessage: ChatMessage = {
+              role: 'user',
+              content: [
+                { type: 'text', text: userText },
+                { type: 'image_url', image_url: { url: imageUrl } },
+              ] as any,
+            };
+
+            const skillContent = getQuickActionSkill(actionKey);
+            const systemMsg = skillContent
+              ? skillContent + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
+              : `You are an expert chart data extractor. ${GLOBAL_STYLE_INSTRUCTIONS}`;
+
+            await runAgentLoop(
+              [{ role: 'system', content: systemMsg }, userMessage],
+              resolveChatModelTier(),
+            );
+          } catch (err) {
+            logService.error('[QuickActions] digitizeChart error', err);
+            messageUtil.error(t('errorGeneric') || 'An error occurred.');
+          } finally {
+            loading.value = false;
+            abortController.value = null;
+            resolve();
+          }
+        };
+
+        fileInput.oncancel = () => resolve();
+        fileInput.click();
+      });
     }
 
     if (selectedExcelQuickAction?.mode === 'draft') {

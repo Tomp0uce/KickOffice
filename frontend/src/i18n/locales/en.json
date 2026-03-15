@@ -187,6 +187,8 @@
   "summary_tooltip": "Select text first. The AI will generate a concise summary of the selected content.",
   "excelIngest_tooltip": "Select pasted data. The AI will clean it and convert it into a formatted Excel table.",
   "excelAutoGraph_tooltip": "Select data with headers. The AI will analyze it and insert the most appropriate chart automatically.",
+  "excelDigitizeChart": "Digitize Chart",
+  "excelDigitizeChart_tooltip": "Upload a chart image. The AI will extract the data points and import them into Excel with a matching chart (equivalent to WebPlotDigitizer).",
   "excelExplain_tooltip": "Select a formula or data range. The AI will explain what it does in plain language.",
   "excelFormulaGenerator_tooltip": "Describe the formula you need. The AI will generate the correct Excel formula for your use case.",
   "excelDataTrend_tooltip": "Select a data range. The AI will identify trends, patterns, and anomalies in your data.",
