@@ -84,9 +84,11 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 // Creating them here (this script runs as root in manifest-gen, which
 // already runs before kickoffice-backend) avoids a dedicated logs-init
 // container.
+//
+// IMPORTANT: manifest-gen must mount ./backend/logs:/app/logs for this to work.
 // ---------------------------------------------------------------------------
 
-const LOGS_DIR = path.join(ROOT_DIR, 'backend', 'logs');
+const LOGS_DIR = '/app/logs';
 const LOG_SUBDIRS = ['feedback', 'frontend'];
 for (const sub of LOG_SUBDIRS) {
   fs.mkdirSync(path.join(LOGS_DIR, sub), { recursive: true });

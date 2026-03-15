@@ -8,6 +8,7 @@ services:
       - ./scripts:/app/scripts:ro
       - ./manifests-templates:/app/manifests-templates:ro
       - ./generated-manifests:/app/generated-manifests
+      - ./backend/logs:/app/logs
     working_dir: /app
     environment:
       - SERVER_IP=${SERVER_IP}
