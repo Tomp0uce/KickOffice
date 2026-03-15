@@ -1,6 +1,4 @@
 import { detectOfficeHost } from './hostDetection';
-import { getUserEmail } from './credentialStorage';
-import { appendLogEntry } from '@/composables/useSessionDB';
 import { LOG_RING_BUFFER_SIZE } from '@/constants/limits';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -55,7 +53,7 @@ class LogService {
     return {
       host: detectOfficeHost(),
       sessionId: this._currentSessionId,
-      userId: (await getUserEmail()) || 'anonymous',
+      userId: await import('./credentialStorage').then(m => m.getUserEmail()).catch(() => 'anonymous'),
     };
   }
 
@@ -104,7 +102,7 @@ class LogService {
       sessionLogs.shift();
     }
 
-    appendLogEntry(entry).catch(() => {});
+    import('@/composables/useSessionDB').then(m => m.appendLogEntry(entry)).catch(() => {});
   }
 
   error(message: string, error?: any, data?: any) {

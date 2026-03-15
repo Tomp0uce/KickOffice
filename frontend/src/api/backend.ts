@@ -1,4 +1,7 @@
 import type { ModelTier, ModelInfo } from '@/types';
+import { getUserKey, getUserEmail } from '@/utils/credentialStorage';
+import { logService } from '@/utils/logger';
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 if (!BACKEND_URL) {
@@ -207,9 +210,6 @@ async function fetchWithTimeoutAndRetry(
     }
   }
 }
-
-import { getUserKey, getUserEmail } from '@/utils/credentialStorage';
-import { logService } from '@/utils/logger';
 
 function getCsrfToken(): string {
   const match = document.cookie.match(/(?:^| )csrf_token=([^;]+)/);
