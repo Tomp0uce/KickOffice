@@ -27,6 +27,7 @@ import pptProofreadSkill from './quickactions/ppt-proofread.skill.md?raw';
 import pptTranslateSkill from './quickactions/ppt-translate.skill.md?raw';
 import wordTranslateSkill from './quickactions/word-translate.skill.md?raw';
 import wordProofreadSkill from './quickactions/word-proofread.skill.md?raw';
+import wordReviewSkill from './quickactions/word-review.skill.md?raw';
 import polishSkill from './quickactions/polish.skill.md?raw';
 import academicSkill from './quickactions/academic.skill.md?raw';
 import summarySkill from './quickactions/summary.skill.md?raw';
@@ -113,6 +114,7 @@ const quickActionSkillMap: Record<string, string> = {
   // Word (agent-based, chirurgical)
   'word-translate': wordTranslateSkill,
   'word-proofread': wordProofreadSkill,
+  'word-review': wordReviewSkill,
 
   // Word / Outlook (non-agent)
   translate: translateSkill,

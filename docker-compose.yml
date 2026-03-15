@@ -1,22 +1,6 @@
 services:
-  # One-shot init container: creates the backend log directory on the HOST
-  # with the correct ownership for the non-root node user (UID/GID 1000).
-  # Without this step, Docker would create the bind-mount directory as root
-  # and the container would silently fail to write any log files.
-  logs-init:
-    image: node:22-slim
-    container_name: kickoffice-logs-init
-    volumes:
-      - ./backend/logs:/app/logs
-    # node:22-slim runs as root by default; the node user inside is UID/GID 1000.
-    command: >
-      /bin/sh -c "
-        mkdir -p /app/logs/feedback /app/logs/frontend &&
-        chown -R 1000:1000 /app/logs &&
-        echo 'Log directories ready.'
-      "
-    restart: "no"
-
+  # One-shot init container: generates Office manifest XMLs from templates
+  # and ensures backend log directories exist with the correct ownership.
   manifest-gen:
     image: node:22-slim
     container_name: kickoffice-manifest-gen
@@ -69,8 +53,6 @@ services:
       - ./backend/logs:/app/logs
     depends_on:
       manifest-gen:
-        condition: service_completed_successfully
-      logs-init:
         condition: service_completed_successfully
     networks:
       - kickoffice

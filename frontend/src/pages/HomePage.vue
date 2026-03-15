@@ -263,10 +263,11 @@ const wordQuickActions = computed<QuickAction[]>(() => [
     tooltipKey: 'polish_tooltip',
   },
   {
-    key: 'academic',
-    label: t('academic'),
+    key: 'word-review',
+    label: t('wordReview', 'Review'),
     icon: BookOpen,
-    tooltipKey: 'academic_tooltip',
+    executeWithAgent: true,
+    tooltipKey: 'wordReview_tooltip',
   },
   {
     key: 'summary',

@@ -75,6 +75,34 @@ const OUTPUT_DIR    = path.join(ROOT_DIR, 'generated-manifests');
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
+// ---------------------------------------------------------------------------
+// 2b. Ensure backend log directories exist with correct ownership
+//
+// The backend bind-mount (./backend/logs → /app/logs) requires the host
+// directories to exist BEFORE the backend container starts, and to be
+// writable by the node user (UID/GID 1000) inside the container.
+// Creating them here (this script runs as root in manifest-gen, which
+// already runs before kickoffice-backend) avoids a dedicated logs-init
+// container.
+// ---------------------------------------------------------------------------
+
+const LOGS_DIR = path.join(ROOT_DIR, 'backend', 'logs');
+const LOG_SUBDIRS = ['feedback', 'frontend'];
+for (const sub of LOG_SUBDIRS) {
+  fs.mkdirSync(path.join(LOGS_DIR, sub), { recursive: true });
+}
+
+// Set ownership to UID/GID 1000 (node user inside the container).
+// This mirrors what the former logs-init container did.  Only attempt
+// chown when running as root (CI/CD, Docker) — skip silently otherwise.
+try {
+  const { execSync } = require('child_process');
+  execSync(`chown -R 1000:1000 ${LOGS_DIR}`);
+  console.log('[manifest-gen] Log directories created and ownership set to 1000:1000');
+} catch {
+  console.log('[manifest-gen] Log directories created (chown skipped — not running as root)');
+}
+
 const templates = [
   {
     src:  path.join(TEMPLATES_DIR, 'manifest-office.template.xml'),

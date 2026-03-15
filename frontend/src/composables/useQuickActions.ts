@@ -629,6 +629,14 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         }
       }
 
+      // LANG-UNIVERSAL: Inject UI language tag into ALL quick-action user messages.
+      // Skill-based actions already have it (from SKILL-L1 above); this covers
+      // built-in prompts and hardcoded systemPrompt paths so every host (Word,
+      // Excel, PowerPoint, Outlook) respects the interface language.
+      if (userMsg && !userMsg.startsWith('[UI language:')) {
+        userMsg = `[UI language: ${lang}]\n\n${userMsg}`;
+      }
+
       // Enforce global formatting constraints on all Quick Actions
       systemMsg += `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
 

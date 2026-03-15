@@ -87,6 +87,21 @@ Find the first empty area on the active sheet using `getWorksheetData`, then wri
 - Round extracted values to 2 decimal places
 - If X-axis is categorical (not numeric), use the category labels as text
 
+### STEP 3b — Convert extracted data to an Excel table
+
+Immediately after writing the data with `setCellRange`, convert the range to a formatted Excel table:
+
+```json
+{
+  "address": "A1:C21",
+  "hasHeaders": true,
+  "tableName": "tbl_digitized",
+  "style": "TableStyleMedium2"
+}
+```
+
+Use a descriptive name (e.g., `tbl_digitized_sales`, `tbl_digitized_revenue`). This enables filters, alternating row shading, and structured references.
+
 ### STEP 4 — Create the chart
 
 Immediately after writing the data, create the chart:
