@@ -367,10 +367,11 @@ const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
     tooltipKey: 'ppt_proofread_tooltip',
   },
   {
-    key: 'translate',
+    key: 'ppt-translate',
     label: t('translate'),
     icon: Globe,
     mode: 'immediate',
+    executeWithAgent: true,
     tooltipKey: 'translate_tooltip',
   },
   {

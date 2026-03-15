@@ -26,11 +26,12 @@ export function useHealthCheck(
   }
 
   // Interval polls are skipped when the document is hidden to avoid
-  // unnecessary requests. The initial check and visibility-change handler
-  // always run regardless so Office add-ins (where visibilityState can
-  // remain 'hidden' inside a WebView2 iframe) still get an accurate status.
+  // unnecessary requests — UNLESS the backend is currently offline.
+  // When offline, we always retry regardless of visibility so that Office
+  // add-ins running inside a WebView2 iframe (where visibilityState is
+  // permanently 'hidden') recover automatically after a transient failure.
   async function checkBackend() {
-    if (document.visibilityState === 'hidden') return;
+    if (document.visibilityState === 'hidden' && backendOnline.value) return;
     await runCheck();
   }
 

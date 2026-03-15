@@ -505,11 +505,16 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       let systemMsg = '';
       let userMsg = '';
 
+      // Resolve UI language once — used for skill injection and fallback prompts
+      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const targetLang = lang === 'English' ? 'French' : 'English';
+
       // SKILL-L1: Try to load skill file first (priority 1)
       const skillContent = getQuickActionSkill(actionKey);
       if (skillContent) {
         systemMsg = skillContent;
-        userMsg = textForLlm;
+        // Inject language context so skills like translate know the direction
+        userMsg = `[UI language: ${lang} → Target language: ${targetLang}]\n\n${textForLlm}`;
       } else {
         // Priority 2: systemPrompt from Quick Action definition
         if (hostIsOutlook) {
@@ -539,7 +544,6 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
         if (!systemMsg || !userMsg) {
           if (!action) action = getBuiltInPrompt()[actionKey as keyof typeof builtInPrompt];
           if (!action) return;
-          const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
           systemMsg = action.system(lang);
           userMsg = action.user(textForLlm, lang);
         }
