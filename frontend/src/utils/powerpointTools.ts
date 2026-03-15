@@ -18,10 +18,16 @@ import {
 import { sandboxedEval } from './sandbox';
 import { validateOfficeCode } from './officeCodeValidator';
 import {
+  readFile as vfsReadFile,
+  writeFile as vfsWriteFile,
+  getVfs,
+} from '@/utils/vfs';
+import {
   computeTextDiffStats,
   createOfficeTools,
   normalizeLineEndings,
   getErrorMessage,
+  getDetailedOfficeError,
 } from './common';
 import { message as messageUtil } from '@/utils/message';
 import { withSlideZip, escapeXml } from './pptxZipUtils';
@@ -29,6 +35,23 @@ import { logService } from '@/utils/logger';
 
 declare const Office: any;
 declare const PowerPoint: any;
+
+// Mutation detection patterns for PowerPoint — ported from Office Agents
+const PPT_MUTATION_PATTERNS = [
+  /\.insertSlide\s*\(/,
+  /\.delete\s*\(/,
+  /\.text\s*=/,
+  /\.insertText\s*\(/,
+  /\.font\.\w+\s*=/,
+  /\.fill\.\w+\s*=/,
+  /\.set\s*\(/,
+  /\.add\s*\(/,
+  /\.addImage\s*\(/,
+];
+
+function looksLikeMutationPpt(code: string): boolean {
+  return PPT_MUTATION_PATTERNS.some(p => p.test(code));
+}
 
 // Point 3 Fix: Memory registry to store images without crashing the LLM
 export const powerpointImageRegistry = new Map<string, string>();
@@ -1181,13 +1204,23 @@ try {
         }
 
         try {
-          // Execute in sandbox with host restriction
+          const hasMutated = looksLikeMutationPpt(code);
+
+          // Execute in sandbox with host restriction + VFS access
+          // VFS helpers ported from Office Agents SDK sandbox pattern
           const result = await sandboxedEval(
             code,
             {
               context,
               PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined,
               Office: typeof Office !== 'undefined' ? Office : undefined,
+              readFile: vfsReadFile,
+              readFileBuffer: async (path: string) => {
+                const vfs = getVfs();
+                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
+                return vfs.readFileBuffer(fullPath);
+              },
+              writeFile: vfsWriteFile,
             },
             'PowerPoint', // Restrict to PowerPoint namespace only
           );
@@ -1197,6 +1230,7 @@ try {
               success: true,
               result: result ?? null,
               explanation,
+              hasMutated,
               warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
             },
             null,
@@ -1206,7 +1240,7 @@ try {
           return JSON.stringify(
             {
               success: false,
-              error: getErrorMessage(err),
+              error: getDetailedOfficeError(err),
               explanation,
               codeExecuted: code.slice(0, 200) + '...',
               hint: 'Check that all properties are loaded before access, and context.sync() is called.',

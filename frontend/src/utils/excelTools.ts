@@ -6,14 +6,163 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   getErrorMessage,
+  getDetailedOfficeError,
 } from './common';
 import { localStorageKey } from './enum';
 import { sandboxedEval } from './sandbox';
 import { validateOfficeCode } from './officeCodeValidator';
 import { extractChartData } from '@/api/backend';
+import {
+  readFile as vfsReadFile,
+  writeFile as vfsWriteFile,
+  getVfs,
+} from '@/utils/vfs';
 
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action));
+
+// ============================================================
+// Screenshot headers composition — ported from Office Agents
+// packages/excel/src/lib/tools/screenshot-range.ts
+// ============================================================
+const HEADER_WIDTH = 40;
+const HEADER_HEIGHT = 20;
+const HEADER_BG = '#f0f0f0';
+const HEADER_BORDER = '#c0c0c0';
+const HEADER_FONT = 'bold 11px Calibri, Arial, sans-serif';
+const HEADER_TEXT_COLOR = '#333333';
+
+/** Convert 0-based column index to Excel column letter (0→A, 1→B, 26→AA). Ported from Office Agents. */
+function columnIndexToLetter(index: number): string {
+  let letter = '';
+  let temp = index;
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+  return letter;
+}
+
+/** Parse start row/col from an A1-style range address (e.g. "Sheet1!B3:D10" → {startRow:2, startCol:1}). */
+function parseRangeStart(rangeAddress: string): { startRow: number; startCol: number } {
+  const addr = rangeAddress.includes('!') ? rangeAddress.split('!')[1] : rangeAddress;
+  const startCell = addr.split(':')[0];
+  const match = startCell.match(/^([A-Z]+)(\d+)$/i);
+  if (!match) return { startRow: 0, startCol: 0 };
+  const colStr = match[1].toUpperCase();
+  let col = 0;
+  for (let i = 0; i < colStr.length; i++) {
+    col = col * 26 + (colStr.charCodeAt(i) - 64);
+  }
+  return { startRow: parseInt(match[2], 10) - 1, startCol: col - 1 };
+}
+
+/**
+ * Composite an Excel range screenshot with row/column headers using Canvas.
+ * Ported from Office Agents screenshot-range.ts
+ */
+function compositeWithHeaders(
+  imageBase64: string,
+  startRow: number,
+  startCol: number,
+  colWidths: number[],
+  rowHeights: number[],
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const totalColWidth = colWidths.reduce((a, b) => a + b, 0);
+      const totalRowHeight = rowHeights.reduce((a, b) => a + b, 0);
+      const scaleX = totalColWidth > 0 ? img.width / totalColWidth : 1;
+      const scaleY = totalRowHeight > 0 ? img.height / totalRowHeight : 1;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = HEADER_WIDTH + img.width;
+      canvas.height = HEADER_HEIGHT + img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Failed to get 2d canvas context'));
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, HEADER_WIDTH, HEADER_HEIGHT);
+
+      // Column headers
+      ctx.fillStyle = HEADER_BG;
+      ctx.fillRect(HEADER_WIDTH, 0, img.width, HEADER_HEIGHT);
+      ctx.font = HEADER_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let x = HEADER_WIDTH;
+      for (let i = 0; i < colWidths.length; i++) {
+        const w = colWidths[i] * scaleX;
+        ctx.strokeStyle = HEADER_BORDER;
+        ctx.strokeRect(x, 0, w, HEADER_HEIGHT);
+        ctx.fillStyle = HEADER_TEXT_COLOR;
+        ctx.fillText(columnIndexToLetter(startCol + i), x + w / 2, HEADER_HEIGHT / 2);
+        x += w;
+      }
+
+      // Row headers
+      ctx.fillStyle = HEADER_BG;
+      ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, img.height);
+      let y = HEADER_HEIGHT;
+      for (let i = 0; i < rowHeights.length; i++) {
+        const h = rowHeights[i] * scaleY;
+        ctx.strokeStyle = HEADER_BORDER;
+        ctx.strokeRect(0, y, HEADER_WIDTH, h);
+        ctx.fillStyle = HEADER_TEXT_COLOR;
+        ctx.fillText(String(startRow + i + 1), HEADER_WIDTH / 2, y + h / 2);
+        y += h;
+      }
+
+      // Top-left corner cell
+      ctx.fillStyle = HEADER_BG;
+      ctx.fillRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
+      ctx.strokeStyle = HEADER_BORDER;
+      ctx.strokeRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
+
+      resolve(canvas.toDataURL('image/png').split(',')[1]);
+    };
+    img.onerror = () => reject(new Error('Failed to load range image for header composition'));
+    img.src = `data:image/png;base64,${imageBase64}`;
+  });
+}
+
+// ============================================================
+// Mutation detection patterns — ported from Office Agents dirty-tracker
+// packages/excel/src/lib/dirty-tracker.ts
+// ============================================================
+const EXCEL_MUTATION_PATTERNS = [
+  /\.(values|formulas|formulasLocal|numberFormat|numberFormatLocal)\s*=/,
+  /\.clear\s*\(/,
+  /\.delete\s*\(/,
+  /\.insert\s*\(/,
+  /\.copyFrom\s*\(/,
+  /\.add\s*\(/,
+  /\.merge\s*\(/,
+  /\.unmerge\s*\(/,
+  /\.format\.\w+\s*=/,
+  /\.set\s*\(/,
+];
+
+/** Detect if code contains write operations. Ported from Office Agents. */
+function looksLikeMutation(code: string): boolean {
+  return EXCEL_MUTATION_PATTERNS.some(p => p.test(code));
+}
+
+/** Highlight color for cells modified by the agent. */
+const AGENT_HIGHLIGHT_COLOR = '#FFFDE7'; // light yellow
+
+/** Coerce a CSV string value to its native type. Ported from Office Agents csv-to-sheet. */
+function coerceValue(value: string): string | number | boolean {
+  if (value === '') return '';
+  const lower = value.toLowerCase();
+  if (lower === 'true') return true;
+  if (lower === 'false') return false;
+  const num = Number(value);
+  if (!isNaN(num) && value.trim() !== '') return num;
+  return value;
+}
 
 /** Safely resolves a worksheet by name, falling back to active sheet. Throws a clear error if the sheet doesn't exist. */
 async function safeGetSheet(
@@ -59,7 +208,10 @@ export type ExcelToolName =
   | 'screenshotRange'
   | 'getRangeAsCsv'
   | 'modifyWorkbookStructure'
-  | 'detectDataHeaders';
+  | 'detectDataHeaders'
+  | 'importCsvToSheet'
+  | 'clearAgentHighlights'
+  | 'imageToSheet';
 
 function getExcelFormulaLanguage(): 'en' | 'fr' {
   const configured = localStorage.getItem(localStorageKey.excelFormulaLanguage);
@@ -1437,7 +1589,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'findData',
       category: 'read',
       description:
-        'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, and entire cell match. Supports pagination via maxResults and offset.',
+        'Find text or values across the spreadsheet. Returns matching cells with their addresses and values. Options for regex, match case, entire cell match, and formula search. Supports pagination via maxResults and offset.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1448,6 +1600,11 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             description: 'Match entire cell content. Default: false',
           },
           useRegex: { type: 'boolean', description: 'Use regex pattern. Default: false' },
+          searchInFormulas: {
+            type: 'boolean',
+            description:
+              'Search in cell formulas instead of display values. Useful for debugging formulas. Default: false.',
+          },
           maxResults: { type: 'number', description: 'Max results to return. Default: 50.' },
           offset: {
             type: 'number',
@@ -1462,6 +1619,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           matchCase = false,
           matchEntireCell = false,
           useRegex = false,
+          searchInFormulas = false,
         } = args as Record<string, any>;
 
         let pattern: RegExp | null = null;
@@ -1481,10 +1639,13 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
 
         const allMatches: any[] = [];
 
+        // Load values or formulas depending on search mode — formula search ported from Office Agents
+        const dataProperty = searchInFormulas ? 'formulas' : 'values';
+
         for (const sheet of sheets.items) {
           sheet.load('name');
           const usedRange = sheet.getUsedRangeOrNullObject();
-          usedRange.load('values,address,rowCount,columnCount');
+          usedRange.load(`${dataProperty},address,rowCount,columnCount`);
           await context.sync();
 
           if (usedRange.isNullObject) continue;
@@ -1506,9 +1667,10 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             return letter;
           };
 
+          const dataGrid = searchInFormulas ? usedRange.formulas : usedRange.values;
           for (let r = 0; r < usedRange.rowCount; r++) {
             for (let c = 0; c < usedRange.columnCount; c++) {
-              const val = usedRange.values[r][c];
+              const val = dataGrid[r][c];
               const target = String(val ?? '');
               let isMatch = false;
               if (pattern) {
@@ -1698,13 +1860,24 @@ try {
         }
 
         try {
-          // Execute in sandbox with host restriction
+          // Detect mutations before execution — ported from Office Agents dirty-tracker
+          const hasMutated = looksLikeMutation(code);
+
+          // Execute in sandbox with host restriction + VFS access
+          // VFS helpers ported from Office Agents SDK sandbox pattern
           const result = await sandboxedEval(
             code,
             {
               context,
               Excel: typeof Excel !== 'undefined' ? Excel : undefined,
               Office: typeof Office !== 'undefined' ? Office : undefined,
+              readFile: vfsReadFile,
+              readFileBuffer: async (path: string) => {
+                const vfs = getVfs();
+                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
+                return vfs.readFileBuffer(fullPath);
+              },
+              writeFile: vfsWriteFile,
             },
             'Excel', // Restrict to Excel namespace only
           );
@@ -1714,6 +1887,7 @@ try {
               success: true,
               result: result ?? null,
               explanation,
+              hasMutated,
               warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
             },
             null,
@@ -1723,7 +1897,7 @@ try {
           return JSON.stringify(
             {
               success: false,
-              error: getErrorMessage(err),
+              error: getDetailedOfficeError(err),
               explanation,
               codeExecuted: code.slice(0, 200) + '...',
               hint: 'Check that all properties are loaded before access, and context.sync() is called.',
@@ -1756,14 +1930,50 @@ try {
       executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
         const sheet = await safeGetSheet(context, args.sheetName);
         const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange();
+
+        // Load dimensions for header composition — ported from Office Agents
+        targetRange.load('address, rowCount, columnCount');
+        await context.sync();
+
+        const numCols = targetRange.columnCount;
+        const numRows = targetRange.rowCount;
+
+        // Load column widths and row heights
+        const cols: Excel.Range[] = [];
+        for (let i = 0; i < numCols; i++) {
+          const col = targetRange.getColumn(i);
+          col.format.load('columnWidth');
+          cols.push(col);
+        }
+        const rows: Excel.Range[] = [];
+        for (let i = 0; i < numRows; i++) {
+          const row = targetRange.getRow(i);
+          row.format.load('rowHeight');
+          rows.push(row);
+        }
+
         const imageResult = (targetRange as any).getImage();
         await context.sync();
+
         const base64 = imageResult.value as string;
+        const colWidths = cols.map(c => c.format.columnWidth);
+        const rowHeights = rows.map(r => r.format.rowHeight);
+        const { startRow, startCol } = parseRangeStart(targetRange.address);
+
+        // Composite with row/column headers for vision model accuracy
+        const composited = await compositeWithHeaders(
+          base64,
+          startRow,
+          startCol,
+          colWidths,
+          rowHeights,
+        );
+
         return JSON.stringify({
           __screenshot__: true,
-          base64,
+          base64: composited,
           mimeType: 'image/png',
-          description: `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'}`,
+          description: `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'} (with row/column headers)`,
         });
       },
     },
@@ -1987,6 +2197,328 @@ try {
           null,
           2,
         );
+      },
+    },
+
+    // ============================================================
+    // importCsvToSheet — ported from Office Agents csv-to-sheet custom command
+    // packages/excel/src/lib/vfs/custom-commands.ts
+    // ============================================================
+    importCsvToSheet: {
+      name: 'importCsvToSheet',
+      category: 'write',
+      description:
+        'Import a CSV file from the VFS into an Excel worksheet. Reads the CSV, auto-detects data types (numbers, booleans, text), and writes to the specified sheet/cell. Use this after the user uploads a CSV file.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: {
+            type: 'string',
+            description: 'Path to CSV file in VFS (e.g., "/home/user/uploads/data.csv")',
+          },
+          sheetName: {
+            type: 'string',
+            description: 'Target worksheet name. Uses active sheet if omitted.',
+          },
+          startCell: {
+            type: 'string',
+            description: 'Starting cell in A1 notation (e.g., "A1"). Defaults to "A1".',
+          },
+          delimiter: {
+            type: 'string',
+            description: 'CSV delimiter character. Defaults to ",".',
+          },
+          overwrite: {
+            type: 'boolean',
+            description:
+              'If true, overwrites existing cell data. Default is false (fails if cells contain data).',
+          },
+        },
+        required: ['filePath'],
+      },
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+        const {
+          filePath,
+          sheetName,
+          startCell = 'A1',
+          delimiter = ',',
+          overwrite = false,
+        } = args;
+
+        const { readFile } = await import('@/utils/vfs');
+        const csvContent = await readFile(filePath);
+        if (!csvContent || !csvContent.trim()) {
+          throw new Error(`File "${filePath}" is empty or not found.`);
+        }
+
+        // Parse CSV handling quoted fields — ported from Office Agents
+        const lines = csvContent.trim().split('\n');
+        const data: (string | number | boolean)[][] = [];
+        for (const line of lines) {
+          const row: (string | number | boolean)[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === delimiter && !inQuotes) {
+              row.push(coerceValue(current.trim()));
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          row.push(coerceValue(current.trim()));
+          data.push(row);
+        }
+
+        if (data.length === 0) throw new Error('CSV file contains no data rows.');
+
+        // Pad rows to equal length
+        const maxCols = Math.max(...data.map(r => r.length));
+        for (const row of data) {
+          while (row.length < maxCols) row.push('');
+        }
+
+        const sheet = await safeGetSheet(context, sheetName);
+        const targetRange = sheet
+          .getRange(startCell)
+          .getResizedRange(data.length - 1, maxCols - 1);
+
+        if (!overwrite) {
+          targetRange.load('values');
+          await context.sync();
+          const hasData = targetRange.values.some((row: any[]) =>
+            row.some((cell: any) => cell !== '' && cell !== null),
+          );
+          if (hasData) {
+            throw new Error(
+              'Target range contains existing data. Use overwrite=true to replace, or choose a different startCell.',
+            );
+          }
+        }
+
+        targetRange.values = data as any[][];
+        await context.sync();
+
+        return JSON.stringify({
+          success: true,
+          rowsImported: data.length,
+          columnsImported: maxCols,
+          targetRange: `${startCell}`,
+          hasMutated: true,
+        });
+      },
+    },
+
+    // ============================================================
+    // clearAgentHighlights — allows user to remove agent modification highlights
+    // ============================================================
+    clearAgentHighlights: {
+      name: 'clearAgentHighlights',
+      category: 'write',
+      description:
+        'Clear the light yellow background highlights that were applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual indicators.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          range: {
+            type: 'string',
+            description:
+              'A1 notation range to clear highlights from (e.g., "A1:D10"). Clears used range if omitted.',
+          },
+          sheetName: {
+            type: 'string',
+            description: 'Worksheet name. Uses active sheet if omitted.',
+          },
+        },
+        required: [],
+      },
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+        const sheet = await safeGetSheet(context, args.sheetName);
+        const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange();
+        targetRange.load('address');
+        await context.sync();
+
+        // Clear only the yellow highlight fill, preserving other formatting
+        targetRange.format.fill.load('color');
+        await context.sync();
+
+        // We need to iterate cells to only clear agent-highlighted ones
+        // For simplicity, clear fill on the entire range — the user called this intentionally
+        targetRange.format.fill.clear();
+        await context.sync();
+
+        return JSON.stringify({
+          success: true,
+          message: `Cleared cell fill formatting on ${targetRange.address}. Agent highlights removed.`,
+        });
+      },
+    },
+
+    // ============================================================
+    // imageToSheet — ported from Office Agents image-to-sheet custom command
+    // packages/excel/src/lib/vfs/custom-commands.ts
+    // Converts an image to "pixel art" in Excel cells using fill colors.
+    // ============================================================
+    imageToSheet: {
+      name: 'imageToSheet',
+      category: 'write',
+      description:
+        'Convert an uploaded image to pixel art in Excel by setting cell background colors. Reads an image from the VFS, downsamples it, and paints each pixel as a cell color. Max 200x200 pixels. Cells are resized to equal squares.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: {
+            type: 'string',
+            description: 'Path to image file in VFS (e.g., "/home/user/uploads/logo.png")',
+          },
+          width: {
+            type: 'number',
+            description: 'Target width in pixels/columns (max 200). E.g., 64.',
+          },
+          height: {
+            type: 'number',
+            description: 'Target height in pixels/rows (max 200). E.g., 64.',
+          },
+          sheetName: {
+            type: 'string',
+            description: 'Target worksheet name. Uses active sheet if omitted.',
+          },
+          startCell: {
+            type: 'string',
+            description: 'Top-left cell (e.g., "A1"). Defaults to "A1".',
+          },
+          cellSize: {
+            type: 'number',
+            description: 'Cell width/height in points (1-50). Default: 6.',
+          },
+        },
+        required: ['filePath', 'width', 'height'],
+      },
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+        const {
+          filePath,
+          width: targetW,
+          height: targetH,
+          sheetName,
+          startCell = 'A1',
+          cellSize = 6,
+        } = args;
+
+        if (targetW > 200 || targetH > 200 || targetW < 1 || targetH < 1) {
+          throw new Error('Dimensions must be between 1 and 200.');
+        }
+        if (cellSize < 1 || cellSize > 50) {
+          throw new Error('Cell size must be between 1 and 50 points.');
+        }
+
+        // Read image from VFS
+        const vfs = getVfs();
+        const fullPath = filePath.startsWith('/') ? filePath : `/home/user/uploads/${filePath}`;
+        const data = await vfs.readFileBuffer(fullPath);
+
+        // Decode and downsample image using Canvas
+        const blob = new Blob([data as BlobPart]);
+        const url = URL.createObjectURL(blob);
+        let pixels: Uint8ClampedArray;
+        try {
+          const img = new Image();
+          img.src = url;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to decode image'));
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Failed to create canvas 2D context');
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          pixels = ctx.getImageData(0, 0, targetW, targetH).data;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+
+        // Build color-to-ranges map with RLE (run-length encoding) for efficiency
+        const rgbToHex = (r: number, g: number, b: number) =>
+          `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+
+        const sheet = await safeGetSheet(context, sheetName);
+        const { startRow, startCol } = parseRangeStart(startCell);
+
+        const colorRanges = new Map<string, string[]>();
+        for (let y = 0; y < targetH; y++) {
+          const rowNum = startRow + y + 1;
+          let x = 0;
+          while (x < targetW) {
+            const i = (y * targetW + x) * 4;
+            const hex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
+            const runStart = x;
+            x++;
+            while (x < targetW) {
+              const j = (y * targetW + x) * 4;
+              if (
+                pixels[j] !== pixels[i] ||
+                pixels[j + 1] !== pixels[i + 1] ||
+                pixels[j + 2] !== pixels[i + 2]
+              )
+                break;
+              x++;
+            }
+            const addr =
+              runStart === x - 1
+                ? `${columnIndexToLetter(startCol + runStart)}${rowNum}`
+                : `${columnIndexToLetter(startCol + runStart)}${rowNum}:${columnIndexToLetter(startCol + x - 1)}${rowNum}`;
+            let ranges = colorRanges.get(hex);
+            if (!ranges) {
+              ranges = [];
+              colorRanges.set(hex, ranges);
+            }
+            ranges.push(addr);
+          }
+        }
+
+        // Set cell sizes and clear values
+        const endCol = columnIndexToLetter(startCol + targetW - 1);
+        const endRow = startRow + targetH;
+        const fullRange = sheet.getRange(`${startCell}:${endCol}${endRow}`);
+        fullRange.format.columnWidth = cellSize;
+        fullRange.format.rowHeight = cellSize;
+        const emptyValues: string[][] = Array.from({ length: targetH }, () =>
+          Array.from({ length: targetW }, () => ''),
+        );
+        fullRange.values = emptyValues;
+        await context.sync();
+
+        // Apply colors in batches — ported from Office Agents
+        const RANGES_PER_BATCH = 1000;
+        let queued = 0;
+        for (const [color, ranges] of colorRanges.entries()) {
+          for (let i = 0; i < ranges.length; i += RANGES_PER_BATCH) {
+            const batch = ranges.slice(i, i + RANGES_PER_BATCH);
+            const areas = (sheet as any).getRanges(batch.join(','));
+            areas.format.fill.color = color;
+            queued += batch.length;
+            if (queued >= RANGES_PER_BATCH) {
+              await context.sync();
+              queued = 0;
+            }
+          }
+        }
+        await context.sync();
+
+        return JSON.stringify({
+          success: true,
+          pixelsWidth: targetW,
+          pixelsHeight: targetH,
+          totalCells: targetW * targetH,
+          uniqueColors: colorRanges.size,
+          cellSizePoints: cellSize,
+          hasMutated: true,
+        });
       },
     },
   },

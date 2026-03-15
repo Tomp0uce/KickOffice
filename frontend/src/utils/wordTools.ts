@@ -4,6 +4,11 @@ import { executeOfficeAction } from './officeAction';
 import { sandboxedEval } from './sandbox';
 import { validateOfficeCode } from './officeCodeValidator';
 import { applyRevisionToSelection, applyRevisionToDocument } from './wordDiffUtils';
+import {
+  readFile as vfsReadFile,
+  writeFile as vfsWriteFile,
+  getVfs,
+} from '@/utils/vfs';
 
 import {
   applyInheritedStyles,
@@ -18,6 +23,7 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   getErrorMessage,
+  getDetailedOfficeError,
 } from './common';
 import { escapeXml } from './pptxZipUtils';
 import {
@@ -59,10 +65,33 @@ export type WordToolName =
   | 'proposeRevision'
   | 'proposeDocumentRevision'
   | 'editDocumentXml'
-  | 'eval_wordjs';
+  | 'eval_wordjs'
+  | 'getDocumentOoxml';
 
 const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Word.run(action));
+
+// Mutation detection patterns for Word — ported from Office Agents
+const WORD_MUTATION_PATTERNS = [
+  /\.insertText\s*\(/,
+  /\.insertHtml\s*\(/,
+  /\.insertOoxml\s*\(/,
+  /\.insertParagraph\s*\(/,
+  /\.insertBreak\s*\(/,
+  /\.insertTable\s*\(/,
+  /\.insertInlinePictureFromBase64\s*\(/,
+  /\.delete\s*\(/,
+  /\.clear\s*\(/,
+  /\.font\.\w+\s*=/,
+  /\.style\s*=/,
+  /\.styleBuiltIn\s*=/,
+  /\.alignment\s*=/,
+  /\.set\s*\(/,
+];
+
+function looksLikeMutationWord(code: string): boolean {
+  return WORD_MUTATION_PATTERNS.some(p => p.test(code));
+}
 
 /**
  * Strip outer <ul>/<ol> wrapper tags from HTML while keeping <li> elements.
@@ -1671,7 +1700,7 @@ Your code should:
           return JSON.stringify(
             {
               success: false,
-              error: getErrorMessage(err),
+              error: getDetailedOfficeError(err),
               explanation,
             },
             null,
@@ -1711,6 +1740,149 @@ Your code should:
             success: true,
             explanation,
             action: 'No modifications applied (setResult not called)',
+          },
+          null,
+          2,
+        );
+      },
+    },
+
+    // ============================================================
+    // getDocumentOoxml — ported from Office Agents get-ooxml tool
+    // packages/word/src/lib/tools/get-ooxml.ts
+    // Extracts document OOXML structure for inspection.
+    // Use getDocumentHtml for simpler content reading;
+    // use getDocumentOoxml when you need to understand exact formatting
+    // (run-level properties, styles, numbering) for OOXML-based editing.
+    // ============================================================
+    getDocumentOoxml: {
+      name: 'getDocumentOoxml',
+      category: 'read',
+      description: `Extract the OOXML (Office Open XML) structure of the document body or a specific range.
+Returns the raw XML and a structural summary (paragraph count, table count, body-child types).
+Writes the full XML to a VFS file for detailed inspection.
+
+**USE WHEN:**
+- You need to understand exact run-level formatting (fonts, colors, sizes) before editing
+- You need to inspect numbering definitions or custom styles
+- Before using editDocumentXml to preserve complex formatting
+- When getDocumentHtml doesn't provide enough detail
+
+**DO NOT USE for simple text reading** — use getDocumentContent or getDocumentHtml instead.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          scope: {
+            type: 'string',
+            description:
+              'What to extract: "body" for full document body, "selection" for current selection. Default: "body".',
+            enum: ['body', 'selection'],
+          },
+          outputFile: {
+            type: 'string',
+            description:
+              'VFS path to write the XML to (e.g., "/home/user/uploads/document.xml"). Default: "/home/user/uploads/ooxml-body.xml".',
+          },
+        },
+        required: [],
+      },
+      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+        const scope = args.scope || 'body';
+        const outputFile = args.outputFile || '/home/user/uploads/ooxml-body.xml';
+
+        // Get the target range
+        let range: Word.Range;
+        if (scope === 'selection') {
+          range = context.document.getSelection();
+        } else {
+          range = context.document.body.getRange();
+        }
+
+        // Get OOXML
+        const ooxml = range.getOoxml();
+        await context.sync();
+
+        const xmlStr = ooxml.value;
+
+        // Parse and analyze the XML structure
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(xmlStr, 'application/xml');
+
+        // Extract body children summary
+        const bodyEl = doc.getElementsByTagName('w:body')[0];
+        const bodyChildren: { index: number; type: string; textPreview: string }[] = [];
+
+        if (bodyEl) {
+          let paraIdx = 0;
+          let tableIdx = 0;
+          Array.from(bodyEl.childNodes).forEach((node, i) => {
+            if (node.nodeType !== 1) return; // skip non-elements
+            const el = node as Element;
+            const tagName = el.tagName || el.nodeName;
+
+            if (tagName === 'w:p') {
+              const textContent = (el.textContent || '').trim().substring(0, 80);
+              bodyChildren.push({
+                index: i,
+                type: `paragraph[${paraIdx}]`,
+                textPreview: textContent || '<empty>',
+              });
+              paraIdx++;
+            } else if (tagName === 'w:tbl') {
+              const rowCount = el.getElementsByTagName('w:tr').length;
+              bodyChildren.push({
+                index: i,
+                type: `table[${tableIdx}] (${rowCount} rows)`,
+                textPreview: '',
+              });
+              tableIdx++;
+            } else if (tagName === 'w:sdt') {
+              bodyChildren.push({
+                index: i,
+                type: 'contentControl',
+                textPreview: (el.textContent || '').trim().substring(0, 40),
+              });
+            } else if (tagName === 'w:sectPr') {
+              bodyChildren.push({ index: i, type: 'sectionProperties', textPreview: '' });
+            }
+          });
+        }
+
+        // Detect run-level formatting (w:rPr inside w:r)
+        const runProps = doc.getElementsByTagName('w:rPr');
+        const hasRunLevelOverrides = runProps.length > 0;
+
+        // Extract referenced style names
+        const styleRefs = new Set<string>();
+        const pStyles = doc.getElementsByTagName('w:pStyle');
+        for (let i = 0; i < pStyles.length; i++) {
+          const val = pStyles[i].getAttribute('w:val');
+          if (val) styleRefs.add(val);
+        }
+        const rStyles = doc.getElementsByTagName('w:rStyle');
+        for (let i = 0; i < rStyles.length; i++) {
+          const val = rStyles[i].getAttribute('w:val');
+          if (val) styleRefs.add(val);
+        }
+
+        // Clean RSID attributes (noise) from the XML before saving
+        const cleanedXml = xmlStr.replace(/\s*w:rsid\w*="[^"]*"/g, '');
+
+        // Write to VFS
+        await vfsWriteFile(outputFile, cleanedXml);
+
+        return JSON.stringify(
+          {
+            scope,
+            xmlLength: cleanedXml.length,
+            savedTo: outputFile,
+            hasRunLevelOverrides,
+            referencedStyles: Array.from(styleRefs),
+            bodyChildrenCount: bodyChildren.length,
+            bodyChildren: bodyChildren.slice(0, 50), // Limit to first 50 for context size
+            hint: hasRunLevelOverrides
+              ? 'Document has run-level formatting overrides. Use editDocumentXml with OOXML insertion to preserve formatting when editing.'
+              : 'No run-level overrides detected. Standard text editing tools (insertContent, searchAndReplace) should preserve formatting.',
           },
           null,
           2,
@@ -1806,13 +1978,23 @@ try {
         }
 
         try {
-          // Execute in sandbox with host restriction
+          const hasMutated = looksLikeMutationWord(code);
+
+          // Execute in sandbox with host restriction + VFS access
+          // VFS helpers ported from Office Agents SDK sandbox pattern
           const result = await sandboxedEval(
             code,
             {
               context,
               Word: typeof Word !== 'undefined' ? Word : undefined,
               Office: typeof Office !== 'undefined' ? Office : undefined,
+              readFile: vfsReadFile,
+              readFileBuffer: async (path: string) => {
+                const vfs = getVfs();
+                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
+                return vfs.readFileBuffer(fullPath);
+              },
+              writeFile: vfsWriteFile,
             },
             'Word', // Restrict to Word namespace only
           );
@@ -1822,6 +2004,7 @@ try {
               success: true,
               result: result ?? null,
               explanation,
+              hasMutated,
               warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
             },
             null,
@@ -1831,7 +2014,7 @@ try {
           return JSON.stringify(
             {
               success: false,
-              error: getErrorMessage(err),
+              error: getDetailedOfficeError(err),
               explanation,
               codeExecuted: truncateString(code, WORD_CODE_TRUNCATE_SHORT),
               hint: 'Check that all properties are loaded before access, and context.sync() is called.',

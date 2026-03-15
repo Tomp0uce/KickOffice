@@ -13,6 +13,7 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   getErrorMessage,
+  getDetailedOfficeError,
 } from './common';
 import { getLastRichContext, setLastRichContext } from './richContextStore';
 import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver';
@@ -612,7 +613,7 @@ try {
           return JSON.stringify(
             {
               success: false,
-              error: getErrorMessage(err),
+              error: getDetailedOfficeError(err),
               explanation,
               codeExecuted: truncateString(code, 200),
               hint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
