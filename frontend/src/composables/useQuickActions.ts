@@ -191,6 +191,9 @@ export function useQuickActions(options: UseQuickActionsOptions) {
       }
 
       // Step B: If no sufficient selection, screenshot + describe the current slide
+      // Step B: If no sufficient selection, screenshot the current slide and use it directly
+      // for image prompt generation (vision → imagePrompt in one LLM call, no intermediate description)
+      let slideScreenshotUri: string | null = null;
       if (imageContextMode === 'slide') {
         let currentSlideNum = 1;
         try {
@@ -203,33 +206,13 @@ export function useQuickActions(options: UseQuickActionsOptions) {
           });
           const screenshot = JSON.parse(screenshotJson);
           if (screenshot.base64 && !screenshot.error) {
-            const dataUri = `data:image/png;base64,${screenshot.base64}`;
-            let slideDesc = '';
-            await chatStream({
-              messages: [
-                {
-                  role: 'user',
-                  content: [
-                    { type: 'image_url', image_url: { url: dataUri } },
-                    {
-                      type: 'text',
-                      text: 'Describe the content and main visual concept of this presentation slide in 2-3 sentences. Focus on the main topic, key data or message, and overall visual context.',
-                    },
-                  ] as any,
-                },
-              ],
-              modelTier: resolveChatModelTier(),
-              onStream: async (text: string) => {
-                slideDesc = text;
-              },
-            });
-            if (slideDesc.trim()) imageContext = slideDesc.trim();
+            slideScreenshotUri = `data:image/png;base64,${screenshot.base64}`;
           }
         } catch (err) {
-          logService.warn('[AgentLoop] PPT-IMG: slide screenshot/describe failed', err);
+          logService.warn('[AgentLoop] PPT-IMG: slide screenshot failed', err);
         }
         // Last resort: fall back to raw slide text
-        if (!imageContext) {
+        if (!slideScreenshotUri) {
           try {
             const sn = await powerpointToolDefinitions.getCurrentSlideIndex.execute({});
             const slideNum = parseInt(sn, 10);
@@ -254,10 +237,46 @@ export function useQuickActions(options: UseQuickActionsOptions) {
             ? '🖼️ Illustrating the full slide'
             : '🖼️ Illustration de la slide complète';
 
-      // Step 1: call standard LLM to generate a proper image description prompt
+      // Step 1: call LLM to generate a proper image generation prompt
+      // - If we have a screenshot: pass image directly (vision) — one LLM call, most accurate
+      // - Otherwise: pass text content through the visual prompt template
       const visualPrompt = getPowerPointBuiltInPrompt().visual;
       const systemMsg = visualPrompt.system(lang);
-      const userMsg = visualPrompt.user(imageContext || '', lang);
+
+      // Build user message: vision (screenshot) or text (selection/fallback)
+      const visualRequirements = `Requirements for the image generation prompt:
+- The image must visually represent the SPECIFIC topic, concept, or data from this slide — not a generic illustration.
+- Choose the most appropriate visual style: photo-realistic scene, flat vector illustration, isometric diagram, infographic, conceptual metaphor, data visualization, etc.
+- If the concept benefits from labels or short text in the image, explicitly request it.
+- Describe composition: foreground, background, key focal elements.
+- Specify color palette, mood, and lighting that match the slide's tone (professional, energetic, calm, technical).
+- Wide landscape format (16:9), high resolution, suitable for professional presentation slides.
+- No generic filler images (e.g., no random handshakes or abstract blobs unless directly relevant).
+
+Constraints:
+1. Respond in ${lang}.
+2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.`;
+
+      type ChatMessage = { role: string; content: any };
+      const promptMessages: ChatMessage[] =
+        slideScreenshotUri
+          ? [
+              { role: 'system', content: systemMsg },
+              {
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: slideScreenshotUri } },
+                  {
+                    type: 'text',
+                    text: `Task: Based on this presentation slide image, write a detailed prompt for an image generation model that will produce a visual directly illustrating this slide's content.\n\n${visualRequirements}`,
+                  },
+                ],
+              },
+            ]
+          : [
+              { role: 'system', content: systemMsg },
+              { role: 'user', content: visualPrompt.user(imageContext || '', lang) },
+            ];
 
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(
@@ -274,10 +293,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
       try {
         let imagePrompt = '';
         await chatStream({
-          messages: [
-            { role: 'system', content: systemMsg },
-            { role: 'user', content: userMsg },
-          ],
+          messages: promptMessages as any,
           modelTier: resolveChatModelTier(),
           onStream: async (text: string) => {
             imagePrompt = text;
