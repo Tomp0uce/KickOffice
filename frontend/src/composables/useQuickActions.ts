@@ -267,7 +267,17 @@ Constraints:
               imagePart,
               {
                 type: 'text',
-                text: `Task: Write a detailed prompt for an image generation model that will produce a visual directly illustrating the selected text below. Use the slide screenshot only as a visual reference for colour palette, style and tone — the image must represent the selected text specifically, not the entire slide.\n\nSelected text to illustrate:\n"${imageContext}"\n\n${visualRequirements}`,
+                text: `Task: Write a detailed prompt for an image generation model to illustrate the selected text below.
+
+PRIORITY RULES (strictly follow this weighting):
+1. [HIGHEST WEIGHT] The image MUST illustrate the selected text — this is the sole subject of the image. Every visual element must directly serve this text.
+2. [MEDIUM WEIGHT] Borrow the slide's visual style from the screenshot: colour palette, graphic style (flat, realistic, technical, etc.), mood and tone.
+3. [IGNORE] All other text visible on the slide that is NOT the selected text must be completely ignored — do not let it influence the subject or composition of the image.
+
+Selected text to illustrate:
+"${imageContext}"
+
+${visualRequirements}`,
               },
             ],
           };
