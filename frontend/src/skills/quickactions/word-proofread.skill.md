@@ -82,6 +82,7 @@ Les corrections sont visibles dans le suivi des modifications.
 - **NEVER use `searchAndReplace`** — it does not create Track Changes
 - **NEVER rewrite or rephrase** — only fix genuine errors
 - **Preserve the author's voice** — do not change sentence structure unless required for correctness
+- **Preserve inline formatting** in `revisedText`: keep `**bold**`, `*italic*`, `__underline__` markers exactly as they appear in `originalText` — only correct the text content inside them
 - **Skip non-text content**: tables, code blocks, images
 - **Match language**: French text stays French, English stays English (do not translate)
 

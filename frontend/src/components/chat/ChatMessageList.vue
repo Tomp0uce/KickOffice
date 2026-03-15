@@ -166,6 +166,17 @@
             :icon-size="12"
             @click="context.handleRegenerate()"
           />
+          <!-- Undo: only on last assistant message when undo is available -->
+          <CustomButton
+            v-if="item.key === lastAssistantKey && context.canUndo.value && !loading"
+            :title="undoLabel"
+            text=""
+            :icon="Undo2"
+            type="secondary"
+            class="bg-surface! p-1.5! text-amber-600!"
+            :icon-size="12"
+            @click="context.undoLastInsert()"
+          />
         </div>
         <!-- User message edit button: hidden until hover (U-L2) -->
         <div
@@ -224,6 +235,7 @@ import {
   RotateCcw,
   Sparkles,
   Terminal,
+  Undo2,
 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
@@ -307,6 +319,7 @@ const thoughtProcessLabel = computed(
 );
 const regenerateLabel = computed(() => props.regenerateLabel ?? context.t('regenerate'));
 const editMessageLabel = computed(() => props.editMessageLabel ?? context.t('editMessage'));
+const undoLabel = computed(() => context.t('undoLastInsert', 'Undo'));
 
 // UX-H1 — Delegate scroll event to context or prop handler
 function handleScrollEvent() {

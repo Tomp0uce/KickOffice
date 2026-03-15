@@ -258,17 +258,17 @@ const wordQuickActions = computed<QuickAction[]>(() => [
     tooltipKey: 'translate_tooltip',
   },
   {
-    key: 'polish',
-    label: t('polish'),
-    icon: Sparkle,
-    tooltipKey: 'polish_tooltip',
-  },
-  {
     key: 'word-review',
     label: t('wordReview', 'Review'),
     icon: BookOpen,
     executeWithAgent: true,
     tooltipKey: 'wordReview_tooltip',
+  },
+  {
+    key: 'polish',
+    label: t('polish'),
+    icon: Sparkle,
+    tooltipKey: 'polish_tooltip',
   },
   {
     key: 'summary',
@@ -553,7 +553,7 @@ function handleEditMessage(message: DisplayMessage) {
   homePage.handleEditMessage(message);
 }
 
-const { insertMessageToDocument, copyMessageToClipboard } = officeInsert;
+const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
 provideHomePageContext({
@@ -590,6 +590,8 @@ provideHomePageContext({
   handleEditMessage,
   insertMessageToDocument,
   copyMessageToClipboard,
+  undoLastInsert,
+  canUndo,
   goToSettings,
   executeNewChat,
   handleSwitchSession,

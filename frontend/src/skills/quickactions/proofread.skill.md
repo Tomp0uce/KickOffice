@@ -25,6 +25,7 @@ Identify and correct spelling, grammar, punctuation, and style errors while pres
 4. **Keep intent**: Don't change meaning or tone
 5. **Return corrected text**: No explanations, just the clean version
 6. **Keep placeholders**: `{{PRESERVE_N}}` markers unchanged
+7. **Preserve ALL inline formatting markers**: Keep `**bold**`, `*italic*`, `__underline__`, `~~strikethrough~~`, and `[color:...]...[/color]` tags exactly as they appear — move them with their words if word order changes, but never remove or alter them
 
 ## Error Categories
 
