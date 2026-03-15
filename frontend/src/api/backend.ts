@@ -68,6 +68,8 @@ export interface CategorizedError {
   type: ErrorType;
   /** i18n key to use in the UI */
   i18nKey: string;
+  /** Optional raw message from the upstream provider (e.g. LiteLLM BadRequestError detail) */
+  rawDetail?: string;
 }
 
 /** Maps backend error codes to i18n keys. Falls back to message inspection if no code present. */
@@ -75,6 +77,7 @@ const ERROR_CODE_MAP: Record<string, CategorizedError> = {
   VALIDATION_ERROR: { type: 'unknown', i18nKey: 'failedToResponse' },
   AUTH_REQUIRED: { type: 'auth', i18nKey: 'credentialsRequired' },
   RATE_LIMITED: { type: 'rate_limit', i18nKey: 'errorRateLimit' },
+  LLM_BAD_REQUEST: { type: 'unknown', i18nKey: 'errorLlmBadRequest' },
   LLM_UPSTREAM_ERROR: { type: 'server', i18nKey: 'errorServer' },
   LLM_EMPTY_RESPONSE: { type: 'server', i18nKey: 'errorServer' },
   LLM_INVALID_JSON: { type: 'server', i18nKey: 'errorServer' },
@@ -106,7 +109,10 @@ export function categorizeError(error: unknown): CategorizedError {
   // Try structured error code first (from backend ErrorCodes registry)
   if (error instanceof Error && 'code' in error) {
     const mapped = ERROR_CODE_MAP[(error as any).code];
-    if (mapped) return mapped;
+    if (mapped) {
+      const rawDetail = (error as any).detail as string | undefined;
+      return rawDetail ? { ...mapped, rawDetail } : mapped;
+    }
   }
 
   // Fallback: inspect error message string
@@ -335,14 +341,30 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
   );
 
   if (!res.ok) {
-    const err = await res.text();
+    const errText = await res.text();
     const sanitizedBody = sanitizePayloadForLogs({ messages, modelTier, tools });
     logService.error('Chat API error', undefined, {
       status: res.status,
-      error: err,
+      error: errText,
       body: sanitizedBody,
     });
-    throw new Error(`Chat API error ${res.status}: ${err}`);
+    // Try to parse structured error response { code, error, detail? }
+    let errCode: string | undefined;
+    let errDetail: string | undefined;
+    try {
+      const parsed = JSON.parse(errText);
+      errCode = parsed?.code;
+      errDetail = parsed?.detail;
+    } catch {
+      // not JSON — keep defaults
+    }
+    const error = new Error(`Chat API error ${res.status}: ${errText}`) as Error & {
+      code?: string;
+      detail?: string;
+    };
+    if (errCode) error.code = errCode;
+    if (errDetail) error.detail = errDetail;
+    throw error;
   }
 
   const chatReqId = res.headers.get('x-request-id');

@@ -26,6 +26,7 @@ export interface HomePageContext {
   loading: Ref<boolean>;
   imageLoading: Ref<boolean>;
   backendOnline: Ref<boolean>;
+  backendChecked: Ref<boolean>;
   currentAction: Ref<string>;
   userInput: Ref<string>;
   customSystemPrompt: Ref<string>;

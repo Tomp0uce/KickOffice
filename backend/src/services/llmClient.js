@@ -161,6 +161,13 @@ export async function imageGeneration({ body, userCredentials }) {
  * @param {Response} response - The failed response
  * @param {string} context - Context string for logging
  */
+/**
+ * Extracts and sanitizes error text for logging.
+ * Returns the sanitized error text so callers can forward it to the client.
+ * @param {Response} response - The failed response
+ * @param {string} context - Context string for logging
+ * @returns {{ status: number, rawMessage: string }} Sanitized error info
+ */
 export async function handleErrorResponse(response, context) {
   const errorText = await response.text()
   const sanitized = sanitizeErrorText(errorText)
@@ -169,4 +176,18 @@ export async function handleErrorResponse(response, context) {
     errorText: sanitized,
     traffic: 'system'
   })
+
+  // Try to extract a user-readable message from the LiteLLM JSON error body
+  // (e.g. { "error": { "message": "litellm.BadRequestError: ..." } })
+  let rawMessage = sanitized
+  try {
+    const parsed = JSON.parse(sanitized)
+    if (parsed?.error?.message) rawMessage = parsed.error.message
+    else if (typeof parsed?.error === 'string') rawMessage = parsed.error
+    else if (parsed?.message) rawMessage = parsed.message
+  } catch {
+    // Not JSON — keep sanitized raw text
+  }
+
+  return { status: response.status, rawMessage }
 }

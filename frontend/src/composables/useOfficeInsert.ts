@@ -146,7 +146,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     insertImageToPowerPoint,
   } = options;
 
-  const documentUndo = useDocumentUndo({ hostIsWord, hostIsOutlook });
+  const documentUndo = useDocumentUndo({ hostIsWord, hostIsOutlook, hostIsExcel, hostIsPowerPoint });
 
   function normalizeInsertionContent(rawContent: string): string {
     return rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -198,21 +198,23 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     });
 
     // Capture selection state before insert for undo support
-    const savedHtml = await documentUndo.captureBeforeInsert();
+    const savedSnapshot = await documentUndo.captureBeforeInsert();
 
     if (hostIsOutlook) {
       await doOutlookInsert(normalizedContent, richHtml, copyToClipboard, t);
-      if (savedHtml != null) documentUndo.saveSnapshot(savedHtml, 'outlook');
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
     if (hostIsPowerPoint) {
       await doPowerPointInsert(normalizedContent, copyToClipboard, t);
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
     if (hostIsExcel) {
       await doExcelInsert(normalizedContent, copyToClipboard, t);
+      if (savedSnapshot) documentUndo.saveSnapshot(savedSnapshot);
       return;
     }
 
@@ -226,9 +228,9 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     );
 
     // After Word insert, wrap in content control for undo targeting
-    if (hostIsWord && savedHtml != null) {
+    if (hostIsWord && savedSnapshot) {
       const tag = await documentUndo.wrapInsertedContentInWord();
-      if (tag) documentUndo.saveSnapshot(savedHtml, 'word', tag);
+      if (tag) documentUndo.saveSnapshot(savedSnapshot, tag);
     }
   }
 

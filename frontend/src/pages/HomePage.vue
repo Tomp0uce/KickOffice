@@ -12,9 +12,9 @@
         @delete-session="handleDeleteSession"
       />
 
-      <!-- Persistent Offline Indicator -->
+      <!-- Persistent Offline Indicator — only shown after first check to avoid false negative flash -->
       <div
-        v-if="!backendOnline"
+        v-if="backendChecked && !backendOnline"
         class="flex items-center justify-center bg-red-500/10 py-1.5 px-3 rounded-md border border-red-500/20 shadow-xs mx-4 mt-2"
       >
         <span class="text-xs text-red-500 font-medium flex items-center gap-2">
@@ -201,7 +201,7 @@ const isNewChatConfirmVisible = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
 const selectedModelTier = useStorage<ModelTier>(localStorageKey.modelTier, 'standard');
 
-const { backendOnline } = useHealthCheck(availableModels, selectedModelTier);
+const { backendOnline, backendChecked } = useHealthCheck(availableModels, selectedModelTier);
 
 const hostIsExcel = isExcel();
 const hostIsWord = isWord();
@@ -563,6 +563,7 @@ provideHomePageContext({
   loading,
   imageLoading,
   backendOnline,
+  backendChecked,
   currentAction,
   userInput,
   customSystemPrompt,

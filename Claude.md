@@ -231,3 +231,22 @@ When asked to create a Pull Request:
 1. **Command Chaining**: On Linux/bash, use `&&` for sequential dependent commands.
 2. **NPM Scripts**: Do not run `npm run check` or `npm run type-check` unless verified in `package.json`. Use `npx tsc --noEmit` for type checking.
 3. **Git**: Never use `--no-verify`, `--force` on shared branches, or `reset --hard` without explicit user instruction. Create new commits rather than amending published ones.
+
+## 16) Interactive Decisions on New or Modified Features
+
+When you are **unsure how to implement** a new feature or modify an existing one — because there are multiple valid approaches with different trade-offs — **do NOT silently pick one and implement it**. Instead:
+
+1. **Use the `AskUserQuestion` tool** to ask an interactive question.
+2. Present **2–4 concrete options**, each with:
+   - A short label (1–5 words)
+   - A description of the resulting **behavior/UX** that the user will observe (not implementation details)
+   - Trade-offs if relevant (e.g., simpler but less precise, richer but more complex)
+3. Wait for the user's choice **before writing any code**.
+
+**What to ask about** (non-exhaustive):
+- UI placement and visibility (e.g., "Where should the undo button appear?")
+- Scope of a feature (e.g., "Should undo cover all operations or only quick actions?")
+- Fallback behavior (e.g., "What should happen if the undo state is unavailable?")
+- Conflict with existing UX (e.g., "This overlaps with Track Changes — prefer to replace it or complement it?")
+
+**What NOT to ask about**: implementation libraries, function names, file structure, code style — decide those yourself based on the existing codebase patterns.

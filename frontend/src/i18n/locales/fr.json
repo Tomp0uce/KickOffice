@@ -449,6 +449,7 @@
   "errorNetwork": "Erreur de connexion au serveur. Vérifiez votre connexion réseau et réessayez.",
   "errorRateLimit": "Trop de requêtes — limite atteinte. Attendez quelques secondes et réessayez.",
   "errorServer": "Erreur interne du serveur. Consultez les logs du backend ou réessayez plus tard.",
+  "errorLlmBadRequest": "La requête a été rejetée par le service IA.",
   "errorTruncated": "⚠️ La réponse a été tronquée : le nombre de tokens maximum a été atteint. Simplifiez votre demande ou augmentez la limite.",
   "modelTier.standard": "Qualité",
   "modelTier.reasoning": "Réflexion profonde",

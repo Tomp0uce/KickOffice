@@ -442,6 +442,7 @@
   "errorNetwork": "Connection error. Check your network connection and try again.",
   "errorRateLimit": "Too many requests — rate limit reached. Wait a few seconds and try again.",
   "errorServer": "Internal server error. Check the backend logs or try again later.",
+  "errorLlmBadRequest": "The AI service rejected the request.",
   "errorTruncated": "⚠️ Response truncated: maximum token limit reached. Simplify your request or increase the limit.",
   "modelTier.standard": "Quality",
   "modelTier.reasoning": "Deep Thinking",
