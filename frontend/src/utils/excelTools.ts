@@ -150,8 +150,8 @@ function looksLikeMutation(code: string): boolean {
   return EXCEL_MUTATION_PATTERNS.some(p => p.test(code));
 }
 
-/** Highlight color for cells modified by the agent. */
-const AGENT_HIGHLIGHT_COLOR = '#FFFDE7'; // light yellow
+/** Bottom border color used to mark cells modified by the agent. */
+const AGENT_MARK_COLOR = '#2563EB'; // blue underline — visible, rarely used, easy to clear
 
 /** Coerce a CSV string value to its native type. Ported from Office Agents csv-to-sheet. */
 function coerceValue(value: string): string | number | boolean {
@@ -385,6 +385,15 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
                 description: 'Number format string (e.g., "0.00%", "#,##0", "dd/mm/yyyy")',
               },
               horizontalAlignment: { type: 'string', enum: ['Left', 'Center', 'Right'] },
+              borderBottomStyle: {
+                type: 'string',
+                description: 'Bottom border style. Use "continuous" to underline modified cells as a visible marker. Use "none" to remove.',
+                enum: ['none', 'continuous', 'dash'],
+              },
+              borderBottomColor: {
+                type: 'string',
+                description: 'Bottom border color hex (e.g., "#2563EB"). Defaults to blue if borderBottomStyle is set.',
+              },
             },
           },
           copyToRange: {
@@ -420,6 +429,16 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           if (formatting.fillColor) range.format.fill.color = formatting.fillColor;
           if (formatting.fontColor) range.format.font.color = formatting.fontColor;
           if (formatting.numberFormat) range.numberFormat = [[formatting.numberFormat]];
+          if (formatting.borderBottomStyle) {
+            const borderStyleMap: Record<string, any> = {
+              none: Excel.BorderLineStyle.none,
+              continuous: Excel.BorderLineStyle.continuous,
+              dash: Excel.BorderLineStyle.dash,
+            };
+            const bottomBorder = range.format.borders.getItem(Excel.BorderIndex.edgeBottom);
+            bottomBorder.style = borderStyleMap[formatting.borderBottomStyle] ?? Excel.BorderLineStyle.continuous;
+            if (formatting.borderBottomColor) bottomBorder.color = formatting.borderBottomColor;
+          }
           if (formatting.horizontalAlignment) {
             const alignMap: Record<string, any> = {
               Left: Excel.HorizontalAlignment.left,
@@ -658,10 +677,21 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
 
             if (hasHeaders) {
               if (seriesBy === 'columns' && dataRange.columnCount > 1) {
-                categoryRange = dataRange.getColumn(0);
+                // Category labels = first column, EXCLUDING the top-left header cell so it
+                // never shows up as a data category (e.g. "Mois" must not appear in the axis).
+                categoryRange = dataRange
+                  .getColumn(0)
+                  .getOffsetRange(1, 0)
+                  .getResizedRange(-1, 0);
+                // Plot data = remaining columns (row 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(0, 1).getResizedRange(0, -1);
               } else if (seriesBy === 'rows' && dataRange.rowCount > 1) {
-                categoryRange = dataRange.getRow(0);
+                // Category labels = first row, EXCLUDING the top-left header cell
+                categoryRange = dataRange
+                  .getRow(0)
+                  .getOffsetRange(0, 1)
+                  .getResizedRange(0, -1);
+                // Plot data = remaining rows (column 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(1, 0).getResizedRange(-1, 0);
               }
             }
@@ -2319,14 +2349,14 @@ try {
       name: 'clearAgentHighlights',
       category: 'write',
       description:
-        'Clear the light yellow background highlights that were applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual indicators.',
+        'Clear the bottom-border underline markings applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual underline indicators.',
       inputSchema: {
         type: 'object',
         properties: {
           range: {
             type: 'string',
             description:
-              'A1 notation range to clear highlights from (e.g., "A1:D10"). Clears used range if omitted.',
+              'A1 notation range to clear markings from (e.g., "A1:D10"). Clears used range if omitted.',
           },
           sheetName: {
             type: 'string',
@@ -2341,18 +2371,14 @@ try {
         targetRange.load('address');
         await context.sync();
 
-        // Clear only the yellow highlight fill, preserving other formatting
-        targetRange.format.fill.load('color');
-        await context.sync();
-
-        // We need to iterate cells to only clear agent-highlighted ones
-        // For simplicity, clear fill on the entire range — the user called this intentionally
-        targetRange.format.fill.clear();
+        // Clear the bottom border (underline) marking applied by the agent
+        targetRange.format.borders.getItem(Excel.BorderIndex.edgeBottom).style =
+          Excel.BorderLineStyle.none;
         await context.sync();
 
         return JSON.stringify({
           success: true,
-          message: `Cleared cell fill formatting on ${targetRange.address}. Agent highlights removed.`,
+          message: `Cleared bottom-border markings on ${targetRange.address}. Agent underline indicators removed.`,
         });
       },
     },
