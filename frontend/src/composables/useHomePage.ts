@@ -18,6 +18,7 @@ import type { SavedPrompt } from '@/utils/savedPrompts';
 import { loadSavedPromptsFromStorage } from '@/utils/savedPrompts';
 import { TEXTAREA_MAX_HEIGHT_PX } from '@/constants/limits';
 import type { useSessionManager } from '@/composables/useSessionManager';
+import { resetVfs } from '@/utils/vfs';
 
 type SessionManager = ReturnType<typeof useSessionManager>;
 
@@ -89,7 +90,8 @@ export function useHomePage(deps: {
   // UX-H1 — Handle scroll event to detect manual user scrolling
   function handleScroll() {
     // Ignore scroll events fired by our own programmatic scrolls
-    if (Date.now() - programmaticScrollTs < 300) return;
+    // 600ms covers smooth scrolls which can take 500ms+ to complete
+    if (Date.now() - programmaticScrollTs < 600) return;
 
     const rawContainer = messageListRef.value?.containerEl;
     const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
@@ -177,6 +179,8 @@ export function useHomePage(deps: {
     if (loading.value) stopGeneration();
     await sessionManager.newSession();
     resetSessionStats();
+    rebuildSessionFiles(); // clear session files — prevents leaking files into the new session
+    resetVfs();            // clear VFS — new session starts with a clean filesystem
     userInput.value = '';
     customSystemPrompt.value = '';
     selectedPromptId.value = '';
@@ -205,6 +209,7 @@ export function useHomePage(deps: {
     if (loading.value) return;
     await sessionManager.switchSession(sessionId);
     rebuildSessionFiles();
+    resetVfs(); // each session has its own VFS state
     resetSessionStats();
     await nextTick();
     scrollToConversationTop();

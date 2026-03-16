@@ -92,8 +92,32 @@ async function doWordInsert(
   useWordFormatting: boolean,
   copyToClipboard: Function,
   t: (key: string) => string,
+  ccTag?: string, // If provided, insert into the pre-created Content Control (undo anchor)
 ) {
   try {
+    // When a CC tag is available, insert directly INTO the CC.
+    // The CC was created before the insert (in captureBeforeInsert) so it correctly
+    // wraps the original selection. Inserting into it keeps the undo anchor intact.
+    if (ccTag) {
+      const htmlToInsert = richHtml
+        ? DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } })
+        : renderOfficeCommonApiHtml(content);
+      await Word.run(async context => {
+        const ccs = context.document.contentControls.getByTag(ccTag);
+        ccs.load('items');
+        await context.sync();
+        if (ccs.items.length > 0) {
+          ccs.items[0].insertHtml(htmlToInsert, 'Replace');
+          await context.sync();
+        } else {
+          // CC not found (e.g. user manually undid something) — fall through to normal insert
+          throw new Error('CC not found, falling back to normal insert');
+        }
+      });
+      messageUtil.success(t('inserted'));
+      return;
+    }
+
     if (richHtml) {
       const sanitizedHtml = DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } });
       await Word.run(async context => {
@@ -218,6 +242,9 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       return;
     }
 
+    // Pass the CC tag so doWordInsert can insert INTO the pre-created CC anchor.
+    // The CC was created by captureBeforeInsert before the selection was modified.
+    const ccTag = savedSnapshot?.contentControlTag;
     await doWordInsert(
       normalizedContent,
       type,
@@ -225,12 +252,12 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
       useWordFormatting.value,
       copyToClipboard,
       t,
+      ccTag,
     );
 
-    // After Word insert, wrap in content control for undo targeting
     if (hostIsWord && savedSnapshot) {
-      const tag = await documentUndo.wrapInsertedContentInWord();
-      if (tag) documentUndo.saveSnapshot(savedSnapshot, tag);
+      // CC tag is already embedded in savedSnapshot — no extra wrap step needed.
+      documentUndo.saveSnapshot(savedSnapshot);
     }
   }
 

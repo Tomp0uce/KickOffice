@@ -71,15 +71,21 @@ export async function withSlideZip(
     });
     await context.sync();
 
-    // Delete original (reload to find it)
-    slides.load('items/id');
+    // Delete the original slide by its stable ID.
+    // IMPORTANT: use a FRESH slides collection reference after the insertion — the original
+    // `slides` proxy may be stale and not reflect the post-insert state reliably.
+    // Position-based indexing is intentionally avoided: if the API inserts at an unexpected
+    // position, index arithmetic would risk deleting a neighbouring slide.
+    const freshSlides = context.presentation.slides;
+    freshSlides.load('items/id');
     await context.sync();
 
-    const original = slides.items.find((s: any) => s.id === slideId);
+    const original = freshSlides.items.find((s: any) => s.id === slideId);
     if (original) {
       original.delete();
       await context.sync();
     }
+    // If the original is not found (e.g. already gone), no deletion happens — safe.
   }
 
   return result;

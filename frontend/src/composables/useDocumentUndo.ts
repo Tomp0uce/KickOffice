@@ -73,8 +73,7 @@ export function useDocumentUndo(options: {
   async function captureBeforeInsert(): Promise<Partial<UndoSnapshot> | null> {
     try {
       if (hostIsWord) {
-        const html = await captureWordSelection();
-        return html != null ? { host: 'word', html } : null;
+        return await captureWordSelectionAndWrap();
       }
       if (hostIsOutlook) {
         const html = await captureOutlookSelection();
@@ -92,13 +91,29 @@ export function useDocumentUndo(options: {
     return null;
   }
 
-  async function captureWordSelection(): Promise<string | null> {
-    return new Promise<string | null>((resolve) => {
+  /**
+   * Capture the current Word selection AND wrap it in a Content Control.
+   * The CC acts as a persistent anchor so the subsequent insert (which targets the CC)
+   * and the eventual undo (which finds the CC by tag) are always in sync.
+   */
+  async function captureWordSelectionAndWrap(): Promise<Partial<UndoSnapshot> | null> {
+    const tag = `${UNDO_CC_TAG_PREFIX}${Date.now()}`;
+    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
       Word.run(async (context: any) => {
         const selection = context.document.getSelection();
         const htmlResult = selection.getHtml();
+        // Wrap the selection in a hidden CC — this becomes the undo anchor.
+        // Even for empty selections (cursor only), an empty CC is created at the cursor.
+        const cc = selection.insertContentControl();
+        cc.tag = tag;
+        cc.appearance = 'Hidden';
+        cc.title = 'KickOffice Undo';
         await context.sync();
-        resolve(htmlResult.value || null);
+        resolve({
+          host: 'word',
+          html: htmlResult.value ?? '',
+          contentControlTag: tag,
+        });
       }).catch(() => resolve(null));
     });
   }
@@ -167,32 +182,11 @@ export function useDocumentUndo(options: {
     undoSnapshot.value = {
       ...partial,
       timestamp: Date.now(),
-      contentControlTag: tag,
+      // Only override contentControlTag when an explicit tag is passed (backward compat).
+      // The new Word flow embeds the tag directly in the partial from captureWordSelectionAndWrap.
+      ...(tag !== undefined ? { contentControlTag: tag } : {}),
     } as UndoSnapshot;
     canUndo.value = true;
-  }
-
-  /**
-   * Wrap the just-inserted content in a Word Content Control for undo targeting.
-   * Returns the tag assigned to the content control.
-   */
-  async function wrapInsertedContentInWord(): Promise<string | null> {
-    const tag = `${UNDO_CC_TAG_PREFIX}${Date.now()}`;
-    try {
-      await Word.run(async (context: any) => {
-        const selection = context.document.getSelection();
-        const cc = selection.insertContentControl();
-        cc.tag = tag;
-        cc.appearance = 'BoundingBox';
-        cc.color = '#4A90D9';
-        cc.title = 'KickOffice — Ctrl+Z to undo';
-        await context.sync();
-      });
-      return tag;
-    } catch (err) {
-      logService.warn('[useDocumentUndo] Failed to wrap inserted content in CC', err);
-      return null;
-    }
   }
 
   /**
@@ -336,7 +330,6 @@ export function useDocumentUndo(options: {
     canUndo,
     captureBeforeInsert,
     saveSnapshot,
-    wrapInsertedContentInWord,
     undoLastInsert,
     clearUndo,
   };

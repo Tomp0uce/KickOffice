@@ -150,8 +150,8 @@ function looksLikeMutation(code: string): boolean {
   return EXCEL_MUTATION_PATTERNS.some(p => p.test(code));
 }
 
-/** Highlight color for cells modified by the agent. */
-const AGENT_HIGHLIGHT_COLOR = '#FFFDE7'; // light yellow
+// Agent-modified cells are marked with text underline (font.underline = single).
+// This is auto-applied by setCellRange and cleared by clearAgentHighlights.
 
 /** Coerce a CSV string value to its native type. Ported from Office Agents csv-to-sheet. */
 function coerceValue(value: string): string | number | boolean {
@@ -224,7 +224,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'getSelectedCells',
       category: 'read',
       description:
-        'Get the values, address, and dimensions of the currently selected cells in Excel. Returns a JSON object with address, rowCount, columnCount, and the 2D values array.',
+        'Get the values, formulas, address, and dimensions of the currently selected cells in Excel. Returns a JSON object with address, rowCount, columnCount, the 2D values array, and the 2D formulas array (cells without formulas show their value as-is in the formulas array). Always use formulas (not values) when explaining how a cell is calculated.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -232,7 +232,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       },
       executeExcel: async context => {
         const range = context.workbook.getSelectedRange();
-        range.load('values, address, rowCount, columnCount');
+        range.load('values, formulas, address, rowCount, columnCount');
         await context.sync();
         return JSON.stringify(
           {
@@ -240,6 +240,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             rowCount: range.rowCount,
             columnCount: range.columnCount,
             values: range.values,
+            formulas: range.formulas,
           },
           null,
           2,
@@ -251,7 +252,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'getWorksheetData',
       category: 'read',
       description:
-        'Get data from a worksheet. By default, reads all data from the used range of the active worksheet. Optionally specify a worksheet name and/or a specific range address. Returns the values, address, row count, and column count.',
+        'Get data from a worksheet. By default, reads all data from the used range of the active worksheet. Optionally specify a worksheet name and/or a specific range address. Returns the values, formulas, address, row count, and column count. Use formulas (not values) when you need to understand how cells are calculated.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -274,7 +275,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           : context.workbook.worksheets.getActiveWorksheet();
 
         const range = address ? sheet.getRange(address) : sheet.getUsedRange();
-        range.load('values, address, rowCount, columnCount');
+        range.load('values, formulas, address, rowCount, columnCount');
         await context.sync();
 
         return JSON.stringify(
@@ -284,6 +285,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             rowCount: range.rowCount,
             columnCount: range.columnCount,
             values: range.values,
+            formulas: range.formulas,
           },
           null,
           2,
@@ -339,7 +341,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'setCellRange',
       category: 'write',
       description:
-        'PREFERRED tool for ALL write operations in Excel. Write values OR formulas to a range, apply formatting, and optionally fill down a formula to a larger range — all in one call. Use `copyToRange` to fill a formula from the first row of `address` down to a larger range (e.g., address="C2:C2", copyToRange="C2:C50"). For multi-cell writes, always prefer passing a 2D array to `values` over calling this tool multiple times.',
+        'PREFERRED tool for ALL write operations in Excel. Write values OR formulas to a range, apply formatting, and optionally fill down a formula to a larger range — all in one call. Automatically underlines modified cells (font underline) so the user can review changes; use `clearAgentHighlights` to remove the underline when done. Use `copyToRange` to fill a formula from the first row of `address` down to a larger range (e.g., address="C2:C2", copyToRange="C2:C50"). For multi-cell writes, always prefer passing a 2D array to `values` over calling this tool multiple times.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -412,6 +414,11 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
         } else if (values !== undefined) {
           range.values = values;
+        }
+
+        // Auto-mark modified cells with text underline so the user can review changes
+        if (values !== undefined || formulas) {
+          range.format.font.underline = Excel.RangeUnderlineStyle.single;
         }
 
         // Apply formatting
@@ -658,10 +665,21 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
 
             if (hasHeaders) {
               if (seriesBy === 'columns' && dataRange.columnCount > 1) {
-                categoryRange = dataRange.getColumn(0);
+                // Category labels = first column, EXCLUDING the top-left header cell so it
+                // never shows up as a data category (e.g. "Mois" must not appear in the axis).
+                categoryRange = dataRange
+                  .getColumn(0)
+                  .getOffsetRange(1, 0)
+                  .getResizedRange(-1, 0);
+                // Plot data = remaining columns (row 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(0, 1).getResizedRange(0, -1);
               } else if (seriesBy === 'rows' && dataRange.rowCount > 1) {
-                categoryRange = dataRange.getRow(0);
+                // Category labels = first row, EXCLUDING the top-left header cell
+                categoryRange = dataRange
+                  .getRow(0)
+                  .getOffsetRange(0, 1)
+                  .getResizedRange(0, -1);
+                // Plot data = remaining rows (column 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(1, 0).getResizedRange(-1, 0);
               }
             }
@@ -2319,14 +2337,14 @@ try {
       name: 'clearAgentHighlights',
       category: 'write',
       description:
-        'Clear the light yellow background highlights that were applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual indicators.',
+        'Clear the text underline markings automatically applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual underline indicators.',
       inputSchema: {
         type: 'object',
         properties: {
           range: {
             type: 'string',
             description:
-              'A1 notation range to clear highlights from (e.g., "A1:D10"). Clears used range if omitted.',
+              'A1 notation range to clear markings from (e.g., "A1:D10"). Clears used range if omitted.',
           },
           sheetName: {
             type: 'string',
@@ -2341,18 +2359,13 @@ try {
         targetRange.load('address');
         await context.sync();
 
-        // Clear only the yellow highlight fill, preserving other formatting
-        targetRange.format.fill.load('color');
-        await context.sync();
-
-        // We need to iterate cells to only clear agent-highlighted ones
-        // For simplicity, clear fill on the entire range — the user called this intentionally
-        targetRange.format.fill.clear();
+        // Clear the font underline marking automatically applied by setCellRange
+        targetRange.format.font.underline = Excel.RangeUnderlineStyle.none;
         await context.sync();
 
         return JSON.stringify({
           success: true,
-          message: `Cleared cell fill formatting on ${targetRange.address}. Agent highlights removed.`,
+          message: `Cleared text underline markings on ${targetRange.address}. Agent modification indicators removed.`,
         });
       },
     },
