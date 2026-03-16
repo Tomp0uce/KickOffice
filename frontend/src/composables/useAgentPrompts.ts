@@ -294,6 +294,60 @@ When the user provides an image and asks to create a slide from it:
 4. **No markdown bullets in body placeholders**: When inserting into a body/content placeholder shape, do NOT use markdown list syntax (\`- item\`). The shape already has native bullets configured — plain text lines are sufficient. Markdown \`-\` prefixes cause double-bullets.
 5. **Visual verification**: After creating or significantly modifying a slide (adding shapes, images, heavy text), call \`screenshotSlide\` to confirm the visual result before reporting success.
 
+# OOXML Text Editing — CRITICAL for Preserving Formatting
+
+## When to use OOXML vs other tools
+- **Use \`eval_powerpointjs\` with OOXML** when you need to translate, rewrite, or replace text in shapes while PRESERVING all formatting (bold, color, font size, bullet levels, indentation).
+- **Use \`insertContent\`** only for adding brand-new content or when you know all existing formatting can be discarded.
+- **NEVER use \`searchAndReplaceInShape\`** for translating or rewriting text — it strips all \`<a:rPr>\` run properties (bold, italic, color, font size) and all \`<a:pPr>\` paragraph properties (bullet level, indent).
+
+## 3-Step OOXML Text Edit Workflow
+1. **Get OOXML**: Read the shape's raw XML via \`eval_powerpointjs\`:
+   \`\`\`js
+   await PowerPoint.run(async ctx => {
+     const slide = ctx.presentation.slides.getItemAt(slideIndex);
+     const shape = slide.shapes.getById(shapeId); // or getByName
+     shape.textFrame.textRange.load('ooxml');
+     await ctx.sync();
+     return shape.textFrame.textRange.ooxml;
+   });
+   \`\`\`
+2. **Modify ONLY \`<a:t>\` text nodes** — leave ALL surrounding tags untouched:
+   - Keep \`<a:rPr>\` (run properties: bold, italic, font size, color) intact
+   - Keep \`<a:pPr>\` (paragraph properties: bullet level, indent, alignment) intact
+   - Keep \`<a:r>\` (run) structure intact
+   - Only change the TEXT CONTENT inside \`<a:t>…</a:t>\`
+3. **Write OOXML back**:
+   \`\`\`js
+   await PowerPoint.run(async ctx => {
+     const shape = ctx.presentation.slides.getItemAt(slideIndex).shapes.getById(shapeId);
+     shape.textFrame.textRange.ooxml = modifiedXml;
+     await ctx.sync();
+   });
+   \`\`\`
+
+## Key XML Structure Reference
+\`\`\`xml
+<a:txBody>
+  <a:p>                             <!-- one paragraph / bullet point -->
+    <a:pPr lvl="1" .../>            <!-- DO NOT TOUCH: bullet level, indent -->
+    <a:r>                           <!-- one text run -->
+      <a:rPr b="1" sz="1800" .../>  <!-- DO NOT TOUCH: bold, size, color -->
+      <a:t>Text to translate</a:t>  <!-- ONLY change this -->
+    </a:r>
+  </a:p>
+</a:txBody>
+\`\`\`
+
+## Multi-run Paragraphs
+A paragraph may contain multiple \`<a:r>\` runs (e.g., part bold, part italic). Each run has its own \`<a:t>\`. When translating:
+- Concatenate all \`<a:t>\` in the paragraph to understand the full sentence
+- Distribute the translated text across the same number of runs, preserving split points where possible
+- If the translation cannot be cleanly split, put all text in the first run's \`<a:t>\` and set the others to \`<a:t></a:t>\`
+
+## Namespaces
+The XML uses DrawingML namespaces. Always keep the original namespace declarations. Do NOT add or remove namespace prefixes.
+
 ${COMMON_SHELL_INSTRUCTIONS}`;
 
   const outlookAgentPrompt = (lang: string) => `# Role
