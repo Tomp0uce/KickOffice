@@ -71,14 +71,35 @@ export async function withSlideZip(
     });
     await context.sync();
 
-    // Delete original (reload to find it)
+    // Delete original slide.
+    // After insertSlidesFromBase64, the new slide is inserted before (or at position of) the
+    // original. The original is now shifted one position forward.
+    // Use position-based deletion (slideIndex + 1) as primary; ID-based as fallback.
     slides.load('items/id');
     await context.sync();
 
-    const original = slides.items.find((s: any) => s.id === slideId);
-    if (original) {
-      original.delete();
-      await context.sync();
+    const insertedCount = slides.items.length; // total slides after insert
+    const expectedOriginalIndex = slideIndex + 1; // original was pushed one slot forward
+    if (expectedOriginalIndex < insertedCount) {
+      const candidateByPos = slides.items[expectedOriginalIndex];
+      if (candidateByPos.id === slideId) {
+        candidateByPos.delete();
+        await context.sync();
+      } else {
+        // Position-based guess was wrong (e.g. insert at end) — fall back to ID search
+        const original = slides.items.find((s: any) => s.id === slideId);
+        if (original) {
+          original.delete();
+          await context.sync();
+        }
+      }
+    } else {
+      // Fallback: search by ID
+      const original = slides.items.find((s: any) => s.id === slideId);
+      if (original) {
+        original.delete();
+        await context.sync();
+      }
     }
   }
 

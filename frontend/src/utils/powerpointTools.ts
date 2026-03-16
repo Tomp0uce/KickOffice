@@ -690,23 +690,54 @@ PARAMETERS:
               // If not found by id/name, search all shapes (best-effort)
               const searchRoot: Element = targetSp ?? doc.documentElement;
 
-              // Replace text content within <a:t> elements
+              // Replace text content within <a:t> elements.
+              // Text in OOXML can be split across multiple <a:r> runs within a <a:p> paragraph.
+              // Strategy: for each <a:p>, concatenate all <a:t> text, check for match,
+              // then redistribute the replacement across the affected runs.
               const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
-              const textNodes = searchRoot.getElementsByTagNameNS(nsA, 't');
-              for (let i = 0; i < textNodes.length; i++) {
-                const node = textNodes[i];
-                const text = node.textContent ?? '';
-                if (text.includes(searchText)) {
-                  const newText = replaceAll
-                    ? text.split(searchText).join(replaceText)
-                    : text.replace(searchText, replaceText);
-                  if (newText !== text) {
-                    node.textContent = newText;
-                    replacements++;
-                    markDirty();
-                    if (!replaceAll) break;
+              const paragraphs = searchRoot.getElementsByTagNameNS(nsA, 'p');
+              let done = false;
+              for (let pi = 0; pi < paragraphs.length && !(done && !replaceAll); pi++) {
+                const para = paragraphs[pi];
+                const runs = para.getElementsByTagNameNS(nsA, 'r');
+                if (runs.length === 0) continue;
+
+                // Collect text of each run and build concatenated paragraph text
+                const runTexts: string[] = [];
+                for (let ri = 0; ri < runs.length; ri++) {
+                  const tNode = runs[ri].getElementsByTagNameNS(nsA, 't')[0];
+                  runTexts.push(tNode?.textContent ?? '');
+                }
+                const paraText = runTexts.join('');
+
+                if (!paraText.includes(searchText)) continue;
+
+                // Perform replacement(s) on concatenated text
+                const newParaText = replaceAll
+                  ? paraText.split(searchText).join(replaceText)
+                  : paraText.replace(searchText, replaceText);
+
+                if (newParaText === paraText) continue;
+
+                // Redistribute newParaText back across the same number of runs,
+                // keeping run boundaries as close to original as possible.
+                // Simple approach: put all new text in the first run, empty the rest.
+                const firstTNode = runs[0].getElementsByTagNameNS(nsA, 't')[0];
+                if (firstTNode) {
+                  firstTNode.textContent = newParaText;
+                  // Preserve xml:space="preserve" if the new text has leading/trailing spaces
+                  if (newParaText !== newParaText.trim()) {
+                    firstTNode.setAttribute('xml:space', 'preserve');
                   }
                 }
+                for (let ri = 1; ri < runs.length; ri++) {
+                  const tNode = runs[ri].getElementsByTagNameNS(nsA, 't')[0];
+                  if (tNode) tNode.textContent = '';
+                }
+
+                replacements++;
+                markDirty();
+                if (!replaceAll) done = true;
               }
 
               if (replacements > 0) {
@@ -873,6 +904,98 @@ replaces the paragraph text, then re-applies those font properties so style is f
       executePowerPoint: async (context, args: Record<string, any>) => {
         const { slideNumber, shapeIdOrName, paragraphReplacements } = args;
 
+        // XML fallback: edit paragraph text directly in OOXML, preserving all run formatting
+        const tryXmlParagraphReplacement = async (): Promise<{
+          success: boolean;
+          results: { paragraphIndex: number; status: string }[];
+          error?: string;
+        }> => {
+          if (!isPowerPointApiSupported('1.5')) {
+            return {
+              success: false,
+              results: [],
+              error: 'PowerPointApi 1.5 not supported',
+            };
+          }
+          const slideIndex = Math.trunc(Number(slideNumber)) - 1;
+          const results: { paragraphIndex: number; status: string }[] = [];
+          try {
+            await withSlideZip(context, slideIndex, async (zip: any, markDirty: () => void) => {
+              const slideXmlStr = await zip.file('ppt/slides/slide1.xml')?.async('string');
+              if (!slideXmlStr) throw new Error('Could not read slide XML');
+
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(slideXmlStr, 'application/xml');
+
+              const nsP = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+              const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+
+              // Find target shape
+              const spElements = doc.getElementsByTagNameNS(nsP, 'sp');
+              let targetSp: Element | null = null;
+              for (let i = 0; i < spElements.length; i++) {
+                const sp = spElements[i];
+                const nvSpPr = sp.getElementsByTagNameNS(nsP, 'nvSpPr')[0];
+                if (nvSpPr) {
+                  const cNvPr = nvSpPr.getElementsByTagNameNS(nsP, 'cNvPr')[0];
+                  if (cNvPr) {
+                    const spId = cNvPr.getAttribute('id');
+                    const spName = cNvPr.getAttribute('name');
+                    if (spId === String(shapeIdOrName) || spName === String(shapeIdOrName)) {
+                      targetSp = sp;
+                      break;
+                    }
+                  }
+                }
+              }
+              const searchRoot: Element = targetSp ?? doc.documentElement;
+              const xmlParas = searchRoot.getElementsByTagNameNS(nsA, 'p');
+
+              for (const replacement of paragraphReplacements as {
+                paragraphIndex: number;
+                newText: string;
+              }[]) {
+                const { paragraphIndex, newText } = replacement;
+                if (paragraphIndex < 0 || paragraphIndex >= xmlParas.length) {
+                  results.push({
+                    paragraphIndex,
+                    status: `skipped — index out of range (XML has ${xmlParas.length} paragraphs)`,
+                  });
+                  continue;
+                }
+                const para = xmlParas[paragraphIndex];
+                const runs = para.getElementsByTagNameNS(nsA, 'r');
+                if (runs.length === 0) {
+                  results.push({ paragraphIndex, status: 'skipped — paragraph has no runs' });
+                  continue;
+                }
+                // Put all new text in first run's <a:t>, clear rest
+                const firstTNode = runs[0].getElementsByTagNameNS(nsA, 't')[0];
+                if (firstTNode) {
+                  firstTNode.textContent = newText;
+                  if (newText !== newText.trim()) {
+                    firstTNode.setAttribute('xml:space', 'preserve');
+                  }
+                }
+                for (let ri = 1; ri < runs.length; ri++) {
+                  const tNode = runs[ri].getElementsByTagNameNS(nsA, 't')[0];
+                  if (tNode) tNode.textContent = '';
+                }
+                markDirty();
+                results.push({ paragraphIndex, status: 'replaced-xml' });
+              }
+
+              if (results.some(r => r.status === 'replaced-xml')) {
+                const serializer = new XMLSerializer();
+                zip.file('ppt/slides/slide1.xml', serializer.serializeToString(doc));
+              }
+            });
+            return { success: true, results };
+          } catch (xmlErr: unknown) {
+            return { success: false, results, error: getErrorMessage(xmlErr) };
+          }
+        };
+
         try {
           const { shape: targetShape, error } = await findShapeOnSlide(
             context,
@@ -920,7 +1043,7 @@ replaces the paragraph text, then re-applies those font properties so style is f
               para.textRange.textRuns.load('items');
               await context.sync();
 
-              if (para.textRange.textRuns.items.length > 0) {
+              if (para.textRange.textRuns?.items?.length > 0) {
                 const firstRun = para.textRange.textRuns.items[0];
                 firstRun.font.load('name,size,bold,italic,color');
                 await context.sync();
@@ -957,7 +1080,28 @@ replaces the paragraph text, then re-applies those font properties so style is f
 
           return JSON.stringify({ success: true, results }, null, 2);
         } catch (error: unknown) {
-          return JSON.stringify({ success: false, error: getErrorMessage(error) }, null, 2);
+          // textRuns/paragraphs API failed — fall back to XML editing
+          logService.warn(
+            '[replaceShapeParagraphs] API approach failed, trying XML fallback:',
+            error,
+          );
+          const xmlResult = await tryXmlParagraphReplacement();
+          if (xmlResult.success) {
+            return JSON.stringify(
+              { success: true, method: 'xml-fallback', results: xmlResult.results },
+              null,
+              2,
+            );
+          }
+          return JSON.stringify(
+            {
+              success: false,
+              error: getErrorMessage(error),
+              xmlFallbackError: xmlResult.error,
+            },
+            null,
+            2,
+          );
         }
       },
     },

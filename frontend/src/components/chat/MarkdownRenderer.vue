@@ -27,10 +27,16 @@ const renderedHtml = computed(() => renderSanitizedMarkdown(props.content));
   margin-bottom: 0;
 }
 
-.markdown-renderer :deep(ul),
+.markdown-renderer :deep(ul) {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
 .markdown-renderer :deep(ol) {
   margin: 0.25rem 0 0.5rem;
   padding-left: 1.25rem;
+  list-style-type: decimal;
 }
 
 .markdown-renderer :deep(pre) {
