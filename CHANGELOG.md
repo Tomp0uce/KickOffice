@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **DESIGN_REVIEW.md**: DR v12 full review — 5 critical, 5 high, 19 medium, 12 low findings across architecture, error handling, UX, dead code, duplication, and code quality. All deferred items from previous reviews carried forward.
+- **Documentation sync**: Tool counts updated across README.md (95 total), Claude.md, and DESIGN_REVIEW.md to match actual tool definitions in code.
+
 ### Added
 
 - **`screenshotSlide` tool** (PowerPoint): Captures a slide as a PNG image (960px wide) and injects it into the vision context for the next LLM turn. Requires PowerPointApi 1.5+. Enables the agent to visually verify layout changes.
