@@ -147,9 +147,20 @@
             :icon-size="12"
             @click="context.copyMessageToClipboard(item.message)"
           />
+          <!-- ERR-L2: Prominent Retry button when the last message ended with a stream error -->
+          <CustomButton
+            v-if="item.key === lastAssistantKey && !loading && item.message.streamError"
+            :title="regenerateLabel"
+            :text="context.t('retry', 'Retry')"
+            :icon="RotateCcw"
+            type="secondary"
+            class="bg-surface! p-1! text-xs! text-amber-600! border border-amber-400/40 rounded!"
+            :icon-size="11"
+            @click="context.handleRegenerate()"
+          />
           <!-- Regenerate: only on the last assistant message (U-L2) -->
           <CustomButton
-            v-if="item.key === lastAssistantKey && !loading"
+            v-if="item.key === lastAssistantKey && !loading && !item.message.streamError"
             :title="regenerateLabel"
             text=""
             :icon="RotateCcw"

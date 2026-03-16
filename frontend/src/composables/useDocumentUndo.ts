@@ -122,7 +122,7 @@ export function useDocumentUndo(options: {
     return new Promise<string | null>((resolve) => {
       const mailbox = getOutlookMailbox();
       const item = mailbox?.item;
-      if (!item?.body?.getSelectedDataAsync) {
+      if (!(item?.body as any)?.getSelectedDataAsync) {
         resolve(null);
         return;
       }

@@ -223,6 +223,13 @@ function getCsrfToken(): string {
   return '';
 }
 
+// ERR-L1: Generate a per-request UUID for frontend↔backend log correlation
+function generateRequestId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ─── QC-L2: Header cache ─────────────────────────────────────────────────────
 // getGlobalHeaders() is called on every network request. The calls to
 // getUserKey(), getUserEmail() and logService.getContext() touch async storage
@@ -329,11 +336,19 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
     abortSignal,
   } = options;
 
+  // ERR-L1: Per-request ID for frontend↔backend log correlation
+  const requestId = generateRequestId();
+  logService.debug(`[chatStream] requestId=${requestId}`, { traffic: 'llm' });
+
   const res = await fetchWithTimeoutAndRetry(
     `${BACKEND_URL}/api/chat`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await getGlobalHeaders()) },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Request-Id': requestId,
+        ...(await getGlobalHeaders()),
+      },
       body: JSON.stringify({ messages, modelTier, tools, stream_options: { include_usage: true } }),
       signal: abortSignal,
     },

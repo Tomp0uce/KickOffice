@@ -218,7 +218,8 @@ const currentHost =
   }) || 'word';
 const history = ref<DisplayMessage[]>([]);
 
-const sessionManager = useSessionManager(currentHost, history);
+// RACE-C1: pass loading so switchSession is blocked while the agent loop is active
+const sessionManager = useSessionManager(currentHost, history, loading);
 const userInput = ref('');
 const loading = ref(false);
 const imageLoading = ref(false);

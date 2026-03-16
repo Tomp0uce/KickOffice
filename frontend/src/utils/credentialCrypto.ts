@@ -25,9 +25,8 @@ export async function getEncryptionKey(remember: boolean): Promise<CryptoKey | n
     keyData = fallbackStorage.getItem(ENCRYPTION_KEY_NAME);
     if (keyData) {
       primaryStorage.setItem(ENCRYPTION_KEY_NAME, keyData);
-      logService.info(
-        '[CredentialCrypto] Migrated encryption key to',
-        remember ? 'localStorage' : 'sessionStorage',
+      logService.debug(
+        `[CredentialCrypto] Migrated encryption key to ${remember ? 'localStorage' : 'sessionStorage'}`,
       );
     }
   }

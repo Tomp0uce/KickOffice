@@ -126,6 +126,9 @@ export function getDetailedOfficeError(error: unknown): string {
  * - PowerPoint: { executePowerPoint: (context: PowerPoint.RequestContext, args: Record<string, unknown>) => Promise<string> }
  * - Outlook: { executeOutlook: (item: Office.MessageCompose, args: Record<string, unknown>) => Promise<string> }
  */
+// TContext is a phantom generic used by call sites to document context type — not used in the body
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-ignore TS6133 intentional phantom generic
 export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>;
 
 /**

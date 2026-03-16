@@ -106,6 +106,7 @@ import {
   powerPointBuiltInPrompt,
 } from '@/utils/constant';
 import { isExcel, forHost } from '@/utils/hostDetection';
+import { logService } from '@/utils/logger';
 
 const { t } = useI18n();
 
@@ -213,7 +214,7 @@ function loadBuiltInPrompts() {
         }
       });
     } catch (error) {
-      console.error('Error loading custom built-in prompts:', error);
+      logService.error('Error loading custom built-in prompts:', error);
     }
   }
 }
@@ -230,7 +231,7 @@ function saveBuiltInPrompts() {
     localStorage.setItem(builtInPromptsStorageKey, JSON.stringify(customPrompts));
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn(
+      logService.warn(
         '[BuiltinPromptsTab] localStorage quota exceeded — built-in prompts not persisted',
       );
     } else {

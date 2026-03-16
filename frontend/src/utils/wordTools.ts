@@ -22,7 +22,6 @@ import {
   truncateString,
   buildExecuteWrapper,
   type OfficeToolTemplate,
-  getErrorMessage,
   getDetailedOfficeError,
 } from './common';
 import { escapeXml } from './pptxZipUtils';

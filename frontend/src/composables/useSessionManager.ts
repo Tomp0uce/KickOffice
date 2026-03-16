@@ -17,7 +17,11 @@ import { logService } from '@/utils/logger';
 export type { ChatSession };
 export { getSessionMessageCount };
 
-export function useSessionManager(hostType: string, history: Ref<DisplayMessage[]>) {
+export function useSessionManager(
+  hostType: string,
+  history: Ref<DisplayMessage[]>,
+  isAgentRunning?: Ref<boolean>,
+) {
   const sessions = ref<ChatSession[]>([]);
   const currentSessionId = ref<string | null>(null);
   const isSwitching = ref(false);
@@ -65,6 +69,15 @@ export function useSessionManager(hostType: string, history: Ref<DisplayMessage[
   async function switchSession(sessionId: string) {
     if (isSwitching.value) return;
     if (sessionId === currentSessionId.value) return;
+    // RACE-C1: Prevent history.value replacement while the agent loop is actively writing to it.
+    // If the caller already guards (e.g. useHomePage.handleSwitchSession), this is a second
+    // defensive layer that also protects any direct call paths.
+    if (isAgentRunning?.value) {
+      logService.warn('[SessionManager] switchSession blocked — agent loop is running', {
+        targetSessionId: sessionId,
+      });
+      return;
+    }
     isSwitching.value = true;
     try {
       // Save current session

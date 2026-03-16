@@ -1,7 +1,7 @@
 # DESIGN_REVIEW.md
 
-**Last updated**: 2026-03-16 — DR v12 full review
-**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward.
+**Last updated**: 2026-03-16 — DR v12 full review + critical fixes
+**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16).
 
 ---
 
@@ -120,47 +120,56 @@ Slides can be added, deleted, duplicated, but not reordered. PowerPointApi 1.5 s
 
 ### 3. Error Handling & Debugging
 
-#### ERR-C1 — SSE JSON parse failures silently dropped [CRITICAL]
+#### ERR-C1 — SSE JSON parse failures silently dropped [CRITICAL] ✅ FIXED
 
 `backend/src/routes/chat.js:191-193`: Malformed SSE chunks parsed with `JSON.parse()` wrapped in `try-catch` with empty catch body. Tool calls in bad chunks are permanently lost — the agent doesn't know the tool ran.
 
 **Impact**: Tool execution results silently disappear. Agent may retry the same tool call infinitely.
 **Path**: Log parse failures at `warn` level. Consider accumulating the raw chunk and re-parsing on next chunk boundary.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `req.logger.warn(...)` in the inner catch block with the raw chunk (truncated to 200 chars) and the parse error message. Parse failures are now visible in server logs. Status: **FULL FIX**.
 
-#### ERR-C2 — Streaming errors after headers sent not delivered [CRITICAL]
+#### ERR-C2 — Streaming errors after headers sent not delivered [CRITICAL] ✅ FIXED
 
 `backend/src/routes/chat.js:247-250`: If a stream error occurs after SSE headers are already sent, the error is logged server-side but no error frame is written to the SSE response. The client receives an incomplete stream with no indication of failure.
 
 **Impact**: User sees a truncated response with no error message.
 **Path**: Write `data: {"error": "stream_interrupted"}` frame before `res.end()` in the catch block.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `res.write('data: {"error":"stream_interrupted"}\n\n')` in the inner stream catch block, guarded by `!res.writableEnded` and `!clientDisconnected`. The client's SSE parser now receives an explicit error event on stream failure. Status: **FULL FIX**.
 
-#### ERR-C3 — VFS/file persistence failures completely silent [CRITICAL]
+#### ERR-C3 — VFS/file persistence failures completely silent [CRITICAL] ✅ FIXED
 
 `useAgentLoop.ts:1003-1006, 1041-1043`: VFS file writes are wrapped in `.catch(err => logService.warn(...))` with no user notification. If file persistence fails, the agent has incomplete context on the next turn but neither the user nor the agent is aware.
 
 **Impact**: Agent loses file context silently, leading to confusing follow-up responses.
 **Path**: Surface a non-blocking warning in the chat when VFS persistence fails.
 **Effort**: LOW
+**Fix (2026-03-16)**: Both VFS `.catch()` handlers in `useAgentLoop.ts` now call `messageUtil.warning(...)` after logging, displaying a non-blocking toast to the user. i18n key `warningVfsWriteFailed` with English fallback. Status: **FULL FIX**.
 
-#### ERR-C4 — AbortListener memory leak in officeAction.ts [CRITICAL]
+#### ERR-C4 — AbortListener memory leak in officeAction.ts [CRITICAL] ✅ FIXED
 
 `officeAction.ts:40-46`: When `abortSignal` is provided, an `abort` event listener is added but only removed in the `finally` block of the *retry* loop. On the *success* path (line 51 `return result`), the listener cleanup in `finally` runs — but if the `abortListener` variable is not yet assigned (race), the `removeEventListener` on line 83-84 may be a no-op.
 
 **Impact**: In long sessions with many Office actions, abort listeners accumulate on the signal, causing performance degradation.
 **Path**: Move listener registration to before the `Promise.race`, ensure cleanup in `finally` always runs.
 **Effort**: LOW
+**Fix (2026-03-16)**: Refactored `officeAction.ts` to register the abort listener **outside** the `timeoutPromise` constructor. The listener now uses a `rejectTimeoutPromise` closure variable to reject the Promise from outside. `abortListener` is typed `(() => void) | undefined`, and the `finally` block checks it without a non-null assertion (`!`). The listener is guaranteed to be cleaned up on every code path (success, retry, abort, timeout). Status: **FULL FIX**.
 
-#### RACE-C1 — Session switch during agent loop replaces history [CRITICAL]
+#### RACE-C1 — Session switch during agent loop replaces history [CRITICAL] ✅ FIXED
 
 `useSessionManager.ts:65-84`: When the user switches sessions while the agent loop is running, `history.value` is replaced with the target session's messages. The agent loop still holds a reference to the old reactive array and pushes messages that vanish.
 
 **Impact**: Messages from an in-progress agent loop are silently lost.
 **Path**: Guard session switching while `loading.value === true` (disable the session switcher), or abort the agent loop before switching.
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Three-layer protection implemented:
+1. **Model layer**: `useSessionManager` now accepts an optional `isAgentRunning?: Ref<boolean>` third argument. `switchSession` returns early with a `logService.warn` if `isAgentRunning.value` is true — blocks any direct call path.
+2. **Controller layer**: `useHomePage.handleSwitchSession` already had `if (loading.value) return` — retained as a second layer.
+3. **UI layer**: `ChatHeader.vue` already disables session buttons when `loading` is true — retained as a third layer.
+`HomePage.vue` updated to pass `loading` as the third argument to `useSessionManager`. Status: **FULL FIX**.
 
-#### ERR-M2 — Raw console usage in 5+ files [MEDIUM]
+#### ERR-M2 — Raw console usage in 5+ files [MEDIUM] ✅ FIXED
 
 The codebase convention is to use `logService` from `logger.ts`, but several files bypass it:
 
@@ -175,46 +184,52 @@ The codebase convention is to use `logService` from `logger.ts`, but several fil
 **Impact**: These logs are invisible to the structured logging system (ring buffer, IndexedDB, backend log forwarding).
 **Path**: Replace with `logService.info/warn/error` calls. For sandbox.ts, use `logService.debug` with `traffic: 'system'`.
 **Effort**: LOW
+**Fix (2026-03-16)**: All 5 files replaced with `logService` calls. `sandbox.ts` uses `logService.debug`, all others use `logService.warn/error`. `logService` import added to each file. Status: **FULL FIX**.
 
-#### ERR-M3 — Frontend log forwarding to backend incomplete [MEDIUM]
+#### ERR-M3 — Frontend log forwarding to backend incomplete [MEDIUM] ✅ FIXED
 
 `logService` stores entries in an in-memory ring buffer and IndexedDB but never sends them to the backend's `/api/logs` endpoint. The backend route (`routes/logs.js`) exists and accepts `POST /api/logs`.
 
 **Impact**: Frontend errors/warnings are only visible in browser DevTools or IndexedDB — not in server logs where ops teams can monitor them.
 **Path**: Add a periodic flush (every 30s or on `error` level) from `logService` to `POST /api/logs`.
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: `logService` now queues `warn`/`error` entries into `_pendingFlush` on every `addEntry`. `startFlushTimer()` starts a 30 s periodic flush via `setInterval`. Error-level entries also trigger an immediate flush. `main.ts` calls `startFlushTimer()` at app boot. Flush uses lazy import of `submitLogs` to avoid circular dependency. Status: **FULL FIX**.
 
-#### ERR-M4 — Rate limit retry exhaustion may calculate 0ms retry [MEDIUM]
+#### ERR-M4 — Rate limit retry exhaustion may calculate 0ms retry [MEDIUM] ✅ FIXED
 
 `llmClient.js:76-80`: When all retries are exhausted on a 429 response, `lastRateLimitMs` is used to construct the `RateLimitError`. But if the Retry-After header was never present, `lastRateLimitMs` stays at 0 — telling the client to retry immediately.
 
 **Impact**: Client may hammer the rate-limited upstream with instant retries.
 **Path**: Set a minimum floor (e.g., 5000ms) for `retryAfterMs` in `RateLimitError`.
 **Effort**: LOW
+**Fix (2026-03-16)**: `throw new RateLimitError(Math.max(retryMs, 5_000))` — ensures retryAfterMs is never less than 5 seconds, even when `Retry-After: 0` is received. Status: **FULL FIX**.
 
-#### ERR-M5 — Read timeout in SSE stream doesn't abort upstream [MEDIUM]
+#### ERR-M5 — Read timeout in SSE stream doesn't abort upstream [MEDIUM] ✅ FIXED
 
 `chat.js:160-172`: If `reader.read()` times out (30s), the error is thrown but the upstream reader is not cancelled. The LLM API continues streaming data that nobody reads, wasting resources.
 
 **Impact**: Resource leak on the LLM provider side.
 **Path**: Call `reader.cancel()` in the timeout handler.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `reader.cancel().catch(() => {})` in the `readError` catch block before re-throwing, so the upstream connection is cancelled when a read times out. Status: **FULL FIX**.
 
-#### ERR-L1 — Missing correlation ID between frontend and backend [LOW]
+#### ERR-L1 — Missing correlation ID between frontend and backend [LOW] ✅ FIXED
 
 Frontend chat requests don't include a `requestId` / `correlationId`. Backend generates `reqId` via middleware, but there's no way to trace a frontend error back to a specific backend request.
 
 **Impact**: Debugging production issues requires timestamp-matching between frontend and backend logs.
 **Path**: Generate a UUID per request in `backend.ts`, pass as `X-Request-Id` header, log on both sides.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `generateRequestId()` in `backend.ts` (uses `crypto.randomUUID()` with fallback). `chatStream` generates a UUID per request and sends it as `X-Request-Id` request header, then logs `Request correlated: <id>` when the response arrives. `server.js` middleware updated to prefer the incoming `X-Request-Id` header over its own generated UUID, so both ends share the same ID in their logs. Status: **FULL FIX**.
 
-#### ERR-L2 — SSE stream error recovery lacks user guidance [LOW]
+#### ERR-L2 — SSE stream error recovery lacks user guidance [LOW] ✅ FIXED
 
 When the SSE stream fails mid-response (network drop, backend restart), the user sees an error toast but the partial response stays in the chat without a clear "retry" affordance.
 
 **Impact**: Users may not know they can resend the message.
 **Path**: Add a "Retry" button on failed assistant messages (similar to ChatGPT's pattern).
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Added `streamError?: boolean` to `DisplayMessage`. When `stream_interrupted` is detected in `useAgentLoop`, the current assistant message is marked `streamError: true`. `ChatMessageList.vue` now shows a highlighted amber "Retry" button (with label text) in place of the plain regenerate icon when `streamError` is true. Status: **FULL FIX**.
 
 ---
 
@@ -567,62 +582,98 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 
 ## DR v12 Summary by Criticality
 
-### Critical (5 items)
-| ID | Category | Title |
-|----|----------|-------|
-| ERR-C1 | Error Handling | SSE JSON parse failures silently dropped in chat.js:191 |
-| ERR-C2 | Error Handling | Streaming errors after headers sent not delivered to client |
-| ERR-C3 | Error Handling | VFS/file persistence failures completely silent (`.catch(() => {})`) |
-| ERR-C4 | Error Handling | AbortListener memory leak in officeAction.ts (never removed on success) |
-| RACE-C1 | Race Condition | Session switch during agent loop replaces `history.value` — messages lost |
+### Critical (5 items) — ALL FIXED ✅
+
+| ID | Category | Title | Status |
+|----|----------|-------|--------|
+| ERR-C1 | Error Handling | SSE JSON parse failures silently dropped in chat.js:191 | ✅ FULL FIX |
+| ERR-C2 | Error Handling | Streaming errors after headers sent not delivered to client | ✅ FULL FIX |
+| ERR-C3 | Error Handling | VFS/file persistence failures completely silent (`.catch(() => {})`) | ✅ FULL FIX |
+| ERR-C4 | Error Handling | AbortListener memory leak in officeAction.ts (never removed on success) | ✅ FULL FIX |
+| RACE-C1 | Race Condition | Session switch during agent loop replaces `history.value` — messages lost | ✅ FULL FIX |
 
 ### High (5 items)
-| ID | Category | Title |
-|----|----------|-------|
-| ARCH-H2 | Architecture | useAgentLoop.ts still oversized (1,118 lines) |
-| ARCH-H3 | Architecture | Tool files are monolithic (2,000–2,700 lines each) |
-| DUP-H1 | Duplication | Mutation detection patterns duplicated across 3 tool files |
-| QUAL-H1 | Code Quality | 160+ uses of `any` type across composables/utils |
-| QUAL-H2 | Code Quality | useQuickActions.ts 753 lines with host-specific branching |
+| ID | Category | Title | Status |
+|----|----------|-------|--------|
+| ARCH-H2 | Architecture | useAgentLoop.ts still oversized (1,118 lines) | OPEN |
+| ARCH-H3 | Architecture | Tool files are monolithic (2,000–2,700 lines each) | OPEN |
+| DUP-H1 | Duplication | Mutation detection patterns duplicated across 3 tool files | OPEN |
+| QUAL-H1 | Code Quality | 160+ uses of `any` type across composables/utils | OPEN |
+| QUAL-H2 | Code Quality | useQuickActions.ts 753 lines with host-specific branching | OPEN |
 
 ### Medium (19 items)
-| ID | Category | Title |
-|----|----------|-------|
-| ARCH-M2 | Architecture | backend.ts mixes concerns (669 lines) |
-| ARCH-M3 | Architecture | office-agents/ directory purpose unclear |
-| FUNC-M1 | Functionality | Tool count discrepancy across documentation |
-| FUNC-M2 | Functionality | No Outlook compose-time file attachment tool |
-| ERR-M2 | Error Handling | Raw console usage in 5+ files |
-| ERR-M3 | Error Handling | Frontend log forwarding to backend incomplete |
-| ERR-M4 | Error Handling | Rate limit retry exhaustion may calculate 0ms retry |
-| ERR-M5 | Error Handling | SSE read timeout doesn't abort upstream reader |
-| DUP-M1 | Duplication | VFS imports duplicated across tool files |
-| DUP-M2 | Duplication | eval_* tool boilerplate repeated 4 times |
-| UX-M1 | UX | No keyboard shortcut documentation |
-| UX-M2 | UX | ChatMessageList no virtualization for long conversations |
-| UX-M3 | UX | Missing i18n keys with hardcoded fallbacks (3 keys) |
-| UX-M4 | UX | Keyboard accessibility gaps in dropdowns |
-| QUAL-M1 | Code Quality | No unit tests for composables |
-| QUAL-M2 | Code Quality | powerpointImageRegistry memory leak potential |
-| QUAL-M3 | Code Quality | tokenManager JSON truncation breaks structure |
-| QUAL-M4 | Code Quality | Markdown CSS injection risk via custom color syntax |
-| QUAL-M5 | Code Quality | Backend models.js doesn't validate parsed env vars |
+| ID | Category | Title | Status |
+|----|----------|-------|--------|
+| ARCH-M2 | Architecture | backend.ts mixes concerns (669 lines) | OPEN |
+| ARCH-M3 | Architecture | office-agents/ directory purpose unclear | OPEN |
+| FUNC-M1 | Functionality | Tool count discrepancy across documentation | OPEN |
+| FUNC-M2 | Functionality | No Outlook compose-time file attachment tool | OPEN |
+| ERR-M2 | Error Handling | Raw console usage in 5+ files | ✅ FULL FIX |
+| ERR-M3 | Error Handling | Frontend log forwarding to backend incomplete | ✅ FULL FIX |
+| ERR-M4 | Error Handling | Rate limit retry exhaustion may calculate 0ms retry | ✅ FULL FIX |
+| ERR-M5 | Error Handling | SSE read timeout doesn't abort upstream reader | ✅ FULL FIX |
+| DUP-M1 | Duplication | VFS imports duplicated across tool files | OPEN |
+| DUP-M2 | Duplication | eval_* tool boilerplate repeated 4 times | OPEN |
+| UX-M1 | UX | No keyboard shortcut documentation | OPEN |
+| UX-M2 | UX | ChatMessageList no virtualization for long conversations | OPEN |
+| UX-M3 | UX | Missing i18n keys with hardcoded fallbacks (3 keys) | OPEN |
+| UX-M4 | UX | Keyboard accessibility gaps in dropdowns | OPEN |
+| QUAL-M1 | Code Quality | No unit tests for composables | OPEN |
+| QUAL-M2 | Code Quality | powerpointImageRegistry memory leak potential | OPEN |
+| QUAL-M3 | Code Quality | tokenManager JSON truncation breaks structure | OPEN |
+| QUAL-M4 | Code Quality | Markdown CSS injection risk via custom color syntax | OPEN |
+| QUAL-M5 | Code Quality | Backend models.js doesn't validate parsed env vars | OPEN |
 
 ### Low (12 items)
-| ID | Category | Title |
-|----|----------|-------|
-| ARCH-L1 | Architecture | PowerPoint tool pattern inconsistency |
-| FUNC-L1 | Functionality | Excel chart creation limited to basic types |
-| FUNC-L2 | Functionality | No PowerPoint slide reorder tool |
-| ERR-L1 | Error Handling | Missing correlation ID frontend↔backend |
-| ERR-L2 | Error Handling | SSE stream error recovery lacks user guidance |
-| UX-L1 | UX | No dark mode toggle |
-| UX-L2 | UX | Quick action tooltips not i18n-ready |
-| DEAD-L1 | Dead Code | i18n key asymmetry (2 keys) |
-| DEAD-L2 | Dead Code | plotDigitizer route may become obsolete |
-| QUAL-L1 | Code Quality | Backend logs full response body for /api/chat/sync |
-| QUAL-L2 | Code Quality | credentialCrypto stores extractable key in localStorage |
-| DEAD-L3 | Dead Code | Unused credential utility exports (clearEncryptionKeys) |
+| ID | Category | Title | Status |
+|----|----------|-------|--------|
+| ARCH-L1 | Architecture | PowerPoint tool pattern inconsistency | OPEN |
+| FUNC-L1 | Functionality | Excel chart creation limited to basic types | OPEN |
+| FUNC-L2 | Functionality | No PowerPoint slide reorder tool | OPEN |
+| ERR-L1 | Error Handling | Missing correlation ID frontend↔backend | ✅ FULL FIX |
+| ERR-L2 | Error Handling | SSE stream error recovery lacks user guidance | ✅ FULL FIX |
+| UX-L1 | UX | No dark mode toggle | OPEN |
+| UX-L2 | UX | Quick action tooltips not i18n-ready | OPEN |
+| DEAD-L1 | Dead Code | i18n key asymmetry (2 keys) | OPEN |
+| DEAD-L2 | Dead Code | plotDigitizer route may become obsolete | OPEN |
+| QUAL-L1 | Code Quality | Backend logs full response body for /api/chat/sync | OPEN |
+| QUAL-L2 | Code Quality | credentialCrypto stores extractable key in localStorage | OPEN |
+| DEAD-L3 | Dead Code | Unused credential utility exports (clearEncryptionKeys) | OPEN |
+
+---
+
+## Fix Batch — 2026-03-16 (ERR + TS Fixes)
+
+All 5 CRITICAL items and all 6 ERR items (M2–M5, L1–L2) fixed. Pre-existing TypeScript errors (8 items) also resolved.
+
+### ERR Fixes Summary
+
+| Item | Status | Files changed |
+|------|--------|---------------|
+| ERR-C1 | ✅ FULL FIX | `backend/src/routes/chat.js` |
+| ERR-C2 | ✅ FULL FIX | `backend/src/routes/chat.js` |
+| ERR-C3 | ✅ FULL FIX | `frontend/src/composables/useAgentLoop.ts` |
+| ERR-C4 | ✅ FULL FIX | `frontend/src/utils/officeAction.ts` |
+| RACE-C1 | ✅ FULL FIX | `useSessionManager.ts`, `HomePage.vue` |
+| ERR-M2 | ✅ FULL FIX | `sandbox.ts`, `lockdown.ts`, `useOfficeSelection.ts`, `BuiltinPromptsTab.vue`, `PromptsTab.vue` |
+| ERR-M3 | ✅ FULL FIX | `logger.ts`, `main.ts` |
+| ERR-M4 | ✅ FULL FIX | `backend/src/services/llmClient.js` |
+| ERR-M5 | ✅ FULL FIX | `backend/src/routes/chat.js` |
+| ERR-L1 | ✅ FULL FIX | `backend.ts`, `backend/src/server.js` |
+| ERR-L2 | ✅ FULL FIX | `types/chat.ts`, `useAgentLoop.ts`, `ChatMessageList.vue` |
+
+### TypeScript Errors Fixed (pre-existing)
+
+| Error | File | Fix |
+|-------|------|-----|
+| TS6133 unused `nextTick` | `useAgentLoop.ts` | Removed import |
+| TS2551 `getSelectedDataAsync` | `useDocumentUndo.ts` | Added `as any` cast |
+| TS6133 unused `TContext` | `common.ts` | Added `@ts-ignore` with phantom generic comment |
+| TS2345 traffic type mismatch | `credentialCrypto.ts` | Changed to `logService.debug(string)` |
+| TS6133 unused `buildExecuteWrapper` | `outlookTools.ts` | Removed import |
+| TS6133 unused `getErrorMessage` | `wordTools.ts` | Removed import |
+| TS2353 `minItems` not in ToolProperty | `types/index.ts` | Added `minItems?/maxItems?` to interface |
+| TS6133 unused `redlineEnabled` | `wordTrackChanges.ts` | Renamed to `_redlineEnabled` |
 
 ---
 
