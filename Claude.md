@@ -124,12 +124,12 @@ Compatible providers may return `data[0].b64_json` or `data[0].url`. Keep suppor
 
 Current tool landscape:
 
-- Word: 31 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `eval_wordjs`, `getDocumentOoxml`, and 26 more)
-- Excel: 27 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, `modifyWorkbookStructure`, and 22 more)
-- PowerPoint: 23 tools (`screenshotSlide`, `editSlideXml`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 17 more)
-- Outlook: 8 tools (`eval_outlookjs` and 7 more)
+- Word: 34 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `eval_wordjs`, `getDocumentOoxml`, and 26 more)
+- Excel: 27 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, `modifyWorkbookStructure`, and 22 more — includes Waterfall/Treemap/Funnel chart types)
+- PowerPoint: 24 tools (`screenshotSlide`, `editSlideXml`, `reorderSlide`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 17 more)
+- Outlook: 9 tools (`eval_outlookjs`, `addAttachment`, and 7 more)
 - General: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
-- **Total**: 95 tools
+- **Total**: 100 tools
 
 **Agent Stability Features**:
 

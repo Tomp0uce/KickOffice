@@ -59,6 +59,8 @@
         :send-label="t('send')"
         :stop-label="t('stop')"
         :draft-focus-glow="isDraftFocusGlowing"
+        :can-validate-ai-changes="canValidateAiChanges"
+        :on-validate-ai-changes="handleValidateAiChanges"
         @submit="sendMessage"
         @stop="stopGeneration"
       />
@@ -103,6 +105,8 @@ import { useOutlookQuickActions } from '@/composables/quickActions/useOutlookQui
 import { usePowerPointQuickActions } from '@/composables/quickActions/usePowerPointQuickActions';
 import { localStorageKey } from '@/utils/enum';
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
+import { acceptAiChangesInDocument } from '@/utils/wordTools';
+import { clearAllAgentHighlightsInWorkbook } from '@/utils/excelTools';
 import { type SavedPrompt } from '@/utils/savedPrompts';
 import { useHomePage } from '@/composables/useHomePage';
 import type { ExcelFormulaLanguage } from '@/utils/constant'; // TOOL-M4
@@ -124,6 +128,15 @@ const hostIsExcel = isExcel();
 const hostIsWord = isWord();
 const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
+
+// "Valider les modifications IA" — available for Word and Excel only
+const canValidateAiChanges = hostIsWord || hostIsExcel;
+
+async function handleValidateAiChanges(): Promise<string> {
+  if (hostIsWord) return acceptAiChangesInDocument();
+  if (hostIsExcel) return clearAllAgentHighlightsInWorkbook();
+  return '';
+}
 
 const currentHost =
   forHost({

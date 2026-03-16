@@ -26,6 +26,7 @@ export type OutlookToolName =
   | 'getEmailRecipients'
   | 'addRecipient'
   | 'getEmailSender'
+  | 'addAttachment'
   | 'eval_outlookjs';
 
 type RecipientField = 'to' | 'cc' | 'bcc';
@@ -509,6 +510,46 @@ const outlookToolDefinitions = createOfficeTools<
         if (!sender) return '';
 
         return JSON.stringify(normalizeRecipient(sender));
+      },
+    },
+
+    addAttachment: {
+      name: 'addAttachment',
+      category: 'write',
+      description:
+        'Attach a file to the email being composed. Requires a publicly accessible URL for the file. Uses MailboxApi 1.1+.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'Publicly accessible URL of the file to attach.',
+          },
+          name: {
+            type: 'string',
+            description: 'File name to display in the email (e.g. "report.pdf").',
+          },
+        },
+        required: ['url', 'name'],
+      },
+      executeOutlook: async (mailbox, args: Record<string, any>) => {
+        if (!mailbox?.item) return 'Error: No compose item available. Attachments can only be added in compose mode.';
+        if (typeof mailbox.item.addFileAttachmentAsync !== 'function') {
+          return 'Error: addFileAttachmentAsync is not available. Requires MailboxApi 1.1+ in compose mode.';
+        }
+        const { url, name } = args as { url: string; name: string };
+        if (!url || typeof url !== 'string') return 'Error: url is required.';
+        if (!name || typeof name !== 'string') return 'Error: name is required.';
+
+        return new Promise<string>(resolve => {
+          mailbox.item.addFileAttachmentAsync(url, name, (result: any) => {
+            if (result.status === getOfficeAsyncStatus()?.Succeeded) {
+              resolve(`File "${name}" attached successfully (attachment ID: ${result.value}).`);
+            } else {
+              resolve(`Error: ${result.error?.message || 'Failed to attach file.'}`);
+            }
+          });
+        });
       },
     },
 

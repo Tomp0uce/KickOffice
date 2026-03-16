@@ -467,5 +467,7 @@
   "toolCall.result": "Résultat",
   "authErrorBanner": "Authentification requise ou clé API invalide.",
   "goToSettings": "Accéder aux Paramètres pour configurer",
-  "shiftEnterHint": "Maj + Entrée pour nouvelle ligne"
+  "shiftEnterHint": "Maj + Entrée pour nouvelle ligne",
+  "validateAiChanges": "Valider les modifications IA",
+  "validateAiChangesTooltip": "Accepter les Track Changes IA (Word) ou supprimer les surlignements IA (Excel)"
 }

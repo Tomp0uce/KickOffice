@@ -461,6 +461,8 @@
   "authErrorBanner": "Authentication required or invalid API key.",
   "goToSettings": "Go to Settings to configure",
   "shiftEnterHint": "Shift + Enter for new line",
+  "validateAiChanges": "Validate AI changes",
+  "validateAiChangesTooltip": "Accept AI track changes (Word) or clear AI cell highlights (Excel)",
   "agentWaitingForLLM": "⏳ Waiting for the AI (generating response)...",
   "outlookTranslateFormalize_tooltip": "Select text. The AI will translate and formalize the content."
 }
