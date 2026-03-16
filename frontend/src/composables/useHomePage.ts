@@ -90,7 +90,8 @@ export function useHomePage(deps: {
   // UX-H1 — Handle scroll event to detect manual user scrolling
   function handleScroll() {
     // Ignore scroll events fired by our own programmatic scrolls
-    if (Date.now() - programmaticScrollTs < 300) return;
+    // 600ms covers smooth scrolls which can take 500ms+ to complete
+    if (Date.now() - programmaticScrollTs < 600) return;
 
     const rawContainer = messageListRef.value?.containerEl;
     const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;

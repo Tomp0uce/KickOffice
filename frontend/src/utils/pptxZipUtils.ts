@@ -71,36 +71,21 @@ export async function withSlideZip(
     });
     await context.sync();
 
-    // Delete original slide.
-    // After insertSlidesFromBase64, the new slide is inserted before (or at position of) the
-    // original. The original is now shifted one position forward.
-    // Use position-based deletion (slideIndex + 1) as primary; ID-based as fallback.
-    slides.load('items/id');
+    // Delete the original slide by its stable ID.
+    // IMPORTANT: use a FRESH slides collection reference after the insertion — the original
+    // `slides` proxy may be stale and not reflect the post-insert state reliably.
+    // Position-based indexing is intentionally avoided: if the API inserts at an unexpected
+    // position, index arithmetic would risk deleting a neighbouring slide.
+    const freshSlides = context.presentation.slides;
+    freshSlides.load('items/id');
     await context.sync();
 
-    const insertedCount = slides.items.length; // total slides after insert
-    const expectedOriginalIndex = slideIndex + 1; // original was pushed one slot forward
-    if (expectedOriginalIndex < insertedCount) {
-      const candidateByPos = slides.items[expectedOriginalIndex];
-      if (candidateByPos.id === slideId) {
-        candidateByPos.delete();
-        await context.sync();
-      } else {
-        // Position-based guess was wrong (e.g. insert at end) — fall back to ID search
-        const original = slides.items.find((s: any) => s.id === slideId);
-        if (original) {
-          original.delete();
-          await context.sync();
-        }
-      }
-    } else {
-      // Fallback: search by ID
-      const original = slides.items.find((s: any) => s.id === slideId);
-      if (original) {
-        original.delete();
-        await context.sync();
-      }
+    const original = freshSlides.items.find((s: any) => s.id === slideId);
+    if (original) {
+      original.delete();
+      await context.sync();
     }
+    // If the original is not found (e.g. already gone), no deletion happens — safe.
   }
 
   return result;

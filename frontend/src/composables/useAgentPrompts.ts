@@ -90,7 +90,7 @@ export function useAgentPrompts(options: UseAgentPromptsOptions) {
 You have access to an in-memory, stateful bash shell and filesystem.
 - **Available tools**: \`executeBash\`, \`vfsWriteFile\`, \`vfsReadFile\`, \`vfsListFiles\`
 - **Directories**: 
-  - \`/home/user/uploads/\`: Files uploaded by the user are extracted and placed here.
+  - \`/home/user/uploads/\`: Files uploaded by the user are stored here. **Text files** are stored as UTF-8. **Image files** (PNG, JPG, etc.) are stored as binary and readable by tools like \`imageToSheet\`. Use \`vfsListFiles('/home/user/uploads/')\` to see available files.
   - \`/home/user/scripts/\`: Use this directory to save reusable shell scripts or custom functions.
 - **Stateful Shell**: The \`executeBash\` shell maintains state between calls within a single session.
 - **Custom Agent Tools (Scripts Pattern)**: 

@@ -224,7 +224,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'getSelectedCells',
       category: 'read',
       description:
-        'Get the values, address, and dimensions of the currently selected cells in Excel. Returns a JSON object with address, rowCount, columnCount, and the 2D values array.',
+        'Get the values, formulas, address, and dimensions of the currently selected cells in Excel. Returns a JSON object with address, rowCount, columnCount, the 2D values array, and the 2D formulas array (cells without formulas show their value as-is in the formulas array). Always use formulas (not values) when explaining how a cell is calculated.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -232,7 +232,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       },
       executeExcel: async context => {
         const range = context.workbook.getSelectedRange();
-        range.load('values, address, rowCount, columnCount');
+        range.load('values, formulas, address, rowCount, columnCount');
         await context.sync();
         return JSON.stringify(
           {
@@ -240,6 +240,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             rowCount: range.rowCount,
             columnCount: range.columnCount,
             values: range.values,
+            formulas: range.formulas,
           },
           null,
           2,
@@ -251,7 +252,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'getWorksheetData',
       category: 'read',
       description:
-        'Get data from a worksheet. By default, reads all data from the used range of the active worksheet. Optionally specify a worksheet name and/or a specific range address. Returns the values, address, row count, and column count.',
+        'Get data from a worksheet. By default, reads all data from the used range of the active worksheet. Optionally specify a worksheet name and/or a specific range address. Returns the values, formulas, address, row count, and column count. Use formulas (not values) when you need to understand how cells are calculated.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -274,7 +275,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           : context.workbook.worksheets.getActiveWorksheet();
 
         const range = address ? sheet.getRange(address) : sheet.getUsedRange();
-        range.load('values, address, rowCount, columnCount');
+        range.load('values, formulas, address, rowCount, columnCount');
         await context.sync();
 
         return JSON.stringify(
@@ -284,6 +285,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             rowCount: range.rowCount,
             columnCount: range.columnCount,
             values: range.values,
+            formulas: range.formulas,
           },
           null,
           2,

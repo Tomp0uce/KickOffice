@@ -994,6 +994,17 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 fileId: imageFileId,
               });
 
+              // Write image binary to VFS so tools like imageToSheet can access it
+              try {
+                const base64Data = result.imageBase64.replace(/^data:[^;]+;base64,/, '');
+                const binaryStr = atob(base64Data);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(
+                  err => logService.warn('[AgentLoop] VFS write failed for uploaded image', err),
+                );
+              } catch { /* best-effort */ }
+
               // Point 3 Fix: Store in PPT registry for tool access (by filename AND imageId)
               if (hostIsPowerPoint) {
                 const rawBase64 = result.imageBase64.replace(/^data:[^;]+;base64,/, '');
