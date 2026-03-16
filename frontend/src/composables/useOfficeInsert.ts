@@ -319,5 +319,9 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     undoLastInsert,
     canUndo: documentUndo.canUndo,
     clearUndo: documentUndo.clearUndo,
+    // Exposed for external callers (e.g. quick actions) that need to capture state before
+    // modifying the document and mark undo available afterwards.
+    captureBeforeInsert: documentUndo.captureBeforeInsert,
+    saveSnapshot: documentUndo.saveSnapshot,
   };
 }

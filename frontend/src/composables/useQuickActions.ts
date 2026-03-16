@@ -46,6 +46,7 @@ import { applyInheritedStyles, renderOfficeCommonApiHtml } from '@/utils/markdow
 import { areCredentialsConfigured } from '@/utils/credentialStorage';
 import { logService } from '@/utils/logger';
 import { getQuickActionSkill } from '@/skills';
+import { writeFile as vfsWriteFile } from '@/utils/vfs';
 
 export interface UseQuickActionsOptions {
   // Translation function
@@ -99,6 +100,10 @@ export interface UseQuickActionsOptions {
 
   // Pending MoM flag (set to true when MoM mode is activated, checked by useAgentLoop)
   pendingMoM?: Ref<boolean>;
+
+  // Undo support: capture document state before quick action runs
+  captureBeforeInsert?: () => Promise<Partial<any> | null>;
+  saveSnapshot?: (partial: Partial<any>, tag?: string) => void;
 }
 
 export function useQuickActions(options: UseQuickActionsOptions) {
@@ -129,6 +134,8 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     runAgentLoop,
     resolveChatModelTier,
     pendingMoM,
+    captureBeforeInsert,
+    saveSnapshot,
   } = options;
 
   async function applyQuickAction(actionKey: string) {
@@ -485,12 +492,26 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
               if (platformResult.fileId) fileId = platformResult.fileId;
             } catch { /* inline fallback */ }
 
+            // Write image to VFS so tools like imageToSheet can access it via filePath
+            if (result.imageBase64) {
+              try {
+                const base64Data = result.imageBase64.replace(/^data:[^;]+;base64,/, '');
+                const binaryStr = atob(base64Data);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                await vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes);
+              } catch (vfsErr) {
+                logService.warn('[QuickActions] VFS write failed for image', vfsErr);
+              }
+            }
+
             const imageIdTag = result.imageId ? ` (imageId: ${result.imageId})` : '';
+            const vfsPath = `/home/user/uploads/${result.filename}`;
             const imageContext =
               `<uploaded_images>\nThe following images are available in session memory:\n` +
               `- [${result.filename}]${imageIdTag}\n` +
               (actionKey === 'pixelArt'
-                ? `Use the imageToSheet tool with the uploaded image to generate pixel art in Excel.\n`
+                ? `The image has been saved to VFS at: ${vfsPath}\nUse the imageToSheet tool with filePath="${vfsPath}" to generate pixel art in Excel.\n`
                 : `To extract chart data into Excel, use extract_chart_data with the imageId.\n`) +
               `</uploaded_images>`;
 
@@ -518,10 +539,21 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
               ? skillContent + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`
               : `You are an expert chart data extractor. ${GLOBAL_STYLE_INSTRUCTIONS}`;
 
+            // Capture undo state before the agent modifies the document
+            let undoSnapshot: Partial<any> | null = null;
+            try {
+              if (captureBeforeInsert) undoSnapshot = await captureBeforeInsert();
+            } catch { /* best-effort */ }
+
             await runAgentLoop(
               [{ role: 'system', content: systemMsg }, userMessage],
               resolveChatModelTier(),
             );
+
+            // Mark undo as available now that the agent has finished modifying the document
+            if (undoSnapshot && saveSnapshot) {
+              try { saveSnapshot(undoSnapshot); } catch { /* best-effort */ }
+            }
           } catch (err) {
             logService.error('[QuickActions] digitizeChart error', err);
             messageUtil.error(t('errorGeneric') || 'An error occurred.');
@@ -679,6 +711,12 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       );
 
       if (selectedQuickAction?.executeWithAgent) {
+        // Capture undo state before the agent modifies the document
+        let undoSnapshotQA: Partial<any> | null = null;
+        try {
+          if (captureBeforeInsert) undoSnapshotQA = await captureBeforeInsert();
+        } catch { /* best-effort */ }
+
         await runAgentLoop(
           [
             { role: 'system', content: systemMsg },
@@ -686,6 +724,11 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
           ],
           resolveChatModelTier(),
         );
+
+        // Mark undo as available now that the agent has finished
+        if (undoSnapshotQA && saveSnapshot) {
+          try { saveSnapshot(undoSnapshotQA); } catch { /* best-effort */ }
+        }
       } else {
         history.value.push(createDisplayMessage('assistant', ''));
         await scrollToMessageTop?.(); // Scroll to show start of assistant response

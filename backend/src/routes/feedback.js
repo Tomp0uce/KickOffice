@@ -49,7 +49,8 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
       toolUsageSnapshot, // FB-M1: Recent tool usage at feedback time
     }
 
-    const filename = `feedback_${category}_${new Date().getTime()}.json`
+    const dateStr = new Date().toISOString().replace(/:/g, '-').replace('T', '_').slice(0, 19)
+    const filename = `feedback_${category}_${dateStr}.json`
     const filePath = path.join(FEEDBACK_DIR, filename)
 
     await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))

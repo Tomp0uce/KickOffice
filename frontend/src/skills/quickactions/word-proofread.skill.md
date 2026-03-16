@@ -38,7 +38,27 @@ Go through each paragraph and identify:
 
 ### Step 3 — Apply corrections with Track Changes
 
-Call `proposeDocumentRevision` with one entry per **paragraph that contains corrections**:
+Call `proposeDocumentRevision` with one entry per **paragraph that contains corrections**.
+
+**CRITICAL — originalText rules:**
+- `originalText` MUST be **plain text only** — the exact paragraph text as it appears in the document
+- **NEVER include formatting markers** like `[color:#CC0000]`, `**bold**`, `*italic*`, `__underline__` in `originalText`
+- Strip ALL `[color:...]` markers from `originalText` — they are display annotations, not real document text
+- Only the actual readable words go in `originalText`
+
+**CRITICAL — revisedText rules:**
+- `revisedText` MUST also be **plain text** — no markdown headers (`#`), no formatting markers
+- Only correct the text content — do not change paragraph structure or add markup
+
+**Example** — if `getSelectedTextWithFormatting` returned:
+```
+Dans les années 1960, les grandes puissances [color:#CC0000]se sont lancé[/color] dans une course vers l'espace.
+```
+The `originalText` MUST be:
+```
+Dans les années 1960, les grandes puissances se sont lancé dans une course vers l'espace.
+```
+(All `[color:...]` markers stripped — plain text only)
 
 ```json
 {
@@ -58,7 +78,15 @@ Call `proposeDocumentRevision` with one entry per **paragraph that contains corr
 
 **Only include paragraphs that actually have corrections.** Paragraphs without errors are NOT included.
 
-### Step 4 — Confirm in UI language
+### Step 4 — If proposeDocumentRevision returns NOT FOUND errors
+
+If some paragraphs are NOT FOUND:
+1. Call `getDocumentContent` to read the full document as plain text
+2. Find the exact plain-text paragraph in the document (no markers)
+3. Retry `proposeDocumentRevision` with the correct plain-text `originalText`
+4. **NEVER fall back to `proposeRevision`** — it replaces the entire selection as one giant Track Change, making it impossible to review corrections individually
+
+### Step 5 — Confirm in UI language
 
 After the corrections are applied, respond briefly in the `[UI language: X]` language:
 - Number of paragraphs corrected
@@ -78,11 +106,12 @@ Les corrections sont visibles dans le suivi des modifications.
 ## Rules
 
 - **Use `proposeDocumentRevision`** — one entry per corrected paragraph, full corrected text
-- **NEVER use `proposeRevision`** — it replaces the entire selection as one change
+- **NEVER use `proposeRevision`** — it replaces the entire selection as one change, creating a giant unreadable redline block
 - **NEVER use `searchAndReplace`** — it does not create Track Changes
 - **NEVER rewrite or rephrase** — only fix genuine errors
 - **Preserve the author's voice** — do not change sentence structure unless required for correctness
-- **Preserve inline formatting** in `revisedText`: keep `**bold**`, `*italic*`, `__underline__` markers exactly as they appear in `originalText` — only correct the text content inside them
+- **originalText must be PLAIN TEXT** — no formatting markers, no color annotations, no markdown
+- **revisedText must be PLAIN TEXT** — no markdown headers (`#`), no formatting markup
 - **Skip non-text content**: tables, code blocks, images
 - **Match language**: French text stays French, English stays English (do not translate)
 

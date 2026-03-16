@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Translate the selected text on the current PowerPoint slide and inject the translation **directly into the slide** — not in the chat.
+Translate the selected text on the current PowerPoint slide and inject the translation **directly into the slide** — not in the chat — while **preserving all formatting** (bold, colors, font sizes, bullet levels, indentation).
 
 ## Target Language
 
@@ -14,9 +14,9 @@ Translate the selected text on the current PowerPoint slide and inject the trans
 
 The `[UI language: X]` header tells you which language to use for your chat confirmation message.
 
-## Required Workflow
+## Required Workflow — OOXML-based (preserves all formatting)
 
-### Step 1 — Get current slide
+### Step 1 — Get current slide index
 
 ```json
 { "tool": "getCurrentSlideIndex" }
@@ -24,9 +24,9 @@ The `[UI language: X]` header tells you which language to use for your chat conf
 
 Returns: `{ "slideIndex": N }` (1-based)
 
-### Step 2 — Get shapes with their text
+### Step 2 — Find the target shape and get its XML
 
-Use `eval_powerpointjs` to enumerate text shapes on the current slide:
+Use `eval_powerpointjs` to enumerate text shapes and get the XML of the matching shape:
 
 ```javascript
 try {
@@ -52,43 +52,109 @@ try {
 } catch (e) { return { success: false, error: e.message }; }
 ```
 
-### Step 3 — Find the target shape
+Match the shape whose text most closely matches the selected text from `<document_content>`.
 
-The user message contains the selected text inside `<document_content>` tags.
-Match it against the shapes found in Step 2:
-- Pick the shape whose text most closely matches the selected text.
-- If the selection is a substring, pick the shape that contains it.
+### Step 3 — Get the shape XML
 
-### Step 4 — Translate
+Use `eval_powerpointjs` to extract the raw XML of the matched shape:
 
-Translate the **entire text of the matched shape** to the target language:
-- Preserve paragraph structure (bullet points, numbered lists, line breaks)
-- Preserve tone and formality level
-- Keep proper nouns, brand names, and technical terms as-is
+```javascript
+try {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+  const slide = slides.items[slideIndex - 1];
+  const shapes = slide.shapes;
+  shapes.load('items/id');
+  await context.sync();
 
-### Step 5 — Inject into the slide
+  // Find shape by id
+  const shape = shapes.items.find(s => s.id === targetShapeId);
+  if (!shape) return { success: false, error: 'Shape not found' };
 
-Use `searchAndReplaceInShape` once per **paragraph** — replace each original paragraph with its translation:
+  shape.load('id');
+  await context.sync();
 
-```json
-{
-  "slideNumber": 3,
-  "shapeIdOrName": "42",
-  "searchText": "Original paragraph text here",
-  "replaceText": "Translated paragraph text here"
-}
+  // Get the shape XML via OOXML
+  const range = shape.textFrame.textRange;
+  range.load('ooxml');
+  await context.sync();
+  return { success: true, ooxml: range.ooxml };
+} catch (e) { return { success: false, error: e.message }; }
 ```
 
-One call per paragraph. **Do NOT try to replace the entire multi-paragraph block in a single call** — split by paragraph for reliable matching.
+### Step 4 — Translate by modifying XML text nodes only
+
+Parse the OOXML and translate **only the text content** inside `<a:t>` tags. Preserve everything else:
+- Keep `<a:r>` (text runs) structure intact
+- Keep `<a:rPr>` (run properties: bold, italic, color, font size, etc.) untouched
+- Keep `<a:pPr>` (paragraph properties: bullet level, indentation) untouched
+- Keep `<a:p>` (paragraph) structure intact — same number of paragraphs
+
+**Translation strategy:**
+- Collect all `<a:t>` text content grouped by paragraph (each `<a:p>` = one paragraph)
+- Translate paragraph by paragraph, preserving the 1:1 paragraph mapping
+- Do NOT merge or split paragraphs
+- The translated text must have exactly the **same number of paragraphs** as the original
+
+### Step 5 — Build the modified XML
+
+Replace only the text content of each `<a:t>` element in the OOXML with the translated text.
+
+If a paragraph has multiple runs (`<a:r>`) and you translate the full paragraph, distribute the translated text across the runs proportionally, or put it all in the first run of the paragraph and clear the rest (keeping empty `<a:t/>` in other runs).
+
+**Simpler approach**: if each paragraph has only one run, just replace `<a:t>original text</a:t>` with `<a:t>translated text</a:t>`.
+
+### Step 6 — Write back the modified XML
+
+Use `eval_powerpointjs` to set the modified OOXML back to the shape:
+
+```javascript
+try {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+  const slide = slides.items[slideIndex - 1];
+  const shapes = slide.shapes;
+  shapes.load('items/id');
+  await context.sync();
+
+  const shape = shapes.items.find(s => s.id === targetShapeId);
+  if (!shape) return { success: false, error: 'Shape not found' };
+
+  // Set modified OOXML back
+  shape.textFrame.textRange.ooxml = modifiedOoxml;
+  await context.sync();
+  return { success: true };
+} catch (e) { return { success: false, error: e.message }; }
+```
+
+### Step 7 — Confirm in chat
+
+Briefly confirm in the UI language: e.g. "✅ Translated 3 paragraphs to English — formatting preserved."
+
+Do NOT show the full translated text in the chat — it is already in the slide.
+
+---
+
+## Fallback — if OOXML approach fails
+
+If the OOXML read/write fails (e.g., the property is not available in this version of Office):
+
+1. Use `searchAndReplaceInShape` **one call per paragraph** — never per full multi-paragraph block
+2. Preserve bullet structure: if original has 5 bullet points, translation must have 5 bullet points
+3. Note in the confirmation that formatting may not be fully preserved
+
+---
 
 ## Rules
 
-- **Always inject into the slide** — do NOT just show the translation in the chat.
-- **One `searchAndReplaceInShape` call per paragraph** — never try to replace multi-paragraph text in a single call.
-- **Preserve paragraph structure**: if the original has 5 bullet points, the translation must also have 5 bullet points.
-- **Translate the full matched shape**, not just the literal selection substring.
-- **Skip non-text shapes**: charts, images, OLE objects.
-- **After all replacements**, briefly confirm in the chat what was translated (e.g. "✅ Translated 3 paragraphs to English."). Do NOT show the full translated text in the chat — it is already in the slide.
+- **OOXML first** — always try the XML approach to preserve formatting
+- **Inject into the slide** — do NOT just show the translation in the chat
+- **One paragraph = one XML `<a:p>`** — never merge paragraphs during translation
+- **Preserve run properties** — never touch `<a:rPr>`, `<a:pPr>`, `<a:lstStyle>`, `<a:bodyPr>`
+- **Skip non-text shapes**: charts, images, OLE objects
+- **Translate full matched shape** — not just the selected substring
 
 ## Example
 
@@ -104,15 +170,11 @@ Fort de son expérience en intégration d'outils d'IA de pointe dans un environn
 
 **Workflow:**
 1. `getCurrentSlideIndex` → slide 3
-2. `eval_powerpointjs` → shape id=36 contains "Proposition Kickmaker\nFort de son expérience..."
-3. Translate:
+2. `eval_powerpointjs` → find shape id=36 with matching text
+3. `eval_powerpointjs` → get shape OOXML (contains `<a:t>Proposition Kickmaker</a:t>` etc.)
+4. Translate paragraph by paragraph:
    - "Proposition Kickmaker" → "Kickmaker Proposal"
-   - "Fort de son expérience en intégration..." → "Drawing on its experience integrating..."
-4. Call `searchAndReplaceInShape` for each paragraph:
-   ```json
-   { "slideNumber": 3, "shapeIdOrName": "36", "searchText": "Proposition Kickmaker", "replaceText": "Kickmaker Proposal" }
-   ```
-   ```json
-   { "slideNumber": 3, "shapeIdOrName": "36", "searchText": "Fort de son expérience en intégration d'outils d'IA de pointe dans un environnement sécurisé, Kickmaker propose de réaliser une première étude.", "replaceText": "Drawing on its experience integrating cutting-edge AI tools in a secure environment, Kickmaker proposes conducting an initial study." }
-   ```
-5. Confirm: "✅ Translated 2 paragraphs to English."
+   - "Fort de son expérience..." → "Drawing on its experience integrating cutting-edge AI tools..."
+5. Replace `<a:t>` text nodes in XML, keep all `<a:rPr>` and `<a:pPr>` unchanged
+6. Write modified OOXML back via `eval_powerpointjs`
+7. Confirm: "✅ Translated 2 paragraphs to English — formatting preserved."
