@@ -6,17 +6,13 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   getErrorMessage,
-  getDetailedOfficeError,
+  createEvalExecutor,
+  buildScreenshotResult,
 } from './common';
 import { localStorageKey } from './enum';
-import { sandboxedEval } from './sandbox';
-import { validateOfficeCode } from './officeCodeValidator';
+import { createMutationDetector } from './mutationDetector';
 import { extractChartData } from '@/api/backend';
-import {
-  readFile as vfsReadFile,
-  writeFile as vfsWriteFile,
-  getVfs,
-} from '@/utils/vfs';
+import { getVfs, getVfsSandboxContext } from '@/utils/vfs';
 
 const runExcel = <T>(action: (context: Excel.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => Excel.run(action));
@@ -132,7 +128,8 @@ function compositeWithHeaders(
 // Mutation detection patterns — ported from Office Agents dirty-tracker
 // packages/excel/src/lib/dirty-tracker.ts
 // ============================================================
-const EXCEL_MUTATION_PATTERNS = [
+/** Detect if code contains write operations. Ported from Office Agents. */
+const looksLikeMutation = createMutationDetector([
   /\.(values|formulas|formulasLocal|numberFormat|numberFormatLocal)\s*=/,
   /\.clear\s*\(/,
   /\.delete\s*\(/,
@@ -143,12 +140,7 @@ const EXCEL_MUTATION_PATTERNS = [
   /\.unmerge\s*\(/,
   /\.format\.\w+\s*=/,
   /\.set\s*\(/,
-];
-
-/** Detect if code contains write operations. Ported from Office Agents. */
-function looksLikeMutation(code: string): boolean {
-  return EXCEL_MUTATION_PATTERNS.some(p => p.test(code));
-}
+]);
 
 // Agent-modified cells are marked with text underline (font.underline = single).
 // This is auto-applied by setCellRange and cleared by clearAgentHighlights.
@@ -1850,81 +1842,19 @@ try {
         },
         required: ['code', 'explanation'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const { code, explanation } = args;
-
-        // Validate code BEFORE execution
-        const validation = validateOfficeCode(code, 'Excel');
-
-        if (!validation.valid) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: 'Code validation failed. Fix the errors below and try again.',
-              validationErrors: validation.errors,
-              validationWarnings: validation.warnings,
-              suggestion:
-                'Refer to the Office.js skill document for correct patterns. Remember: Excel values must be 2D arrays.',
-              codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
-            },
-            null,
-            2,
-          );
-        }
-
-        // Log warnings but proceed
-        if (validation.warnings.length > 0) {
-          logService.warn('[eval_officejs] Validation warnings:', validation.warnings);
-        }
-
-        try {
-          // Detect mutations before execution — ported from Office Agents dirty-tracker
-          const hasMutated = looksLikeMutation(code);
-
-          // Execute in sandbox with host restriction + VFS access
-          // VFS helpers ported from Office Agents SDK sandbox pattern
-          const result = await sandboxedEval(
-            code,
-            {
-              context,
-              Excel: typeof Excel !== 'undefined' ? Excel : undefined,
-              Office: typeof Office !== 'undefined' ? Office : undefined,
-              readFile: vfsReadFile,
-              readFileBuffer: async (path: string) => {
-                const vfs = getVfs();
-                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
-                return vfs.readFileBuffer(fullPath);
-              },
-              writeFile: vfsWriteFile,
-            },
-            'Excel', // Restrict to Excel namespace only
-          );
-
-          return JSON.stringify(
-            {
-              success: true,
-              result: result ?? null,
-              explanation,
-              hasMutated,
-              warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
-            },
-            null,
-            2,
-          );
-        } catch (err: unknown) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: getDetailedOfficeError(err),
-              explanation,
-              codeExecuted: code.slice(0, 200) + '...',
-              hint: 'Check that all properties are loaded before access, and context.sync() is called.',
-            },
-            null,
-            2,
-          );
-        }
-      },
+      executeExcel: createEvalExecutor<Excel.RequestContext>({
+        host: 'Excel',
+        toolName: 'eval_officejs',
+        suggestion:
+          'Refer to the Office.js skill document for correct patterns. Remember: Excel values must be 2D arrays.',
+        mutationDetector: looksLikeMutation,
+        buildSandboxContext: (context) => ({
+          context,
+          Excel: typeof Excel !== 'undefined' ? Excel : undefined,
+          Office: typeof Office !== 'undefined' ? Office : undefined,
+          ...getVfsSandboxContext(),
+        }),
+      }),
     },
     screenshotRange: {
       name: 'screenshotRange',
@@ -1987,12 +1917,10 @@ try {
           rowHeights,
         );
 
-        return JSON.stringify({
-          __screenshot__: true,
-          base64: composited,
-          mimeType: 'image/png',
-          description: `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'} (with row/column headers)`,
-        });
+        return buildScreenshotResult(
+          composited,
+          `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'} (with row/column headers)`,
+        );
       },
     },
 

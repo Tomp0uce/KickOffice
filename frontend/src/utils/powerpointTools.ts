@@ -15,19 +15,17 @@ import {
   applyInheritedStyles,
   type InheritedStyles,
 } from './markdown';
-import { sandboxedEval } from './sandbox';
 import { validateOfficeCode } from './officeCodeValidator';
-import {
-  readFile as vfsReadFile,
-  writeFile as vfsWriteFile,
-  getVfs,
-} from '@/utils/vfs';
+import { createMutationDetector } from './mutationDetector';
+import { getVfsSandboxContext } from '@/utils/vfs';
 import {
   computeTextDiffStats,
   createOfficeTools,
   normalizeLineEndings,
   getErrorMessage,
   getDetailedOfficeError,
+  createEvalExecutor,
+  buildScreenshotResult,
 } from './common';
 import { message as messageUtil } from '@/utils/message';
 import { withSlideZip, escapeXml } from './pptxZipUtils';
@@ -37,7 +35,7 @@ declare const Office: any;
 declare const PowerPoint: any;
 
 // Mutation detection patterns for PowerPoint — ported from Office Agents
-const PPT_MUTATION_PATTERNS = [
+const looksLikeMutationPpt = createMutationDetector([
   /\.insertSlide\s*\(/,
   /\.delete\s*\(/,
   /\.text\s*=/,
@@ -47,11 +45,7 @@ const PPT_MUTATION_PATTERNS = [
   /\.set\s*\(/,
   /\.add\s*\(/,
   /\.addImage\s*\(/,
-];
-
-function looksLikeMutationPpt(code: string): boolean {
-  return PPT_MUTATION_PATTERNS.some(p => p.test(code));
-}
+]);
 
 // Point 3 Fix: Memory registry to store images without crashing the LLM
 export const powerpointImageRegistry = new Map<string, string>();
@@ -1319,81 +1313,20 @@ try {
         },
         required: ['code', 'explanation'],
       },
-      executePowerPoint: async (context: any, args: any) => {
-        ensurePowerPointRunAvailable();
-        const { code, explanation } = args;
-
-        // Validate code BEFORE execution
-        const validation = validateOfficeCode(code, 'PowerPoint');
-
-        if (!validation.valid) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: 'Code validation failed. Fix the errors below and try again.',
-              validationErrors: validation.errors,
-              validationWarnings: validation.warnings,
-              suggestion:
-                'Refer to the Office.js skill document for correct patterns. Remember: slide indices are 0-based.',
-              codeReceived: code.slice(0, 300) + (code.length > 300 ? '...' : ''),
-            },
-            null,
-            2,
-          );
-        }
-
-        // Log warnings but proceed
-        if (validation.warnings.length > 0) {
-          logService.warn('[eval_powerpointjs] Validation warnings:', validation.warnings);
-        }
-
-        try {
-          const hasMutated = looksLikeMutationPpt(code);
-
-          // Execute in sandbox with host restriction + VFS access
-          // VFS helpers ported from Office Agents SDK sandbox pattern
-          const result = await sandboxedEval(
-            code,
-            {
-              context,
-              PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined,
-              Office: typeof Office !== 'undefined' ? Office : undefined,
-              readFile: vfsReadFile,
-              readFileBuffer: async (path: string) => {
-                const vfs = getVfs();
-                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
-                return vfs.readFileBuffer(fullPath);
-              },
-              writeFile: vfsWriteFile,
-            },
-            'PowerPoint', // Restrict to PowerPoint namespace only
-          );
-
-          return JSON.stringify(
-            {
-              success: true,
-              result: result ?? null,
-              explanation,
-              hasMutated,
-              warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
-            },
-            null,
-            2,
-          );
-        } catch (err: unknown) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: getDetailedOfficeError(err),
-              explanation,
-              codeExecuted: code.slice(0, 200) + '...',
-              hint: 'Check that all properties are loaded before access, and context.sync() is called.',
-            },
-            null,
-            2,
-          );
-        }
-      },
+      executePowerPoint: createEvalExecutor({
+        host: 'PowerPoint',
+        toolName: 'eval_powerpointjs',
+        suggestion:
+          'Refer to the Office.js skill document for correct patterns. Remember: slide indices are 0-based.',
+        mutationDetector: looksLikeMutationPpt,
+        buildSandboxContext: (context: any) => ({
+          context,
+          PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined,
+          Office: typeof Office !== 'undefined' ? Office : undefined,
+          ...getVfsSandboxContext(),
+        }),
+        preExecuteHook: () => ensurePowerPointRunAvailable(),
+      }),
     },
 
     insertContent: {
@@ -1901,12 +1834,7 @@ try {
         const imageResult = (slide as any).getImageAsBase64({ width: 960 });
         await context.sync();
         const base64 = imageResult.value as string;
-        return JSON.stringify({
-          __screenshot__: true,
-          base64,
-          mimeType: 'image/png',
-          description: `Screenshot of slide ${slideNumber}`,
-        });
+        return buildScreenshotResult(base64, `Screenshot of slide ${slideNumber}`);
       },
     },
 

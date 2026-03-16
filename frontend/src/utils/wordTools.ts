@@ -2,13 +2,9 @@ import type { ToolDefinition } from '@/types';
 import { logService } from '@/utils/logger';
 import { executeOfficeAction } from './officeAction';
 import { sandboxedEval } from './sandbox';
-import { validateOfficeCode } from './officeCodeValidator';
+import { createMutationDetector } from './mutationDetector';
 import { applyRevisionToSelection, applyRevisionToDocument } from './wordDiffUtils';
-import {
-  readFile as vfsReadFile,
-  writeFile as vfsWriteFile,
-  getVfs,
-} from '@/utils/vfs';
+import { writeFile as vfsWriteFile, getVfsSandboxContext } from '@/utils/vfs';
 
 import {
   applyInheritedStyles,
@@ -23,6 +19,7 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   getDetailedOfficeError,
+  createEvalExecutor,
 } from './common';
 import { escapeXml } from './pptxZipUtils';
 import {
@@ -71,7 +68,7 @@ const runWord = <T>(action: (context: Word.RequestContext) => Promise<T>): Promi
   executeOfficeAction(() => Word.run(action));
 
 // Mutation detection patterns for Word — ported from Office Agents
-const WORD_MUTATION_PATTERNS = [
+const looksLikeMutationWord = createMutationDetector([
   /\.insertText\s*\(/,
   /\.insertHtml\s*\(/,
   /\.insertOoxml\s*\(/,
@@ -86,11 +83,7 @@ const WORD_MUTATION_PATTERNS = [
   /\.styleBuiltIn\s*=/,
   /\.alignment\s*=/,
   /\.set\s*\(/,
-];
-
-function looksLikeMutationWord(code: string): boolean {
-  return WORD_MUTATION_PATTERNS.some(p => p.test(code));
-}
+]);
 
 /**
  * Strip outer <ul>/<ol> wrapper tags from HTML while keeping <li> elements.
@@ -1949,80 +1942,21 @@ try {
         },
         required: ['code', 'explanation'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { code, explanation } = args;
-
-        // Validate code BEFORE execution
-        const validation = validateOfficeCode(code, 'Word');
-
-        if (!validation.valid) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: 'Code validation failed. Fix the errors below and try again.',
-              validationErrors: validation.errors,
-              validationWarnings: validation.warnings,
-              suggestion:
-                'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
-              codeReceived: truncateString(code, WORD_CODE_TRUNCATE_LONG),
-            },
-            null,
-            2,
-          );
-        }
-
-        // Log warnings but proceed
-        if (validation.warnings.length > 0) {
-          logService.warn('[eval_wordjs] Validation warnings:', validation.warnings);
-        }
-
-        try {
-          const hasMutated = looksLikeMutationWord(code);
-
-          // Execute in sandbox with host restriction + VFS access
-          // VFS helpers ported from Office Agents SDK sandbox pattern
-          const result = await sandboxedEval(
-            code,
-            {
-              context,
-              Word: typeof Word !== 'undefined' ? Word : undefined,
-              Office: typeof Office !== 'undefined' ? Office : undefined,
-              readFile: vfsReadFile,
-              readFileBuffer: async (path: string) => {
-                const vfs = getVfs();
-                const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
-                return vfs.readFileBuffer(fullPath);
-              },
-              writeFile: vfsWriteFile,
-            },
-            'Word', // Restrict to Word namespace only
-          );
-
-          return JSON.stringify(
-            {
-              success: true,
-              result: result ?? null,
-              explanation,
-              hasMutated,
-              warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
-            },
-            null,
-            2,
-          );
-        } catch (err: unknown) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: getDetailedOfficeError(err),
-              explanation,
-              codeExecuted: truncateString(code, WORD_CODE_TRUNCATE_SHORT),
-              hint: 'Check that all properties are loaded before access, and context.sync() is called.',
-            },
-            null,
-            2,
-          );
-        }
-      },
+      executeWord: createEvalExecutor({
+        host: 'Word',
+        toolName: 'eval_wordjs',
+        suggestion:
+          'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
+        mutationDetector: looksLikeMutationWord,
+        buildSandboxContext: (context) => ({
+          context,
+          Word: typeof Word !== 'undefined' ? Word : undefined,
+          Office: typeof Office !== 'undefined' ? Office : undefined,
+          ...getVfsSandboxContext(),
+        }),
+        validationCodePreviewLength: WORD_CODE_TRUNCATE_LONG,
+        catchCodePreviewLength: WORD_CODE_TRUNCATE_SHORT,
+      }),
     },
   },
   buildExecuteWrapper<WordToolTemplate>('executeWord', runWord),

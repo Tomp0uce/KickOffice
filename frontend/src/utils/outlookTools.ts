@@ -3,8 +3,7 @@ import type { ToolDefinition } from '@/types';
 import { logService } from '@/utils/logger';
 import { executeOfficeAction } from './officeAction';
 import { renderOfficeRichHtml, sanitizeHtml } from './markdown';
-import { sandboxedEval } from './sandbox';
-import { validateOfficeCode } from './officeCodeValidator';
+
 
 import {
   generateVisualDiff,
@@ -13,6 +12,7 @@ import {
   type OfficeToolTemplate,
   getErrorMessage,
   getDetailedOfficeError,
+  createEvalExecutor,
 } from './common';
 import { getLastRichContext, setLastRichContext } from './richContextStore';
 import { reassembleWithFragments, extractTextFromHtml } from './richContentPreserver';
@@ -558,70 +558,18 @@ try {
         },
         required: ['code', 'explanation'],
       },
-      executeOutlook: async (mailbox, args: Record<string, any>) => {
-        const { code, explanation } = args;
-
-        // Validate code BEFORE execution
-        // Note: Outlook doesn't use context.sync(), so validation is less strict
-        const validation = validateOfficeCode(code, 'Outlook');
-
-        if (!validation.valid) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: 'Code validation failed. Fix the errors below and try again.',
-              validationErrors: validation.errors,
-              validationWarnings: validation.warnings,
-              suggestion:
-                'Refer to the Office.js skill document for correct patterns. Remember: Outlook uses callbacks, not async/await.',
-              codeReceived: truncateString(code, 300),
-            },
-            null,
-            2,
-          );
-        }
-
-        // Log warnings but proceed
-        if (validation.warnings.length > 0) {
-          logService.warn('[eval_outlookjs] Validation warnings:', validation.warnings);
-        }
-
-        try {
-          // Execute in sandbox with host restriction
-          const result = await sandboxedEval(
-            code,
-            {
-              mailbox,
-              Office:
-                typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined,
-            },
-            'Outlook', // Restrict to Outlook namespace only
-          );
-
-          return JSON.stringify(
-            {
-              success: true,
-              result: result ?? null,
-              explanation,
-              warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
-            },
-            null,
-            2,
-          );
-        } catch (err: unknown) {
-          return JSON.stringify(
-            {
-              success: false,
-              error: getDetailedOfficeError(err),
-              explanation,
-              codeExecuted: truncateString(code, 200),
-              hint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
-            },
-            null,
-            2,
-          );
-        }
-      },
+      executeOutlook: createEvalExecutor({
+        host: 'Outlook',
+        toolName: 'eval_outlookjs',
+        suggestion:
+          'Refer to the Office.js skill document for correct patterns. Remember: Outlook uses callbacks, not async/await.',
+        buildSandboxContext: (mailbox: any) => ({
+          mailbox,
+          Office:
+            typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined,
+        }),
+        catchHint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
+      }),
     },
   },
   def =>
