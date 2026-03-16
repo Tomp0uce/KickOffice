@@ -9,11 +9,11 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 93 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 95 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane
-- **Multi-Host Support** — Word (31 tools), Excel (27 tools), PowerPoint (21 tools), Outlook (8 tools)
+- **Multi-Host Support** — Word (31 tools), Excel (27 tools), PowerPoint (23 tools), Outlook (8 tools)
 - **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
 - **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
@@ -59,6 +59,8 @@ Express.js proxy server. Holds all secrets (API keys), validates requests, rate-
 - `GET /api/icons/search` — Icon search proxy (Iconify API)
 - `GET /api/icons/svg/:prefix/:name` — SVG icon fetch with optional color
 - `GET /api/models` — Available model tiers
+- `POST /api/feedback` — User feedback submission with log export
+- `POST /api/logs` — Frontend log aggregation endpoint
 - `GET /health` — Health check
 
 ### LLM API
@@ -115,10 +117,10 @@ Native Word revision markup via `docx-redline-js`:
 | -------------- | ------ | --------------------------------------------------------------------------------------------- |
 | **Word**       | 31     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
 | **Excel**      | 27     | `eval_officejs`, formulas, charts, screenshots with headers, CSV import/export, pixel art, header detection       |
-| **PowerPoint** | 21     | `editSlideXml`, slides, shapes, speaker notes, screenshots, icons (Iconify)                   |
+| **PowerPoint** | 23     | `editSlideXml`, slides, shapes, speaker notes, screenshots, icons (Iconify), `verifySlides`   |
 | **Outlook**    | 8      | `eval_outlookjs`, email body/subject, recipients, rich content preservation                   |
 | **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
-| **Total**      | **93** |                                                                                               |
+| **Total**      | **95** |                                                                                               |
 
 ---
 
@@ -197,15 +199,15 @@ KickOffice/
 │       ├── server.js           # Entry point
 │       ├── config/             # env.js, models.js, limits.js
 │       ├── middleware/         # auth.js, validate.js + validators/
-│       ├── routes/             # chat, image, upload, files, icons, models, health, logs
+│       ├── routes/             # chat, image, upload, files, icons, models, health, logs, feedback
 │       ├── services/           # llmClient.js, plotDigitizerService.js, imageStore.js
-│       └── utils/              # http.js, logger.js
+│       └── utils/              # http.js, logger.js, toolUsageLogger.js
 ├── frontend/                   # Vue 3 + TypeScript
 │   └── src/
 │       ├── api/                # backend.ts (HTTP client)
 │       ├── components/         # Chat UI, settings tabs
-│       ├── composables/        # useAgentLoop, useQuickActions, useSessionFiles,
-│       │                       # useOfficeInsert, useImageActions, useMessageOrchestration, etc.
+│       ├── composables/        # 17 composables: useAgentLoop, useQuickActions, useSessionFiles,
+│       │                       # useDocumentUndo, useSessionDB, useSessionManager, etc.
 │       ├── constants/          # limits.ts (centralized magic numbers)
 │       ├── i18n/               # en.json, fr.json
 │       ├── pages/              # HomePage, SettingsPage

@@ -11,7 +11,7 @@ This document provides operational guidance for AI coding agents working in this
 
 | File | Purpose |
 | ---- | ------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Deferred items and architecture notes — read before making architectural changes |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | DR v12 findings (5 critical, 5 high, 19 medium, 12 low) + deferred items — read before making architectural changes |
 | [PRD.md](./PRD.md) | Product Requirements Document — single source of truth for features, user personas, acceptance criteria. **Read before implementing new features.** |
 | [SKILLS_GUIDE.md](./SKILLS_GUIDE.md) | How to create and modify skill files for Quick Actions and host guidance |
 
@@ -39,11 +39,11 @@ Both containers run as non-root users. Frontend listens on port 8080 internally 
 The frontend follows a composable-based architecture:
 
 - **Pages**: `HomePage.vue` (minimal orchestration), `SettingsPage.vue` (decomposed into tab components)
-- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue` + generic components + Settings tabs
-- **Composables**: `useHomePage.ts`, `useAgentLoop.ts`, `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`, `useAgentPrompts.ts`, `useOfficeSelection.ts`, `useImageActions.ts`, `useOfficeInsert.ts`, `useHealthCheck.ts`, `useQuickActions.ts`, `useSessionFiles.ts`, `useMessageOrchestration.ts`
+- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue`, `chat/StatsBar.vue`, `chat/ToolCallBlock.vue`, `chat/MarkdownRenderer.vue`, `settings/AccountTab.vue`, `settings/GeneralTab.vue`, `settings/PromptsTab.vue`, `settings/BuiltinPromptsTab.vue`, `settings/ToolsTab.vue`, `settings/FeedbackDialog.vue`, `CustomButton.vue`, `CustomInput.vue`, `SingleSelect.vue`, `SettingCard.vue`, `Message.vue`
+- **Composables** (17 files): `useHomePage.ts`, `useHomePageContext.ts`, `useAgentLoop.ts`, `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`, `useAgentPrompts.ts`, `useOfficeSelection.ts`, `useImageActions.ts`, `useOfficeInsert.ts`, `useHealthCheck.ts`, `useQuickActions.ts`, `useSessionFiles.ts`, `useSessionManager.ts`, `useSessionDB.ts`, `useMessageOrchestration.ts`, `useDocumentUndo.ts`
 - **Constants**: `limits.ts` (centralized magic numbers: upload sizes, timeouts, buffer sizes, icon sizes)
 - **Router**: `createMemoryHistory` — avoids URL manipulation conflicts with Office iframe host
-- **Utils**: `tokenManager.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordDiffUtils.ts`, `wordTrackChanges.ts`, `toolProviderRegistry.ts`, `officeCodeValidator.ts`, `markdown.ts`, `pptxZipUtils.ts`, `common.ts`, `hostDetection.ts`, `toolStorage.ts`, `richContentPreserver.ts`
+- **Utils**: `tokenManager.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordDiffUtils.ts`, `wordTrackChanges.ts`, `wordFormatter.ts`, `toolProviderRegistry.ts`, `officeCodeValidator.ts`, `markdown.ts`, `pptxZipUtils.ts`, `common.ts`, `hostDetection.ts`, `toolStorage.ts`, `richContentPreserver.ts`, `richContextStore.ts`, `credentialCrypto.ts`, `credentialStorage.ts`, `cryptoPolyfill.ts`, `officeAction.ts`, `officeDocumentContext.ts`, `officeOutlook.ts`, `officeRichText.ts`, `sandbox.ts`, `lockdown.ts`, `vfs.ts`, `savedPrompts.ts`
 - **Skills**: `frontend/src/skills/` — 5 host skills + 17 Quick Action skills (all `.skill.md` files)
 
 ### Backend architecture
@@ -66,13 +66,17 @@ backend/src/
 │   ├── upload.js          # POST /api/upload
 │   ├── files.js           # POST /api/files (proxy to /v1/files)
 │   ├── icons.js           # GET /api/icons/search, GET /api/icons/svg/:prefix/:name
+│   ├── feedback.js        # POST /api/feedback
+│   ├── logs.js            # POST /api/logs (frontend log aggregation)
 │   └── plotDigitizer.js   # POST /api/chart-extract
 ├── services/
 │   ├── llmClient.js       # LLM API client (chatCompletion, imageGeneration, RateLimitError)
 │   ├── plotDigitizerService.js
 │   └── imageStore.js
 └── utils/
-    └── http.js            # fetchWithTimeout, logAndRespond, sanitizeErrorText
+    ├── http.js            # fetchWithTimeout, logAndRespond, sanitizeErrorText
+    ├── logger.js          # Winston logger with daily rotation (console + file)
+    └── toolUsageLogger.js # Tool usage metrics tracking
 ```
 
 Manifest outputs:
@@ -120,12 +124,12 @@ Compatible providers may return `data[0].b64_json` or `data[0].url`. Keep suppor
 
 Current tool landscape:
 
-- Word: 30 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `eval_wordjs`, and 26 more)
-- Excel: 24 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, and 20 more)
-- PowerPoint: 21 tools (`screenshotSlide`, `editSlideXml`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, and 16 more)
+- Word: 31 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `eval_wordjs`, `getDocumentOoxml`, and 26 more)
+- Excel: 27 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, `modifyWorkbookStructure`, and 22 more)
+- PowerPoint: 23 tools (`screenshotSlide`, `editSlideXml`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 17 more)
 - Outlook: 8 tools (`eval_outlookjs` and 7 more)
 - General: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
-- **Total**: 89 tools
+- **Total**: 95 tools
 
 **Agent Stability Features**:
 
