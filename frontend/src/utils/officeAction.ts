@@ -27,24 +27,28 @@ export async function executeOfficeAction<T>(
     }
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let abortListener: () => void;
+    // ERR-C4: Register abort listener OUTSIDE the Promise constructor so it is always
+    // assigned before Promise.race and always removed in finally — no race, no leak.
+    let abortListener: (() => void) | undefined;
+    let rejectTimeoutPromise: ((err: Error) => void) | undefined;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
+      rejectTimeoutPromise = reject;
       timeoutId = setTimeout(() => {
         logService.warn(`[OfficeAction] Timeout executing ${actionName} (attempt ${attempt + 1})`, {
           actionName,
         });
         reject(new Error(OFFICE_BUSY_TIMEOUT_MESSAGE));
       }, timeoutMs);
-
-      if (abortSignal) {
-        abortListener = () => {
-          logService.warn(`[OfficeAction] Aborted ${actionName}`, { actionName });
-          reject(new Error('Operation aborted by user'));
-        };
-        abortSignal.addEventListener('abort', abortListener);
-      }
     });
+
+    if (abortSignal) {
+      abortListener = () => {
+        logService.warn(`[OfficeAction] Aborted ${actionName}`, { actionName });
+        rejectTimeoutPromise?.(new Error('Operation aborted by user'));
+      };
+      abortSignal.addEventListener('abort', abortListener);
+    }
 
     try {
       const result = await Promise.race([action(), timeoutPromise]);
@@ -80,7 +84,8 @@ export async function executeOfficeAction<T>(
       await delay(backoffDelays[attempt]);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
-      if (abortSignal && abortListener!) {
+      // ERR-C4: abortListener is always defined when abortSignal is provided — safe to remove
+      if (abortSignal && abortListener) {
         abortSignal.removeEventListener('abort', abortListener);
       }
     }

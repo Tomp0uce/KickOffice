@@ -101,6 +101,7 @@ import { Edit2, Plus, Trash2 } from 'lucide-vue-next';
 
 import CustomButton from '@/components/CustomButton.vue';
 import { loadSavedPromptsFromStorage, type SavedPrompt } from '@/utils/savedPrompts';
+import { logService } from '@/utils/logger';
 
 const { t } = useI18n();
 
@@ -129,7 +130,7 @@ function savePromptsToStorage() {
     localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts.value));
   } catch (e) {
     if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-      console.warn('[PromptsTab] localStorage quota exceeded — saved prompts not persisted');
+      logService.warn('[PromptsTab] localStorage quota exceeded — saved prompts not persisted');
     } else {
       throw e;
     }

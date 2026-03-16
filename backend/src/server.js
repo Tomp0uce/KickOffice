@@ -123,7 +123,9 @@ app.use((req, res, next) => {
 
 // Add request ID and context logger
 app.use((req, res, next) => {
-  res.locals.reqId = crypto.randomUUID()
+  // ERR-L1: Prefer the request ID sent by the frontend for end-to-end log correlation;
+  // fall back to a server-generated UUID if not present.
+  res.locals.reqId = req.headers['x-request-id'] || crypto.randomUUID()
   res.locals.userId = req.headers['x-user-email'] || 'anonymous'
   res.locals.host = req.headers['x-office-host'] || 'unknown'
 

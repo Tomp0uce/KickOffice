@@ -5,6 +5,7 @@ import {
   getSlideContentStandalone,
 } from '@/utils/powerpointTools';
 import { executeOfficeAction as runOfficeAction } from '@/utils/officeAction';
+import { logService } from '@/utils/logger';
 import {
   getOfficeTextCoercionType,
   getOfficeHtmlCoercionType,
@@ -362,7 +363,7 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
         return bodyHtml.value || '';
       });
     } catch (err) {
-      console.warn('[useOfficeSelection] Word getHtml failed', err);
+      logService.warn('[useOfficeSelection] Word getHtml failed', err);
       return '';
     }
   }

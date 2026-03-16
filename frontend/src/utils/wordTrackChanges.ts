@@ -25,7 +25,7 @@ export interface TrackingState {
  */
 export async function setChangeTrackingForAi(
   context: Word.RequestContext,
-  redlineEnabled: boolean,
+  _redlineEnabled: boolean,
   sourceLabel: string = 'AI',
 ): Promise<TrackingState> {
   let originalMode = null;

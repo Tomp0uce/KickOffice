@@ -1,5 +1,5 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types';
-import { nextTick, ref, type Ref, type ComputedRef } from 'vue';
+import { ref, type Ref, type ComputedRef } from 'vue';
 
 import {
   type ChatMessage,
@@ -380,6 +380,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           currentAssistantMessage.content = errInfo.rawDetail
             ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
             : t(errInfo.i18nKey);
+        }
+        // ERR-L2: Mark the message as stream-interrupted so the UI can show a prominent Retry affordance
+        const isStreamInterrupted =
+          err instanceof Error && err.message.includes('stream_interrupted');
+        if (isStreamInterrupted) {
+          currentAssistantMessage.streamError = true;
         }
         currentAction.value = '';
         break;
@@ -1019,7 +1025,14 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 const bytes = new Uint8Array(binaryStr.length);
                 for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
                 vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(
-                  err => logService.warn('[AgentLoop] VFS write failed for uploaded image', err),
+                  err => {
+                    logService.warn('[AgentLoop] VFS write failed for uploaded image', err);
+                    // ERR-C3: Surface VFS failure so agent context gap is visible to user
+                    messageUtil.warning(
+                      t('warningVfsWriteFailed') ||
+                        `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
+                    );
+                  },
                 );
               } catch { /* best-effort */ }
 
@@ -1057,7 +1070,14 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
               addSessionFile(entry);
               // Write to VFS so the agent can access content via vfsReadFile on future turns
               vfsWriteFile(`/home/user/uploads/${result.filename}`, result.extractedText).catch(
-                err => logService.warn('[AgentLoop] VFS write failed for uploaded file', err),
+                err => {
+                  logService.warn('[AgentLoop] VFS write failed for uploaded file', err);
+                  // ERR-C3: Surface VFS failure so agent context gap is visible to user
+                  messageUtil.warning(
+                    t('warningVfsWriteFailed') ||
+                      `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
+                  );
+                },
               );
               newTextFiles.push({
                 filename: result.filename,

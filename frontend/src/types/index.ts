@@ -27,6 +27,9 @@ export interface ToolProperty {
   required?: string[];
   default?: any;
   anyOf?: ToolProperty[];
+  /** JSON Schema array constraints */
+  minItems?: number;
+  maxItems?: number;
 }
 
 export type ToolCategory = 'read' | 'write' | 'format';

@@ -166,6 +166,8 @@ chatRouter.post('/', async (req, res) => {
           readResult = await Promise.race([readPromise, timeoutPromise])
         } catch (readError) {
           if (clientDisconnected) break
+          // ERR-M5: Cancel the upstream reader so the LLM provider stops streaming to nobody
+          reader.cancel().catch(() => {})
           throw readError
         } finally {
           clearTimeout(timeoutId)
@@ -188,8 +190,13 @@ chatRouter.post('/', async (req, res) => {
               if (deltaToolCalls && Array.isArray(deltaToolCalls)) {
                 toolCalls.push(...deltaToolCalls)
               }
-            } catch {
-              // Ignore parse errors for individual chunks
+            } catch (parseErr) {
+              // ERR-C1: Log parse failures so tool call drops are visible in server logs
+              req.logger.warn('POST /api/chat SSE chunk JSON parse failure', {
+                traffic: 'system',
+                rawChunk: jsonStr.slice(0, 200),
+                error: parseErr?.message,
+              })
             }
           }
         } catch {
@@ -247,6 +254,14 @@ chatRouter.post('/', async (req, res) => {
     } catch (streamError) {
       if (!clientDisconnected) {
         req.logger.error('POST /api/chat stream error', { error: streamError, traffic: 'system' })
+        // ERR-C2: Deliver error frame to client so it knows the stream was interrupted
+        if (!res.writableEnded) {
+          try {
+            res.write(`data: ${JSON.stringify({ error: 'stream_interrupted' })}\n\n`)
+          } catch {
+            // Client disconnected between the check and the write — ignore
+          }
+        }
       }
     } finally {
       // Cancel reader if still active

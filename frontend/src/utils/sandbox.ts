@@ -1,4 +1,5 @@
 import { ensureLockdown } from './lockdown';
+import { logService } from './logger';
 
 /* global Compartment */
 
@@ -59,7 +60,7 @@ export function sandboxedEval(
 
   // Audit trail: log host and truncated code for debugging
   const preview = code.length > 200 ? `${code.slice(0, 200)}…` : code;
-  console.info(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`);
+  logService.debug(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`, { traffic: 'system' });
 
   // Wrap in async IIFE and execute
   return compartment.evaluate(`(async () => { ${code} })()`);

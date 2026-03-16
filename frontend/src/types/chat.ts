@@ -19,6 +19,8 @@ export interface DisplayMessage {
   rawMessages?: any[];
   timestamp?: number;
   attachedFiles?: Array<{ filename: string; content: string; fileId?: string }>;
+  /** ERR-L2: Set to true when this assistant message ended with a stream interruption error */
+  streamError?: boolean;
 }
 
 export interface QuickAction {

@@ -10,7 +10,6 @@ import {
   generateVisualDiff,
   createOfficeTools,
   truncateString,
-  buildExecuteWrapper,
   type OfficeToolTemplate,
   getErrorMessage,
   getDetailedOfficeError,

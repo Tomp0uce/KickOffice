@@ -1,4 +1,5 @@
 import 'ses';
+import { logService } from './logger';
 
 /* global lockdown */
 
@@ -48,7 +49,7 @@ function restoreFunctionProperties(saved: Map<string, unknown>) {
 
   const desc = Object.getOwnPropertyDescriptor(globalThis, 'Function');
   if (!desc || (!desc.writable && !desc.configurable)) {
-    console.warn(
+    logService.warn(
       '[lockdown] Cannot restore Function properties — Function is neither writable nor configurable',
     );
     return;

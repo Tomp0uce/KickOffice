@@ -78,7 +78,8 @@ async function withRetry(fetchFn, maxAttempts = 3) {
           const parsed = parseFloat(retryAfter)
           retryMs = isFinite(parsed) ? parsed * 1000 : Math.max(retryMs, new Date(retryAfter).getTime() - Date.now())
         }
-        throw new RateLimitError(retryMs)
+        // ERR-M4: Enforce a minimum floor so a Retry-After: 0 header never causes immediate hammering
+        throw new RateLimitError(Math.max(retryMs, 5_000))
       }
       return response
     } catch (err) {

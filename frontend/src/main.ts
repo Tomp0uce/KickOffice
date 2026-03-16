@@ -31,6 +31,8 @@ window.onunhandledrejection = event => {
 window.Office.onReady(async () => {
   markOfficeReady();
   detectOfficeHost();
+  // ERR-M3: Start periodic log forwarding to /api/logs (every 30 s, immediate on error)
+  logService.startFlushTimer();
 
   // BUGFIX: Initialize rememberCredentials carefully to avoid breaking existing credentials
   // Office Add-ins MUST persist credentials in localStorage (sessionStorage is wiped on restart)
