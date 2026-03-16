@@ -18,6 +18,7 @@
       :aria-expanded="dropDownOpen"
       :aria-label="title"
       @click="toggleDropdown()"
+      @keydown="handleKeydown"
     >
       <component :is="customFrontIcon || SortAscIcon" v-if="fronticon" :size="14" />
       <span class="text-center text-xs font-medium text-secondary">{{
@@ -32,9 +33,10 @@
       role="listbox"
     >
       <button
-        v-for="key in keyList"
+        v-for="(key, index) in keyList"
         :key="key"
         class="block min-h-[unset] w-full cursor-pointer border-none bg-bg-tertiary px-2 py-1 text-center text-sm leading-[1.4] text-main transition-all duration-fast ease-apple hover:bg-accent/50"
+        :class="{ 'bg-accent/30': index === focusedIndex }"
         role="option"
         :aria-selected="modelValue === key"
         @click="selectItem(key)"
@@ -48,12 +50,13 @@
 <script setup lang="ts">
 import { onClickOutside } from '@vueuse/core';
 import { ChevronDownIcon, SortAscIcon } from 'lucide-vue-next';
-import { nextTick, ref, type Component } from 'vue';
+import { nextTick, ref, watch, type Component } from 'vue';
 
 const dropdownRef = ref(null);
 const modelValue = defineModel<string>();
 const triggerRef = ref<HTMLElement | null>(null);
 const optionsRef = ref<HTMLElement | null>(null);
+const focusedIndex = ref(-1);
 
 function selectItem(key: string) {
   modelValue.value = key;
@@ -70,6 +73,46 @@ async function toggleDropdown() {
     updatePosition();
   }
 }
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!dropDownOpen.value) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleDropdown();
+    }
+    return;
+  }
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      focusedIndex.value = Math.min(focusedIndex.value + 1, keyList.length - 1);
+      break;
+    case 'ArrowUp':
+      event.preventDefault();
+      focusedIndex.value = Math.max(focusedIndex.value - 1, 0);
+      break;
+    case 'Enter':
+      event.preventDefault();
+      if (focusedIndex.value >= 0 && focusedIndex.value < keyList.length) {
+        selectItem(keyList[focusedIndex.value]);
+      }
+      break;
+    case 'Escape':
+      event.preventDefault();
+      dropDownOpen.value = false;
+      break;
+  }
+}
+
+watch(dropDownOpen, val => {
+  if (!val) {
+    focusedIndex.value = -1;
+  } else {
+    // Start focus on the currently selected item
+    focusedIndex.value = keyList.indexOf(modelValue.value ?? '');
+  }
+});
 
 function updatePosition() {
   const trigger = triggerRef.value;

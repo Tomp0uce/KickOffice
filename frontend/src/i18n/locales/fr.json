@@ -464,5 +464,8 @@
   "stats.contextWarning": "⚠️ Utilisation du contexte à {pct}% - limite approchée. Envisagez de démarrer une nouvelle conversation.",
   "toolCall.args": "Arguments",
   "toolCall.error": "Erreur",
-  "toolCall.result": "Résultat"
+  "toolCall.result": "Résultat",
+  "authErrorBanner": "Authentification requise ou clé API invalide.",
+  "goToSettings": "Accéder aux Paramètres pour configurer",
+  "shiftEnterHint": "Maj + Entrée pour nouvelle ligne"
 }

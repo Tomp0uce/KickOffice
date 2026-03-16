@@ -12,83 +12,17 @@
         @delete-session="handleDeleteSession"
       />
 
-      <!-- Persistent Offline Indicator — only shown after first check to avoid false negative flash -->
-      <div
-        v-if="backendChecked && !backendOnline"
-        class="flex items-center justify-center bg-red-500/10 py-1.5 px-3 rounded-md border border-red-500/20 shadow-xs mx-4 mt-2"
-      >
-        <span class="text-xs text-red-500 font-medium flex items-center gap-2">
-          <span class="relative flex h-2 w-2">
-            <span
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
-            ></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-          </span>
-          {{ t('backendOffline') }}
-        </span>
-      </div>
-
-      <!-- Auth Error Indicator (UX-M3) -->
-      <div
-        v-if="backendOnline && Object.keys(availableModels).length === 0 && !loading"
-        class="flex flex-col items-center justify-center bg-warning/10 py-2 px-3 rounded-md border border-warning/30 shadow-xs mx-4 mt-2 mb-2 animate-in fade-in"
-      >
-        <span class="text-xs text-warning-700 dark:text-warning font-medium text-center mb-1">
-          {{ t('authErrorBanner', 'Authentication required or invalid API key.') }}
-        </span>
-        <button
-          class="text-[11px] underline text-accent hover:text-accent-hover transition-colors"
-          @click="goToSettings"
-        >
-          {{ t('goToSettings', 'Go to Settings to configure') }}
-        </button>
-      </div>
-
-      <div
-        v-if="isDeleteConfirmVisible"
-        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
-      >
-        <p class="text-[13px] font-medium leading-tight text-main">
-          {{ t('deleteSessionConfirm') }}
-        </p>
-        <div class="mt-1 flex justify-end gap-2">
-          <button
-            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="isDeleteConfirmVisible = false"
-          >
-            {{ t('cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-bg-tertiary"
-            @click="confirmDeleteSession"
-          >
-            {{ t('confirm') }}
-          </button>
-        </div>
-      </div>
-
-      <div
-        v-if="isNewChatConfirmVisible"
-        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
-      >
-        <p class="text-[13px] font-medium leading-tight text-main">
-          {{ t('newChatConfirm') }}
-        </p>
-        <div class="mt-1 flex justify-end gap-2">
-          <button
-            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="isNewChatConfirmVisible = false"
-          >
-            {{ t('cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary/90"
-            @click="confirmNewChat"
-          >
-            {{ t('confirm') }}
-          </button>
-        </div>
-      </div>
+      <!-- UX-H1: Extracted sub-components -->
+      <OfflineBanner />
+      <AuthErrorBanner />
+      <SessionConfirmDialogs
+        :is-delete-confirm-visible="isDeleteConfirmVisible"
+        :is-new-chat-confirm-visible="isNewChatConfirmVisible"
+        @cancel-delete="isDeleteConfirmVisible = false"
+        @confirm-delete="confirmDeleteSession"
+        @cancel-new-chat="isNewChatConfirmVisible = false"
+        @confirm-new-chat="confirmNewChat"
+      />
 
       <QuickActionsBar
         v-model:selected-prompt-id="selectedPromptId"
@@ -146,25 +80,6 @@ import {
   onDeactivated,
 } from 'vue';
 import { useStorage } from '@vueuse/core';
-import {
-  BookOpen,
-  ChartBarBig,
-  CheckCheck,
-  FileCheck,
-  FunctionSquare,
-  Globe,
-  Grid3X3,
-  Image,
-  ListTodo,
-  Mail,
-  MessageSquare,
-  NotebookPen,
-  ScanSearch,
-  Sparkle,
-  Table,
-  TrendingUp,
-  Zap,
-} from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 
 import { useHealthCheck } from '@/composables/useHealthCheck';
@@ -174,17 +89,18 @@ import ChatInput from '@/components/chat/ChatInput.vue';
 import ChatMessageList from '@/components/chat/ChatMessageList.vue';
 import QuickActionsBar from '@/components/chat/QuickActionsBar.vue';
 import StatsBar from '@/components/chat/StatsBar.vue';
+import OfflineBanner from '@/components/chat/OfflineBanner.vue';
+import AuthErrorBanner from '@/components/chat/AuthErrorBanner.vue';
+import SessionConfirmDialogs from '@/components/chat/SessionConfirmDialogs.vue';
 import { useAgentLoop } from '@/composables/useAgentLoop';
 import { useImageActions } from '@/composables/useImageActions';
 import { useOfficeInsert } from '@/composables/useOfficeInsert';
 import { useSessionManager } from '@/composables/useSessionManager';
-import type {
-  DisplayMessage,
-  ExcelQuickAction,
-  PowerPointQuickAction,
-  OutlookQuickAction,
-  QuickAction,
-} from '@/types/chat';
+import type { DisplayMessage } from '@/types/chat';
+import { useWordQuickActions } from '@/composables/quickActions/useWordQuickActions';
+import { useExcelQuickActions } from '@/composables/quickActions/useExcelQuickActions';
+import { useOutlookQuickActions } from '@/composables/quickActions/useOutlookQuickActions';
+import { usePowerPointQuickActions } from '@/composables/quickActions/usePowerPointQuickActions';
 import { localStorageKey } from '@/utils/enum';
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
 import { type SavedPrompt } from '@/utils/savedPrompts';
@@ -244,174 +160,11 @@ const insertType = ref<InsertType>('replace');
 const chatInputRef = ref<InstanceType<typeof ChatInput>>();
 const messageListRef = ref<InstanceType<typeof ChatMessageList>>();
 
-const wordQuickActions = computed<QuickAction[]>(() => [
-  {
-    key: 'word-proofread',
-    label: t('proofread'),
-    icon: CheckCheck,
-    executeWithAgent: true,
-    tooltipKey: 'proofread_tooltip',
-  },
-  {
-    key: 'word-translate',
-    label: t('translate'),
-    icon: Globe,
-    executeWithAgent: true,
-    tooltipKey: 'translate_tooltip',
-  },
-  {
-    key: 'word-review',
-    label: t('wordReview', 'Review'),
-    icon: BookOpen,
-    executeWithAgent: true,
-    tooltipKey: 'wordReview_tooltip',
-  },
-  {
-    key: 'polish',
-    label: t('polish'),
-    icon: Sparkle,
-    tooltipKey: 'polish_tooltip',
-  },
-  {
-    key: 'summary',
-    label: t('summary'),
-    icon: FileCheck,
-    tooltipKey: 'summary_tooltip',
-  },
-]);
-const excelQuickActions = computed<ExcelQuickAction[]>(() => [
-  {
-    key: 'ingest',
-    label: t('excelIngest', 'Smart Ingestion'),
-    icon: Table,
-    mode: 'immediate',
-    executeWithAgent: true,
-    tooltipKey: 'excelIngest_tooltip',
-  },
-  {
-    key: 'digitizeChart',
-    label: t('excelDigitizeChart', 'Digitize Chart'),
-    icon: ChartBarBig,
-    mode: 'immediate',
-    executeWithAgent: true,
-    imageUpload: true,
-    tooltipKey: 'excelDigitizeChart_tooltip',
-  },
-  {
-    key: 'explain',
-    label: t('excelExplain', 'Explain Formula'),
-    icon: BookOpen,
-    mode: 'immediate',
-    executeWithAgent: true,
-    systemPrompt:
-      'You are an Excel expert. Explain the selected formula or data in simple terms: what it does, how it works, and any edge cases to be aware of.',
-    tooltipKey: 'excelExplain_tooltip',
-  },
-  {
-    key: 'formulaGenerator',
-    label: t('excelFormulaGenerator', 'Formula Generator'),
-    icon: FunctionSquare,
-    mode: 'draft',
-    prefix: t('excelFormulaGeneratorPrefix', 'Help me build a formula'),
-    tooltipKey: 'excelFormulaGenerator_tooltip',
-  },
-  {
-    key: 'dataTrend',
-    label: t('excelDataTrend', 'Data Trend'),
-    icon: TrendingUp,
-    mode: 'immediate',
-    executeWithAgent: true,
-    systemPrompt:
-      'You are a data analyst. Analyze the trends in the selected data: identify patterns, outliers, growth rates, and provide a concise summary with actionable insights.',
-    tooltipKey: 'excelDataTrend_tooltip',
-  },
-  {
-    key: 'pixelArt',
-    label: t('excelPixelArt', 'Pixel Art'),
-    icon: Grid3X3,
-    mode: 'immediate',
-    executeWithAgent: true,
-    imageUpload: true,
-    tooltipKey: 'excelPixelArt_tooltip',
-  },
-]);
-const outlookQuickActions = computed<OutlookQuickAction[]>(() => [
-  {
-    key: 'proofread',
-    label: t('outlookProofread'),
-    icon: CheckCheck,
-    tooltipKey: 'outlookProofread_tooltip',
-  },
-  {
-    key: 'translate',
-    label: t('translate'),
-    icon: Globe,
-    tooltipKey: 'translate_tooltip',
-  },
-  {
-    key: 'reply',
-    label: t('outlookReply'),
-    icon: Mail,
-    mode: 'smart-reply',
-    prefix: t('outlookReplyPrePrompt'),
-    tooltipKey: 'outlookReply_tooltip',
-  },
-  {
-    key: 'extract',
-    label: t('outlookExtract'),
-    icon: ListTodo,
-    tooltipKey: 'outlookExtract_tooltip',
-  },
-  {
-    key: 'mom',
-    label: t('outlookMoM', 'MoM'),
-    icon: NotebookPen,
-    mode: 'mom',
-    prefix: t('outlookMoMPrefix', 'Génère moi un compte rendu de réunion pour ces notes de réunion : '),
-    tooltipKey: 'outlookMoM_tooltip',
-  },
-]);
-const powerPointQuickActions = computed<PowerPointQuickAction[]>(() => [
-  {
-    key: 'ppt-proofread',
-    label: t('proofread'),
-    icon: CheckCheck,
-    mode: 'immediate',
-    executeWithAgent: true,
-    tooltipKey: 'ppt_proofread_tooltip',
-  },
-  {
-    key: 'ppt-translate',
-    label: t('translate'),
-    icon: Globe,
-    mode: 'immediate',
-    executeWithAgent: true,
-    tooltipKey: 'translate_tooltip',
-  },
-  {
-    // PPT-H2: replaced speakerNotes with review — no text selection required
-    key: 'review',
-    label: t('pptReview'),
-    icon: ScanSearch,
-    mode: 'immediate',
-    tooltipKey: 'pptReview_tooltip',
-  },
-  {
-    key: 'punchify',
-    label: t('pptPunchify'),
-    icon: Zap,
-    mode: 'immediate',
-    tooltipKey: 'pptPunchify_tooltip',
-    executeWithAgent: true,
-  },
-  {
-    key: 'visual',
-    label: t('pptVisual'),
-    icon: Image,
-    mode: 'immediate',
-    tooltipKey: 'pptVisual_tooltip',
-  },
-]);
+// UX-H1 / QUAL-H2: Quick action definitions extracted to per-host composables
+const { wordQuickActions } = useWordQuickActions();
+const { excelQuickActions } = useExcelQuickActions();
+const { outlookQuickActions } = useOutlookQuickActions();
+const { powerPointQuickActions } = usePowerPointQuickActions();
 
 const quickActions = computed(() =>
   forHost({

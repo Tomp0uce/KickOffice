@@ -14,7 +14,7 @@
       <div class="px-2 py-1.5 text-xs">
         <div class="text-[10px] uppercase text-secondary mb-1">{{ t('toolCall.args') }}</div>
         <pre
-          class="text-[10px] max-h-28 overflow-y-auto whitespace-pre-wrap wrap-break-word text-main/70 bg-bg-secondary rounded p-1"
+          class="text-[10px] max-h-28 overflow-y-auto whitespace-pre-wrap break-words text-main/70 bg-bg-secondary rounded p-1"
           >{{ argsText }}</pre
         >
       </div>
@@ -29,7 +29,7 @@
           {{ props.toolCall.status === 'error' ? t('toolCall.error') : t('toolCall.result') }}
         </div>
         <pre
-          class="text-[10px] max-h-32 overflow-y-auto whitespace-pre-wrap wrap-break-word rounded p-1"
+          class="text-[10px] max-h-32 overflow-y-auto whitespace-pre-wrap break-words rounded p-1"
           :class="
             props.toolCall.status === 'error'
               ? 'text-red-400 bg-red-50 dark:bg-red-950/20'

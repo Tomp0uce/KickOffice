@@ -12,7 +12,7 @@
         </h3>
       </div>
       <div class="rounded-md border border-border-secondary p-1 shadow-sm">
-        <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
+        <p class="text-xs leading-normal font-medium break-words text-secondary">
           {{
             t('builtinPromptsDescription', {
               text: '[TEXT]',
@@ -80,11 +80,11 @@
 
         <div v-else class="mt-2">
           <p class="mb-2 text-xs font-semibold text-secondary">{{ t('systemPrompt') }}:</p>
-          <p class="text-xs leading-normal wrap-break-word text-secondary">
+          <p class="text-xs leading-normal break-words text-secondary">
             {{ getSystemPromptPreview(promptConfig.system) }}
           </p>
           <p class="mt-2 mb-2 text-xs font-semibold text-secondary">{{ t('userPrompt') }}:</p>
-          <p class="text-xs leading-normal wrap-break-word text-secondary">
+          <p class="text-xs leading-normal break-words text-secondary">
             {{ getUserPromptPreview(promptConfig.user) }}
           </p>
         </div>

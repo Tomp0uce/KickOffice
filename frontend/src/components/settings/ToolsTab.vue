@@ -9,7 +9,7 @@
         </h3>
       </div>
       <div class="rounded-md border border-border-secondary p-1 shadow-sm">
-        <p class="text-xs leading-normal font-medium wrap-break-word text-secondary">
+        <p class="text-xs leading-normal font-medium break-words text-secondary">
           {{ t(toolDescriptionKey) }}
         </p>
       </div>
