@@ -217,11 +217,11 @@ const currentHost =
     word: 'word',
   }) || 'word';
 const history = ref<DisplayMessage[]>([]);
+const loading = ref(false);
 
 // RACE-C1: pass loading so switchSession is blocked while the agent loop is active
 const sessionManager = useSessionManager(currentHost, history, loading);
 const userInput = ref('');
-const loading = ref(false);
 const imageLoading = ref(false);
 const abortController = ref<AbortController | null>(null);
 // GEN-L3: Format UI options removed, but keeping logic vars true implicitly in prompt logic
