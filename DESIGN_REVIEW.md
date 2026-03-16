@@ -1,7 +1,7 @@
 # DESIGN_REVIEW.md
 
-**Last updated**: 2026-03-16 — DR v12 full review + critical fixes + UX/UI batch + UX-H1/QUAL-H2 full + undo bug fix
-**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16).
+**Last updated**: 2026-03-16 — DR v12 full review + critical fixes + UX/UI batch + UX-H1/QUAL-H2 full + undo bug fix + Dead Code & DUP batch + chat wrap fix
+**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16). **Dead Code & DUP batch + chat wrap bug fixed** (2026-03-16): DEAD-M1 ✅, DEAD-L2 → Won't Fix, DUP-H1 ✅, DUP-M1 ✅, DUP-M2 ✅, DUP-L1 ✅. Chat wrap overflow fixed (ChatMessageList + MarkdownRenderer).
 
 ---
 
@@ -304,13 +304,14 @@ Some quick action tooltips use hardcoded English text from skill file metadata r
 
 ### 5. Dead Code
 
-#### DEAD-M1 — office-agents/ directory (unused at runtime) [MEDIUM]
+#### DEAD-M1 — office-agents/ directory (unused at runtime) [MEDIUM] ✅ FIXED
 
 See ARCH-M3 above. The entire `office-agents/` directory (~200+ files) is not referenced by the build system.
 
 **Impact**: Repo bloat.
 **Path**: Remove or move to separate repo.
 **Effort**: LOW
+**Fix (2026-03-16)**: Directory was already removed from the repo in a prior commit (`3ef18ae chore: remove office-agents folder`). README retains the `⭐ Office Agents (MIT)` attribution line as major inspiration. ARCH-M3 remains open as a documentation/clarity item. Status: **FULL FIX**.
 
 #### DEAD-L1 — i18n key asymmetry [LOW] ✅ FIXED
 
@@ -321,19 +322,20 @@ See ARCH-M3 above. The entire `office-agents/` directory (~200+ files) is not re
 **Effort**: LOW (5 min)
 **Fix (2026-03-16)**: Added both keys to `en.json` with appropriate English text. Status: **FULL FIX**.
 
-#### DEAD-L2 — Unused `plotDigitizerService.js` route may be obsolete [LOW]
+#### DEAD-L2 — Unused `plotDigitizerService.js` route may be obsolete [LOW] ❌ WON'T FIX
 
-`/api/chart-extract` (`plotDigitizer.js`) is referenced in `excelTools.ts` (`extractChartData`) but the flow is: screenshot → send to backend → pixel analysis. If the LLM's vision capabilities improve (GPT-5.2 already reads charts well), this entire pipeline may become unnecessary.
+`/api/chart-extract` (`plotDigitizer.js`) is referenced in `excelTools.ts` (`extractChartData`) but the flow is: screenshot → send to backend → pixel analysis. If the LLM's vision capabilities improve, this entire pipeline may become unnecessary.
 
 **Impact**: None now — still functional.
 **Path**: Monitor usage via LOG-H1. Deprecate if vision-based chart reading proves sufficient.
 **Effort**: LOW (monitoring only)
+**Decision (2026-03-16)**: LLM direct-vision approach was tested and found insufficient for accurate chart data extraction. Pixel-analysis pipeline remains the correct approach. Route stays as-is. Moved to Won't Fix.
 
 ---
 
 ### 6. Code Generalization & Duplication
 
-#### DUP-H1 — Mutation detection patterns duplicated across tool files [HIGH]
+#### DUP-H1 — Mutation detection patterns duplicated across tool files [HIGH] ✅ FIXED
 
 Each tool file (Word, Excel, PowerPoint) defines its own mutation detection regex arrays (`WORD_MUTATION_PATTERNS`, `EXCEL_MUTATION_PATTERNS`, `PPT_MUTATION_PATTERNS`) and `looksLikeMutation*()` functions. The pattern is identical — only the regex list differs.
 
@@ -346,20 +348,22 @@ export function createMutationDetector(patterns: RegExp[]) {
 ```
 Each tool file passes its regex array. One function, one behavior.
 **Effort**: LOW
+**Fix (2026-03-16)**: Created `frontend/src/utils/mutationDetector.ts` with `createMutationDetector()`. All three tool files updated to replace their `PATTERNS` const + `looksLikeMutation*()` function with a single `createMutationDetector([...])` call. Status: **FULL FIX**.
 
-#### DUP-M1 — VFS imports duplicated across all tool files [MEDIUM]
+#### DUP-M1 — VFS imports duplicated across all tool files [MEDIUM] ✅ FIXED
 
 Every tool file imports the same VFS utilities:
 ```ts
 import { readFile as vfsReadFile, writeFile as vfsWriteFile, getVfs } from '@/utils/vfs';
 ```
-And uses them in `executeBash`-style tools with the same pattern.
+And uses them in eval tools with the same `readFile / readFileBuffer / writeFile` sandbox setup pattern.
 
-**Impact**: 4 identical import blocks, same usage pattern.
-**Path**: Already generalized in `generalTools.ts`. Remove redundant VFS imports from host-specific tool files if they delegate bash/file operations to general tools.
+**Impact**: 3 identical VFS sandbox context blocks, any path resolution change requires 3 edits.
+**Path**: Centralise the VFS sandbox helpers in `vfs.ts`.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `getVfsSandboxContext()` to `vfs.ts`. All three tool files (wordTools, excelTools, powerpointTools) now use `...getVfsSandboxContext()` in their eval sandbox context. Direct `vfsReadFile/vfsWriteFile/getVfs` imports removed where no longer needed. Status: **FULL FIX**.
 
-#### DUP-M2 — eval_* tool boilerplate repeated 4 times [MEDIUM]
+#### DUP-M2 — eval_* tool boilerplate repeated 4 times [MEDIUM] ✅ FIXED
 
 `eval_wordjs`, `eval_officejs` (Excel), `eval_powerpointjs`, `eval_outlookjs` all follow the same pattern:
 1. Validate code with `validateOfficeCode()`
@@ -372,14 +376,16 @@ And uses them in `executeBash`-style tools with the same pattern.
 **Impact**: Bug fixes (e.g., sandbox globals changes) must be replicated in 4 places.
 **Path**: Create a generic `createEvalTool(host, mutationPatterns, runner)` factory in `common.ts`.
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Added `createEvalExecutor<TCtx>(config: EvalToolConfig<TCtx>)` factory to `common.ts`. All four eval tools refactored to use the factory — each passes only its host-specific config (sandbox context builder, mutation detector, suggestion text, optional pre-execute hook). Removed `sandboxedEval` and `validateOfficeCode` direct imports from 3 of the 4 tool files. Status: **FULL FIX**.
 
-#### DUP-L1 — Screenshot tool pattern similar across Excel and PowerPoint [LOW]
+#### DUP-L1 — Screenshot tool pattern similar across Excel and PowerPoint [LOW] ✅ FIXED
 
 Both `screenshotRange` (Excel) and `screenshotSlide` (PowerPoint) follow: capture → base64 → return `__screenshot__` marker. The marker handling is in `useToolExecutor.ts`.
 
 **Impact**: Minor — only 2 implementations.
 **Path**: Could extract `createScreenshotResult()` helper. Low priority.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `buildScreenshotResult(base64, description)` to `common.ts`. Both `screenshotRange` and `screenshotSlide` now use this helper instead of inline `JSON.stringify({ __screenshot__: true, ... })`. Status: **FULL FIX**.
 
 ---
 
@@ -605,7 +611,7 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 |----|----------|-------|--------|
 | ARCH-H2 | Architecture | useAgentLoop.ts still oversized (1,118 lines) | OPEN |
 | ARCH-H3 | Architecture | Tool files are monolithic (2,000–2,700 lines each) | OPEN |
-| DUP-H1 | Duplication | Mutation detection patterns duplicated across 3 tool files | OPEN |
+| DUP-H1 | Duplication | Mutation detection patterns duplicated across 3 tool files | ✅ FULL FIX |
 | QUAL-H1 | Code Quality | 160+ uses of `any` type across composables/utils | OPEN |
 | QUAL-H2 | Code Quality | useQuickActions.ts 753 lines with host-specific branching | ✅ FULL FIX |
 | UX-H1 | UX | HomePage.vue oversized — 641 → 394 lines, all quick actions extracted | ✅ FULL FIX |
@@ -615,14 +621,15 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 |----|----------|-------|--------|
 | ARCH-M2 | Architecture | backend.ts mixes concerns (669 lines) | OPEN |
 | ARCH-M3 | Architecture | office-agents/ directory purpose unclear | OPEN |
+| DEAD-M1 | Dead Code | office-agents/ directory removed from repo | ✅ FULL FIX |
 | FUNC-M1 | Functionality | Tool count discrepancy across documentation | OPEN |
 | FUNC-M2 | Functionality | No Outlook compose-time file attachment tool | OPEN |
 | ERR-M2 | Error Handling | Raw console usage in 5+ files | ✅ FULL FIX |
 | ERR-M3 | Error Handling | Frontend log forwarding to backend incomplete | ✅ FULL FIX |
 | ERR-M4 | Error Handling | Rate limit retry exhaustion may calculate 0ms retry | ✅ FULL FIX |
 | ERR-M5 | Error Handling | SSE read timeout doesn't abort upstream reader | ✅ FULL FIX |
-| DUP-M1 | Duplication | VFS imports duplicated across tool files | OPEN |
-| DUP-M2 | Duplication | eval_* tool boilerplate repeated 4 times | OPEN |
+| DUP-M1 | Duplication | VFS imports duplicated across tool files | ✅ FULL FIX |
+| DUP-M2 | Duplication | eval_* tool boilerplate repeated 4 times | ✅ FULL FIX |
 | UX-M1 | UX | No keyboard shortcut documentation | ✅ FULL FIX |
 | UX-M2 | UX | ChatMessageList no virtualization for long conversations | OPEN |
 | UX-M3 | UX | Missing i18n keys with hardcoded fallbacks (3 keys) | ✅ FULL FIX |
@@ -644,7 +651,8 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | UX-L1 | UX | No dark mode toggle | ✅ FULL FIX |
 | UX-L2 | UX | Quick action tooltips not i18n-ready | ✅ FULL FIX |
 | DEAD-L1 | Dead Code | i18n key asymmetry (2 keys) | ✅ FULL FIX |
-| DEAD-L2 | Dead Code | plotDigitizer route may become obsolete | OPEN |
+| DEAD-L2 | Dead Code | plotDigitizer route may become obsolete | ❌ WON'T FIX |
+| DUP-L1 | Duplication | Screenshot result shape duplicated (Excel + PPT) | ✅ FULL FIX |
 | QUAL-L1 | Code Quality | Backend logs full response body for /api/chat/sync | OPEN |
 | QUAL-L2 | Code Quality | credentialCrypto stores extractable key in localStorage | OPEN |
 | DEAD-L3 | Dead Code | Unused credential utility exports (clearEncryptionKeys) | OPEN |
@@ -720,6 +728,34 @@ All 5 CRITICAL items and all 6 ERR items (M2–M5, L1–L2) fixed. Pre-existing 
 | TS6133 unused `getErrorMessage` | `wordTools.ts` | Removed import |
 | TS2353 `minItems` not in ToolProperty | `types/index.ts` | Added `minItems?/maxItems?` to interface |
 | TS6133 unused `redlineEnabled` | `wordTrackChanges.ts` | Renamed to `_redlineEnabled` |
+
+---
+
+## Fix Batch — 2026-03-16 (Dead Code & Duplication + Chat Wrap Bug)
+
+### Dead Code Fixes Summary
+
+| Item | Status | Decision |
+|------|--------|---------|
+| DEAD-M1 | ✅ FULL FIX | `office-agents/` already removed from repo; README attribution retained |
+| DEAD-L2 | ❌ WON'T FIX | LLM vision tested, insufficient — pixel analysis pipeline kept |
+
+### Code Generalization & Duplication Fixes Summary
+
+| Item | Status | Files changed |
+|------|--------|---------------|
+| DUP-H1 | ✅ FULL FIX | new `mutationDetector.ts`; `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts` |
+| DUP-M1 | ✅ FULL FIX | `vfs.ts` (added `getVfsSandboxContext()`); `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts` |
+| DUP-M2 | ✅ FULL FIX | `common.ts` (added `createEvalExecutor` + `EvalToolConfig`); all 4 eval tools refactored |
+| DUP-L1 | ✅ FULL FIX | `common.ts` (added `buildScreenshotResult()`); `excelTools.ts`, `powerpointTools.ts` |
+
+### Chat Wrap Overflow Bug Fix
+
+The chat container was clipping long code blocks (e.g., Excel formulas) horizontally without showing a scrollbar. Root cause: `<div class="flex flex-col gap-1">` (bubble wrapper in `ChatMessageList.vue`) had no width constraint. When parent uses `items-start` for assistant messages, children shrink to content — so `max-w-[98%]` on the bubble had no stable reference width, allowing pre blocks to exceed the viewport.
+
+**Fix**:
+- `ChatMessageList.vue`: added `min-w-0 w-full` to the bubble wrapper div; changed `break-words` → `[overflow-wrap:anywhere]` on the bubble
+- `MarkdownRenderer.vue`: added `min-width: 0; max-width: 100%` to `.markdown-renderer`; added `max-width: 100%` to `:deep(pre)`
 
 ---
 

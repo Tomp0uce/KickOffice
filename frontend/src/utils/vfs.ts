@@ -127,6 +127,25 @@ export async function readFile(path: string): Promise<string> {
 }
 
 /**
+ * Returns the VFS helper object to expose inside Office.js eval sandboxes.
+ *
+ * DUP-M1: The readFile / readFileBuffer / writeFile triplet was duplicated
+ * verbatim in wordTools, excelTools, and powerpointTools.  Centralised here so
+ * any future change (e.g. path resolution logic) is made in one place.
+ */
+export function getVfsSandboxContext() {
+  return {
+    readFile,
+    readFileBuffer: async (path: string): Promise<Uint8Array> => {
+      const vfs = getVfs();
+      const fullPath = path.startsWith('/') ? path : `/home/user/uploads/${path}`;
+      return vfs.readFileBuffer(fullPath);
+    },
+    writeFile,
+  };
+}
+
+/**
  * List files in the VFS uploads directory
  */
 export async function listUploads(): Promise<string[]> {

@@ -17,6 +17,8 @@ const renderedHtml = computed(() => renderSanitizedMarkdown(props.content));
 <style scoped>
 .markdown-renderer {
   overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .markdown-renderer :deep(p) {
@@ -49,6 +51,7 @@ const renderedHtml = computed(() => renderSanitizedMarkdown(props.content));
 .markdown-renderer :deep(pre) {
   margin: 0.25rem 0;
   overflow-x: auto;
+  max-width: 100%;
   border-radius: 0.25rem;
   padding: 0.5rem;
   background-color: color-mix(in srgb, var(--color-bg-secondary) 75%, black);

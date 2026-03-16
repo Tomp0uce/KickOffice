@@ -30,14 +30,14 @@
       <div
         class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left"
       >
-        <div class="flex flex-col gap-1">
+        <div class="flex flex-col gap-1 min-w-0 w-full">
           <div
             v-show="
               item.segments.some(s => s.type !== 'text' || s.text.trim() !== '') ||
               (item.message.toolCalls && item.message.toolCalls.length > 0) ||
               item.message.imageSrc
             "
-            class="group max-w-[98%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] break-words text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
+            class="group max-w-[98%] min-w-0 rounded-md border border-border-secondary p-1 text-sm leading-[1.4] [overflow-wrap:anywhere] text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
           >
             <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
               <MarkdownRenderer

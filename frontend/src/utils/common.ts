@@ -1,5 +1,8 @@
 import DiffMatchPatch from 'diff-match-patch';
 import type { ToolDefinition } from '@/types';
+import { validateOfficeCode, type OfficeHost } from './officeCodeValidator';
+import { sandboxedEval, type SandboxHost } from './sandbox';
+import { logService } from './logger';
 
 // R17/CH5 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
 export function generateVisualDiff(originalText: unknown, newText: unknown): string {
@@ -219,4 +222,121 @@ export const optionLists = {
 export function normalizeLineEndings(text: string): string {
   if (!text) return '';
   return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * Build the standard screenshot result JSON returned by screenshotRange and
+ * screenshotSlide.  DUP-L1: the { __screenshot__, base64, mimeType, description }
+ * shape was duplicated in both tool files — centralised here.
+ */
+export function buildScreenshotResult(base64: string, description: string): string {
+  return JSON.stringify({
+    __screenshot__: true,
+    base64,
+    mimeType: 'image/png',
+    description,
+  });
+}
+
+/**
+ * Configuration for a sandboxed Office.js eval tool executor.
+ * DUP-M2: The validate → warn → sandboxedEval → return result/error pattern
+ * was duplicated across eval_wordjs, eval_officejs, eval_powerpointjs, and
+ * eval_outlookjs.  This interface + createEvalExecutor factory centralises it.
+ */
+export interface EvalToolConfig<TCtx> {
+  /** Office host name passed to validateOfficeCode and sandboxedEval (e.g., 'Word') */
+  host: OfficeHost & SandboxHost;
+  /** Tool name used in log messages (e.g., 'eval_wordjs') */
+  toolName: string;
+  /** Hint shown in the suggestion field on validation failure */
+  suggestion: string;
+  /** Optional mutation detector — when provided, hasMutated is included in the success payload */
+  mutationDetector?: (code: string) => boolean;
+  /** Build the globals object passed to sandboxedEval from the host context */
+  buildSandboxContext: (ctx: TCtx) => Record<string, unknown>;
+  /** Optional hook called just before sandboxedEval (e.g., ensurePowerPointRunAvailable) */
+  preExecuteHook?: (ctx: TCtx) => void;
+  /** Max chars for codeReceived in validation errors (default 300) */
+  validationCodePreviewLength?: number;
+  /** Max chars for codeExecuted in catch errors (default 200) */
+  catchCodePreviewLength?: number;
+  /** Hint text in the catch error response */
+  catchHint?: string;
+}
+
+/**
+ * Factory that builds a sandboxed eval executor for Office.js eval_* tools.
+ *
+ * Usage:
+ * ```ts
+ * executeWord: createEvalExecutor<Word.RequestContext>({
+ *   host: 'Word',
+ *   toolName: 'eval_wordjs',
+ *   suggestion: '...',
+ *   mutationDetector: looksLikeMutationWord,
+ *   buildSandboxContext: (context) => ({ context, Word, Office, ...getVfsSandboxContext() }),
+ * }),
+ * ```
+ */
+export function createEvalExecutor<TCtx>(config: EvalToolConfig<TCtx>) {
+  return async (ctx: TCtx, args: Record<string, any>): Promise<string> => {
+    const { code, explanation } = args;
+
+    const validation = validateOfficeCode(code, config.host);
+
+    if (!validation.valid) {
+      const maxLen = config.validationCodePreviewLength ?? 300;
+      return JSON.stringify(
+        {
+          success: false,
+          error: 'Code validation failed. Fix the errors below and try again.',
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+          suggestion: config.suggestion,
+          codeReceived: truncateString(code, maxLen),
+        },
+        null,
+        2,
+      );
+    }
+
+    if (validation.warnings.length > 0) {
+      logService.warn(`[${config.toolName}] Validation warnings:`, validation.warnings);
+    }
+
+    config.preExecuteHook?.(ctx);
+
+    try {
+      const hasMutated = config.mutationDetector?.(code);
+      const result = await sandboxedEval(code, config.buildSandboxContext(ctx), config.host);
+
+      return JSON.stringify(
+        {
+          success: true,
+          result: result ?? null,
+          explanation,
+          ...(hasMutated !== undefined && { hasMutated }),
+          warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+        },
+        null,
+        2,
+      );
+    } catch (err: unknown) {
+      const maxLen = config.catchCodePreviewLength ?? 200;
+      return JSON.stringify(
+        {
+          success: false,
+          error: getDetailedOfficeError(err),
+          explanation,
+          codeExecuted: truncateString(code, maxLen),
+          hint:
+            config.catchHint ??
+            'Check that all properties are loaded before access, and context.sync() is called.',
+        },
+        null,
+        2,
+      );
+    }
+  };
 }
