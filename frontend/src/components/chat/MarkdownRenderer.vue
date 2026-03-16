@@ -29,14 +29,21 @@ const renderedHtml = computed(() => renderSanitizedMarkdown(props.content));
 
 .markdown-renderer :deep(ul) {
   margin: 0.25rem 0 0.5rem;
-  padding-left: 1.25rem;
-  list-style-type: disc;
+  padding-left: 1.5rem;
+  list-style: disc outside none !important;
+  overflow: visible;
 }
 
 .markdown-renderer :deep(ol) {
   margin: 0.25rem 0 0.5rem;
-  padding-left: 1.25rem;
-  list-style-type: decimal;
+  padding-left: 1.5rem;
+  list-style: decimal outside none !important;
+  overflow: visible;
+}
+
+.markdown-renderer :deep(li) {
+  display: list-item;
+  list-style: inherit;
 }
 
 .markdown-renderer :deep(pre) {

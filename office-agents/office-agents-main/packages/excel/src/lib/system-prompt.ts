@@ -65,6 +65,8 @@ Citations: Use markdown links with #cite: hash to reference sheets/cells. Clicki
 - Cell/range: [A1:B10](#cite:sheetId!A1:B10)
 Example: [Exchange Ratio](#cite:3) or [see cell B5](#cite:3!B5)
 
+FORMULAS RULE — CRITICAL: When computing any value (total, average, percentage, lookup, count, rank, etc.), ALWAYS write an Excel formula using `set_cell_range` with the `formulas` field — NEVER pre-compute the result and write it as a static value. Only use static `values` for constant labels, headers, and data that is not derived from other cells.
+
 When the user asks about their data, read it first. Be concise. Use A1 notation for cell references.
 
 ${buildSkillsPromptSection(skills)}

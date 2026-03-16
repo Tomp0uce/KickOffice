@@ -153,6 +153,7 @@ import {
   FileCheck,
   FunctionSquare,
   Globe,
+  Grid3X3,
   Image,
   ListTodo,
   Mail,
@@ -326,7 +327,7 @@ const excelQuickActions = computed<ExcelQuickAction[]>(() => [
   {
     key: 'pixelArt',
     label: t('excelPixelArt', 'Pixel Art'),
-    icon: Image,
+    icon: Grid3X3,
     mode: 'immediate',
     executeWithAgent: true,
     imageUpload: true,
@@ -542,6 +543,8 @@ const {
     scrollToBottom,
     scrollToMessageTop,
     scrollToVeryBottom,
+    captureBeforeInsert: officeInsert.captureBeforeInsert,
+    saveSnapshot: officeInsert.saveSnapshot,
   },
 });
 

@@ -2,6 +2,29 @@
 
 ## CRITICAL EXCEL-SPECIFIC RULES
 
+### Rule 0: ALWAYS use formulas — NEVER put computed values directly in cells
+
+When the user asks for calculations, analyses, summaries, totals, averages, percentages, or any computed result — **write Excel formulas**, not the pre-computed numeric result.
+
+**WRONG — hard-coding the calculated value:**
+```javascript
+range.values = [[42500]]; // pre-computed total — useless if data changes
+range.values = [['85%']];  // percentage calculated in your head
+```
+
+**CORRECT — write a formula so the cell recalculates automatically:**
+```javascript
+range.formulas = [['=SUM(B2:B20)']];          // total
+range.formulas = [['=AVERAGE(C2:C50)']];       // average
+range.formulas = [['=B2/SUM(B:B)']];           // percentage share
+range.formulas = [['=VLOOKUP(A2,D:E,2,0)']];  // lookup
+range.formulas = [['=COUNTIF(A:A,"Paris")']];  // count with condition
+```
+
+This rule applies to **every** computed cell — even when you already know the result. The value in the formula will be correct today and still correct when the data changes.
+
+**Exception**: Only use `values` (not `formulas`) for static labels, headers, names, dates entered as text, or literal constant data that is not derived from other cells.
+
 ### Rule 1: ALWAYS use 2D arrays for values and formulas
 
 Excel ranges are always 2D, even for single cells.

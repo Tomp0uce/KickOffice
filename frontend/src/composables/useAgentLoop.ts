@@ -99,6 +99,10 @@ interface AgentLoopHelpers {
   scrollToBottom: () => Promise<void>;
   scrollToMessageTop?: () => Promise<void>;
   scrollToVeryBottom?: () => Promise<void>;
+  /** Capture document state before a quick action so undo is available afterwards */
+  captureBeforeInsert?: () => Promise<Partial<any> | null>;
+  /** Save the snapshot captured by captureBeforeInsert and mark undo as available */
+  saveSnapshot?: (partial: Partial<any>, tag?: string) => void;
 }
 
 interface UseAgentLoopOptions {
@@ -180,6 +184,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     adjustTextareaHeight,
     scrollToBottom,
     scrollToMessageTop = scrollToBottom, // fallback to scrollToBottom if not provided
+    captureBeforeInsert,
+    saveSnapshot,
   } = helpers;
 
   const currentAction = ref('');
@@ -274,7 +280,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     let toolsWereExecuted = false; // Track if any tools were successfully executed
     currentAction.value = t('agentAnalyzing');
     history.value.push(createDisplayMessage('assistant', ''));
-    await scrollToMessageTop(); // Scroll to show start of assistant response
+    // Scroll to bottom so the thinking banner ("Agent Action Indicator") stays visible.
+    // We do NOT use scrollToMessageTop here — the empty assistant bubble is hidden (v-show=false)
+    // and its getBoundingClientRect() returns zeros, which would scroll to the top of the chat.
+    await scrollToBottom();
     const currentAssistantMessage = history.value[history.value.length - 1];
     let abortedByUser = false;
     while (Date.now() - startTime < timeoutMs) {
@@ -496,6 +505,9 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     if (Date.now() - startTime >= timeoutMs) messageUtil.warning(t('recursionLimitExceeded'));
     currentAction.value = '';
 
+    // Scroll to the top of the completed assistant response so the user sees it from the start.
+    // The assistant message now has content, so scrollToMessageTop finds it correctly.
+    await scrollToMessageTop();
   }
 
   async function handleSmartReply(userMessage: string) {
@@ -534,7 +546,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       .user(sanitizedEmail, lang)
       .replace('[REPLY_INTENT]', sanitizedIntent);
     history.value.push(createDisplayMessage('assistant', ''));
-    await scrollToMessageTop();
+    // Don't scroll here — empty assistant bubble is hidden, would scroll to top of chat.
     try {
       await chatStream({
         messages: [
@@ -568,6 +580,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           : t(errInfo.i18nKey);
       }
     }
+    // Scroll to top of the completed response
+    await scrollToMessageTop();
   }
 
   async function handleMoM(userMessage: string) {
@@ -583,7 +597,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     const userMsg = momPrompt.user(userMessage, lang);
 
     history.value.push(createDisplayMessage('assistant', ''));
-    await scrollToMessageTop();
+    // Don't scroll here — empty assistant bubble is hidden, would scroll to top of chat.
     try {
       await chatStream({
         messages: [
@@ -616,6 +630,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           : t(errInfo.i18nKey);
       }
     }
+    // Scroll to top of the completed response
+    await scrollToMessageTop();
   }
 
   async function fetchSelectionWithTimeout() {
@@ -805,6 +821,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     runAgentLoop,
     resolveChatModelTier,
     pendingMoM,
+    captureBeforeInsert,
+    saveSnapshot,
   });
 
   async function sendMessage(payload?: string, files?: File[]) {
