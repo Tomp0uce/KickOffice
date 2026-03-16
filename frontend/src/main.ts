@@ -1,6 +1,7 @@
 import './index.css';
 
-import { createApp, watch, ref } from 'vue';
+import { createApp, watch } from 'vue';
+import { useStorage } from '@vueuse/core';
 
 import App from './App.vue';
 import { i18n } from './i18n';
@@ -57,21 +58,14 @@ window.Office.onReady(async () => {
 
   const app = createApp(App);
 
-  // Use raw localStorage for dark mode
-  const initialDarkMode = localStorage.getItem(localStorageKey.darkMode) === 'true';
-  const darkMode = ref(initialDarkMode);
-
-  window.addEventListener('storage', e => {
-    if (e.key === localStorageKey.darkMode) {
-      darkMode.value = e.newValue === 'true';
-    }
-  });
+  // UX-L1: Use VueUse useStorage so the dark-mode class is toggled reactively
+  // even when the toggle is changed in the same window (storage events don't fire for same-window writes)
+  const darkMode = useStorage(localStorageKey.darkMode, false);
 
   watch(
     darkMode,
     value => {
       document.documentElement.classList.toggle('dark', value);
-      localStorage.setItem(localStorageKey.darkMode, String(value));
     },
     { immediate: true },
   );

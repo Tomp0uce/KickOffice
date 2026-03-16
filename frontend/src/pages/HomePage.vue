@@ -12,83 +12,17 @@
         @delete-session="handleDeleteSession"
       />
 
-      <!-- Persistent Offline Indicator — only shown after first check to avoid false negative flash -->
-      <div
-        v-if="backendChecked && !backendOnline"
-        class="flex items-center justify-center bg-red-500/10 py-1.5 px-3 rounded-md border border-red-500/20 shadow-xs mx-4 mt-2"
-      >
-        <span class="text-xs text-red-500 font-medium flex items-center gap-2">
-          <span class="relative flex h-2 w-2">
-            <span
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"
-            ></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-          </span>
-          {{ t('backendOffline') }}
-        </span>
-      </div>
-
-      <!-- Auth Error Indicator (UX-M3) -->
-      <div
-        v-if="backendOnline && Object.keys(availableModels).length === 0 && !loading"
-        class="flex flex-col items-center justify-center bg-warning/10 py-2 px-3 rounded-md border border-warning/30 shadow-xs mx-4 mt-2 mb-2 animate-in fade-in"
-      >
-        <span class="text-xs text-warning-700 dark:text-warning font-medium text-center mb-1">
-          {{ t('authErrorBanner', 'Authentication required or invalid API key.') }}
-        </span>
-        <button
-          class="text-[11px] underline text-accent hover:text-accent-hover transition-colors"
-          @click="goToSettings"
-        >
-          {{ t('goToSettings', 'Go to Settings to configure') }}
-        </button>
-      </div>
-
-      <div
-        v-if="isDeleteConfirmVisible"
-        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
-      >
-        <p class="text-[13px] font-medium leading-tight text-main">
-          {{ t('deleteSessionConfirm') }}
-        </p>
-        <div class="mt-1 flex justify-end gap-2">
-          <button
-            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="isDeleteConfirmVisible = false"
-          >
-            {{ t('cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-bg-tertiary"
-            @click="confirmDeleteSession"
-          >
-            {{ t('confirm') }}
-          </button>
-        </div>
-      </div>
-
-      <div
-        v-if="isNewChatConfirmVisible"
-        class="absolute inset-x-4 top-14 z-50 flex flex-col gap-3 rounded-md border border-border-secondary bg-bg-tertiary p-4 shadow-lg animate-in fade-in slide-in-from-top-4"
-      >
-        <p class="text-[13px] font-medium leading-tight text-main">
-          {{ t('newChatConfirm') }}
-        </p>
-        <div class="mt-1 flex justify-end gap-2">
-          <button
-            class="rounded-md border border-border-secondary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-main transition-colors hover:bg-bg-tertiary"
-            @click="isNewChatConfirmVisible = false"
-          >
-            {{ t('cancel') }}
-          </button>
-          <button
-            class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary/90"
-            @click="confirmNewChat"
-          >
-            {{ t('confirm') }}
-          </button>
-        </div>
-      </div>
+      <!-- UX-H1: Extracted sub-components -->
+      <OfflineBanner />
+      <AuthErrorBanner />
+      <SessionConfirmDialogs
+        :is-delete-confirm-visible="isDeleteConfirmVisible"
+        :is-new-chat-confirm-visible="isNewChatConfirmVisible"
+        @cancel-delete="isDeleteConfirmVisible = false"
+        @confirm-delete="confirmDeleteSession"
+        @cancel-new-chat="isNewChatConfirmVisible = false"
+        @confirm-new-chat="confirmNewChat"
+      />
 
       <QuickActionsBar
         v-model:selected-prompt-id="selectedPromptId"
@@ -174,6 +108,9 @@ import ChatInput from '@/components/chat/ChatInput.vue';
 import ChatMessageList from '@/components/chat/ChatMessageList.vue';
 import QuickActionsBar from '@/components/chat/QuickActionsBar.vue';
 import StatsBar from '@/components/chat/StatsBar.vue';
+import OfflineBanner from '@/components/chat/OfflineBanner.vue';
+import AuthErrorBanner from '@/components/chat/AuthErrorBanner.vue';
+import SessionConfirmDialogs from '@/components/chat/SessionConfirmDialogs.vue';
 import { useAgentLoop } from '@/composables/useAgentLoop';
 import { useImageActions } from '@/composables/useImageActions';
 import { useOfficeInsert } from '@/composables/useOfficeInsert';
