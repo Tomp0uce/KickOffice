@@ -285,7 +285,7 @@ npm run build         # Production build
 
 ## Credits & Inspirations
 
-### [Office Agents](https://github.com/nicepkg/office-agents) (MIT License)
+### ⭐ [Office Agents](https://github.com/nicepkg/office-agents) (MIT License) — Major inspiration
 
 - Excel range screenshot with row/column header overlay (A, B, C… / 1, 2, 3…) for improved vision accuracy
 - Enriched Office.js error feedback (`debugInfo.errorLocation`, `statement`, `surroundingStatements`)
