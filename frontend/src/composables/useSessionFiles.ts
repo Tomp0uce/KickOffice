@@ -16,6 +16,12 @@ export interface SessionFile {
   filename: string;
   content: string;
   fileId?: string;
+  /**
+   * Timestamp (ms) of the first time this file's content was injected into an API call.
+   * Undefined = not yet sent. Set automatically by injectUploadedFiles on first use.
+   * Reset to undefined when rebuilt from history (session restore / session switch).
+   */
+  contentInjectedAt?: number;
 }
 
 export interface UseSessionFilesOptions {

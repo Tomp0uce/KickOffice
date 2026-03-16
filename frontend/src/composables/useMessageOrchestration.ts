@@ -90,6 +90,11 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    * Inject uploaded files into messages.
    * Supports both platform file IDs (Claude API /v1/files) and inline content fallback.
    *
+   * Single-pass injection: each file's full content is injected ONLY ONCE (the first turn it
+   * appears). On subsequent turns, a short VFS reference note is added instead so the agent
+   * knows it can use vfsReadFile to access the content without re-sending the full payload.
+   * The contentInjectedAt timestamp on the SessionFile object is used as the sentinel.
+   *
    * @param messages - Messages array to modify (modified in-place)
    * @param uploadedFiles - Files to inject
    * @param injectedContext - Legacy string-based file content (deprecated, kept for compatibility)
@@ -109,15 +114,27 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
       }
     }
 
-    // Modern file injection with platform file IDs
-    if (uploadedFiles && uploadedFiles.length > 0) {
+    if (!uploadedFiles || uploadedFiles.length === 0) return messages;
+
+    // Separate files that haven't been sent yet from files already seen by the LLM.
+    // Mutating contentInjectedAt in-place updates the SessionFile objects stored in
+    // sessionUploadedFiles (shallow copy — same object references).
+    const newFiles = uploadedFiles.filter(f => !f.contentInjectedAt);
+    const seenFiles = uploadedFiles.filter(f => !!f.contentInjectedAt);
+
+    // Mark new files as injected before sending
+    const now = Date.now();
+    for (const f of newFiles) f.contentInjectedAt = now;
+
+    // ── Full content injection for newly uploaded files ──────────────────────
+    if (newFiles.length > 0) {
       const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
       if (lastUserIdx !== -1) {
-        const hasFileRefs = uploadedFiles.some(f => f.fileId);
+        const hasFileRefs = newFiles.some(f => f.fileId);
         if (hasFileRefs && typeof messages[lastUserIdx].content === 'string') {
-          // Convert to content array: text + file references + inline fallback for files without fileId
+          // Convert to multipart content array for platform file IDs
           const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }];
-          for (const f of uploadedFiles) {
+          for (const f of newFiles) {
             if (f.fileId) {
               parts.push({ type: 'file', file: { file_id: f.fileId } });
             } else {
@@ -130,10 +147,28 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
           messages[lastUserIdx].content = parts;
         } else if (typeof messages[lastUserIdx].content === 'string') {
           // All inline fallback
-          const inlineText = uploadedFiles
+          const inlineText = newFiles
             .map(f => `\n\n[Contenu du fichier "${f.filename}"]:\n${f.content}\n[Fin du fichier]`)
             .join('');
           messages[lastUserIdx].content += `\n\n<attached_files>${inlineText}\n</attached_files>`;
+        }
+      }
+    }
+
+    // ── VFS reference note for files already seen in a previous turn ─────────
+    // Avoids re-sending large file payloads; agent can use vfsReadFile if needed.
+    if (seenFiles.length > 0) {
+      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
+      if (lastUserIdx !== -1) {
+        const refs = seenFiles.map(f => `"${f.filename}"`).join(', ');
+        const note =
+          `\n\n[Previously uploaded files available in VFS: ${refs}. ` +
+          `Use the vfsReadFile tool to access their content if needed.]`;
+        const content = messages[lastUserIdx].content;
+        if (typeof content === 'string') {
+          messages[lastUserIdx].content = content + note;
+        } else if (Array.isArray(content)) {
+          (content as any[]).push({ type: 'text', text: note });
         }
       }
     }

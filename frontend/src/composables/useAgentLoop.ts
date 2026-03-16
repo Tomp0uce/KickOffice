@@ -32,6 +32,7 @@ import {
 } from '@/utils/richContextStore';
 import { areCredentialsConfigured } from '@/utils/credentialStorage';
 import { logService } from '@/utils/logger';
+import { writeFile as vfsWriteFile } from '@/utils/vfs';
 
 import type {
   DisplayMessage,
@@ -686,8 +687,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         // generated image matches the document content the user is working on.
         let imagePrompt = userMessage;
         if (selectionContext) {
-          const truncatedContext = selectionContext.length > 800
-            ? selectionContext.slice(0, 800) + '…'
+          const truncatedContext = selectionContext.length > 2000
+            ? selectionContext.slice(0, 2000) + '…'
             : selectionContext;
           imagePrompt = `${userMessage}\n\nDocument context: ${truncatedContext}`;
         }
@@ -1025,6 +1026,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 );
               }
               addSessionFile(entry);
+              // Write to VFS so the agent can access content via vfsReadFile on future turns
+              vfsWriteFile(`/home/user/uploads/${result.filename}`, result.extractedText).catch(
+                err => logService.warn('[AgentLoop] VFS write failed for uploaded file', err),
+              );
               newTextFiles.push({
                 filename: result.filename,
                 content: result.extractedText,
@@ -1052,8 +1057,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           fullMessage = t('pptVisualPrefix') + '\n' + selectedText;
         } else {
           // Truncate selected text to avoid overwhelming the image model with too much content
-          const truncatedText = selectedText.length > 600
-            ? selectedText.slice(0, 600) + '…'
+          const truncatedText = selectedText.length > 2000
+            ? selectedText.slice(0, 2000) + '…'
             : selectedText;
           fullMessage = t('imageGenerationPrompt').replace('{text}', truncatedText);
         }
