@@ -61,6 +61,9 @@ export type WordToolName =
   | 'proposeRevision'
   | 'proposeDocumentRevision'
   | 'editDocumentXml'
+  | 'acceptAiChanges'
+  | 'rejectAiChanges'
+  | 'insertOoxml'
   | 'eval_wordjs'
   | 'getDocumentOoxml';
 
@@ -1740,6 +1743,133 @@ Your code should:
     },
 
     // ============================================================
+    // acceptAiChanges / rejectAiChanges — bulk accept or reject Track Changes
+    // attributed to the KickOffice AI author. Requires WordApi 1.6.
+    // ============================================================
+    acceptAiChanges: {
+      name: 'acceptAiChanges',
+      category: 'write',
+      description:
+        'Accept all Track Changes (redlines) in the document that were made by the KickOffice AI author. Requires WordApi 1.6+.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          author: {
+            type: 'string',
+            description:
+              'Author name to filter by. Defaults to the configured redline author (usually "KickOffice AI").',
+          },
+        },
+        required: [],
+      },
+      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+        if (typeof (context.document as any).getTrackedChanges !== 'function') {
+          return 'Error: acceptAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
+        }
+        const targetAuthor: string =
+          args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
+        const changes = (context.document as any).getTrackedChanges();
+        changes.load('items/authorName');
+        await context.sync();
+        let accepted = 0;
+        for (const change of changes.items) {
+          if (change.authorName === targetAuthor) {
+            change.accept();
+            accepted++;
+          }
+        }
+        await context.sync();
+        return accepted > 0
+          ? `Accepted ${accepted} tracked change${accepted === 1 ? '' : 's'} by "${targetAuthor}".`
+          : `No tracked changes found for author "${targetAuthor}".`;
+      },
+    },
+
+    rejectAiChanges: {
+      name: 'rejectAiChanges',
+      category: 'write',
+      description:
+        'Reject all Track Changes (redlines) in the document that were made by the KickOffice AI author. Requires WordApi 1.6+.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          author: {
+            type: 'string',
+            description:
+              'Author name to filter by. Defaults to the configured redline author (usually "KickOffice AI").',
+          },
+        },
+        required: [],
+      },
+      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+        if (typeof (context.document as any).getTrackedChanges !== 'function') {
+          return 'Error: rejectAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
+        }
+        const targetAuthor: string =
+          args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
+        const changes = (context.document as any).getTrackedChanges();
+        changes.load('items/authorName');
+        await context.sync();
+        let rejected = 0;
+        for (const change of changes.items) {
+          if (change.authorName === targetAuthor) {
+            change.reject();
+            rejected++;
+          }
+        }
+        await context.sync();
+        return rejected > 0
+          ? `Rejected ${rejected} tracked change${rejected === 1 ? '' : 's'} by "${targetAuthor}".`
+          : `No tracked changes found for author "${targetAuthor}".`;
+      },
+    },
+
+    // ============================================================
+    // insertOoxml — insert pre-built OOXML at the current selection.
+    // More powerful than insertHtml: preserves complex formatting,
+    // numbered lists, table styles, section layouts.
+    // ============================================================
+    insertOoxml: {
+      name: 'insertOoxml',
+      category: 'write',
+      description: `Insert rich OOXML content at the current selection or a specified location in the document.
+
+**USE WHEN**: insertHtml loses formatting (numbered lists, complex table styles, section layouts).
+Generates the full <pkg:package> or <w:body> fragment with native Word namespaces.
+
+**DO NOT USE FOR**: Simple text insertion — use insertContent instead.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ooxml: {
+            type: 'string',
+            description:
+              'The OOXML string to insert. Must be valid Office Open XML (pkg:package or w:body fragment).',
+          },
+          location: {
+            type: 'string',
+            description:
+              'Where to insert relative to the selection: "Replace" (default), "Before", "After", "Start" (start of selection), "End" (end of selection).',
+            enum: ['Replace', 'Before', 'After', 'Start', 'End'],
+          },
+        },
+        required: ['ooxml'],
+      },
+      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+        const { ooxml, location = 'Replace' } = args as { ooxml: string; location?: string };
+        if (!ooxml || typeof ooxml !== 'string') return 'Error: ooxml is required.';
+        const validLocations = ['Replace', 'Before', 'After', 'Start', 'End'];
+        if (!validLocations.includes(location)) {
+          return `Error: location must be one of: ${validLocations.join(', ')}.`;
+        }
+        const range = context.document.getSelection();
+        range.insertOoxml(ooxml, location as Word.InsertLocation.replace);
+        await context.sync();
+        return `OOXML inserted at location "${location}" successfully.`;
+      },
+    },
+
+    // ============================================================
     // getDocumentOoxml — ported from Office Agents get-ooxml tool
     // packages/word/src/lib/tools/get-ooxml.ts
     // Extracts document OOXML structure for inspection.
@@ -1967,3 +2097,37 @@ export function getWordToolDefinitions(): ToolDefinition[] {
 }
 
 export { wordToolDefinitions };
+
+/**
+ * Direct helper: bulk-accept all Track Changes attributed to the KickOffice AI author.
+ * Called directly from the UI "Valider les modifications IA" button — bypasses the agent loop.
+ * Returns a user-readable result string.
+ */
+export async function acceptAiChangesInDocument(): Promise<string> {
+  const targetAuthor = localStorage.getItem('redlineAuthor') || 'KickOffice AI';
+  try {
+    return await runWord(async (context: Word.RequestContext) => {
+      if (typeof (context.document as any).getTrackedChanges !== 'function') {
+        return 'Cette fonctionnalité nécessite Word 2019+ (WordApi 1.6). Acceptez les modifications manuellement dans le volet Révision.';
+      }
+      const changes = (context.document as any).getTrackedChanges();
+      changes.load('items/authorName');
+      await context.sync();
+      let accepted = 0;
+      for (const change of changes.items) {
+        if (change.authorName === targetAuthor) {
+          change.accept();
+          accepted++;
+        }
+      }
+      await context.sync();
+      return accepted > 0
+        ? `✓ ${accepted} modification${accepted === 1 ? '' : 's'} de l'IA acceptée${accepted === 1 ? '' : 's'}.`
+        : `Aucune modification de l'IA trouvée (auteur : "${targetAuthor}").`;
+    });
+  } catch (err: unknown) {
+    logService.error('[WordTools] acceptAiChangesInDocument failed', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return `Erreur : ${msg}`;
+  }
+}

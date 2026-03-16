@@ -1,7 +1,7 @@
 # DESIGN_REVIEW.md
 
-**Last updated**: 2026-03-16 — DR v12 full review + critical fixes + UX/UI batch + UX-H1/QUAL-H2 full + undo bug fix + Dead Code & DUP batch + chat wrap fix
-**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16). **Dead Code & DUP batch + chat wrap bug fixed** (2026-03-16): DEAD-M1 ✅, DEAD-L2 → Won't Fix, DUP-H1 ✅, DUP-M1 ✅, DUP-M2 ✅, DUP-L1 ✅. Chat wrap overflow fixed (ChatMessageList + MarkdownRenderer).
+**Last updated**: 2026-03-16 — DR v12 full review + critical fixes + UX/UI batch + UX-H1/QUAL-H2 full + undo bug fix + Dead Code & DUP batch + chat wrap fix + Office Add-in Functionality batch + OXML Enhancements
+**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16). **Dead Code & DUP batch + chat wrap bug fixed** (2026-03-16): DEAD-M1 ✅, DEAD-L2 → Won't Fix, DUP-H1 ✅, DUP-M1 ✅, DUP-M2 ✅, DUP-L1 ✅. Chat wrap overflow fixed (ChatMessageList + MarkdownRenderer). **Office Add-in Functionality + OXML batch fixed** (2026-03-16): FUNC-M1 ✅, FUNC-M2 ✅, FUNC-L1 ✅, FUNC-L2 ✅, OXML-IMP2 ✅, OXML-IMP3 ✅, OXML-IMP4 ✅, OXML-IMP5 ✅, ARCH-M3 ✅.
 
 ---
 
@@ -60,13 +60,14 @@ Each tool file defines all tool schemas + all implementation logic in one file.
 **Path**: Split into `api/httpClient.ts` (fetch wrapper, retry, timeout), `api/errorCategorization.ts`, `api/types.ts`, keeping `api/backend.ts` as the public API facade.
 **Effort**: MEDIUM
 
-#### ARCH-M3 — office-agents/ directory purpose unclear [MEDIUM]
+#### ARCH-M3 — office-agents/ directory purpose unclear [MEDIUM] ✅ FIXED
 
 The `office-agents/office-agents-main/` directory contains a complete separate monorepo (React-based, ~50 packages) that served as inspiration for KickOffice. It ships in the repo but is not used at build/runtime.
 
 **Impact**: Increases repo size (clutter), confuses new contributors, `git clone` is slower.
 **Path**: Move to a separate reference repository or document clearly in `.gitignore`/README if intentionally kept for reference.
 **Effort**: LOW
+**Fix**: Directory was removed from the `main` branch entirely (confirmed by user — not present in branch). Status: **FULL FIX**.
 
 #### ARCH-L1 — PowerPoint tool pattern inconsistency [LOW]
 
@@ -80,7 +81,7 @@ PowerPoint tools use a dual `executePowerPoint` / `executeCommon` pattern (some 
 
 ### 2. Office Add-in Functionality
 
-#### FUNC-M1 — Tool count discrepancy across documentation [MEDIUM]
+#### FUNC-M1 — Tool count discrepancy across documentation [MEDIUM] ✅ FIXED
 
 | Source | Total | Word | Excel | PPT | Outlook | General |
 |--------|-------|------|-------|-----|---------|---------|
@@ -91,30 +92,34 @@ PowerPoint tools use a dual `executePowerPoint` / `executeCommon` pattern (some 
 **Impact**: Misleading documentation.
 **Path**: Audit actual tool definitions in code and synchronize all documents.
 **Effort**: LOW
+**Fix (2026-03-16)**: Audited actual tool type unions in all tool files. Counts after this batch: Word 34, Excel 27, PPT 24, Outlook 9, General 6 — Total **100**. README.md (line 3 + line 12 + tool table), Claude.md all synchronized. Status: **FULL FIX**.
 
-#### FUNC-M2 — No Outlook compose-time file attachment tool [MEDIUM]
+#### FUNC-M2 — No Outlook compose-time file attachment tool [MEDIUM] ✅ FIXED
 
 Outlook tools cover email body/subject/recipients but cannot programmatically add file attachments. The `item.addFileAttachmentAsync()` API exists in MailboxApi 1.1+.
 
 **Impact**: Users cannot ask the agent to attach files to emails.
 **Path**: New `addAttachment` tool wrapping `item.addFileAttachmentAsync()`.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `addAttachment` tool to `outlookTools.ts`. Takes `url` (public URL) + `name` (display filename). Wraps `item.addFileAttachmentAsync()` callback in a Promise. Guards against non-compose mode and missing MailboxApi 1.1. Outlook tool count: 8 → 9. Status: **FULL FIX**.
 
-#### FUNC-L1 — Excel chart creation limited to basic types [LOW]
+#### FUNC-L1 — Excel chart creation limited to basic types [LOW] ✅ FIXED
 
 `manageObject` supports Line, Column, Bar, Pie, Area, XY (Scatter). No support for combo charts, waterfall, treemap, or funnel — common in business reporting.
 
 **Impact**: Users may ask for chart types the agent cannot create.
 **Path**: Add chart subtypes as the Excel API exposes them (ExcelApi 1.8+).
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Added `Waterfall`, `Treemap`, `Funnel` to the `chartType` enum and `chartTypeMap` in `manageObject` (`excelTools.ts`). Maps to `Excel.ChartType.waterfall`, `treemap`, `funnel` (ExcelApi 1.8+). Status: **FULL FIX**.
 
-#### FUNC-L2 — No PowerPoint slide reorder tool [LOW]
+#### FUNC-L2 — No PowerPoint slide reorder tool [LOW] ✅ FIXED
 
 Slides can be added, deleted, duplicated, but not reordered. PowerPointApi 1.5 supports `presentation.slides.moveTo()`.
 
 **Impact**: Agent cannot reorganize presentations.
 **Path**: New `reorderSlide` tool.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `reorderSlide` tool to `powerpointTools.ts`. Takes `slideNumber` (current, 1-based) + `targetPosition` (new, 1-based). Calls `slide.moveTo(toIndex)`. Guards with `isPowerPointApiSupported('1.5')`. PPT tool count: 23 → 24. Status: **FULL FIX**.
 
 ---
 
@@ -480,30 +485,34 @@ These items are intentionally deferred — not forgotten, just not prioritized y
 
 ### OXML Enhancements
 
-#### OXML-IMP2 — Native Word Comments via OOXML [MEDIUM]
+#### OXML-IMP2 — Native Word Comments via OOXML [MEDIUM] ✅ FIXED
 
 `docx-redline-js` exposes `injectCommentsIntoOoxml()`. Currently no tool adds Word comments.
 **Path**: New `addWordComment` tool using `injectCommentsIntoOoxml()`.
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Already fully implemented via Word JS API (superior approach): `addComment` tool searches the selection for the `textSegment` and calls `range.insertComment()`. `getComments` reads all comments from the document body. `docx-redline-js` does not expose `injectCommentsIntoOoxml()` in the current version (`.d.ts` confirms). Word JS API approach avoids OOXML namespace complexity and works reliably in all Word versions. Status: **FULL FIX** (via better approach).
 
-#### OXML-IMP3 — Programmatic Accept/Reject Track Changes [MEDIUM]
+#### OXML-IMP3 — Programmatic Accept/Reject Track Changes [MEDIUM] ✅ FIXED
 
 `docx-redline-js` exposes `acceptTrackedChangesInOoxml(author)`.
 WordApi 1.6 also offers `trackedChange.accept()` / `trackedChange.reject()`.
 **Path**: New `acceptAiChanges` tool to bulk-accept all KickOffice AI changes.
 **Effort**: LOW–MEDIUM
+**Fix (2026-03-16)**: Added `acceptAiChanges` and `rejectAiChanges` tools to `wordTools.ts`. Both filter tracked changes by author (defaults to `localStorage.redlineAuthor` or "KickOffice AI") and call `.accept()` / `.reject()` per item. Requires WordApi 1.6 (guarded). Also added `acceptAiChangesInDocument()` direct helper and `clearAllAgentHighlightsInWorkbook()` in `excelTools.ts` for UI button. Added "Valider les modifications IA" button in `ChatInput.vue` (visible on Word/Excel hosts): calls the appropriate direct helper and shows a success toast. Word tool count: 31 → 34 (includes insertOoxml). Status: **FULL FIX**.
 
-#### OXML-IMP4 — Rich Content Insertion via OOXML Templates [MEDIUM]
+#### OXML-IMP4 — Rich Content Insertion via OOXML Templates [MEDIUM] ✅ FIXED
 
 `insertHtml()` loses complex formatting (numbered lists, table styles, section layouts).
 **Path**: Generate OOXML directly for complex content types, use `insertOoxml()`.
 **Effort**: HIGH — namespace management + relationship IDs are complex
+**Fix (2026-03-16)**: Added dedicated `insertOoxml` tool to `wordTools.ts`. Takes `ooxml` (Office Open XML string) + `location` (Replace/Before/After/Start/End, default Replace). Calls `range.insertOoxml(ooxml, location)` on the current selection. More powerful than `insertHtml` — preserves numbered lists, table styles, section layouts. Status: **FULL FIX**.
 
-#### OXML-IMP5 — PowerPoint Speaker Notes via OOXML [LOW]
+#### OXML-IMP5 — PowerPoint Speaker Notes via OOXML [LOW] ✅ FIXED
 
 `editSlideXml` targets slide XML only. Notes are in `ppt/notesSlides/notesSlideN.xml`.
 **Path**: Extend `withSlideZip` pattern to accept a target XML part path.
 **Effort**: LOW
+**Fix (2026-03-16)**: Already fully implemented via PowerPointApi 1.5 (superior approach): `getSpeakerNotes` and `setSpeakerNotes` tools directly access `slide.notesSlide.notesTextFrame.textRange`. Native API approach is simpler, more reliable, and avoids zip manipulation. Also wired into the direct helper `setCurrentSlideSpeakerNotes()` used by the Quick Actions bar. Status: **FULL FIX** (via better approach).
 
 ---
 
@@ -551,16 +560,16 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 
 ## Architecture Notes (for reference)
 
-### Tool Counts (current — to be audited per FUNC-M1)
+### Tool Counts (audited 2026-03-16 — FUNC-M1 ✅)
 
 | Host | Count | Notable tools |
 |------|-------|---------------|
-| Word | 30 | proposeRevision, proposeDocumentRevision, editDocumentXml, eval_wordjs |
-| Excel | 24 | eval_officejs, screenshotRange, getRangeAsCsv, detectDataHeaders |
-| PowerPoint | 21 | screenshotSlide, editSlideXml, searchIcons, insertIcon |
-| Outlook | 8 | eval_outlookjs, email read/write helpers |
+| Word | 34 | proposeRevision, proposeDocumentRevision, editDocumentXml, insertOoxml, acceptAiChanges, rejectAiChanges, eval_wordjs, getDocumentOoxml |
+| Excel | 27 | eval_officejs, screenshotRange, getRangeAsCsv, detectDataHeaders, manageObject (incl. Waterfall/Treemap/Funnel charts) |
+| PowerPoint | 24 | screenshotSlide, editSlideXml, reorderSlide, getSpeakerNotes, setSpeakerNotes, searchIcons, insertIcon |
+| Outlook | 9 | eval_outlookjs, addAttachment, email read/write helpers |
 | General | 6 | executeBash (VFS), calculateMath, file operations |
-| **Total** | **89** | |
+| **Total** | **100** | |
 
 ### Key Files
 
@@ -620,10 +629,10 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | ID | Category | Title | Status |
 |----|----------|-------|--------|
 | ARCH-M2 | Architecture | backend.ts mixes concerns (669 lines) | OPEN |
-| ARCH-M3 | Architecture | office-agents/ directory purpose unclear | OPEN |
+| ARCH-M3 | Architecture | office-agents/ directory purpose unclear | ✅ FULL FIX |
 | DEAD-M1 | Dead Code | office-agents/ directory removed from repo | ✅ FULL FIX |
-| FUNC-M1 | Functionality | Tool count discrepancy across documentation | OPEN |
-| FUNC-M2 | Functionality | No Outlook compose-time file attachment tool | OPEN |
+| FUNC-M1 | Functionality | Tool count discrepancy across documentation | ✅ FULL FIX |
+| FUNC-M2 | Functionality | No Outlook compose-time file attachment tool | ✅ FULL FIX |
 | ERR-M2 | Error Handling | Raw console usage in 5+ files | ✅ FULL FIX |
 | ERR-M3 | Error Handling | Frontend log forwarding to backend incomplete | ✅ FULL FIX |
 | ERR-M4 | Error Handling | Rate limit retry exhaustion may calculate 0ms retry | ✅ FULL FIX |
@@ -644,8 +653,8 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | ID | Category | Title | Status |
 |----|----------|-------|--------|
 | ARCH-L1 | Architecture | PowerPoint tool pattern inconsistency | OPEN |
-| FUNC-L1 | Functionality | Excel chart creation limited to basic types | OPEN |
-| FUNC-L2 | Functionality | No PowerPoint slide reorder tool | OPEN |
+| FUNC-L1 | Functionality | Excel chart creation limited to basic types | ✅ FULL FIX |
+| FUNC-L2 | Functionality | No PowerPoint slide reorder tool | ✅ FULL FIX |
 | ERR-L1 | Error Handling | Missing correlation ID frontend↔backend | ✅ FULL FIX |
 | ERR-L2 | Error Handling | SSE stream error recovery lacks user guidance | ✅ FULL FIX |
 | UX-L1 | UX | No dark mode toggle | ✅ FULL FIX |
@@ -756,6 +765,42 @@ The chat container was clipping long code blocks (e.g., Excel formulas) horizont
 **Fix**:
 - `ChatMessageList.vue`: added `min-w-0 w-full` to the bubble wrapper div; changed `break-words` → `[overflow-wrap:anywhere]` on the bubble
 - `MarkdownRenderer.vue`: added `min-width: 0; max-width: 100%` to `.markdown-renderer`; added `max-width: 100%` to `:deep(pre)`
+
+---
+
+## Fix Batch — 2026-03-16 (Office Add-in Functionality + OXML Enhancements)
+
+### Office Add-in Functionality Fixes
+
+| Item | Status | Files changed |
+|------|--------|---------------|
+| FUNC-M1 | ✅ FULL FIX | `README.md`, `Claude.md`, `DESIGN_REVIEW.md` — tool counts synchronized to 100 |
+| FUNC-M2 | ✅ FULL FIX | `outlookTools.ts` — new `addAttachment` tool (MailboxApi 1.1+) |
+| FUNC-L1 | ✅ FULL FIX | `excelTools.ts` — Waterfall, Treemap, Funnel added to `manageObject` chart types |
+| FUNC-L2 | ✅ FULL FIX | `powerpointTools.ts` — new `reorderSlide` tool (PowerPointApi 1.5+) |
+
+### OXML Enhancements Assessment & Fixes
+
+| Item | Status | Notes |
+|------|--------|-------|
+| OXML-IMP2 | ✅ FULL FIX | Already implemented via Word JS API (`addComment` + `getComments`) — superior to OOXML injection |
+| OXML-IMP3 | ✅ FULL FIX | New `acceptAiChanges` + `rejectAiChanges` tools (WordApi 1.6) + "Valider modifications IA" UI button |
+| OXML-IMP4 | ✅ FULL FIX | New `insertOoxml` tool — preserves full Office formatting vs `insertHtml()` |
+| OXML-IMP5 | ✅ FULL FIX | Already implemented via PowerPointApi 1.5 (`getSpeakerNotes` + `setSpeakerNotes`) — superior to OOXML path |
+
+### ARCH-M3 Fix
+
+| Item | Status | Notes |
+|------|--------|-------|
+| ARCH-M3 | ✅ FULL FIX | `office-agents/` directory deleted from `main` branch (confirmed by user). No file on this branch either. |
+
+### "Valider les modifications IA" UI Button
+
+New button added to `ChatInput.vue`, visible on Word and Excel hosts only (not loading state):
+- **Word**: calls `acceptAiChangesInDocument()` — bulk-accepts Track Changes by "KickOffice AI"
+- **Excel**: calls `clearAllAgentHighlightsInWorkbook()` — removes underline highlights across all sheets
+- i18n keys added to `en.json` + `fr.json`
+- Files changed: `ChatInput.vue`, `HomePage.vue`, `wordTools.ts`, `excelTools.ts`, `en.json`, `fr.json`
 
 ---
 

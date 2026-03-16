@@ -75,6 +75,7 @@ export type PowerPointToolName =
   | 'eval_powerpointjs'
   | 'screenshotSlide'
   | 'duplicateSlide'
+  | 'reorderSlide'
   | 'verifySlides'
   | 'editSlideXml'
   | 'searchIcons'
@@ -1866,6 +1867,53 @@ try {
         slides.getItemAt(index).copy();
         await context.sync();
         return `Slide ${slideNumber} duplicated successfully.`;
+      },
+    },
+
+    reorderSlide: {
+      name: 'reorderSlide',
+      category: 'write',
+      description:
+        'Move a slide to a new position in the presentation. Requires PowerPointApi 1.5+.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          slideNumber: {
+            type: 'number',
+            description: 'Current position of the slide, 1-based.',
+          },
+          targetPosition: {
+            type: 'number',
+            description: 'New position for the slide, 1-based. Use 1 to move to the beginning.',
+          },
+        },
+        required: ['slideNumber', 'targetPosition'],
+      },
+      executePowerPoint: async (context: any, args: Record<string, any>) => {
+        ensurePowerPointRunAvailable();
+        if (!isPowerPointApiSupported('1.5')) {
+          return 'Error: reorderSlide requires PowerPointApi 1.5 or later, which is not supported in this Office version.';
+        }
+        const slideNumber = Number(args.slideNumber);
+        const targetPosition = Number(args.targetPosition);
+        if (!Number.isFinite(slideNumber) || slideNumber < 1)
+          throw new Error('Error: slideNumber must be >= 1.');
+        if (!Number.isFinite(targetPosition) || targetPosition < 1)
+          throw new Error('Error: targetPosition must be >= 1.');
+        const slides = context.presentation.slides;
+        slides.load('items');
+        await context.sync();
+        const totalSlides = slides.items.length;
+        if (Math.trunc(slideNumber) > totalSlides)
+          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${totalSlides} slides.`);
+        if (Math.trunc(targetPosition) > totalSlides)
+          throw new Error(`Error: targetPosition ${targetPosition} exceeds slide count (${totalSlides}).`);
+        const fromIndex = Math.trunc(slideNumber) - 1;
+        const toIndex = Math.trunc(targetPosition) - 1;
+        if (fromIndex === toIndex) return `Slide ${slideNumber} is already at position ${targetPosition}.`;
+        slides.getItemAt(fromIndex).moveTo(toIndex);
+        await context.sync();
+        return `Slide ${slideNumber} moved to position ${targetPosition}.`;
       },
     },
 

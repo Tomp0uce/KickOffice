@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 89 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
+AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 100 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
 
 **Built for enterprise environments**: API keys never reach the client, all LLM traffic flows through a controlled backend, and no data is sent to third-party services.
 
@@ -9,11 +9,11 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 95 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 100 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane
-- **Multi-Host Support** — Word (31 tools), Excel (27 tools), PowerPoint (23 tools), Outlook (8 tools)
+- **Multi-Host Support** — Word (34 tools), Excel (27 tools), PowerPoint (24 tools), Outlook (9 tools), General (6 tools)
 - **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
 - **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
@@ -115,12 +115,12 @@ Native Word revision markup via `docx-redline-js`:
 
 | Host           | Tools  | Highlights                                                                                    |
 | -------------- | ------ | --------------------------------------------------------------------------------------------- |
-| **Word**       | 31     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
-| **Excel**      | 27     | `eval_officejs`, formulas, charts, screenshots with headers, CSV import/export, pixel art, header detection       |
-| **PowerPoint** | 23     | `editSlideXml`, slides, shapes, speaker notes, screenshots, icons (Iconify), `verifySlides`   |
-| **Outlook**    | 8      | `eval_outlookjs`, email body/subject, recipients, rich content preservation                   |
+| **Word**       | 34     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
+| **Excel**      | 27     | `eval_officejs`, formulas, charts (incl. Waterfall/Treemap/Funnel), screenshots, CSV, pixel art, header detection |
+| **PowerPoint** | 24     | `editSlideXml`, `reorderSlide`, slides, shapes, speaker notes, screenshots, icons (Iconify), `verifySlides` |
+| **Outlook**    | 9      | `eval_outlookjs`, `addAttachment`, email body/subject, recipients, rich content preservation  |
 | **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
-| **Total**      | **95** |                                                                                               |
+| **Total**      | **100** |                                                                                              |
 
 ---
 

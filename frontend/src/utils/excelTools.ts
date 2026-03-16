@@ -578,6 +578,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
               'Area',
               'Doughnut',
               'XYScatter',
+              'Waterfall',
+              'Treemap',
+              'Funnel',
             ],
           },
           title: {
@@ -631,6 +634,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           Area: Excel.ChartType.area,
           Doughnut: Excel.ChartType.doughnut,
           XYScatter: Excel.ChartType.xyscatter,
+          Waterfall: Excel.ChartType.waterfall,
+          Treemap: Excel.ChartType.treemap,
+          Funnel: Excel.ChartType.funnel,
         };
 
         // Resolve target sheet
@@ -2608,3 +2614,32 @@ export function getExcelToolDefinitions(): ToolDefinition[] {
 }
 
 export { excelToolDefinitions };
+
+/**
+ * Direct helper: clear all agent modification underline highlights across the active workbook.
+ * Called directly from the UI "Valider les modifications IA" button — bypasses the agent loop.
+ * Returns a user-readable result string.
+ */
+export async function clearAllAgentHighlightsInWorkbook(): Promise<string> {
+  try {
+    return await runExcel(async (context: Excel.RequestContext) => {
+      const sheets = context.workbook.worksheets;
+      sheets.load('items/name');
+      await context.sync();
+      for (const sheet of sheets.items) {
+        try {
+          const used = sheet.getUsedRange();
+          used.format.font.underline = Excel.RangeUnderlineStyle.none;
+        } catch {
+          // Sheet may be empty — ignore
+        }
+      }
+      await context.sync();
+      return `✓ Surlignements IA supprimés sur ${sheets.items.length} feuille${sheets.items.length === 1 ? '' : 's'}.`;
+    });
+  } catch (err: unknown) {
+    logService.error('[ExcelTools] clearAllAgentHighlightsInWorkbook failed', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return `Erreur : ${msg}`;
+  }
+}

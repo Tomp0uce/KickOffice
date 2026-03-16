@@ -85,6 +85,21 @@
     </div>
     <!-- Formatting checkboxes removed (GEN-L3) -->
 
+    <!-- "Valider les modifications IA" button — Word (accept track changes) / Excel (clear highlights) -->
+    <div v-if="canValidateAiChanges && !loading" class="flex justify-start px-1 mt-0.5">
+      <button
+        class="flex items-center gap-1 rounded-sm border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success hover:bg-success/20 focus:outline-none focus:ring-2 focus:ring-success/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        :disabled="validatingAiChanges"
+        :title="t('validateAiChangesTooltip', 'Accept AI track changes (Word) or clear AI cell highlights (Excel)')"
+        :aria-label="t('validateAiChanges', 'Validate AI changes')"
+        @click="handleValidateAiChanges"
+      >
+        <Loader2 v-if="validatingAiChanges" :size="10" class="animate-spin" />
+        <CheckCheck v-else :size="10" />
+        <span>{{ t('validateAiChanges', 'Validate AI changes') }}</span>
+      </button>
+    </div>
+
     <!-- UX-L2 Keyboard Shortcuts Hint -->
     <div
       class="flex justify-start px-2 mt-0.5 opacity-0 transition-opacity duration-300"
@@ -98,7 +113,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Send, Square, Paperclip, Loader2 } from 'lucide-vue-next';
+import { Send, Square, Paperclip, Loader2, CheckCheck } from 'lucide-vue-next';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { message as messageUtil } from '@/utils/message';
@@ -119,6 +134,8 @@ const props = defineProps<{
   sendLabel: string;
   stopLabel: string;
   isDraftFocusGlowing?: boolean;
+  canValidateAiChanges?: boolean;
+  onValidateAiChanges?: () => Promise<string>;
 }>();
 
 const emit = defineEmits<{
@@ -126,6 +143,21 @@ const emit = defineEmits<{
   (e: 'submit', value: string, files?: File[]): void;
   (e: 'stop'): void;
 }>();
+
+const validatingAiChanges = ref(false);
+
+const handleValidateAiChanges = async () => {
+  if (!props.onValidateAiChanges || validatingAiChanges.value) return;
+  validatingAiChanges.value = true;
+  try {
+    const result = await props.onValidateAiChanges();
+    messageUtil.success(result);
+  } catch (err) {
+    messageUtil.error(err instanceof Error ? err.message : String(err));
+  } finally {
+    validatingAiChanges.value = false;
+  }
+};
 
 const isDragOver = ref(false);
 const dragCounter = ref(0);
