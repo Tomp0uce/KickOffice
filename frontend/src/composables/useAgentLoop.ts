@@ -304,6 +304,11 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       const contextPct = estimateContextUsagePercent(currentMessages, currentSystemPrompt);
 
       const llmWaitTimer = setInterval(() => {
+        // Stop the timer once currentAction was cleared externally (streaming started)
+        if (!currentAction.value) {
+          clearInterval(llmWaitTimer);
+          return;
+        }
         const elapsed = Math.round((Date.now() - llmWaitStart) / 1000);
         const ctxSuffix = contextPct >= 50 ? ` · ctx ${contextPct}%` : '';
         currentAction.value = `${llmWaitLabel} (${elapsed}s${ctxSuffix})`;
@@ -677,7 +682,16 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       await scrollToMessageTop(); // Scroll to top of assistant message
       imageLoading.value = true;
       try {
-        const imageSrc = await generateImage({ prompt: userMessage });
+        // Include document selection context in the image prompt when available so the
+        // generated image matches the document content the user is working on.
+        let imagePrompt = userMessage;
+        if (selectionContext) {
+          const truncatedContext = selectionContext.length > 800
+            ? selectionContext.slice(0, 800) + '…'
+            : selectionContext;
+          imagePrompt = `${userMessage}\n\nDocument context: ${truncatedContext}`;
+        }
+        const imageSrc = await generateImage({ prompt: imagePrompt });
         const message = history.value[history.value.length - 1];
         message.role = 'assistant';
         message.content = '';
@@ -1037,7 +1051,11 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         if (hostIsPowerPoint) {
           fullMessage = t('pptVisualPrefix') + '\n' + selectedText;
         } else {
-          fullMessage = t('imageGenerationPrompt').replace('{text}', selectedText);
+          // Truncate selected text to avoid overwhelming the image model with too much content
+          const truncatedText = selectedText.length > 600
+            ? selectedText.slice(0, 600) + '…'
+            : selectedText;
+          fullMessage = t('imageGenerationPrompt').replace('{text}', truncatedText);
         }
         await processChat(
           fullMessage.trim(),

@@ -17,16 +17,6 @@
       <Sparkles :size="32" />
       <p class="font-semibold text-main">{{ emptyTitle }}</p>
       <p class="text-xs font-semibold text-secondary">{{ emptySubtitle }}</p>
-      <!-- Status: hide entirely until first check resolves to avoid false negative flash -->
-      <div
-        v-if="context.backendChecked.value"
-        role="status"
-        class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-        :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-      >
-        <div class="h-2 w-2 rounded-full" :class="backendOnline ? 'bg-green-500' : 'bg-red-500'" />
-        {{ backendOnline ? backendOnlineLabel : backendOfflineLabel }}
-      </div>
     </div>
 
     <div
@@ -200,7 +190,7 @@
 
     <!-- Agent Action Indicator (Transferred from StatsBar) -->
     <div
-      v-if="
+      v-show="
         currentAction ||
         (loading && history.length > 0 && history[history.length - 1].role !== 'assistant')
       "
