@@ -26,7 +26,7 @@ const router = createRouter({
   ],
 });
 
-router.onError((error, to) => {
+router.onError((error: Error, to: { fullPath?: string; query?: Record<string, string> }) => {
   const isChunkError =
     error.message.includes('Failed to fetch dynamically imported module') ||
     error.message.includes('Importing a module script failed');

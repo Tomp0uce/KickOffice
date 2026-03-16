@@ -42,7 +42,7 @@ export function useSessionFiles(options: UseSessionFilesOptions) {
    * Automatically deduplicates by filename.
    */
   function addSessionFile(file: SessionFile) {
-    const exists = sessionUploadedFiles.value.some(f => f.filename === file.filename);
+    const exists = sessionUploadedFiles.value.some((f: SessionFile) => f.filename === file.filename);
     if (!exists) {
       sessionUploadedFiles.value.push(file);
     }

@@ -175,7 +175,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
       : undefined;
 
     if (actionKey === 'visual' && hostIsPowerPoint) {
-      const imageModelTier = Object.entries(availableModels.value).find(
+      const imageModelTier = (Object.entries(availableModels.value) as [string, ModelInfo][]).find(
         ([_, info]) => info.type === 'image',
       )?.[0] as ModelTier;
       if (!imageModelTier) {

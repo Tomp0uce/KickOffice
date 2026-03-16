@@ -64,13 +64,13 @@ window.Office.onReady(async () => {
 
   watch(
     darkMode,
-    value => {
+    (value: boolean) => {
       document.documentElement.classList.toggle('dark', value);
     },
     { immediate: true },
   );
 
-  app.config.errorHandler = (err, _instance, info) => {
+  app.config.errorHandler = (err: unknown, _instance: unknown, info: string) => {
     logService.error(`Vue Global Error: ${info}`, err);
   };
 

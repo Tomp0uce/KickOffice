@@ -9,7 +9,7 @@ function insertHtmlWithCommonApi(html: string): Promise<void> {
     Office.context.document.setSelectedDataAsync(
       html,
       { coercionType: Office.CoercionType.Html },
-      result => {
+      (result: Office.AsyncResult) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
           resolve();
         } else {
@@ -33,7 +33,7 @@ class WordFormatter {
       return;
     }
 
-    await Word.run(async context => {
+    await Word.run(async (context: any) => {
       const selection = context.document.getSelection();
       if (insertType.value === 'NoAction') return;
 
@@ -59,21 +59,21 @@ class WordFormatter {
 
     switch (insertType.value) {
       case 'replace':
-        await Word.run(async context => {
+        await Word.run(async (context: any) => {
           const range = context.document.getSelection();
           range.insertText(normalizedResult, 'Replace');
           await context.sync();
         });
         break;
       case 'append':
-        await Word.run(async context => {
+        await Word.run(async (context: any) => {
           const range = context.document.getSelection();
           range.insertText(normalizedResult, 'End');
           await context.sync();
         });
         break;
       case 'newLine':
-        await Word.run(async context => {
+        await Word.run(async (context: any) => {
           const range = context.document.getSelection();
           range.insertParagraph(normalizedResult, 'After');
           await context.sync();

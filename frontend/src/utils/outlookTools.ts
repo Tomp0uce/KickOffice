@@ -8,10 +8,8 @@ import { renderOfficeRichHtml, sanitizeHtml } from './markdown';
 import {
   generateVisualDiff,
   createOfficeTools,
-  truncateString,
   type OfficeToolTemplate,
   getErrorMessage,
-  getDetailedOfficeError,
   createEvalExecutor,
 } from './common';
 import { getLastRichContext, setLastRichContext } from './richContextStore';

@@ -401,7 +401,14 @@ chatRouter.post('/sync', async (req, res) => {
       toolCallCount: data?.choices?.[0]?.message?.tool_calls?.length || 0,
     })
 
-    req.logger.info('POST /api/chat/sync upstream response completed', { traffic: 'llm', response: data })
+    // QUAL-L1: Log summary only — full response body can be thousands of chars.
+    req.logger.info('POST /api/chat/sync upstream response completed', {
+      traffic: 'llm',
+      model: data?.model,
+      usage: data?.usage,
+      finish_reason: data?.choices?.[0]?.finish_reason ?? null,
+      tool_calls: data?.choices?.[0]?.message?.tool_calls?.map(tc => tc?.function?.name) ?? [],
+    })
 
     // LOG-H1: Log tool usage if tool calls present
     const toolCalls = data?.choices?.[0]?.message?.tool_calls

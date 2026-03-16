@@ -1026,7 +1026,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         // Manual sort as fallback-safe approach
         const values = range.values.slice();
         const headers = hasHeaders ? [values.shift()!] : [];
-        values.sort((a, b) => {
+        values.sort((a: any[], b: any[]) => {
           const va = a[columnIndex];
           const vb = b[columnIndex];
           if (va < vb) return ascending ? -1 : 1;

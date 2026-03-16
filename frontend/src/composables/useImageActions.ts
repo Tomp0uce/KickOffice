@@ -133,7 +133,7 @@ export function useImageActions(t: (key: string) => string) {
     // Use regex to safely extract base64 payload from data URL
     const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
     if (!base64Payload) throw new Error('Image base64 payload is empty');
-    await Word.run(async ctx => {
+    await Word.run(async (ctx: any) => {
       const range = ctx.document.getSelection();
       range.insertInlinePictureFromBase64(base64Payload, type === 'replace' ? 'Replace' : 'After');
       await ctx.sync();
@@ -187,7 +187,7 @@ export function useImageActions(t: (key: string) => string) {
         Office.context.document.setSelectedDataAsync(
           base64Payload,
           { coercionType: Office.CoercionType.Image },
-          result => {
+          (result: Office.AsyncResult) => {
             if (result.status === Office.AsyncResultStatus.Failed) {
               reject(new Error(result.error.message));
             } else {
@@ -200,7 +200,7 @@ export function useImageActions(t: (key: string) => string) {
   }
 
   function historyWithSegments(history: Ref<DisplayMessage[]>) {
-    return history.value.map(message => ({
+    return history.value.map((message: DisplayMessage) => ({
       message,
       key: message.id,
       segments: splitThinkSegments(message.content),

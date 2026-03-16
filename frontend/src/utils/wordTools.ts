@@ -15,10 +15,8 @@ import {
 
 import {
   createOfficeTools,
-  truncateString,
   buildExecuteWrapper,
   type OfficeToolTemplate,
-  getDetailedOfficeError,
   createEvalExecutor,
 } from './common';
 import { escapeXml } from './pptxZipUtils';
@@ -552,7 +550,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         await context.sync();
 
         const text = body.text || '';
-        const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
+        const wordCount = text.split(/\s+/).filter((word: string) => word.length > 0).length;
         const charCount = text.length;
         const paragraphCount = paragraphs.items.length;
 

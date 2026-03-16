@@ -398,9 +398,18 @@ function applyOfficeBlockStyles(html: string): string {
     .replace(/ data-pre="1"/gi, '');
 
   // Transform [color:HEX]text[/color] syntax into <span style="color:HEX">text</span>
+  // QUAL-M4: Validate color value against an allowlist to prevent CSS injection.
+  // Accepted formats: hex (#RGB, #RRGGBB, #RGBA, #RRGGBBAA), CSS named colors,
+  // rgb(...), rgba(...), hsl(...), hsla(...).
+  const COLOR_SAFE_RE =
+    /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{2,30}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*[\d.]+)?\s*\)|hsla?\(\s*[\d.]+\s*,\s*[\d.]+%\s*,\s*[\d.]+%(?:\s*,\s*[\d.]+)?\s*\))$/;
   const withColor = withCode.replace(
     /\[color:\s*([^\]]+)\]([\s\S]*?)\[\/color\]/gi,
-    '<span style="color:$1">$2</span>',
+    (_match, rawColor: string, text: string) => {
+      const color = rawColor.trim();
+      if (!COLOR_SAFE_RE.test(color)) return text;
+      return `<span style="color:${color}">${text}</span>`;
+    },
   );
 
   return withColor
