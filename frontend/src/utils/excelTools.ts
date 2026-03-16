@@ -150,8 +150,8 @@ function looksLikeMutation(code: string): boolean {
   return EXCEL_MUTATION_PATTERNS.some(p => p.test(code));
 }
 
-/** Bottom border color used to mark cells modified by the agent. */
-const AGENT_MARK_COLOR = '#2563EB'; // blue underline — visible, rarely used, easy to clear
+// Agent-modified cells are marked with text underline (font.underline = single).
+// This is auto-applied by setCellRange and cleared by clearAgentHighlights.
 
 /** Coerce a CSV string value to its native type. Ported from Office Agents csv-to-sheet. */
 function coerceValue(value: string): string | number | boolean {
@@ -341,7 +341,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
       name: 'setCellRange',
       category: 'write',
       description:
-        'PREFERRED tool for ALL write operations in Excel. Write values OR formulas to a range, apply formatting, and optionally fill down a formula to a larger range — all in one call. Use `copyToRange` to fill a formula from the first row of `address` down to a larger range (e.g., address="C2:C2", copyToRange="C2:C50"). For multi-cell writes, always prefer passing a 2D array to `values` over calling this tool multiple times.',
+        'PREFERRED tool for ALL write operations in Excel. Write values OR formulas to a range, apply formatting, and optionally fill down a formula to a larger range — all in one call. Automatically underlines modified cells (font underline) so the user can review changes; use `clearAgentHighlights` to remove the underline when done. Use `copyToRange` to fill a formula from the first row of `address` down to a larger range (e.g., address="C2:C2", copyToRange="C2:C50"). For multi-cell writes, always prefer passing a 2D array to `values` over calling this tool multiple times.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -387,15 +387,6 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
                 description: 'Number format string (e.g., "0.00%", "#,##0", "dd/mm/yyyy")',
               },
               horizontalAlignment: { type: 'string', enum: ['Left', 'Center', 'Right'] },
-              borderBottomStyle: {
-                type: 'string',
-                description: 'Bottom border style. Use "continuous" to underline modified cells as a visible marker. Use "none" to remove.',
-                enum: ['none', 'continuous', 'dash'],
-              },
-              borderBottomColor: {
-                type: 'string',
-                description: 'Bottom border color hex (e.g., "#2563EB"). Defaults to blue if borderBottomStyle is set.',
-              },
             },
           },
           copyToRange: {
@@ -425,22 +416,17 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           range.values = values;
         }
 
+        // Auto-mark modified cells with text underline so the user can review changes
+        if (values !== undefined || formulas) {
+          range.format.font.underline = Excel.RangeUnderlineStyle.single;
+        }
+
         // Apply formatting
         if (formatting) {
           if (formatting.bold !== undefined) range.format.font.bold = formatting.bold;
           if (formatting.fillColor) range.format.fill.color = formatting.fillColor;
           if (formatting.fontColor) range.format.font.color = formatting.fontColor;
           if (formatting.numberFormat) range.numberFormat = [[formatting.numberFormat]];
-          if (formatting.borderBottomStyle) {
-            const borderStyleMap: Record<string, any> = {
-              none: Excel.BorderLineStyle.none,
-              continuous: Excel.BorderLineStyle.continuous,
-              dash: Excel.BorderLineStyle.dash,
-            };
-            const bottomBorder = range.format.borders.getItem(Excel.BorderIndex.edgeBottom);
-            bottomBorder.style = borderStyleMap[formatting.borderBottomStyle] ?? Excel.BorderLineStyle.continuous;
-            if (formatting.borderBottomColor) bottomBorder.color = formatting.borderBottomColor;
-          }
           if (formatting.horizontalAlignment) {
             const alignMap: Record<string, any> = {
               Left: Excel.HorizontalAlignment.left,
@@ -2351,7 +2337,7 @@ try {
       name: 'clearAgentHighlights',
       category: 'write',
       description:
-        'Clear the bottom-border underline markings applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual underline indicators.',
+        'Clear the text underline markings automatically applied to cells modified by the agent. Use this when the user has reviewed the changes and wants to remove the visual underline indicators.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -2373,14 +2359,13 @@ try {
         targetRange.load('address');
         await context.sync();
 
-        // Clear the bottom border (underline) marking applied by the agent
-        targetRange.format.borders.getItem(Excel.BorderIndex.edgeBottom).style =
-          Excel.BorderLineStyle.none;
+        // Clear the font underline marking automatically applied by setCellRange
+        targetRange.format.font.underline = Excel.RangeUnderlineStyle.none;
         await context.sync();
 
         return JSON.stringify({
           success: true,
-          message: `Cleared bottom-border markings on ${targetRange.address}. Agent underline indicators removed.`,
+          message: `Cleared text underline markings on ${targetRange.address}. Agent modification indicators removed.`,
         });
       },
     },

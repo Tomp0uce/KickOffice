@@ -226,7 +226,7 @@ Do NOT skip the analysis step. Do NOT fabricate an imageId.
 6. **Batch verification.** When creating multiple charts in one task, take one final \`screenshotRange\` at the end covering all chart positions.
 
 # CELL MODIFICATION MARKING
-After modifying cell values, mark the changed range with a **bottom-border underline** so the user can easily review and then clear the indicators. Use \`setCellRange\` with \`formatting: { borderBottomStyle: "continuous", borderBottomColor: "#2563EB" }\`.
+\`setCellRange\` **automatically underlines** (text underline) any cells it writes values or formulas to — no extra step needed. The user can call \`clearAgentHighlights\` to remove the underline once they have reviewed the changes.
 **NEVER use \`fillColor\` or \`fontColor\` to mark modified cells** — yellow backgrounds with white fonts make text invisible.
 
 # TABLE CONVERSION RULE

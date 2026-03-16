@@ -287,45 +287,55 @@ npm run build         # Production build
 
 ### [Office Agents](https://github.com/nicepkg/office-agents) (MIT License)
 
-Major source of features and patterns ported into KickOffice. The following capabilities were adapted from Office Agents:
-
-- **Excel screenshot with row/column headers** — Canvas-based compositing that draws column letters (A, B, C…) and row numbers (1, 2, 3…) around range screenshots, dramatically improving vision model cell targeting accuracy. Ported from `packages/excel/src/lib/tools/screenshot-range.ts`.
-- **Enriched Office.js error feedback** — Extracts `debugInfo.errorLocation`, `debugInfo.statement`, and `debugInfo.surroundingStatements` from `OfficeExtension.Error` objects for precise auto-correction by the LLM agent. Inspired by error handling patterns across all Office Agents tool executors.
-- **Static mutation tracker** — Regex-based detection of write operations (`.values =`, `.delete()`, `.insert()`, etc.) in `eval_*` tool code, returning `hasMutated` flags and applying visual cell highlights for user awareness. Adapted from `packages/excel/src/lib/dirty-tracker.ts`.
-- **VFS injection in sandbox** — Exposes `btoa`, `atob`, `readFile()`, `readFileBuffer()`, `writeFile()` inside the SES sandboxed eval, enabling LLM-generated code to handle images, CSV data, and binary files. Ported from the Office Agents SDK sandbox pattern.
-- **CSV-to-sheet / sheet-to-CSV bash commands** — Custom VFS bash commands for importing CSV files into Excel sheets (with type coercion) and exporting sheet data to CSV. Adapted from `packages/excel/src/lib/vfs/custom-commands.ts`.
-- **Image-to-sheet (pixel art)** — Converts uploaded images into Excel cell colors (pixel art), with downsampling, run-length encoding, and batched color assignments. Ported from `packages/excel/src/lib/vfs/custom-commands.ts`.
-- **OOXML extraction for Word (`getDocumentOoxml`)** — Extracts document OOXML structure with body-child summaries, referenced styles, and numbering definitions. Adapted from `packages/word/src/lib/tools/get-ooxml.ts`.
-- **Enriched Word document metadata** — Run-level formatting detection (`hasRunLevelOverrides`), heading outline, content control info, and style sampling for intelligent editing strategy selection. Inspired by `packages/word/src/lib/adapter.tsx` metadata collection.
-- **Search data improvements** — Formula search capability added to Excel's `findData` tool. Inspired by `packages/excel/src/lib/tools/search-data.ts`.
+- Excel range screenshot with row/column header overlay (A, B, C… / 1, 2, 3…) for improved vision accuracy
+- Enriched Office.js error feedback (`debugInfo.errorLocation`, `statement`, `surroundingStatements`)
+- Static mutation tracker — detects write operations in `eval_*` code, returns `hasMutated` flags
+- VFS injection in SES sandbox (`btoa`, `atob`, `readFile`, `readFileBuffer`, `writeFile`)
+- CSV-to-sheet / sheet-to-CSV bash commands with type coercion
+- Image-to-sheet pixel art (downsampling, run-length encoding, batched color assignments)
+- Word OOXML extraction with body-child summaries, referenced styles, numbering definitions
+- Word document metadata enrichment (run-level formatting, heading outline, content control info)
+- Excel formula search in `findData`
 
 ### [word-GPT-Plus](https://github.com/Kuingsmile/word-GPT-Plus) (MIT License)
 
-Original foundation for the Word add-in architecture: chat UI, SSE streaming, settings page, i18n framework, built-in prompt structure.
+- Office task pane chat UI architecture
+- SSE streaming response handling
+- Settings page structure
+- i18n framework (multi-language UI + reply language selection)
+- Quick action prompt system
 
 ### [excel-ai-assistant](https://github.com/ilberpy/excel-ai-assistant) (MIT License)
 
-Inspired the tool definition schema, Excel tool set, agent loop pattern, and formula localization.
+- Tool definition schema pattern
+- Excel tool set design and agent loop
+- Formula locale switching (French / English)
+- Chart creation and data analysis flows
 
 ### [docx-redline-js](https://github.com/AnsonLai/docx-redline-js) (MIT License)
 
-OOXML reconciliation engine for native Word Track Changes (`<w:ins>` / `<w:del>`), configurable author, formatting preservation. Zero dependencies.
+- Native Word Track Changes engine (`<w:ins>` / `<w:del>` OOXML)
+- Configurable revision author
+- Formatting preservation in diffs
+- Zero-dependency implementation
 
 ### [Gemini AI for Office](https://github.com/AnsonLai/Gemini-AI-for-Office-Microsoft-Word-Add-In-for-Vibe-Drafting) (MIT License)
 
-Integration pattern: disable TC → insertOoxml with embedded revision markup → restore TC. Prevents double-tracking.
-
-### [Iconify](https://iconify.design) (MIT License — API free to use)
-
-Icon search and SVG delivery for the `searchIcons` / `insertIcon` PowerPoint tools. 200,000+ icons, proxied via `/api/icons/` backend route.
-
-### [JSZip](https://stuk.github.io/jszip/) (MIT License)
-
-PPTX ZIP manipulation for the `editSlideXml` PowerPoint tool.
+- TC disable → `insertOoxml` → TC restore pattern to prevent double-tracking
 
 ### [Redink](https://github.com/LawDigital/redink) (MIT License)
 
-Conceptual inspiration for document revision workflows.
+- Multi-host Office add-in design (Word, Excel, Outlook)
+- AI-powered inline review and commenting approach
+- Document revision workflow patterns
+
+### [Iconify](https://iconify.design) (MIT License — API free to use)
+
+- Icon search and SVG delivery (`searchIcons` / `insertIcon` PowerPoint tools, 200,000+ icons)
+
+### [JSZip](https://stuk.github.io/jszip/) (MIT License)
+
+- PPTX ZIP manipulation for `editSlideXml`
 
 ---
 
