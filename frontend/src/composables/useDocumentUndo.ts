@@ -191,10 +191,17 @@ export function useDocumentUndo(options: {
 
   /**
    * Undo the last insert operation — restore the original content.
+   * Snapshot is always cleared after one attempt (success or failure) so the
+   * undo button never gets stuck showing the error on repeated clicks.
    */
   async function undoLastInsert(): Promise<boolean> {
     const snapshot = undoSnapshot.value;
     if (!snapshot) return false;
+
+    // Clear immediately so the button disappears regardless of outcome.
+    // If the CC was removed by an OOXML tool the undo is unrecoverable anyway.
+    undoSnapshot.value = null;
+    canUndo.value = false;
 
     try {
       if (snapshot.host === 'word' && snapshot.contentControlTag) {
