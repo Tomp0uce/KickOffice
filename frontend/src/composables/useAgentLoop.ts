@@ -1079,6 +1079,14 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       // Step 4: Pass session uploaded files to processChat (inline or file_id reference)
       const uploadedFilesForChat = getSessionFilesForChat();
 
+      // Capture document state before agent modifies the document (enables undo)
+      let undoSnapshot: Partial<any> | null = null;
+      try {
+        if (captureBeforeInsert) undoSnapshot = await captureBeforeInsert();
+      } catch (snapErr) {
+        logService.warn('[AgentLoop] sendMessage: captureBeforeInsert failed', snapErr);
+      }
+
       // Only append context to standard text chats, not pure image generations
       // selectedText is passed separately to processChat so it never pollutes the UI history
       if (isImageFromSelection) {
@@ -1107,6 +1115,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           selectedText || undefined,
           uploadedFilesForChat,
         );
+      }
+
+      // Save snapshot so undo button becomes available after agent completes
+      if (undoSnapshot && saveSnapshot) {
+        try {
+          saveSnapshot(undoSnapshot);
+        } catch (saveErr) {
+          logService.warn('[AgentLoop] sendMessage: saveSnapshot failed', saveErr);
+        }
       }
     } catch (error: unknown) {
       if (!(error instanceof Error) || error.name !== 'AbortError') {

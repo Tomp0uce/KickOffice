@@ -910,6 +910,99 @@ Also manually verify:
 - **Remove unused images** — Remove any images that are no longer relevant (especially if filling in an existing template). If appropriate, replace with placeholder shapes.
 
 
+## OOXML-Based Text Editing in Shapes — PREFERRED for text modifications
+
+**When to use OOXML vs `searchAndReplaceInShape`:**
+- **`searchAndReplaceInShape`**: Only for single-word or short-phrase corrections where the surrounding formatting must be preserved but the change is minimal (e.g., fixing a typo)
+- **OOXML approach (preferred for any paragraph-level change)**: Translation, rewriting, grammar correction of full sentences/paragraphs, any change that touches most of the text in a run
+
+**Why OOXML?** `searchAndReplaceInShape` replaces text character-by-character inside `<a:t>` elements via the Office.js API, which can lose run properties (`<a:rPr>`) and paragraph properties (`<a:pPr>`) in some contexts. OOXML editing preserves ALL formatting because you directly manipulate the XML structure.
+
+### OOXML text-editing workflow for PPT shapes
+
+**Step 1 — Get the shape XML** via \`eval_powerpointjs\`:
+\`\`\`javascript
+try {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+  const slide = slides.items[slideIndex - 1]; // 0-based
+  const shapes = slide.shapes;
+  shapes.load('items/id,items/name');
+  await context.sync();
+  const shape = shapes.items.find(s => s.id === targetShapeId);
+  if (!shape) return { error: 'shape not found' };
+  const range = shape.textFrame.textRange;
+  range.load('ooxml');
+  await context.sync();
+  return { ooxml: range.ooxml };
+} catch (e) { return { error: e.message }; }
+\`\`\`
+
+**Step 2 — Modify only the \`<a:t>\` text content** — NEVER touch \`<a:rPr>\`, \`<a:pPr>\`, \`<a:lstStyle>\`, \`<a:bodyPr>\`:
+\`\`\`xml
+<!-- BEFORE -->
+<a:p>
+  <a:pPr marL="457200" indent="-457200"><a:buChar char="•"/></a:pPr>  <!-- KEEP -->
+  <a:r>
+    <a:rPr lang="fr-FR" sz="1400" b="1" dirty="0"/>                   <!-- KEEP -->
+    <a:t>Original French text here</a:t>                               <!-- CHANGE ONLY THIS -->
+  </a:r>
+</a:p>
+<!-- AFTER -->
+<a:p>
+  <a:pPr marL="457200" indent="-457200"><a:buChar char="•"/></a:pPr>  <!-- unchanged -->
+  <a:r>
+    <a:rPr lang="en-US" sz="1400" b="1" dirty="0"/>                   <!-- only lang attr may change -->
+    <a:t>Translated English text here</a:t>                            <!-- text replaced -->
+  </a:r>
+</a:p>
+\`\`\`
+
+**Step 3 — Write the modified OOXML back** via \`eval_powerpointjs\`:
+\`\`\`javascript
+try {
+  const slides = context.presentation.slides;
+  slides.load('items');
+  await context.sync();
+  const slide = slides.items[slideIndex - 1];
+  const shapes = slide.shapes;
+  shapes.load('items/id');
+  await context.sync();
+  const shape = shapes.items.find(s => s.id === targetShapeId);
+  if (!shape) return { error: 'shape not found' };
+  shape.textFrame.textRange.ooxml = modifiedOoxml;
+  await context.sync();
+  return { success: true };
+} catch (e) { return { error: e.message }; }
+\`\`\`
+
+### PPT OOXML — Key namespace prefixes
+- \`a:\` = DrawingML (text, runs, paragraphs, formatting)
+- \`p:\` = PresentationML (slides, shapes, slide layouts)
+
+### PPT OOXML — Text structure reference
+\`\`\`xml
+<p:sp>
+  <p:txBody>
+    <a:bodyPr/>          <!-- body properties — DO NOT MODIFY -->
+    <a:lstStyle/>        <!-- list style — DO NOT MODIFY -->
+    <a:p>                <!-- one paragraph -->
+      <a:pPr>            <!-- paragraph props (bullets, indent, align) — DO NOT MODIFY -->
+        <a:buChar char="•"/>
+      </a:pPr>
+      <a:r>              <!-- one text run -->
+        <a:rPr lang="fr-FR" sz="1400" b="1" dirty="0"/>  <!-- run props — preserve, only update lang if translating -->
+        <a:t>Text content here</a:t>  <!-- ONLY MODIFY THIS -->
+      </a:r>
+    </a:p>
+  </p:txBody>
+</p:sp>
+\`\`\`
+
+### Handling multi-run paragraphs
+If a paragraph has multiple runs (mixed formatting), translate paragraph-by-paragraph: collect all \`<a:t>\` text from all runs in one paragraph, translate as a whole, then put the translation in the first run and clear the other runs (\`<a:t/>\`). This preserves run structure.
+
 ${buildSkillsPromptSection(skills)}
 `;
 }
