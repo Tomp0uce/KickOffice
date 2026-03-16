@@ -37,7 +37,7 @@
               (item.message.toolCalls && item.message.toolCalls.length > 0) ||
               item.message.imageSrc
             "
-            class="group max-w-[98%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] wrap-break-word text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
+            class="group max-w-[98%] rounded-md border border-border-secondary p-1 text-sm leading-[1.4] break-words text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
           >
             <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
               <MarkdownRenderer
@@ -75,7 +75,7 @@
                 </button>
                 <pre
                   v-if="isThoughtOpen(item.key, idx)"
-                  class="m-0 px-2 py-1.5 text-xs wrap-break-word whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
+                  class="m-0 px-2 py-1.5 text-xs break-words whitespace-pre-wrap text-secondary border-t border-border-secondary max-h-20 overflow-y-auto"
                   >{{ segment.text.trim() }}</pre
                 >
               </div>
@@ -209,7 +209,7 @@
     >
       <div class="flex min-w-0 flex-1 flex-col gap-1 items-start text-left">
         <div
-          class="max-w-[98%] rounded-md border border-border-secondary px-3 py-2 text-[10px] leading-[1.4] wrap-break-word text-main/90 shadow-sm bg-bg-tertiary"
+          class="max-w-[98%] rounded-md border border-border-secondary px-3 py-2 text-[10px] leading-[1.4] break-words text-main/90 shadow-sm bg-bg-tertiary"
         >
           <div class="flex items-start gap-2 text-accent" role="status" aria-live="polite">
             <span
