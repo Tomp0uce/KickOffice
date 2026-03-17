@@ -12,7 +12,7 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Autonomous Agent** — 100 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
-- **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane
+- **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane. Bulk-accept/reject via `acceptAiChanges`/`rejectAiChanges` tools or the "Valider" UI button
 - **Multi-Host Support** — Word (34 tools), Excel (27 tools), PowerPoint (24 tools), Outlook (9 tools), General (6 tools)
 - **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
 - **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
@@ -22,6 +22,9 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Large File Support** — Extended 5-minute LLM timeout; files optionally forwarded via `/v1/files` API to avoid re-sending content on every message
 - **Internationalization** — 2 UI languages (EN/FR), 13 reply languages
 - **Reverse Proxy Support** — Compatible with Synology/nginx reverse proxies
+- **Stream Error Recovery** — Retry button on interrupted responses; SSE parse failures and upstream errors logged and surfaced to the user
+- **Request Correlation** — `X-Request-Id` header shared between frontend and backend for end-to-end log tracing
+- **Frontend Log Forwarding** — warn/error log entries flushed to the backend `/api/logs` endpoint every 30 s for centralized monitoring
 
 ---
 
@@ -115,9 +118,9 @@ Native Word revision markup via `docx-redline-js`:
 
 | Host           | Tools  | Highlights                                                                                    |
 | -------------- | ------ | --------------------------------------------------------------------------------------------- |
-| **Word**       | 34     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
+| **Word**       | 34     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `addComment`, `getComments`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
 | **Excel**      | 27     | `eval_officejs`, formulas, charts (incl. Waterfall/Treemap/Funnel), screenshots, CSV, pixel art, header detection |
-| **PowerPoint** | 24     | `editSlideXml`, `reorderSlide`, slides, shapes, speaker notes, screenshots, icons (Iconify), `verifySlides` |
+| **PowerPoint** | 24     | `editSlideXml`, `reorderSlide`, `getSpeakerNotes`, `setSpeakerNotes`, slides, shapes, screenshots, icons (Iconify), `verifySlides` |
 | **Outlook**    | 9      | `eval_outlookjs`, `addAttachment`, email body/subject, recipients, rich content preservation  |
 | **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
 | **Total**      | **100** |                                                                                              |
@@ -273,14 +276,15 @@ npm run build         # Production build
 
 - **API keys server-side only** — Never sent to client
 - **CORS restricted** — Frontend origin only
-- **Rate limiting** — IP-based on chat, image, and upload endpoints
+- **Rate limiting** — IP-based on chat, image, and upload endpoints; 5 s minimum floor on rate-limit retry
 - **Credential encryption** — Web Crypto API (AES-GCM 256-bit) for stored credentials
 - **Non-root containers** — Both backend and frontend run as non-root users
 - **SES sandbox** — Safe dynamic code execution with host isolation
 - **Code validation** — Pre-execution checks for Office.js patterns
 - **Helmet headers** — HSTS, X-Frame-Options, X-Content-Type-Options
-- **DOMPurify** — XSS protection with strict allowlists
-- **Structured logging** — All errors/warnings routed through logService (not raw console)
+- **DOMPurify** — XSS protection with strict allowlists; custom color syntax validated against a strict allowlist
+- **Structured logging** — All errors/warnings routed through logService (not raw console); forwarded to backend
+- **Request correlation** — `X-Request-Id` header links frontend and backend log entries
 - **No third-party services** — Privacy-first, no telemetry
 
 ---
