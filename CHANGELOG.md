@@ -4,10 +4,53 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`addComment` / `getComments` tools** (Word): Native Word comment insertion via `range.insertComment()` (Word JS API); reads all document body comments. Superior to OOXML injection approach.
+- **`acceptAiChanges` / `rejectAiChanges` tools** (Word): Bulk-accept or bulk-reject Track Changes attributed to the AI author. Requires WordApi 1.6; version guard uses `Office.context.requirements.isSetSupported('WordApi', '1.6')` and accesses `context.document.trackedChanges` (property, not method).
+- **`insertOoxml` tool** (Word): Insert raw Office Open XML at the current selection — preserves numbered lists, table styles, section layouts that `insertHtml` would lose.
+- **`addAttachment` tool** (Outlook): Programmatically attach a file to the composed email via `item.addFileAttachmentAsync()` (MailboxApi 1.1+).
+- **Waterfall, Treemap, Funnel chart types** (Excel): Added to `manageObject` chart type enum, backed by ExcelApi 1.8+.
+- **`reorderSlide` tool** (PowerPoint): Move a slide to a new position via `slide.moveTo()` (PowerPointApi 1.5+).
+- **Stream Error Retry button**: When the SSE stream is interrupted (`stream_interrupted` event), the failed assistant message shows an amber Retry button (ERR-L2).
+- **Request correlation ID**: `chatStream` generates a UUID per request and sends it as `X-Request-Id`; backend middleware uses the incoming ID so both ends share the same log correlation ID (ERR-L1).
+- **Frontend log forwarding**: `logService.startFlushTimer()` (called at boot) batches warn/error log entries and flushes to `POST /api/logs` every 30 s; error-level entries trigger an immediate flush (ERR-M3).
+- **`mutationDetector.ts`** utility: `createMutationDetector(patterns)` factory shared by all three eval tool hosts (DUP-H1).
+- **`createEvalExecutor` factory** in `common.ts`: All four `eval_*` tools refactored to use this generic factory (DUP-M2).
+- **`getVfsSandboxContext()`** in `vfs.ts`: Centralised VFS sandbox context builder used by wordTools, excelTools, powerpointTools (DUP-M1).
+- **`buildScreenshotResult()`** helper in `common.ts`: Shared screenshot result builder for `screenshotRange` and `screenshotSlide` (DUP-L1).
+- **"Valider les modifications IA" button** (Word/Excel): Visible in `ChatInput.vue` when AI changes are pending. Calls `acceptAiChangesInDocument()` (Word) or `clearAllAgentHighlightsInWorkbook()` (Excel). Button is reactive — hidden when no AI changes are present.
+- **`OfflineBanner.vue`**, **`AuthErrorBanner.vue`**, **`SessionConfirmDialogs.vue`** components extracted from `HomePage.vue` (UX-H1).
+- **Per-host quick action composables**: `useWordQuickActions.ts`, `useExcelQuickActions.ts`, `useOutlookQuickActions.ts`, `usePowerPointQuickActions.ts` in `composables/quickActions/` (QUAL-H2).
+- **`hasAiTrackedChanges()`** export in `wordTools.ts`: Returns `true` when ≥1 tracked change by the AI author exists in the document.
+
+### Fixed
+
+- **SSE JSON parse failures** (`chat.js`): Malformed chunks now logged at `warn` level with truncated raw content instead of silently dropped (ERR-C1).
+- **Streaming error after headers sent** (`chat.js`): `data: {"error":"stream_interrupted"}` frame now written to the SSE response before `res.end()` on stream failure (ERR-C2).
+- **VFS persistence failures silent** (`useAgentLoop.ts`): Both `.catch()` handlers now call `messageUtil.warning()` to display a non-blocking toast when VFS writes fail (ERR-C3).
+- **AbortListener memory leak** (`officeAction.ts`): Listener now registered before the Promise.race and guaranteed to be cleaned up on all code paths — success, retry, abort, timeout (ERR-C4).
+- **Session switch during agent loop** (`useSessionManager.ts`, `HomePage.vue`): Three-layer protection — session switch blocked if `isAgentRunning` is true; `handleSwitchSession` checks `loading.value`; UI disables session buttons when loading (RACE-C1).
+- **Raw console calls** (`sandbox.ts`, `lockdown.ts`, `useOfficeSelection.ts`, `BuiltinPromptsTab.vue`, `PromptsTab.vue`): All replaced with `logService` calls (ERR-M2).
+- **Rate limit floor** (`llmClient.js`): `RateLimitError` `retryAfterMs` now has a 5 s minimum floor when the `Retry-After` header is absent or zero (ERR-M4).
+- **SSE read timeout doesn't cancel upstream** (`chat.js`): Added `reader.cancel()` in the timeout catch block to release the upstream connection (ERR-M5).
+- **Dark mode toggle broken** (`main.ts`): Replaced raw `localStorage` + `storage` event with `useStorage()` from `@vueuse/core` so the dark-mode class toggles reactively in the same window (UX-L1).
+- **Missing i18n keys** (`en.json`, `fr.json`): Added `authErrorBanner`, `goToSettings`, `shiftEnterHint`, `agentWaitingForLLM`, `outlookTranslateFormalize_tooltip` (UX-M1/M3, DEAD-L1).
+- **Keyboard navigation in dropdowns** (`SingleSelect.vue`): ArrowDown/Up to navigate, Enter to select, Escape to close (UX-M4).
+- **PowerPoint image registry memory leak** (`powerpointTools.ts`, `useSessionManager.ts`): `clearPowerpointImageRegistry()` called on session create and switch (QUAL-M2).
+- **JSON tool result truncation** (`tokenManager.ts`): `truncateJsonToolResult()` wraps truncated JSON objects/arrays in a `{ ...[N chars truncated]... }` envelope instead of tail-cutting the raw string (QUAL-M3).
+- **CSS injection via custom color syntax** (`markdown.ts`): `COLOR_SAFE_RE` allowlist validates hex, named, rgb/rgba, hsl/hsla colors before injecting into `style` attribute (QUAL-M4).
+- **Backend env var validation** (`config/models.js`): `parsePositiveInt()` applied to `MAX_TOOLS`, max tokens, and context window env vars — startup fails fast on invalid values (QUAL-M5).
+- **Backend sync endpoint logs full response** (`chat.js`): Replaced `response: data` with a summary object `{ model, usage, finish_reason, tool_calls: [names] }` (QUAL-L1).
+- **WordApi 1.6 version check wrong method** (`wordTools.ts`): Version guard changed from `getTrackedChanges()` (method that doesn't exist) to `Office.context.requirements.isSetSupported('WordApi', '1.6')`; API access changed from `getTrackedChanges()` call to `document.trackedChanges` property (OXML-IMP3 critical bug fix).
+- **TypeScript `any` types** (multiple files): `let response: any` → `StreamResponse`; `toolCall: any` → `ToolCall`; `tools?: any[]` → `ApiToolDefinition[]`; `sanitizePayloadForLogs(payload: any)` → `LogPayload` interface (QUAL-H1).
+- **Undo button permanently stuck**: `undoLastInsert()` now clears `undoSnapshot` and `canUndo` at entry, so the button always disappears after one click regardless of whether the restore succeeded.
+- **Tool count documentation**: All references updated to Word 34, Excel 27, PPT 24, Outlook 9, General 6 — Total 100 (FUNC-M1).
+
 ### Changed
 
-- **DESIGN_REVIEW.md**: DR v12 full review — 5 critical, 5 high, 19 medium, 12 low findings across architecture, error handling, UX, dead code, duplication, and code quality. All deferred items from previous reviews carried forward.
-- **Documentation sync**: Tool counts updated across README.md (95 total), Claude.md, and DESIGN_REVIEW.md to match actual tool definitions in code.
+- **DESIGN_REVIEW.md**: Consolidated — all completed items removed, only open architectural refactors (ARCH-H2/H3, ARCH-M2, ARCH-L1), UX performance item (UX-M2), test coverage (QUAL-M1), and deferred context/token items remain.
+- **Documentation sync**: README.md, Claude.md, and DESIGN_REVIEW.md updated to reflect 100 tools, new components, new composables, and current architecture patterns.
 
 ### Added
 

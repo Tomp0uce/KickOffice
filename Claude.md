@@ -11,7 +11,7 @@ This document provides operational guidance for AI coding agents working in this
 
 | File | Purpose |
 | ---- | ------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | DR v12 findings (5 critical, 5 high, 19 medium, 12 low) + deferred items — read before making architectural changes |
+| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Open architectural items (ARCH-H2/H3, ARCH-M2, ARCH-L1, UX-M2, QUAL-M1) + deferred context/token items — read before making architectural changes |
 | [PRD.md](./PRD.md) | Product Requirements Document — single source of truth for features, user personas, acceptance criteria. **Read before implementing new features.** |
 | [SKILLS_GUIDE.md](./SKILLS_GUIDE.md) | How to create and modify skill files for Quick Actions and host guidance |
 
@@ -39,11 +39,11 @@ Both containers run as non-root users. Frontend listens on port 8080 internally 
 The frontend follows a composable-based architecture:
 
 - **Pages**: `HomePage.vue` (minimal orchestration), `SettingsPage.vue` (decomposed into tab components)
-- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue`, `chat/StatsBar.vue`, `chat/ToolCallBlock.vue`, `chat/MarkdownRenderer.vue`, `settings/AccountTab.vue`, `settings/GeneralTab.vue`, `settings/PromptsTab.vue`, `settings/BuiltinPromptsTab.vue`, `settings/ToolsTab.vue`, `settings/FeedbackDialog.vue`, `CustomButton.vue`, `CustomInput.vue`, `SingleSelect.vue`, `SettingCard.vue`, `Message.vue`
-- **Composables** (17 files): `useHomePage.ts`, `useHomePageContext.ts`, `useAgentLoop.ts`, `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`, `useAgentPrompts.ts`, `useOfficeSelection.ts`, `useImageActions.ts`, `useOfficeInsert.ts`, `useHealthCheck.ts`, `useQuickActions.ts`, `useSessionFiles.ts`, `useSessionManager.ts`, `useSessionDB.ts`, `useMessageOrchestration.ts`, `useDocumentUndo.ts`
+- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue`, `chat/StatsBar.vue`, `chat/ToolCallBlock.vue`, `chat/MarkdownRenderer.vue`, `chat/OfflineBanner.vue`, `chat/AuthErrorBanner.vue`, `chat/SessionConfirmDialogs.vue`, `settings/AccountTab.vue`, `settings/GeneralTab.vue`, `settings/PromptsTab.vue`, `settings/BuiltinPromptsTab.vue`, `settings/ToolsTab.vue`, `settings/FeedbackDialog.vue`, `CustomButton.vue`, `CustomInput.vue`, `SingleSelect.vue`, `SettingCard.vue`, `Message.vue`
+- **Composables** (21 files): `useHomePage.ts`, `useHomePageContext.ts`, `useAgentLoop.ts`, `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`, `useAgentPrompts.ts`, `useOfficeSelection.ts`, `useImageActions.ts`, `useOfficeInsert.ts`, `useHealthCheck.ts`, `useQuickActions.ts`, `useSessionFiles.ts`, `useSessionManager.ts`, `useSessionDB.ts`, `useMessageOrchestration.ts`, `useDocumentUndo.ts`, `quickActions/useWordQuickActions.ts`, `quickActions/useExcelQuickActions.ts`, `quickActions/useOutlookQuickActions.ts`, `quickActions/usePowerPointQuickActions.ts`
 - **Constants**: `limits.ts` (centralized magic numbers: upload sizes, timeouts, buffer sizes, icon sizes)
 - **Router**: `createMemoryHistory` — avoids URL manipulation conflicts with Office iframe host
-- **Utils**: `tokenManager.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordDiffUtils.ts`, `wordTrackChanges.ts`, `wordFormatter.ts`, `toolProviderRegistry.ts`, `officeCodeValidator.ts`, `markdown.ts`, `pptxZipUtils.ts`, `common.ts`, `hostDetection.ts`, `toolStorage.ts`, `richContentPreserver.ts`, `richContextStore.ts`, `credentialCrypto.ts`, `credentialStorage.ts`, `cryptoPolyfill.ts`, `officeAction.ts`, `officeDocumentContext.ts`, `officeOutlook.ts`, `officeRichText.ts`, `sandbox.ts`, `lockdown.ts`, `vfs.ts`, `savedPrompts.ts`
+- **Utils**: `tokenManager.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordDiffUtils.ts`, `wordTrackChanges.ts`, `wordFormatter.ts`, `toolProviderRegistry.ts`, `officeCodeValidator.ts`, `markdown.ts`, `pptxZipUtils.ts`, `mutationDetector.ts`, `common.ts`, `hostDetection.ts`, `toolStorage.ts`, `richContentPreserver.ts`, `richContextStore.ts`, `credentialCrypto.ts`, `credentialStorage.ts`, `cryptoPolyfill.ts`, `officeAction.ts`, `officeDocumentContext.ts`, `officeOutlook.ts`, `officeRichText.ts`, `sandbox.ts`, `lockdown.ts`, `vfs.ts`, `savedPrompts.ts`
 - **Skills**: `frontend/src/skills/` — 5 host skills + 17 Quick Action skills (all `.skill.md` files)
 
 ### Backend architecture
@@ -124,9 +124,9 @@ Compatible providers may return `data[0].b64_json` or `data[0].url`. Keep suppor
 
 Current tool landscape:
 
-- Word: 34 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `eval_wordjs`, `getDocumentOoxml`, and 26 more)
+- Word: 34 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `addComment`, `getComments`, `eval_wordjs`, `getDocumentOoxml`, and 24 more)
 - Excel: 27 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, `modifyWorkbookStructure`, and 22 more — includes Waterfall/Treemap/Funnel chart types)
-- PowerPoint: 24 tools (`screenshotSlide`, `editSlideXml`, `reorderSlide`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 17 more)
+- PowerPoint: 24 tools (`screenshotSlide`, `editSlideXml`, `reorderSlide`, `getSpeakerNotes`, `setSpeakerNotes`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 15 more)
 - Outlook: 9 tools (`eval_outlookjs`, `addAttachment`, and 7 more)
 - General: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
 - **Total**: 100 tools
@@ -135,11 +135,17 @@ Current tool landscape:
 
 - **Skills System**: `.skill.md` files in `frontend/src/skills/` — 5 host skills + 17 Quick Action skills loaded via `getQuickActionSkill()` / host skill loaders in `useAgentPrompts.ts`
 - **Code Validator**: Pre-execution validation for `eval_*` tools in `officeCodeValidator.ts`
-- **Track Changes**: `proposeRevision` (selection) and `proposeDocumentRevision` (document-wide) both use `applyRedlineToOxml()` from `@ansonlai/docx-redline-js`. Pattern: disable TC → `insertOoxml` with `w:ins`/`w:del` → restore TC.
+- **Track Changes**: `proposeRevision` (selection) and `proposeDocumentRevision` (document-wide) both use `applyRedlineToOxml()` from `@ansonlai/docx-redline-js`. Pattern: disable TC → `insertOoxml` with `w:ins`/`w:del` → restore TC. `acceptAiChanges`/`rejectAiChanges` use `Office.context.requirements.isSetSupported('WordApi', '1.6')` guard and `context.document.trackedChanges` (property, not method).
 - **ToolProviderRegistry**: Singleton in `toolProviderRegistry.ts`. Maps host names to tool providers. Auto-initializes with ES6 static imports at module load.
-- **Context Management**: `tokenManager.ts` — `prepareMessagesForContext()` prunes messages to fit within 1.2M chars. `summarizeOldToolResults()` (Phase 7A) compresses tool results from iterations older than the last 3, keeping recent context intact.
-- **Session Persistence**: `useSessionFiles.ts` manages uploaded files. Each `DisplayMessage` stores `attachedFiles?: Array<{filename, content, fileId?}>`. Call `rebuildSessionFiles()` after `history` replace from IndexedDB.
+- **Context Management**: `tokenManager.ts` — `prepareMessagesForContext()` prunes messages to fit within 1.2M chars. `summarizeOldToolResults()` (Phase 7A) compresses tool results from iterations older than the last 3, keeping recent context intact. `truncateJsonToolResult()` preserves JSON structure when truncating tool results.
+- **Session Persistence**: `useSessionFiles.ts` manages uploaded files. Each `DisplayMessage` stores `attachedFiles?: Array<{filename, content, fileId?}>`. Call `rebuildSessionFiles()` after `history` replace from IndexedDB. Session switch is blocked while agent loop is running (3-layer protection in `useSessionManager`, `useHomePage`, `ChatHeader.vue`).
 - **Log Sanitization**: Payloads with Base64 images MUST pass through `sanitizePayloadForLogs` before logging.
+- **Log Forwarding**: `logService.startFlushTimer()` sends warn/error entries to `POST /api/logs` every 30 s. Call at app boot in `main.ts`.
+- **Request Correlation**: `generateRequestId()` in `backend.ts` creates a UUID per chat request. Sent as `X-Request-Id` request header; server middleware uses incoming ID to correlate frontend and backend log entries.
+- **Stream Error Recovery**: `DisplayMessage.streamError?: boolean` set to `true` when `stream_interrupted` is detected. `ChatMessageList.vue` shows an amber Retry button on the failed message.
+- **Mutation Detector**: `createMutationDetector(patterns)` factory in `mutationDetector.ts` shared by all three eval tool hosts.
+- **Eval Tool Factory**: `createEvalExecutor<TCtx>(config)` in `common.ts` — all four `eval_*` tools use this factory. Host-specific config: sandbox context builder, mutation detector, suggestion text, optional pre-execute hook.
+- **VFS Sandbox Context**: `getVfsSandboxContext()` in `vfs.ts` — shared across wordTools, excelTools, powerpointTools eval tools.
 
 ## 6) Backend Editing Guidelines
 
@@ -195,7 +201,7 @@ Current tool landscape:
 
 ## 10) Known Issues
 
-Consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for the current deferred items list. All critical/high/medium items are resolved.
+Consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for the current open and deferred items list. All critical items are resolved. Open high-priority items are architectural refactors (ARCH-H2: useAgentLoop oversized, ARCH-H3: monolithic tool files) and test coverage (QUAL-M1). No functional bugs are outstanding.
 
 ## 11) Validation Checklist Before Commit
 
