@@ -42,7 +42,7 @@ import type {
   QuickAction,
 } from '@/types/chat';
 
-import { useAgentStream } from './useAgentStream';
+import { useAgentStream, type StreamResponse } from './useAgentStream';
 import { executeAgentToolCall } from './useToolExecutor';
 import { useLoopDetection } from './useLoopDetection';
 import { useSessionFiles } from './useSessionFiles';
@@ -330,7 +330,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         contextPct,
       });
 
-      let response: any;
+      let response: StreamResponse;
       let truncatedByLength = false;
 
       try {

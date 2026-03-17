@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 import type { DisplayMessage } from '@/types/chat';
-import type { ToolCategory } from '@/types';
+import type { ToolCategory, ToolDefinition } from '@/types';
+import type { ToolCall } from './useAgentStream';
 import { logService } from '@/utils/logger';
 
 /**
@@ -45,8 +46,8 @@ function safeStringify(obj: unknown, maxDepth = 10): string {
 }
 
 export async function executeAgentToolCall(
-  toolCall: any,
-  enabledToolDefs: any[],
+  toolCall: ToolCall,
+  enabledToolDefs: ToolDefinition[],
   assistantMessage: DisplayMessage | undefined,
   currentActionRef: Ref<string>,
   getActionLabelForCategory: (cat?: ToolCategory) => string,

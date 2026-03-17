@@ -105,7 +105,7 @@ import { useOutlookQuickActions } from '@/composables/quickActions/useOutlookQui
 import { usePowerPointQuickActions } from '@/composables/quickActions/usePowerPointQuickActions';
 import { localStorageKey } from '@/utils/enum';
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
-import { acceptAiChangesInDocument } from '@/utils/wordTools';
+import { acceptAiChangesInDocument, hasAiTrackedChanges } from '@/utils/wordTools';
 import { clearAllAgentHighlightsInWorkbook } from '@/utils/excelTools';
 import { type SavedPrompt } from '@/utils/savedPrompts';
 import { useHomePage } from '@/composables/useHomePage';
@@ -129,13 +129,29 @@ const hostIsWord = isWord();
 const hostIsPowerPoint = isPowerPoint();
 const hostIsOutlook = isOutlook();
 
-// "Valider les modifications IA" — available for Word and Excel only
-const canValidateAiChanges = hostIsWord || hostIsExcel;
+// "Valider les modifications IA" — shown only when there are actual AI changes to validate.
+// For Word: checks trackedChanges attributed to the KickOffice AI author (WordApi 1.6).
+// For Excel: shown after each agent turn since Excel highlights are always present post-run.
+const canValidateAiChanges = ref(false);
+
+async function refreshCanValidateAiChanges(): Promise<void> {
+  if (hostIsWord) {
+    canValidateAiChanges.value = await hasAiTrackedChanges();
+  } else if (hostIsExcel) {
+    canValidateAiChanges.value = true;
+  } else {
+    canValidateAiChanges.value = false;
+  }
+}
 
 async function handleValidateAiChanges(): Promise<string> {
-  if (hostIsWord) return acceptAiChangesInDocument();
-  if (hostIsExcel) return clearAllAgentHighlightsInWorkbook();
-  return '';
+  let result = '';
+  if (hostIsWord) result = await acceptAiChangesInDocument();
+  else if (hostIsExcel) result = await clearAllAgentHighlightsInWorkbook();
+  // After validation, re-check — if accepted, button should disappear
+  await refreshCanValidateAiChanges();
+  if (hostIsExcel) canValidateAiChanges.value = false;
+  return result;
 }
 
 const currentHost =
@@ -373,10 +389,11 @@ provideHomePageContext({
   inputPlaceholder,
 });
 
-// Persist session after each agent turn completes
+// Persist session and refresh "Valider" button visibility after each agent turn
 watch(loading, async (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
     await sessionManager.persistCurrentSession();
+    await refreshCanValidateAiChanges();
   }
 });
 
@@ -385,6 +402,7 @@ onBeforeMount(async () => {
   loadSavedPrompts();
   await sessionManager.init();
   rebuildSessionFiles();
+  await refreshCanValidateAiChanges();
 });
 
 onActivated(() => {

@@ -29,17 +29,23 @@ function wait(ms: number): Promise<void> {
   });
 }
 
+interface LogPayload {
+  messages?: ChatRequestMessage[];
+  modelTier?: ModelTier;
+  tools?: ApiToolDefinition[];
+}
+
 /**
  * Point 1 Fix: Prevents massive Base64 data from saturating backend/terminal logs.
  * Truncates image_url data for logging purposes.
  */
-function sanitizePayloadForLogs(payload: any) {
+function sanitizePayloadForLogs(payload: LogPayload): LogPayload {
   try {
-    const clone = JSON.parse(JSON.stringify(payload));
+    const clone = JSON.parse(JSON.stringify(payload)) as LogPayload;
     if (clone.messages) {
-      clone.messages.forEach((msg: any) => {
+      clone.messages.forEach((msg: ChatRequestMessage) => {
         if (Array.isArray(msg.content)) {
-          msg.content.forEach((part: any) => {
+          (msg.content as Array<{ type: string; image_url?: { url: string } }>).forEach(part => {
             if (part.type === 'image_url' && part.image_url?.url) {
               part.image_url.url = '[BASE64_IMAGE_DATA_TRUNCATED_FOR_LOGS]';
             }
