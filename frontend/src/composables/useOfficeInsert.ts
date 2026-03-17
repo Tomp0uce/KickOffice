@@ -322,6 +322,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     // Exposed for external callers (e.g. quick actions) that need to capture state before
     // modifying the document and mark undo available afterwards.
     captureBeforeInsert: documentUndo.captureBeforeInsert,
+    captureDocumentState: documentUndo.captureDocumentState,
     saveSnapshot: documentUndo.saveSnapshot,
   };
 }

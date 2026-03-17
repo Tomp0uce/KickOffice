@@ -326,6 +326,7 @@ const {
     scrollToBottom,
     scrollToMessageTop,
     scrollToVeryBottom,
+    captureDocumentState: officeInsert.captureDocumentState,
     captureBeforeInsert: officeInsert.captureBeforeInsert,
     saveSnapshot: officeInsert.saveSnapshot,
   },

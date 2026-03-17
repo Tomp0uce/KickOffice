@@ -35,8 +35,15 @@ interface UndoSnapshot {
   // Word / Outlook
   /** The original HTML content before the LLM intervention */
   html?: string;
-  /** Tag of the content control wrapping the inserted content (Word only) */
+  /** Tag of the content control wrapping the inserted content (Word only, manual-insert path) */
   contentControlTag?: string;
+  /**
+   * Full body OOXML snapshot (Word only, agent-loop path).
+   * Preferred over the CC approach for the agent loop because agent tools that replace
+   * whole paragraphs (e.g. proposeDocumentRevision) destroy the CC wrapper, making the
+   * CC-based undo fail even when the user never touched the document.
+   */
+  wordBodyOoxml?: string;
 
   // Excel
   /** Address of the captured range (e.g. "Sheet1!A1:C3") */
@@ -175,6 +182,37 @@ export function useDocumentUndo(options: {
   }
 
   /**
+   * Capture the full document body OOXML — no CC created.
+   * Used by the agent loop so that para-level replacements (proposeDocumentRevision, etc.)
+   * cannot destroy the undo anchor.
+   */
+  async function captureWordBodyState(): Promise<Partial<UndoSnapshot> | null> {
+    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
+      Word.run(async (context: any) => {
+        const ooxmlResult = context.document.body.getOoxml();
+        await context.sync();
+        resolve({ host: 'word', wordBodyOoxml: ooxmlResult.value as string });
+      }).catch(() => resolve(null));
+    });
+  }
+
+  /**
+   * Capture document state for the agent loop (full body OOXML for Word, selection for others).
+   * Unlike captureBeforeInsert, this does NOT create a Content Control — so agent tools that
+   * replace whole paragraphs cannot destroy the undo anchor.
+   */
+  async function captureDocumentState(): Promise<Partial<UndoSnapshot> | null> {
+    try {
+      if (hostIsWord) return await captureWordBodyState();
+      // For other hosts the selection-based approach is fine — keep existing behaviour.
+      return await captureBeforeInsert();
+    } catch (err) {
+      logService.warn('[useDocumentUndo] Failed to capture document state for undo', err);
+      return null;
+    }
+  }
+
+  /**
    * Save the snapshot and mark undo as available.
    * Called after captureBeforeInsert returns.
    */
@@ -204,6 +242,9 @@ export function useDocumentUndo(options: {
     canUndo.value = false;
 
     try {
+      if (snapshot.host === 'word' && snapshot.wordBodyOoxml) {
+        return await undoWordBodyRestore(snapshot);
+      }
       if (snapshot.host === 'word' && snapshot.contentControlTag) {
         return await undoWordInsert(snapshot);
       }
@@ -220,6 +261,18 @@ export function useDocumentUndo(options: {
       logService.error('[useDocumentUndo] Undo failed', err);
     }
     return false;
+  }
+
+  async function undoWordBodyRestore(snapshot: UndoSnapshot): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      Word.run(async (context: any) => {
+        context.document.body.insertOoxml(snapshot.wordBodyOoxml!, 'Replace');
+        await context.sync();
+        undoSnapshot.value = null;
+        canUndo.value = false;
+        resolve(true);
+      }).catch(() => resolve(false));
+    });
   }
 
   async function undoWordInsert(snapshot: UndoSnapshot): Promise<boolean> {
@@ -336,6 +389,7 @@ export function useDocumentUndo(options: {
   return {
     canUndo,
     captureBeforeInsert,
+    captureDocumentState,
     saveSnapshot,
     undoLastInsert,
     clearUndo,
