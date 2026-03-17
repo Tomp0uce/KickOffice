@@ -18,6 +18,7 @@ import {
   buildExecuteWrapper,
   type OfficeToolTemplate,
   createEvalExecutor,
+  getDetailedOfficeError,
 } from './common';
 import { escapeXml } from './pptxZipUtils';
 import {
@@ -1861,7 +1862,7 @@ Generates the full <pkg:package> or <w:body> fragment with native Word namespace
           return `Error: location must be one of: ${validLocations.join(', ')}.`;
         }
         const range = context.document.getSelection();
-        range.insertOoxml(ooxml, location as Word.InsertLocation.replace);
+        range.insertOoxml(ooxml, location as Word.InsertLocation);
         await context.sync();
         return `OOXML inserted at location "${location}" successfully.`;
       },

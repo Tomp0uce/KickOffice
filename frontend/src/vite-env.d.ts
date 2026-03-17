@@ -9,12 +9,47 @@ declare const __APP_VERSION__: string;
 
 // Minimal Office.js global declarations so tsc resolves Office globals without @types/office-js.
 // The actual runtime types come from the Office.js script loaded by the add-in manifest.
-// We declare them as `any` to avoid re-declaring every sub-member; real types live in @types/office-js.
+// `declare const X: any` provides the runtime value; `declare namespace X` provides type-position
+// members (e.g. `context: Excel.RequestContext`, `as Word.Alignment`).
+// All members are typed as `any` — real types live in @types/office-js.
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-namespace */
+
 declare const Excel: any;
+declare namespace Excel {
+  type RequestContext = any;
+  type Worksheet = any;
+  type Range = any;
+  type HorizontalAlignment = any;
+  type VerticalAlignment = any;
+  type BorderLineStyle = any;
+  type BorderIndex = any;
+  type BorderWeight = any;
+  type ChartType = any;
+  type ChartSeriesBy = any;
+  type ConditionalCellValueOperator = any;
+  type ConditionalFormatColorCriterionType = any;
+  type ConditionalFormatRuleType = any;
+  type ConditionalFormatType = any;
+  type ConditionalTextOperator = any;
+  type IconSet = any;
+  type ProtectionSelectionMode = any;
+}
+
 declare const Word: any;
+declare namespace Word {
+  type RequestContext = any;
+  type Range = any;
+  type Alignment = any;
+  type BuiltInStyleName = any;
+  type InsertLocation = any;
+}
+
 declare const PowerPoint: any;
-// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace PowerPoint {
+  type RequestContext = any;
+}
+
 declare namespace Office {
   const context: any;
   function onReady(callback: () => Promise<void> | void): void;
@@ -24,6 +59,7 @@ declare namespace Office {
   const CoercionType: any;
   type AsyncResult<T = any> = { value: T; status: string; error?: any };
 }
+/* eslint-enable @typescript-eslint/no-namespace */
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 interface Window {
