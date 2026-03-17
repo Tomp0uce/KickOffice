@@ -253,7 +253,7 @@ export function useHomePage(deps: {
   }
 
   function loadSelectedPrompt() {
-    const prompt = savedPrompts.value.find(p => p.id === selectedPromptId.value);
+    const prompt = savedPrompts.value.find((p: SavedPrompt) => p.id === selectedPromptId.value);
     if (!prompt) {
       customSystemPrompt.value = '';
       return;

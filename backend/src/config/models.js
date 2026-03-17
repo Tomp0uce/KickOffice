@@ -22,8 +22,10 @@
  */
 
 import logger from '../utils/logger.js'
+import { parsePositiveInt } from './env.js'
 
-const MAX_TOOLS = parseInt(process.env.MAX_TOOLS || '128', 10)
+// QUAL-M5: Use parsePositiveInt so invalid env vars throw at startup rather than silently produce NaN.
+const MAX_TOOLS = parsePositiveInt('MAX_TOOLS', 128, 'MAX_TOOLS')
 const LLM_API_BASE_URL = process.env.LLM_API_BASE_URL || 'https://litellm.kickmaker.net/v1'
 const LLM_API_KEY = process.env.LLM_API_KEY || ''
 
@@ -41,8 +43,8 @@ const models = {
   standard: {
     id: process.env.MODEL_STANDARD || 'gpt-5.1',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
-    maxTokens: parseInt(process.env.MODEL_STANDARD_MAX_TOKENS || '32000', 10),
-    contextWindow: parseInt(process.env.MODEL_STANDARD_CONTEXT_WINDOW || '400000', 10),
+    maxTokens: parsePositiveInt('MODEL_STANDARD_MAX_TOKENS', 32000, 'MODEL_STANDARD_MAX_TOKENS'),
+    contextWindow: parsePositiveInt('MODEL_STANDARD_CONTEXT_WINDOW', 400000, 'MODEL_STANDARD_CONTEXT_WINDOW'),
     temperature: parseFloat(process.env.MODEL_STANDARD_TEMPERATURE || '0.7'),
     reasoningEffort: process.env.MODEL_STANDARD_REASONING_EFFORT || undefined,
     type: 'chat',
@@ -50,8 +52,8 @@ const models = {
   reasoning: {
     id: process.env.MODEL_REASONING || 'gpt-5.1',
     label: process.env.MODEL_REASONING_LABEL || 'Reasoning',
-    maxTokens: parseInt(process.env.MODEL_REASONING_MAX_TOKENS || '65000', 10),
-    contextWindow: parseInt(process.env.MODEL_REASONING_CONTEXT_WINDOW || '400000', 10),
+    maxTokens: parsePositiveInt('MODEL_REASONING_MAX_TOKENS', 65000, 'MODEL_REASONING_MAX_TOKENS'),
+    contextWindow: parsePositiveInt('MODEL_REASONING_CONTEXT_WINDOW', 400000, 'MODEL_REASONING_CONTEXT_WINDOW'),
     temperature: parseFloat(process.env.MODEL_REASONING_TEMPERATURE || '1'),
     reasoningEffort: process.env.MODEL_REASONING_EFFORT || 'high',
     type: 'chat',

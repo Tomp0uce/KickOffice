@@ -42,7 +42,7 @@ import type {
   QuickAction,
 } from '@/types/chat';
 
-import { useAgentStream } from './useAgentStream';
+import { useAgentStream, type StreamResponse } from './useAgentStream';
 import { executeAgentToolCall } from './useToolExecutor';
 import { useLoopDetection } from './useLoopDetection';
 import { useSessionFiles } from './useSessionFiles';
@@ -99,9 +99,15 @@ interface AgentLoopHelpers {
   scrollToBottom: () => Promise<void>;
   scrollToMessageTop?: () => Promise<void>;
   scrollToVeryBottom?: () => Promise<void>;
-  /** Capture document state before a quick action so undo is available afterwards */
+  /**
+   * Capture full document state (body OOXML for Word) before the agent runs.
+   * Preferred over captureBeforeInsert for the agent loop because agent tools that replace
+   * whole paragraphs cannot destroy a body-OOXML snapshot (unlike the CC-based approach).
+   */
+  captureDocumentState?: () => Promise<Partial<any> | null>;
+  /** Capture selection state before a quick action so undo is available afterwards */
   captureBeforeInsert?: () => Promise<Partial<any> | null>;
-  /** Save the snapshot captured by captureBeforeInsert and mark undo as available */
+  /** Save the snapshot captured by captureDocumentState/captureBeforeInsert and mark undo available */
   saveSnapshot?: (partial: Partial<any>, tag?: string) => void;
 }
 
@@ -184,6 +190,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     adjustTextareaHeight,
     scrollToBottom,
     scrollToMessageTop = scrollToBottom, // fallback to scrollToBottom if not provided
+    captureDocumentState,
     captureBeforeInsert,
     saveSnapshot,
   } = helpers;
@@ -330,7 +337,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         contextPct,
       });
 
-      let response: any;
+      let response: StreamResponse;
       let truncatedByLength = false;
 
       try {
@@ -1099,12 +1106,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       // Step 4: Pass session uploaded files to processChat (inline or file_id reference)
       const uploadedFilesForChat = getSessionFilesForChat();
 
-      // Capture document state before agent modifies the document (enables undo)
+      // Capture document state before agent modifies the document (enables undo).
+      // captureDocumentState snapshots full body OOXML (Word) so para-level replacements
+      // by agent tools cannot destroy the undo anchor (unlike the CC approach).
       let undoSnapshot: Partial<any> | null = null;
       try {
-        if (captureBeforeInsert) undoSnapshot = await captureBeforeInsert();
+        const captureFn = captureDocumentState ?? captureBeforeInsert;
+        if (captureFn) undoSnapshot = await captureFn();
       } catch (snapErr) {
-        logService.warn('[AgentLoop] sendMessage: captureBeforeInsert failed', snapErr);
+        logService.warn('[AgentLoop] sendMessage: captureDocumentState failed', snapErr);
       }
 
       // Only append context to standard text chats, not pure image generations

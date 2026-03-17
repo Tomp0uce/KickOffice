@@ -72,7 +72,7 @@ async function doExcelInsert(
   t: (key: string) => string,
 ) {
   try {
-    await Excel.run(async ctx => {
+    await Excel.run(async (ctx: any) => {
       const range = ctx.workbook.getSelectedRange();
       range.values = [[content]];
       range.format.wrapText = true;
@@ -102,7 +102,7 @@ async function doWordInsert(
       const htmlToInsert = richHtml
         ? DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } })
         : renderOfficeCommonApiHtml(content);
-      await Word.run(async context => {
+      await Word.run(async (context: any) => {
         const ccs = context.document.contentControls.getByTag(ccTag);
         ccs.load('items');
         await context.sync();
@@ -120,7 +120,7 @@ async function doWordInsert(
 
     if (richHtml) {
       const sanitizedHtml = DOMPurify.sanitize(richHtml, { USE_PROFILES: { html: true } });
-      await Word.run(async context => {
+      await Word.run(async (context: any) => {
         const range = context.document.getSelection();
         range.insertHtml(sanitizedHtml, type === 'newLine' ? 'After' : 'Replace');
         await context.sync();
@@ -322,6 +322,7 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     // Exposed for external callers (e.g. quick actions) that need to capture state before
     // modifying the document and mark undo available afterwards.
     captureBeforeInsert: documentUndo.captureBeforeInsert,
+    captureDocumentState: documentUndo.captureDocumentState,
     saveSnapshot: documentUndo.saveSnapshot,
   };
 }

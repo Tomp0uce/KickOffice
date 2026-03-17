@@ -17,6 +17,34 @@ const TRUNCATION_MARKER_TAIL = '[Truncated ...]\n\n';
 let hasWarnedTruncation = false;
 
 /**
+ * QUAL-M3: JSON-aware truncation for tool results.
+ * If content starts with '{' or '[', preserve the outer structure so the LLM
+ * can still parse the opening and closing brackets of the JSON envelope.
+ * Falls back to plain tail-truncation for non-JSON content.
+ */
+function truncateJsonToolResult(content: string, budget: number): string {
+  if (budget <= 0) return '';
+  if (content.length <= budget) return content;
+
+  const isObject = content.trimStart().startsWith('{');
+  const isArray = !isObject && content.trimStart().startsWith('[');
+
+  if (!isObject && !isArray) {
+    // Plain text tool result — keep tail (conclusion)
+    const marker = TRUNCATION_MARKER_TAIL;
+    if (budget <= marker.length) return marker.slice(0, budget);
+    return `${marker}${content.slice(-(budget - marker.length))}`;
+  }
+
+  const open = isObject ? '{' : '[';
+  const close = isObject ? '}' : ']';
+  const inner = `${open} ...[${content.length - budget} chars truncated]... ${close}`;
+  if (budget >= inner.length) return inner;
+  // budget too small even for the envelope — fall back to plain truncation
+  return content.slice(0, budget);
+}
+
+/**
  * Phase 7A: Heuristic tool result summarization.
  * Groups messages by tool-call iteration (assistant w/ tool_calls + its tool responses).
  * Keeps the last TOOL_RESULT_KEEP_FULL_COUNT iterations intact.
@@ -42,12 +70,9 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
     if (msg.role !== 'tool' || i >= keepFromIndex) return msg;
     if (typeof msg.content !== 'string' || msg.content.length <= TOOL_RESULT_MAX_CHARS) return msg;
 
-    const originalLength = msg.content.length;
-    const compressed = msg.content.slice(0, TOOL_RESULT_MAX_CHARS);
-    return {
-      ...msg,
-      content: `${compressed}\n[... ${originalLength - TOOL_RESULT_MAX_CHARS} chars omitted — Phase 7A compression]`,
-    };
+    // QUAL-M3: Use JSON-aware truncation so the LLM receives a valid envelope.
+    const compressed = truncateJsonToolResult(msg.content, TOOL_RESULT_MAX_CHARS);
+    return { ...msg, content: compressed };
   });
 }
 
@@ -164,9 +189,12 @@ export function prepareMessagesForContext(
     }
 
     if (message.role === 'tool' || forceInclude) {
-      // Tool results: keep the end (conclusion/result). User/assistant: keep the beginning (structure/intent).
-      const dir = message.role === 'tool' ? 'tail' : 'head';
-      const truncatedContent = truncateToBudget(message.content, remainingBudget, dir);
+      // Tool results: JSON-aware truncation preserves the outer structure.
+      // User/assistant: keep the beginning (structure/intent).
+      const truncatedContent =
+        message.role === 'tool' && typeof message.content === 'string'
+          ? truncateJsonToolResult(message.content, remainingBudget)
+          : truncateToBudget(message.content, remainingBudget, 'head');
       if (!truncatedContent && !forceInclude) return;
 
       selectedMessages.push({ index, message: { ...message, content: truncatedContent } });

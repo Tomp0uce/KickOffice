@@ -152,7 +152,7 @@ export async function listUploads(): Promise<string[]> {
   const vfs = getVfs();
   try {
     const entries = await vfs.readdir('/home/user/uploads');
-    return entries.filter(e => e !== '.keep');
+    return entries.filter((e: string) => e !== '.keep');
   } catch {
     return [];
   }

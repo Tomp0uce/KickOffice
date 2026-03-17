@@ -15,11 +15,10 @@ import {
 
 import {
   createOfficeTools,
-  truncateString,
   buildExecuteWrapper,
   type OfficeToolTemplate,
-  getDetailedOfficeError,
   createEvalExecutor,
+  getDetailedOfficeError,
 } from './common';
 import { escapeXml } from './pptxZipUtils';
 import {
@@ -552,7 +551,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         await context.sync();
 
         const text = body.text || '';
-        const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
+        const wordCount = text.split(/\s+/).filter((word: string) => word.length > 0).length;
         const charCount = text.length;
         const paragraphCount = paragraphs.items.length;
 
@@ -1763,12 +1762,12 @@ Your code should:
         required: [],
       },
       executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
-        if (typeof (context.document as any).getTrackedChanges !== 'function') {
+        if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
           return 'Error: acceptAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
         }
         const targetAuthor: string =
           args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
-        const changes = (context.document as any).getTrackedChanges();
+        const changes = (context.document as any).trackedChanges;
         changes.load('items/authorName');
         await context.sync();
         let accepted = 0;
@@ -1802,12 +1801,12 @@ Your code should:
         required: [],
       },
       executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
-        if (typeof (context.document as any).getTrackedChanges !== 'function') {
+        if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
           return 'Error: rejectAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
         }
         const targetAuthor: string =
           args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
-        const changes = (context.document as any).getTrackedChanges();
+        const changes = (context.document as any).trackedChanges;
         changes.load('items/authorName');
         await context.sync();
         let rejected = 0;
@@ -1863,7 +1862,7 @@ Generates the full <pkg:package> or <w:body> fragment with native Word namespace
           return `Error: location must be one of: ${validLocations.join(', ')}.`;
         }
         const range = context.document.getSelection();
-        range.insertOoxml(ooxml, location as Word.InsertLocation.replace);
+        range.insertOoxml(ooxml, location as Word.InsertLocation);
         await context.sync();
         return `OOXML inserted at location "${location}" successfully.`;
       },
@@ -2107,10 +2106,10 @@ export async function acceptAiChangesInDocument(): Promise<string> {
   const targetAuthor = localStorage.getItem('redlineAuthor') || 'KickOffice AI';
   try {
     return await runWord(async (context: Word.RequestContext) => {
-      if (typeof (context.document as any).getTrackedChanges !== 'function') {
+      if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
         return 'Cette fonctionnalité nécessite Word 2019+ (WordApi 1.6). Acceptez les modifications manuellement dans le volet Révision.';
       }
-      const changes = (context.document as any).getTrackedChanges();
+      const changes = (context.document as any).trackedChanges;
       changes.load('items/authorName');
       await context.sync();
       let accepted = 0;
@@ -2129,5 +2128,27 @@ export async function acceptAiChangesInDocument(): Promise<string> {
     logService.error('[WordTools] acceptAiChangesInDocument failed', err);
     const msg = err instanceof Error ? err.message : String(err);
     return `Erreur : ${msg}`;
+  }
+}
+
+/**
+ * Returns true if the document has at least one tracked change attributed to the
+ * KickOffice AI author.  Used to conditionally show the "Valider" button.
+ * Returns false when WordApi 1.6 is unavailable or on any error.
+ */
+export async function hasAiTrackedChanges(): Promise<boolean> {
+  if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) return false;
+  const targetAuthor = localStorage.getItem('redlineAuthor') || 'KickOffice AI';
+  try {
+    return await runWord(async (context: Word.RequestContext) => {
+      const changes = (context.document as any).trackedChanges;
+      changes.load('items/authorName');
+      await context.sync();
+      return changes.items.some(
+        (change: any) => change.authorName === targetAuthor,
+      );
+    });
+  } catch {
+    return false;
   }
 }

@@ -1,4 +1,4 @@
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { createMemoryHistory, createRouter, type RouteLocationNormalized } from 'vue-router';
 
 import { logService } from '@/utils/logger';
 
@@ -26,10 +26,11 @@ const router = createRouter({
   ],
 });
 
-router.onError((error, to) => {
+router.onError((error: unknown, to: RouteLocationNormalized) => {
+  const msg = error instanceof Error ? error.message : '';
   const isChunkError =
-    error.message.includes('Failed to fetch dynamically imported module') ||
-    error.message.includes('Importing a module script failed');
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed');
 
   if (isChunkError) {
     // Prevent infinite reload loops

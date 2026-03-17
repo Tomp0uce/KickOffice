@@ -13,6 +13,7 @@ import {
   getSessionMessageCount,
 } from '@/composables/useSessionDB';
 import { logService } from '@/utils/logger';
+import { clearPowerpointImageRegistry } from '@/utils/powerpointTools';
 
 export type { ChatSession };
 export { getSessionMessageCount };
@@ -27,7 +28,7 @@ export function useSessionManager(
   const isSwitching = ref(false);
 
   const currentSession = (): ChatSession | undefined =>
-    sessions.value.find(s => s.id === currentSessionId.value);
+    sessions.value.find((s: ChatSession) => s.id === currentSessionId.value);
 
   async function loadSessions() {
     sessions.value = await listSessions(hostType);
@@ -64,6 +65,7 @@ export function useSessionManager(
     currentSessionId.value = session.id;
     logService.setCurrentSessionId(session.id);
     history.value = [];
+    clearPowerpointImageRegistry(); // QUAL-M2: prevent memory leak across sessions
   }
 
   async function switchSession(sessionId: string) {
@@ -86,11 +88,12 @@ export function useSessionManager(
       }
       // Reload sessions to get latest names
       await loadSessions();
-      const target = sessions.value.find(s => s.id === sessionId);
+      const target = sessions.value.find((s: ChatSession) => s.id === sessionId);
       if (!target) return;
       currentSessionId.value = sessionId;
       logService.setCurrentSessionId(sessionId);
       history.value = target.messages ?? [];
+      clearPowerpointImageRegistry(); // QUAL-M2: prevent memory leak across sessions
     } finally {
       isSwitching.value = false;
     }
@@ -107,7 +110,7 @@ export function useSessionManager(
     if (!currentSessionId.value) return;
     const idToDelete = currentSessionId.value;
     // Switch to another session first
-    const others = sessions.value.filter(s => s.id !== idToDelete);
+    const others = sessions.value.filter((s: ChatSession) => s.id !== idToDelete);
     if (others.length > 0) {
       currentSessionId.value = others[0].id;
       logService.setCurrentSessionId(others[0].id);

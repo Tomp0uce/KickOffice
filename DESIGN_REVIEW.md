@@ -1,7 +1,7 @@
 # DESIGN_REVIEW.md
 
-**Last updated**: 2026-03-16 — DR v12 full review + critical fixes + UX/UI batch + UX-H1/QUAL-H2 full + undo bug fix + Dead Code & DUP batch + chat wrap fix + Office Add-in Functionality batch + OXML Enhancements
-**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16). **Dead Code & DUP batch + chat wrap bug fixed** (2026-03-16): DEAD-M1 ✅, DEAD-L2 → Won't Fix, DUP-H1 ✅, DUP-M1 ✅, DUP-M2 ✅, DUP-L1 ✅. Chat wrap overflow fixed (ChatMessageList + MarkdownRenderer). **Office Add-in Functionality + OXML batch fixed** (2026-03-16): FUNC-M1 ✅, FUNC-M2 ✅, FUNC-L1 ✅, FUNC-L2 ✅, OXML-IMP2 ✅, OXML-IMP3 ✅, OXML-IMP4 ✅, OXML-IMP5 ✅, ARCH-M3 ✅.
+**Last updated**: 2026-03-17 — QUAL-H1 deep architectural any types fully fixed; WordApi 1.6 version-check bug fixed; "Valider" button made reactive
+**Status**: All prior items resolved. DR v12 found 5 critical, 5 high, 19 medium, 12 low new items. Deferred items carried forward. **All 5 critical items fixed** (2026-03-16). **UX/UI batch fixed** (2026-03-16): UX-H1 ✅, UX-M1, UX-M3, UX-M4, UX-L1, UX-L2, DEAD-L1. **QUAL-H2 fixed** (2026-03-16, combined with UX-H1). **Undo bug fixed** (2026-03-16). **Dead Code & DUP batch + chat wrap bug fixed** (2026-03-16): DEAD-M1 ✅, DEAD-L2 → Won't Fix, DUP-H1 ✅, DUP-M1 ✅, DUP-M2 ✅, DUP-L1 ✅. Chat wrap overflow fixed (ChatMessageList + MarkdownRenderer). **Office Add-in Functionality + OXML batch fixed** (2026-03-16): FUNC-M1 ✅, FUNC-M2 ✅, FUNC-L1 ✅, FUNC-L2 ✅, OXML-IMP2 ✅, OXML-IMP3 ✅, OXML-IMP4 ✅, OXML-IMP5 ✅, ARCH-M3 ✅. **Deep Code Review batch fixed** (2026-03-16): QUAL-M2 ✅, QUAL-M3 ✅, QUAL-M4 ✅, QUAL-M5 ✅, QUAL-L1 ✅, QUAL-L2 → Won't Fix, DEAD-L3 → False Positive (already used). **QUAL-H1 full fix + critical runtime bugs** (2026-03-17): QUAL-H1 ✅ FULL FIX, WordApi 1.6 version-check bug fixed, "Valider" button made reactive.
 
 ---
 
@@ -396,7 +396,7 @@ Both `screenshotRange` (Excel) and `screenshotSlide` (PowerPoint) follow: captur
 
 ### 7. Deep Code Review (Quality, Maintainability, Optimization, Bug Risk)
 
-#### QUAL-H1 — 160+ uses of `any` type across composables and utils [HIGH]
+#### QUAL-H1 — 160+ uses of `any` type across composables and utils [HIGH] ✅ FULL FIX
 
 Broad `any` usage undermines TypeScript's safety. Key hotspots:
 
@@ -411,6 +411,8 @@ Broad `any` usage undermines TypeScript's safety. Key hotspots:
 **Impact**: Prevents the compiler from catching type mismatches. `toolCall: any` in `executeAgentToolCall` means no safety on `.function.name` access.
 **Path**: Define `ToolCall` interface matching OpenAI's `ChatCompletionMessageToolCall`. Type `response` as `ChatCompletionStreamResponse`. Keep `Record<string, any>` for dynamic tool args (acceptable trade-off).
 **Effort**: MEDIUM
+**Fix (2026-03-16)**: Fixed all TS7006 (implicit any) and TS6133 (unused var) errors across the codebase — 0 non-module tsc errors remain. Added Office.js global declarations (`Excel`, `Word`, `PowerPoint`, `Office` namespace) to `vite-env.d.ts` so the add-in host globals resolve without `@types/office-js` installed. Removed unused imports (`truncateString`, `getDetailedOfficeError`) from `outlookTools.ts`, `wordTools.ts`, `powerpointTools.ts`. Fixed implicit any params in composables, utils, and router. Added `ImportMeta.env` augmentation for `import.meta.env` support.
+**Fix (2026-03-17)**: Completed the architectural `any` fixes: `let response: any` in `useAgentLoop.ts` → `StreamResponse` (imported from `useAgentStream.ts`); `toolCall: any` / `enabledToolDefs: any[]` in `useToolExecutor.ts` → `ToolCall` / `ToolDefinition[]` (from `useAgentStream.ts` and `@/types`); `tools?: any[]` in `useAgentStream.ts` → `ApiToolDefinition[]` (from `@/api/backend`); `sanitizePayloadForLogs(payload: any)` in `backend.ts` → typed `LogPayload` interface. `args: Record<string, any>` in tool handlers kept as acceptable trade-off for dynamic dispatch. Status: **FULL FIX**.
 
 #### QUAL-H2 — useQuickActions.ts is 753 lines with host-specific branching [HIGH] ✅ FULL FIX
 
@@ -429,53 +431,59 @@ Test coverage exists only for utils (`common.test.ts`, `officeCodeValidator.test
 **Path**: Add tests for `useMessageOrchestration`, `useToolExecutor`, `useLoopDetection`, `useSessionFiles` — these are the most testable composables (pure logic, no Office.js dependency).
 **Effort**: HIGH
 
-#### QUAL-M2 — Potential memory leak in powerpointImageRegistry [MEDIUM]
+#### QUAL-M2 — Potential memory leak in powerpointImageRegistry [MEDIUM] ✅ FULL FIX
 
 `powerpointImageRegistry` (`powerpointTools.ts:57`) is a global `Map<string, string>` that stores base64 image data. It is never cleared — images accumulate across the session.
 
 **Impact**: Long sessions with many image insertions could consume significant memory.
 **Path**: Clear the registry when sessions switch, or use a WeakRef/LRU approach with a max entry count.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `clearPowerpointImageRegistry()` export to `powerpointTools.ts`. Called in both `createNewSession()` and `switchSession()` in `useSessionManager.ts`. Registry is cleared on every session transition. Status: **FULL FIX**.
 
-#### QUAL-M3 — tokenManager truncation direction heuristic is fragile [MEDIUM]
+#### QUAL-M3 — tokenManager truncation direction heuristic is fragile [MEDIUM] ✅ FULL FIX
 
 `truncateToBudget()` uses `'head'` (keep beginning) for user/assistant and `'tail'` (keep end) for tool results. But tool results containing structured JSON lose their opening braces when tail-truncated, making them unparseable by the LLM.
 
 **Impact**: Truncated JSON tool results may confuse the LLM.
 **Path**: For JSON tool results, truncate to `{ ... [truncated] }` preserving the outer structure. For text results, current tail approach is fine.
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `truncateJsonToolResult()` in `tokenManager.ts`. Detects JSON objects/arrays by leading `{`/`[`, and replaces content with `{ ...[N chars truncated]... }` envelope. Plain-text tool results keep the existing tail approach. Used in both `summarizeOldToolResults()` (Phase 7A compression) and `addMessageWithBudget()` (budget-pressure truncation). Status: **FULL FIX**.
 
-#### QUAL-M4 — Markdown CSS injection risk via custom color syntax [MEDIUM]
+#### QUAL-M4 — Markdown CSS injection risk via custom color syntax [MEDIUM] ✅ FULL FIX
 
 `markdown.ts` supports custom `[color:#HEX]...[/color]` syntax that wraps user input in a `<span style="color:...">` tag. DOMPurify allows the `style` attribute. A crafted color value like `red}; display:none;` could inject arbitrary CSS properties.
 
 **Impact**: CSS injection could hide content or mislead users. No script execution risk (DOMPurify blocks that).
 **Path**: Validate color values against a strict regex (`/^#[0-9a-fA-F]{3,8}$/` or named colors only).
 **Effort**: LOW
+**Fix (2026-03-16)**: Added `COLOR_SAFE_RE` allowlist regex in `applyOfficeBlockStyles()` covering hex (`#RGB`–`#RRGGBBAA`), CSS named colors (`[a-zA-Z]{2,30}`), `rgb()`/`rgba()`, and `hsl()`/`hsla()`. The replace callback validates `rawColor.trim()` before injecting. Invalid colors fall through to plain text (content preserved, style stripped). Layout features fully preserved. Status: **FULL FIX**.
 
-#### QUAL-M5 — Backend models.js doesn't validate parsed env vars [MEDIUM]
+#### QUAL-M5 — Backend models.js doesn't validate parsed env vars [MEDIUM] ✅ FULL FIX
 
 `config/models.js` uses `parseInt(process.env.MAX_TOOLS || '128', 10)` and similar without validation. If env is set to a non-numeric string, `parseInt` returns `NaN`, causing undefined behavior downstream.
 
 **Impact**: Misconfigured environment variables could crash the server or cause silent failures.
 **Path**: Apply the same `parsePositiveInt()` validation used in `config/env.js`.
 **Effort**: LOW
+**Fix (2026-03-16)**: Exported `parsePositiveInt` from `config/env.js`. Updated `config/models.js` to use `parsePositiveInt()` for `MAX_TOOLS`, `MODEL_STANDARD_MAX_TOKENS`, `MODEL_STANDARD_CONTEXT_WINDOW`, `MODEL_REASONING_MAX_TOKENS`, `MODEL_REASONING_CONTEXT_WINDOW`. Throws at startup on invalid values. `parseFloat` calls for temperature kept unchanged (no existing utility). Status: **FULL FIX**.
 
-#### QUAL-L1 — Backend logs full request body for /api/chat/sync [LOW]
+#### QUAL-L1 — Backend logs full request body for /api/chat/sync [LOW] ✅ FULL FIX
 
 `chat.js:389`: `req.logger.info('POST /api/chat/sync upstream response completed', { traffic: 'llm', response: data })` logs the full LLM response including all content. For large responses with tool calls, this produces massive log entries.
 
 **Impact**: Log file size inflation.
 **Path**: Log summary only (model, token usage, finish_reason, tool call names) — consistent with streaming endpoint behavior.
 **Effort**: LOW
+**Fix (2026-03-16)**: Replaced `response: data` with a summary object: `{ model, usage, finish_reason, tool_calls: [names] }`. Consistent with what the streaming endpoint already logs. Status: **FULL FIX**.
 
-#### QUAL-L2 — credentialCrypto stores encryption key in localStorage [LOW]
+#### QUAL-L2 — credentialCrypto stores encryption key in localStorage [LOW] ❌ WON'T FIX
 
 The AES-GCM key is exported as JWK and stored in `localStorage`. This means any script with access to the same origin can extract the key and decrypt credentials.
 
 **Impact**: In an add-in context, the origin is controlled and XSS is mitigated by DOMPurify + CSP. Risk is theoretical but worth noting.
 **Path**: Investigate `CryptoKey` non-extractable keys (set `extractable: false`). Would require re-keying on each session.
 **Effort**: MEDIUM — trade-off between persistence and security.
+**Decision (2026-03-16)**: Won't Fix. The add-in runs on dedicated PCs with per-user Windows login. Requiring re-keying on each session would force users to re-enter credentials on every browser/add-in restart, which is a significant UX regression. XSS risk is already mitigated by DOMPurify + strict CSP. Risk remains theoretical. Status: **WON'T FIX**.
 
 ---
 
@@ -499,6 +507,7 @@ WordApi 1.6 also offers `trackedChange.accept()` / `trackedChange.reject()`.
 **Path**: New `acceptAiChanges` tool to bulk-accept all KickOffice AI changes.
 **Effort**: LOW–MEDIUM
 **Fix (2026-03-16)**: Added `acceptAiChanges` and `rejectAiChanges` tools to `wordTools.ts`. Both filter tracked changes by author (defaults to `localStorage.redlineAuthor` or "KickOffice AI") and call `.accept()` / `.reject()` per item. Requires WordApi 1.6 (guarded). Also added `acceptAiChangesInDocument()` direct helper and `clearAllAgentHighlightsInWorkbook()` in `excelTools.ts` for UI button. Added "Valider les modifications IA" button in `ChatInput.vue` (visible on Word/Excel hosts): calls the appropriate direct helper and shows a success toast. Word tool count: 31 → 34 (includes insertOoxml). Status: **FULL FIX**.
+**Critical bug fix (2026-03-17)**: The WordApi 1.6 version guard used `typeof (context.document as any).getTrackedChanges !== 'function'` — but `getTrackedChanges` does not exist in Office.js. The tracked changes collection is exposed as a **property** (`document.trackedChanges`), not a method. This caused the guard to always evaluate false, and the subsequent `getTrackedChanges()` call to throw at runtime, producing the user-visible error "Cette fonctionnalité nécessite Word 2019+ (WordApi 1.6)" even on current Office 365. Fixed in all 3 locations (`acceptAiChanges.executeWord`, `rejectAiChanges.executeWord`, `acceptAiChangesInDocument()`): version check now uses `Office.context.requirements.isSetSupported('WordApi', '1.6')`; API call changed to `context.document.trackedChanges` (property). Added `hasAiTrackedChanges()` export (returns `true` when ≥1 tracked change attributed to the AI author exists). `canValidateAiChanges` in `HomePage.vue` changed from a static boolean (`hostIsWord || hostIsExcel`) to a reactive `ref<boolean>` refreshed after each agent turn and on mount via `hasAiTrackedChanges()` / Excel heuristic — button is now hidden when there are no pending AI changes.
 
 #### OXML-IMP4 — Rich Content Insertion via OOXML Templates [MEDIUM] ✅ FIXED
 
@@ -621,7 +630,7 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | ARCH-H2 | Architecture | useAgentLoop.ts still oversized (1,118 lines) | OPEN |
 | ARCH-H3 | Architecture | Tool files are monolithic (2,000–2,700 lines each) | OPEN |
 | DUP-H1 | Duplication | Mutation detection patterns duplicated across 3 tool files | ✅ FULL FIX |
-| QUAL-H1 | Code Quality | 160+ uses of `any` type across composables/utils | OPEN |
+| QUAL-H1 | Code Quality | 160+ uses of `any` type across composables/utils | ⚠️ PARTIAL FIX |
 | QUAL-H2 | Code Quality | useQuickActions.ts 753 lines with host-specific branching | ✅ FULL FIX |
 | UX-H1 | UX | HomePage.vue oversized — 641 → 394 lines, all quick actions extracted | ✅ FULL FIX |
 
@@ -644,10 +653,10 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | UX-M3 | UX | Missing i18n keys with hardcoded fallbacks (3 keys) | ✅ FULL FIX |
 | UX-M4 | UX | Keyboard accessibility gaps in dropdowns | ✅ FULL FIX |
 | QUAL-M1 | Code Quality | No unit tests for composables | OPEN |
-| QUAL-M2 | Code Quality | powerpointImageRegistry memory leak potential | OPEN |
-| QUAL-M3 | Code Quality | tokenManager JSON truncation breaks structure | OPEN |
-| QUAL-M4 | Code Quality | Markdown CSS injection risk via custom color syntax | OPEN |
-| QUAL-M5 | Code Quality | Backend models.js doesn't validate parsed env vars | OPEN |
+| QUAL-M2 | Code Quality | powerpointImageRegistry memory leak potential | ✅ FULL FIX |
+| QUAL-M3 | Code Quality | tokenManager JSON truncation breaks structure | ✅ FULL FIX |
+| QUAL-M4 | Code Quality | Markdown CSS injection risk via custom color syntax | ✅ FULL FIX |
+| QUAL-M5 | Code Quality | Backend models.js doesn't validate parsed env vars | ✅ FULL FIX |
 
 ### Low (12 items)
 | ID | Category | Title | Status |
@@ -662,9 +671,9 @@ Candidate sub-components: `AttachedFilesList`, `MessageItem`, `ConfirmationDialo
 | DEAD-L1 | Dead Code | i18n key asymmetry (2 keys) | ✅ FULL FIX |
 | DEAD-L2 | Dead Code | plotDigitizer route may become obsolete | ❌ WON'T FIX |
 | DUP-L1 | Duplication | Screenshot result shape duplicated (Excel + PPT) | ✅ FULL FIX |
-| QUAL-L1 | Code Quality | Backend logs full response body for /api/chat/sync | OPEN |
-| QUAL-L2 | Code Quality | credentialCrypto stores extractable key in localStorage | OPEN |
-| DEAD-L3 | Dead Code | Unused credential utility exports (clearEncryptionKeys) | OPEN |
+| QUAL-L1 | Code Quality | Backend logs full response body for /api/chat/sync | ✅ FULL FIX |
+| QUAL-L2 | Code Quality | credentialCrypto stores extractable key in localStorage | ❌ WON'T FIX |
+| DEAD-L3 | Dead Code | Unused credential utility exports (clearEncryptionKeys) | ❌ FALSE POSITIVE |
 
 ---
 

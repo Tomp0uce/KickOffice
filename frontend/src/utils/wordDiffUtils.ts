@@ -193,7 +193,7 @@ export async function applyRevisionToDocument(
   await context.sync();
 
   const items = paragraphs.items;
-  items.forEach(p => p.load('text'));
+  items.forEach((p: any) => p.load('text'));
   await context.sync();
 
   const details: string[] = [];
@@ -210,7 +210,7 @@ export async function applyRevisionToDocument(
   try {
     for (const { originalText, revisedText } of revisions) {
       // Find the first paragraph whose trimmed text matches
-      const paraIndex = items.findIndex(p => p.text.trim() === originalText.trim());
+      const paraIndex = items.findIndex((p: any) => p.text.trim() === originalText.trim());
       if (paraIndex === -1) {
         details.push(
           `[NOT FOUND] "${originalText.slice(0, 60)}${originalText.length > 60 ? '…' : ''}"`,

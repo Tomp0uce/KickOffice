@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import { chatStream, type ChatRequestMessage, type TokenUsage } from '@/api/backend';
+import { chatStream, type ChatRequestMessage, type TokenUsage, type ApiToolDefinition } from '@/api/backend';
 import type { ModelTier } from '@/types';
 import type { DisplayMessage } from '@/types/chat';
 
@@ -33,7 +33,7 @@ export function useAgentStream() {
   async function executeStream(options: {
     messages: ChatRequestMessage[];
     modelTier: ModelTier;
-    tools?: any[];
+    tools?: ApiToolDefinition[];
     abortSignal?: AbortSignal;
     currentAction?: Ref<string>;
     currentAssistantMessage?: DisplayMessage;

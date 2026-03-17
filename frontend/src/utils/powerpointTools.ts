@@ -23,7 +23,6 @@ import {
   createOfficeTools,
   normalizeLineEndings,
   getErrorMessage,
-  getDetailedOfficeError,
   createEvalExecutor,
   buildScreenshotResult,
 } from './common';
@@ -49,6 +48,11 @@ const looksLikeMutationPpt = createMutationDetector([
 
 // Point 3 Fix: Memory registry to store images without crashing the LLM
 export const powerpointImageRegistry = new Map<string, string>();
+
+/** QUAL-M2: Clear the image registry on session switch to prevent unbounded memory growth. */
+export function clearPowerpointImageRegistry(): void {
+  powerpointImageRegistry.clear();
+}
 
 const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => PowerPoint.run(action) as Promise<T>);
