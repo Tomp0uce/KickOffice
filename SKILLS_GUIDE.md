@@ -1,7 +1,7 @@
 # KickOffice Skills System Guide
 
-> **Document version**: 1.0 (2026-03-14)
-> **Based on**: [Anthropic's Complete Guide to Building Skills for Claude](https://www.anthropic.com/index/building-effective-agents)
+> **Document version**: 2.0 (2026-03-18)
+> **Based on**: [Anthropic Skill Creator](https://github.com/anthropics/skills/tree/main/skills/skill-creator)
 
 ---
 
@@ -10,8 +10,8 @@
 1. [What are Skills?](#what-are-skills)
 2. [Skills in KickOffice](#skills-in-kickoffice)
 3. [Skill File Format](#skill-file-format)
-4. [Creating Custom Skills](#creating-custom-skills)
-5. [Quick Action Skills](#quick-action-skills)
+4. [User Skills — Creating Your Own](#user-skills--creating-your-own)
+5. [Built-in Skills Reference](#built-in-skills-reference)
 6. [Host Skills](#host-skills)
 7. [Best Practices](#best-practices)
 8. [Troubleshooting](#troubleshooting)
@@ -39,7 +39,7 @@ Skills are defined in **Markdown files** (`.skill.md`) that contain structured i
 
 ## Skills in KickOffice
 
-KickOffice uses two types of skills:
+KickOffice uses three types of skills:
 
 ### 1. Host Skills (Chat Libre Mode)
 Located in: `frontend/src/skills/`
@@ -54,10 +54,19 @@ These skills provide context for **free chat** mode (Chat Libre). They document 
 | `outlook.skill.md` | Outlook tool usage, email patterns | User chats in Outlook |
 | `common.skill.md` | Universal guidelines (all hosts) | Always loaded |
 
-### 2. Quick Action Skills (Predefined Workflows)
+### 2. Quick Action Skills (Built-in Workflows)
 Located in: `frontend/src/skills/quickactions/`
 
 These skills define specific, user-triggered workflows. When a user clicks a Quick Action button (like "Bullets", "Translate", "Review"), the corresponding skill is loaded to guide Claude's response.
+
+### 3. User Skills (Custom, LLM-created)
+
+User-created skills stored in `localStorage` as JSON (key: `ki_UserSkills_v1`). Each skill has the same `.skill.md` format as built-in skills and can be:
+- **Created** via the Skill Creator modal (describe in natural language → LLM generates the skill)
+- **Edited** inline in the Settings → Skills Library tab
+- **Exported** as `.skill.md` for sharing with other users
+- **Imported** from a `.skill.md` file
+- **Executed** with one click from the Quick Actions Bar dropdown
 
 | Skill File | Quick Action | Host | Purpose |
 |------------|--------------|------|---------|
@@ -83,156 +92,116 @@ These skills define specific, user-triggered workflows. When a user clicks a Qui
 
 ## Skill File Format
 
-Skills follow a structured Markdown format with these key sections:
+All skills (built-in and user-created) share the same `.skill.md` format: a YAML frontmatter block followed by free-form Markdown instructions.
 
-### Required Sections
+### YAML Frontmatter (required)
 
-#### 1. **Title** (H1)
 ```markdown
-# Skill Name
+---
+name: Reformuler en bullets
+description: "Transforme le texte sélectionné en 3-7 bullet points concis et percutants pour PowerPoint. Idéal pour convertir des paragraphes denses en points mémorables."
+host: powerpoint
+executionMode: immediate
+icon: List
+actionKey: bullets
+---
 ```
 
-#### 2. **Purpose** (H2)
-Clear one-sentence description of what the skill does.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Short label shown in UI (≤ 5 words, imperative) |
+| `description` | string | ✅ | User-facing benefit description (~30 words). Shown in dropdown tooltip. |
+| `host` | `word \| excel \| powerpoint \| outlook \| all` | ✅ | Contextual filter — skill only appears for this host |
+| `executionMode` | `immediate \| draft \| agent` | ✅ | How the skill executes (see table below) |
+| `icon` | string | ✅ | Lucide icon name (e.g., `List`, `Languages`, `Wand2`) |
+| `actionKey` | string | ❌ | Built-in skills only — links to the quick action key |
+
+### Execution Modes
+
+| Mode | Behavior | When to use |
+|------|----------|-------------|
+| `immediate` | Streams response into chat | Text transformation (translate, summarize, rewrite) — no document modification |
+| `draft` | Pre-fills the textarea + focus glow | User wants to review before sending (email reply, draft) |
+| `agent` | Runs the full agentic loop with Office tools | Any task that modifies the document, inserts content, or requires reading context |
+
+**Rule of thumb**: If the skill touches the document → `agent`. If it returns text in chat → `immediate`.
+
+### Skill Body (free Markdown)
+
+The body follows the frontmatter and is injected as the system prompt. It follows **Theory of Mind** principles (from Anthropic's skill design guidelines):
+
+- **Explain the WHY** behind each rule, not just the WHAT
+  - ❌ `CRITICAL: NEVER drop {{PRESERVE_N}} placeholders`
+  - ✅ `Preserve {{PRESERVE_N}} markers — they represent embedded images; dropping them breaks the email silently`
+- **Use concrete examples** (input/output pairs) rather than abstract rules
+- **Structured freely** — use whatever sections serve clarity: tools, approach, edge cases, examples
+- **Anticipate real edge cases** only (not hypothetical ones)
+
+### Example: complete skill file
+
 ```markdown
-## Purpose
-Transform selected text into concise, impactful bullet points optimized for PowerPoint presentations.
-```
+---
+name: Traduire le texte
+description: "Traduit le texte sélectionné entre français et anglais en détectant automatiquement la langue source. Préserve les formatages gras/italique/tableaux et les placeholders d'images {{PRESERVE_N}}."
+host: all
+executionMode: immediate
+icon: Languages
+actionKey: translate
+---
 
-#### 3. **When to Use** (H2)
-Specific trigger conditions for this skill.
-```markdown
-## When to Use
-- User clicks the "Bullets" Quick Action
-- Selected text contains dense paragraphs
-- Goal: Presentation-ready bullet points
-```
+Traduis le texte reçu vers l'autre langue (FR ↔ EN). Détecte la langue source — ne te fie pas au tag [UI language] pour déterminer la direction.
 
-#### 4. **Input Contract** (H2)
-What the skill expects as input.
-```markdown
-## Input Contract
-- **Selected text**: The content to transform
-- **Language**: Preserve the language of the original text
-- **Context**: PowerPoint presentation slide
-```
+**Pourquoi la détection automatique ?** L'utilisateur travaille souvent sur des documents multilingues. Une direction fixe casserait la moitié des cas d'usage.
 
-#### 5. **Output Requirements** (H2)
-Precise output format and constraints.
-```markdown
-## Output Requirements
-1. **Structure**: Return ONLY the bullet points, no preamble
-2. **Format**: Use `- ` for main bullets, `  - ` for sub-bullets
-3. **Length**: 3-7 main bullets maximum
-4. **Language**: MUST match the original text language exactly
-```
+## Préservation du formatage
 
-### Optional Sections
+Maintiens tous les marqueurs autour du texte traduit :
+- `**gras**` → `**texte traduit**`
+- `[color:#CC0000]texte[/color]` → `[color:#CC0000]texte traduit[/color]`
 
-#### Tool Usage
-Specify which Office.js tools to call (if any).
-```markdown
-## Tool Usage
-**MUST execute in this exact order:**
-1. `getCurrentSlideIndex` - Get current slide number
-2. `screenshotSlide` - Capture visual layout
-3. `getAllSlidesOverview` - Understand full presentation context
-```
+## Placeholders {{PRESERVE_N}}
 
-#### Style Guidelines
-Specific formatting rules and patterns.
-```markdown
-## Style Guidelines
-- **NO em-dashes (—) or semicolons (;)**
-- **Active voice only**
-- **Present tense when possible**
-```
+Ces marqueurs représentent des images embarquées. Les supprimer casserait l'email de manière invisible.
+Positionne-les au même endroit logique dans le texte traduit.
 
-#### Examples
-Concrete before/after transformations.
-```markdown
-## Example Transformation
-
-### Input:
-\`\`\`
-The marketing campaign was very successful...
-\`\`\`
-
-### Output:
-\`\`\`
-- 45% increase in website traffic
-- 30% boost in social media engagement
-\`\`\`
-```
-
-#### Edge Cases
-How to handle unusual inputs.
-```markdown
-## Edge Cases
-- **Already bullets**: Optimize and refine existing structure
-- **Too short (< 20 words)**: Return simplified version
+**Output** : retourne UNIQUEMENT le texte traduit. Aucune explication.
 ```
 
 ---
 
-## Creating Custom Skills
+## User Skills — Creating Your Own
 
-### Step 1: Choose Skill Type
+### Method 1: Skill Creator (recommended, no code)
 
-**Quick Action Skill** (recommended for new workflows):
-- Predefined, user-triggered workflows
-- Consistent, repeatable outputs
-- File location: `frontend/src/skills/quickactions/<name>.skill.md`
+1. Click the **`+`** button next to the skills dropdown in the Quick Actions Bar
+2. Describe what you want the skill to do (natural language, any language)
+3. Select the target host (Word / Excel / PowerPoint / Outlook / All)
+4. Click **Generate** — the LLM creates a full `.skill.md` with appropriate tools and instructions
+5. Review and edit the generated fields (name, description, execution mode, markdown body)
+6. Click **Test on selection** to try it on your currently selected text before saving
+7. Click **Save** — the skill appears immediately in the dropdown
 
-**Host Skill** (modify existing):
-- General guidance for free chat
-- File location: `frontend/src/skills/<host>.skill.md`
+### Method 2: Import a `.skill.md` file
 
-### Step 2: Define the Skill
+1. Go to **Settings → Skills**
+2. Click the **Import** button
+3. Select a `.skill.md` file (with YAML frontmatter)
 
-Create a new `.skill.md` file following the format above. Use existing skills as templates:
+### Method 3: Write from scratch (developers)
 
-```bash
-# Copy an existing skill as a starting point
-cp frontend/src/skills/quickactions/bullets.skill.md frontend/src/skills/quickactions/my-action.skill.md
+Create a `.skill.md` file with the format from §3 and import it via the UI, or add it directly to `frontend/src/skills/quickactions/` as a built-in skill (requires code registration in `skills/index.ts`).
 
-# Edit the file
-# Update: Purpose, When to Use, Input/Output, Examples
-```
+### Sharing skills
 
-### Step 3: Register the Quick Action (if applicable)
+Export any skill as a `.skill.md` file (Settings → Skills → Export button). The exported file includes YAML frontmatter and can be imported by any KickOffice user.
 
-If creating a new Quick Action, register it in `frontend/src/utils/constant.ts`:
+### Iterating on a skill
 
-```typescript
-export const powerPointQuickActions: PowerPointQuickAction[] = [
-  // ... existing actions
-  {
-    key: 'myAction',
-    label: 'My Action',
-    icon: SomeIcon,
-    category: 'transform',
-  },
-]
-```
-
-### Step 4: Test the Skill
-
-1. **Build**: `npm run build` (frontend)
-2. **Load add-in**: Refresh your Office application
-3. **Trigger**: Click the Quick Action or type in Chat Libre
-4. **Verify**: Check that Claude follows the skill instructions
-
-### Step 5: Iterate
-
-Skills are **declarative prompts** — iterate on the Markdown content, not code:
-- Too verbose? Tighten the Output Requirements
-- Wrong tools called? Update the Tool Usage section
-- Inconsistent results? Add more Examples and Edge Cases
+Edit the skill inline in Settings → Skills. The markdown body is fully editable. Changes take effect immediately on the next execution.
 
 ---
 
-## Quick Action Skills
+## Built-in Skills Reference
 
 ### How Quick Actions Use Skills
 

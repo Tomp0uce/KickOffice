@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **User Skills system** — replaces Custom Prompts. Users create, edit, export/import and execute custom skills as one-click quick actions. Skills stored in localStorage as `.skill.md` with YAML frontmatter.
+  - `useUserSkills` composable: CRUD, export/import `.skill.md`, migration from legacy prompts
+  - `SkillLibraryTab`: replaces PromptsTab + BuiltinPromptsTab in Settings; filterable by host, inline edit form
+  - `useUserSkillExecution`: immediate/agent/draft pipeline identical to built-in quick actions
+  - `QuickActionsBar`: user skills dropdown + `+` button opens `SkillCreatorModal`
+  - `SkillCreatorModal`: 4-step LLM-assisted creation (Describe → Generate → Review → Test) with editable fields and test-on-selection
+  - `POST /api/skill-creator` backend: non-streaming LLM call, JSON retry, rate-limited 10/hour/IP
+  - `MigrationDialog`: auto-detects legacy custom prompts on first launch and offers one-click migration
+- **Unified `.skill.md` format**: all 24 built-in quick action skills now have YAML frontmatter (`name`, `description`, `host`, `executionMode`, `icon`, `actionKey`). New `skillParser.ts` parses frontmatter at build time (zero runtime cost).
+- `getQuickActionSkillMetadata(actionKey)` and `getAllBuiltInSkillsMetadata()` from `skills/index.ts`: metadata-driven registry replaces hardcoded `quickActionSkillMap`.
+
+### Removed
+
+- **Custom Prompts system**: `PromptsTab.vue`, `BuiltinPromptsTab.vue`, `savedPrompts.ts` deleted; replaced by User Skills.
+- `customSystemPrompt` / `selectedPromptId` state removed from `useAgentLoop`, `useHomePage`, `useHomePageContext`, `HomePage.vue`.
+- 10 obsolete i18n keys: `addPrompt`, `builtinPrompts`, `builtinPromptsDescription`, `prompts`, `savedPrompts`, `selectPrompt`, `systemPrompt`, `systemPromptPlaceholder`, `userPrompt`, `userPromptPlaceholder`.
+
+### Added (continued)
+
 - **`addComment` / `getComments` tools** (Word): Native Word comment insertion via `range.insertComment()` (Word JS API); reads all document body comments. Superior to OOXML injection approach.
 - **`acceptAiChanges` / `rejectAiChanges` tools** (Word): Bulk-accept or bulk-reject Track Changes attributed to the AI author. Requires WordApi 1.6; version guard uses `Office.context.requirements.isSetSupported('WordApi', '1.6')` and accesses `context.document.trackedChanges` (property, not method).
 - **`insertOoxml` tool** (Word): Insert raw Office Open XML at the current selection — preserves numbered lists, table styles, section layouts that `insertHtml` would lose.

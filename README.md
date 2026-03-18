@@ -88,13 +88,17 @@ Models are configured **server-side only** in `backend/.env`. Three tiers:
 
 KickOffice implements three complementary systems for reliable Office.js code execution:
 
-### 1. Skills System (Defensive Prompting)
+### 1. Skills System (Defensive Prompting + User Customization)
 
-Office.js best practices automatically injected into agent prompts via `.skill.md` files:
+Office.js best practices automatically injected into agent prompts via `.skill.md` files.
 
+All skill files share a unified YAML frontmatter format (`name`, `description`, `host`, `executionMode`, `icon`, `actionKey`), parsed at build time by `skillParser.ts`. This enables a metadata-driven registry and powers the User Skills feature.
+
+**Built-in skills:**
 - **5 host skills**: `common.skill.md` (universal) + Word / Excel / PowerPoint / Outlook
-- **17 Quick Action skills**: bullets, punchify, review, translate, formalize, concise, proofread, polish, academic, summary, ingest, autograph, explain-excel, formula-generator, data-trend, extract, reply
-- Skills define tool sequences, output format rules, and language preservation constraints
+- **24 Quick Action skills**: bullets, punchify, review, translate, formalize, concise, proofread, polish, academic, summary, word-translate, word-proofread, word-review, ppt-translate, ppt-proofread, ingest, autograph, explain-excel, formula-generator, data-trend, chart-digitizer, pixel-art, extract, reply
+
+**User Skills (new):** Users can create custom skills directly in the add-in via a 4-step LLM-assisted creator (describe in natural language → LLM generates a full `.skill.md` → review/edit → test on selected text → save). User skills appear in the quick actions bar and execute with the same pipeline as built-in skills. Skills are stored in `localStorage` and can be exported/imported as `.skill.md` files for sharing.
 
 ### 2. Code Validator (Pre-Execution Safety)
 
