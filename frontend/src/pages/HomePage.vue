@@ -15,6 +15,13 @@
       <!-- UX-H1: Extracted sub-components -->
       <OfflineBanner />
       <AuthErrorBanner />
+      <MigrationDialog
+        v-if="showMigrationDialog"
+        :prompt-count="migrationPromptCount"
+        @convert="handleMigrationConvert"
+        @dismiss="handleMigrationDismiss"
+      />
+
       <SkillCreatorModal
         v-if="showSkillCreator"
         @close="showSkillCreator = false"
@@ -101,6 +108,7 @@ import OfflineBanner from '@/components/chat/OfflineBanner.vue';
 import AuthErrorBanner from '@/components/chat/AuthErrorBanner.vue';
 import SessionConfirmDialogs from '@/components/chat/SessionConfirmDialogs.vue';
 import SkillCreatorModal from '@/components/skills/SkillCreatorModal.vue';
+import MigrationDialog from '@/components/MigrationDialog.vue';
 import { useAgentLoop } from '@/composables/useAgentLoop';
 import { useImageActions } from '@/composables/useImageActions';
 import { useOfficeInsert } from '@/composables/useOfficeInsert';
@@ -343,7 +351,22 @@ function handleEditMessage(message: DisplayMessage) {
 const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
 // ── User Skills ──────────────────────────────────────────────────────────────
-const { skills: userSkills, skillsForHost } = useUserSkills();
+const { skills: userSkills, skillsForHost, checkAndMigrateOldPrompts, migrateOldPrompts, confirmMigrationDone, dismissMigration } = useUserSkills();
+
+// Migration dialog state
+const showMigrationDialog = ref(false);
+const migrationPromptCount = ref(0);
+
+function handleMigrationConvert(): void {
+  migrateOldPrompts();
+  confirmMigrationDone();
+  showMigrationDialog.value = false;
+}
+
+function handleMigrationDismiss(): void {
+  dismissMigration();
+  showMigrationDialog.value = false;
+}
 const currentHostLower = (
   forHost({ outlook: 'outlook', powerpoint: 'powerpoint', excel: 'excel', word: 'word' }) || 'word'
 ) as import('@/utils/skillParser').SkillHost;
@@ -442,6 +465,17 @@ onBeforeMount(async () => {
   await sessionManager.init();
   rebuildSessionFiles();
   await refreshCanValidateAiChanges();
+  // Check for legacy custom prompts to migrate (only once per install)
+  if (checkAndMigrateOldPrompts()) {
+    const stored = localStorage.getItem('savedPrompts');
+    if (stored) {
+      try {
+        const prompts = JSON.parse(stored) as Array<{ name: string; systemPrompt: string; userPrompt: string }>;
+        migrationPromptCount.value = prompts.filter(p => p.name !== 'Default' || p.systemPrompt || p.userPrompt).length;
+      } catch { migrationPromptCount.value = 1; }
+    }
+    showMigrationDialog.value = true;
+  }
 });
 
 onDeactivated(() => {
