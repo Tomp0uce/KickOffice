@@ -15,6 +15,13 @@
       <!-- UX-H1: Extracted sub-components -->
       <OfflineBanner />
       <AuthErrorBanner />
+      <SkillCreatorModal
+        v-if="showSkillCreator"
+        @close="showSkillCreator = false"
+        @skill-created="showSkillCreator = false"
+        @test-skill="handleTestSkill"
+      />
+
       <SessionConfirmDialogs
         :is-delete-confirm-visible="isDeleteConfirmVisible"
         :is-new-chat-confirm-visible="isNewChatConfirmVisible"
@@ -93,6 +100,7 @@ import StatsBar from '@/components/chat/StatsBar.vue';
 import OfflineBanner from '@/components/chat/OfflineBanner.vue';
 import AuthErrorBanner from '@/components/chat/AuthErrorBanner.vue';
 import SessionConfirmDialogs from '@/components/chat/SessionConfirmDialogs.vue';
+import SkillCreatorModal from '@/components/skills/SkillCreatorModal.vue';
 import { useAgentLoop } from '@/composables/useAgentLoop';
 import { useImageActions } from '@/composables/useImageActions';
 import { useOfficeInsert } from '@/composables/useOfficeInsert';
@@ -370,6 +378,11 @@ const { executeUserSkill } = useUserSkillExecution({
 function handleExecuteUserSkill(id: string): void {
   const skill = userSkills.value.find(s => s.id === id);
   if (skill) executeUserSkill(skill);
+}
+
+function handleTestSkill(skillDraft: Omit<import('@/types/userSkill').UserSkill, 'id' | 'createdAt' | 'updatedAt'>): void {
+  // Execute as ephemeral skill (not saved) — result appears in chat
+  executeUserSkill({ ...skillDraft, id: 'preview', createdAt: 0, updatedAt: 0 });
 }
 
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
