@@ -4,34 +4,33 @@
 
 ### 1. Implementation choices — ask before coding
 
-When a task has several valid technical approaches (libraries, patterns, levels of effort), use the **`AskUserQuestion` tool** to present options _before writing any code_.
+Ask **only** when there is genuine ambiguity in _how_ to implement something. The two cases that require a question:
 
-Each option must include:
+1. **Multiple valid approaches exist** — there are at least two reasonable paths with meaningfully different trade-offs (effort, risk, dependencies, maintenance cost).
+2. **A smarter approach exists than what was requested** — you judge that a different solution would better serve the goal (less complexity, fewer dependencies, safer, more maintainable).
+
+**Do NOT ask** when there is only one sensible implementation, or when the request and its implementation are both clear — just do it.
+
+Each option presented must include:
 - What it does (short description)
 - Trade-offs (pros/cons, risks)
 - Effort estimate
-- Your recommendation clearly labelled
-
-**Triggers (non-exhaustive):**
-- Choosing between two libraries or frameworks
-- Simple CSS fix vs full JS solution for a UX/perf problem
-- Refactor strategy (inline vs extract vs third-party)
-- Architectural choices (new file vs extend existing)
-- Any path where the user's intent would lead to very different implementations
+- Your recommendation clearly labelled "(Recommandé)"
 
 ### 2. Unclear requirements — ask before coding
 
-When a user request is ambiguous, incomplete, or has multiple plausible interpretations that would lead to different implementations, ask for clarification before starting.
+Ask when a request is genuinely ambiguous — i.e. two different interpretations would lead to meaningfully different implementations.
+
+**Do NOT ask** to confirm something that is clear from context, or to seek reassurance before acting.
 
 **Triggers:**
-- Missing scope ("fix the performance" → where? which metric?)
-- No success criteria for open-ended tasks
-- A request that could reasonably mean two different things
-- Conflicting constraints visible in the code vs the request
+- Missing scope where it materially changes what to build ("fix the performance" → which component? which metric?)
+- A request with conflicting constraints visible in the code
+- A request where you cannot determine the target state without guessing
 
 ### Question format
 
-Use the `AskUserQuestion` tool. Keep questions focused: 1–2 questions max per checkpoint, 2–4 options per question. Always include your recommendation as the first option with "(Recommandé)" in the label.
+Use the `AskUserQuestion` tool. 1–2 questions max, 2–4 options per question. Recommendation goes first, labelled "(Recommandé)".
 
 ---
 
