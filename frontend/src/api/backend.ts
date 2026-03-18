@@ -1,6 +1,35 @@
-import type { ModelTier, ModelInfo } from '@/types';
-import { getUserKey, getUserEmail } from '@/utils/credentialStorage';
+import type { ModelInfo } from '@/types';
 import { logService } from '@/utils/logger';
+import { fetchWithTimeoutAndRetry, getGlobalHeaders, generateRequestId } from './httpClient';
+import type {
+  ChatRequestMessage,
+  ChatStreamOptions,
+  ApiToolDefinition,
+  ImageGenerateOptions,
+  ChartExtractParams,
+  ChartExtractResult,
+  FeedbackSystemContext,
+} from './types';
+
+// ─── Public API re-exports ────────────────────────────────────────────────────
+export type { ErrorType, CategorizedError } from './errorCategorization';
+export { categorizeError } from './errorCategorization';
+export { invalidateHeaderCache } from './httpClient';
+export type {
+  ChatMessage,
+  ToolChatMessage,
+  ChatRequestMessage,
+  TokenUsage,
+  ChatStreamOptions,
+  ApiToolDefinition,
+  ImageGenerateOptions,
+  PlotAreaBox,
+  ChartExtractParams,
+  ChartExtractResult,
+  FeedbackSystemContext,
+} from './types';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -8,30 +37,8 @@ if (!BACKEND_URL) {
   throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env');
 }
 
-// Timeouts by model tier — reasoning models need more time (up to 6 min LLM + overhead)
-const BASE_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 180_000;
-const TIMEOUT_BY_TIER: Record<string, number> = {
-  reasoning: 600_000, // 10 min — GPT-5.2 up to 65k output tokens
-  standard: 300_000, // 5 min — GPT-5.2 up to 32k output tokens
-  fast: 120_000,
-};
-
-function getTimeoutForTier(modelTier?: string): number {
-  if (modelTier && TIMEOUT_BY_TIER[modelTier]) return TIMEOUT_BY_TIER[modelTier];
-  return BASE_TIMEOUT_MS;
-}
-
-const RETRY_DELAYS_MS = [1_500, 4_000] as const;
-
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
 interface LogPayload {
   messages?: ChatRequestMessage[];
-  modelTier?: ModelTier;
   tools?: ApiToolDefinition[];
 }
 
@@ -59,220 +66,6 @@ function sanitizePayloadForLogs(payload: LogPayload): LogPayload {
   }
 }
 
-function isRetryableError(error: unknown): boolean {
-  return (
-    error instanceof TypeError || (error instanceof DOMException && error.name === 'TimeoutError')
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Error categorisation — exposes structured info for user-facing messages
-// ────────────────────────────────────────────────────────────────────────────
-export type ErrorType = 'timeout' | 'network' | 'rate_limit' | 'auth' | 'server' | 'unknown';
-
-export interface CategorizedError {
-  type: ErrorType;
-  /** i18n key to use in the UI */
-  i18nKey: string;
-  /** Optional raw message from the upstream provider (e.g. LiteLLM BadRequestError detail) */
-  rawDetail?: string;
-}
-
-/** Maps backend error codes to i18n keys. Falls back to message inspection if no code present. */
-const ERROR_CODE_MAP: Record<string, CategorizedError> = {
-  VALIDATION_ERROR: { type: 'unknown', i18nKey: 'failedToResponse' },
-  AUTH_REQUIRED: { type: 'auth', i18nKey: 'credentialsRequired' },
-  RATE_LIMITED: { type: 'rate_limit', i18nKey: 'errorRateLimit' },
-  LLM_BAD_REQUEST: { type: 'unknown', i18nKey: 'errorLlmBadRequest' },
-  LLM_UPSTREAM_ERROR: { type: 'server', i18nKey: 'errorServer' },
-  LLM_EMPTY_RESPONSE: { type: 'server', i18nKey: 'errorServer' },
-  LLM_INVALID_JSON: { type: 'server', i18nKey: 'errorServer' },
-  LLM_NO_CHOICES: { type: 'server', i18nKey: 'errorServer' },
-  LLM_CONTENT_FILTERED: { type: 'server', i18nKey: 'errorServer' },
-  LLM_TIMEOUT: { type: 'timeout', i18nKey: 'errorTimeout' },
-  IMAGE_TIMEOUT: { type: 'timeout', i18nKey: 'errorTimeout' },
-  INTERNAL_ERROR: { type: 'server', i18nKey: 'errorServer' },
-  PDF_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
-  DOCX_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
-  NO_FILE_UPLOADED: { type: 'unknown', i18nKey: 'failedToResponse' },
-  UNSUPPORTED_FILE_TYPE: { type: 'unknown', i18nKey: 'failedToResponse' },
-  FILE_EMPTY: { type: 'unknown', i18nKey: 'failedToResponse' },
-  CHART_IMAGE_NOT_FOUND: { type: 'unknown', i18nKey: 'failedToResponse' },
-  CHART_EXTRACTION_FAILED: { type: 'unknown', i18nKey: 'failedToResponse' },
-};
-
-export function categorizeError(error: unknown): CategorizedError {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return { type: 'unknown', i18nKey: 'generationStop' };
-  }
-  if (error instanceof DOMException && error.name === 'TimeoutError') {
-    return { type: 'timeout', i18nKey: 'errorTimeout' };
-  }
-  if (error instanceof TypeError) {
-    return { type: 'network', i18nKey: 'errorNetwork' };
-  }
-
-  // Try structured error code first (from backend ErrorCodes registry)
-  if (error instanceof Error && 'code' in error) {
-    const mapped = ERROR_CODE_MAP[(error as any).code];
-    if (mapped) {
-      const rawDetail = (error as any).detail as string | undefined;
-      return rawDetail ? { ...mapped, rawDetail } : mapped;
-    }
-  }
-
-  // Fallback: inspect error message string
-  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-  if (
-    msg.includes('401') ||
-    msg.includes('403') ||
-    msg.includes('credentials') ||
-    msg.includes('x-user-key') ||
-    msg.includes('x-user-email')
-  ) {
-    return { type: 'auth', i18nKey: 'credentialsRequired' };
-  }
-  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many')) {
-    return { type: 'rate_limit', i18nKey: 'errorRateLimit' };
-  }
-  if (
-    msg.includes('500') ||
-    msg.includes('502') ||
-    msg.includes('503') ||
-    msg.includes('internal server')
-  ) {
-    return { type: 'server', i18nKey: 'errorServer' };
-  }
-  if (msg.includes('timeout') || msg.includes('timed out')) {
-    return { type: 'timeout', i18nKey: 'errorTimeout' };
-  }
-  return { type: 'unknown', i18nKey: 'failedToResponse' };
-}
-
-function createTimeoutSignal(
-  timeoutMs: number,
-  externalSignal?: AbortSignal,
-): { signal: AbortSignal; cleanup: () => void } {
-  const timeoutController = new AbortController();
-
-  const timeoutId = setTimeout(() => {
-    timeoutController.abort(new DOMException('Request timed out', 'TimeoutError'));
-  }, timeoutMs);
-
-  const abortFromExternal = () => {
-    timeoutController.abort(externalSignal?.reason);
-  };
-
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      abortFromExternal();
-    } else {
-      externalSignal.addEventListener('abort', abortFromExternal, { once: true });
-    }
-  }
-
-  return {
-    signal: timeoutController.signal,
-    cleanup: () => {
-      clearTimeout(timeoutId);
-      externalSignal?.removeEventListener('abort', abortFromExternal);
-    },
-  };
-}
-
-async function fetchWithTimeoutAndRetry(
-  url: string,
-  init: RequestInit = {},
-  modelTier?: string,
-): Promise<Response> {
-  let attempt = 0;
-  const timeoutMs = getTimeoutForTier(modelTier);
-
-  while (true) {
-    const { signal, cleanup } = createTimeoutSignal(timeoutMs, init.signal ?? undefined);
-
-    try {
-      return await fetch(url, {
-        ...init,
-        credentials: 'include',
-        signal,
-      });
-    } catch (error) {
-      if (init.signal?.aborted) {
-        throw error;
-      }
-
-      const isPost = init.method?.toUpperCase() === 'POST';
-      // Allow 1 retry on POST for timeout/network errors (transient failures)
-      const maxPostRetries = 1;
-      const shouldRetry =
-        attempt < RETRY_DELAYS_MS.length &&
-        isRetryableError(error) &&
-        (!isPost || attempt < maxPostRetries);
-      if (!shouldRetry) {
-        logService.error(`Network request failed: ${url}`, error);
-        throw error;
-      }
-
-      logService.warn(`Network retry ${attempt + 1}/${RETRY_DELAYS_MS.length} for ${url}`, error);
-      await wait(RETRY_DELAYS_MS[attempt]);
-      attempt += 1;
-    } finally {
-      cleanup();
-    }
-  }
-}
-
-function getCsrfToken(): string {
-  const match = document.cookie.match(/(?:^| )csrf_token=([^;]+)/);
-  if (match) return match[1];
-  return '';
-}
-
-// ERR-L1: Generate a per-request UUID for frontend↔backend log correlation
-function generateRequestId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-// ─── QC-L2: Header cache ─────────────────────────────────────────────────────
-// getGlobalHeaders() is called on every network request. The calls to
-// getUserKey(), getUserEmail() and logService.getContext() touch async storage
-// on each invocation. We cache the resolved headers and expose
-// invalidateHeaderCache() so callers can bust the cache after credential changes.
-let _headerCache: Promise<Record<string, string>> | null = null;
-
-/** Bust the cached credentials headers (call after saving new credentials). */
-export function invalidateHeaderCache(): void {
-  _headerCache = null;
-}
-
-async function buildGlobalHeaders(): Promise<Record<string, string>> {
-  const userKey = await getUserKey();
-  const userEmail = await getUserEmail();
-  const ctx = await logService.getContext();
-
-  const headers: Record<string, string> = {};
-  if (userKey) headers['X-User-Key'] = userKey;
-  if (userEmail) headers['X-User-Email'] = userEmail;
-  if (ctx.host) headers['X-Office-Host'] = ctx.host;
-  if (ctx.sessionId) headers['X-Session-Id'] = ctx.sessionId;
-
-  return headers;
-}
-
-async function getGlobalHeaders(): Promise<Record<string, string>> {
-  if (!_headerCache) {
-    _headerCache = buildGlobalHeaders();
-  }
-  const cached = await _headerCache;
-  // CSRF token reads from document.cookie — always fresh (not cached)
-  const csrf = getCsrfToken();
-  if (csrf) return { ...cached, 'x-csrf-token': csrf };
-  return cached;
-}
-
 export async function fetchModels(): Promise<Record<string, ModelInfo>> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/models`, {
     headers: { ...(await getGlobalHeaders()) },
@@ -290,44 +83,6 @@ export async function healthCheck(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string | any[];
-  tool_calls?: Array<{
-    id: string;
-    type: 'function';
-    function: {
-      name: string;
-      arguments: string;
-    };
-  }>;
-}
-
-export interface ToolChatMessage {
-  role: 'tool';
-  tool_call_id: string;
-  content: string;
-}
-
-export type ChatRequestMessage = ChatMessage | ToolChatMessage;
-
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-}
-
-export interface ChatStreamOptions {
-  messages: ChatRequestMessage[];
-  modelTier: ModelTier;
-  tools?: ApiToolDefinition[];
-  onStream: (text: string) => void;
-  onToolCallDelta?: (toolCallDeltas: any[]) => void;
-  onFinishReason?: (finishReason: string | null) => void;
-  onUsage?: (usage: TokenUsage) => void;
-  abortSignal?: AbortSignal;
 }
 
 export async function chatStream(options: ChatStreamOptions): Promise<void> {
@@ -363,7 +118,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   if (!res.ok) {
     const errText = await res.text();
-    const sanitizedBody = sanitizePayloadForLogs({ messages, modelTier, tools });
+    const sanitizedBody = sanitizePayloadForLogs({ messages, tools });
     logService.error('Chat API error', undefined, {
       status: res.status,
       error: errText,
@@ -460,23 +215,6 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
       }
     }
   }
-}
-
-export interface ApiToolDefinition {
-  type: 'function';
-  function: {
-    name: string;
-    description?: string;
-    parameters: Record<string, any>;
-    strict?: boolean;
-  };
-}
-
-export interface ImageGenerateOptions {
-  prompt: string;
-  size?: string;
-  quality?: string;
-  abortSignal?: AbortSignal;
 }
 
 export async function generateImage(options: ImageGenerateOptions): Promise<string> {
@@ -586,36 +324,6 @@ export async function submitLogs(entries: unknown[]): Promise<void> {
   }
 }
 
-export interface PlotAreaBox {
-  /** Left edge of the chart's plot area. Value in [0,1] = fraction of image width; value > 1 = raw pixels. */
-  xMinPx: number;
-  /** Right edge of the chart's plot area. */
-  xMaxPx: number;
-  /** Top edge of the chart's plot area (smaller pixel value = higher on screen). */
-  yMinPx: number;
-  /** Bottom edge of the chart's plot area (larger pixel value = lower on screen, where X axis sits). */
-  yMaxPx: number;
-}
-
-export interface ChartExtractParams {
-  imageId: string;
-  xAxisRange: [number, number];
-  yAxisRange: [number, number];
-  targetColor: string;
-  plotAreaBox: PlotAreaBox;
-  chartType?: string;
-  colorTolerance?: number;
-  numPoints?: number;
-}
-
-export interface ChartExtractResult {
-  points: Array<{ x: number; y: number }>;
-  pixelsMatched: number;
-  imageSize: { width: number; height: number };
-  plotBounds?: { pxMin: number; pxMax: number; pyMin: number; pyMax: number };
-  warning?: string;
-}
-
 export async function extractChartData(params: ChartExtractParams): Promise<ChartExtractResult> {
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/chart-extract`, {
     method: 'POST',
@@ -653,13 +361,6 @@ export async function fetchIconSvg(prefix: string, name: string, color?: string)
   });
   if (!res.ok) throw new Error(`Icon SVG fetch failed: ${res.status}`);
   return res.text();
-}
-
-export interface FeedbackSystemContext {
-  host: string;
-  appVersion: string;
-  modelTier: string;
-  userAgent: string;
 }
 
 export async function submitFeedback(

@@ -463,6 +463,34 @@ function ensurePowerPointRunAvailable() {
   }
 }
 
+/**
+ * Mirrors the pattern of `buildExecuteWrapper` used by Word and Excel.
+ * Routes to `runPowerPoint` for tools with a PowerPoint context, or to
+ * `executeOfficeAction` for tools that use the Common API directly.
+ */
+function buildPowerPointExecute(
+  def: PowerPointToolTemplate,
+): (args?: Record<string, any>) => Promise<string> {
+  return async (args = {}) => {
+    try {
+      if (def.executePowerPoint)
+        return await runPowerPoint(ctx => def.executePowerPoint!(ctx, args));
+      return await executeOfficeAction(() => def.executeCommon!(args));
+    } catch (error: unknown) {
+      return JSON.stringify(
+        {
+          success: false,
+          error: getErrorMessage(error),
+          tool: def.name,
+          suggestion: 'Fix the error parameters or context and try again.',
+        },
+        null,
+        2,
+      );
+    }
+  };
+}
+
 const powerpointToolDefinitions = createOfficeTools<
   PowerPointToolName,
   PowerPointToolTemplate,
@@ -2317,25 +2345,7 @@ ALWAYS call markDirty() after modifying the zip.`,
       },
     },
   },
-  def =>
-    async (args = {}) => {
-      try {
-        if (def.executePowerPoint)
-          return await runPowerPoint(ctx => def.executePowerPoint!(ctx, args));
-        return await executeOfficeAction(() => def.executeCommon!(args));
-      } catch (error: unknown) {
-        return JSON.stringify(
-          {
-            success: false,
-            error: getErrorMessage(error),
-            tool: def.name,
-            suggestion: 'Fix the error parameters or context and try again.',
-          },
-          null,
-          2,
-        );
-      }
-    },
+  buildPowerPointExecute,
 );
 
 export async function getSlideContentStandalone(
