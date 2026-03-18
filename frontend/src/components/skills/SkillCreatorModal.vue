@@ -314,5 +314,11 @@ function resetState(): void {
   descriptionInput.value = '';
   selectedHost.value = 'all';
   generationError.value = '';
+  editName.value = '';
+  editDescription.value = '';
+  editHost.value = 'all';
+  editExecutionMode.value = 'immediate';
+  editIcon.value = 'Zap';
+  editContent.value = '';
 }
 </script>

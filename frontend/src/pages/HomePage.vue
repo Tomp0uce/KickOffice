@@ -290,6 +290,7 @@ const {
   sessionStats,
   resetSessionStats,
   rebuildSessionFiles,
+  runAgentLoop,
 } = useAgentLoop({
   t,
   refs: {
