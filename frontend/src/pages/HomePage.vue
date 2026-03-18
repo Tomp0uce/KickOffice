@@ -25,13 +25,12 @@
       />
 
       <QuickActionsBar
-        v-model:selected-prompt-id="selectedPromptId"
         :quick-actions="quickActions ?? []"
         :loading="loading"
-        :saved-prompts="savedPrompts"
-        :select-prompt-title="t('selectPrompt')"
+        :user-skills-for-host="userSkillsForHost"
         @apply-action="applyQuickAction"
-        @load-prompt="loadSelectedPrompt"
+        @execute-user-skill="handleExecuteUserSkill"
+        @open-skill-creator="showSkillCreator = true"
       />
 
       <!-- ARCH-H2 — Props removed, uses context via provide/inject -->
@@ -107,16 +106,15 @@ import { localStorageKey } from '@/utils/enum';
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
 import { acceptAiChangesInDocument, hasAiTrackedChanges } from '@/utils/wordTools';
 import { clearAllAgentHighlightsInWorkbook } from '@/utils/excelTools';
-import { type SavedPrompt } from '@/utils/savedPrompts';
 import { useHomePage } from '@/composables/useHomePage';
+import { useUserSkills } from '@/composables/useUserSkills';
+import { useUserSkillExecution } from '@/composables/useUserSkillExecution';
 import type { ExcelFormulaLanguage } from '@/utils/constant'; // TOOL-M4
 
 const { t } = useI18n();
 
-const savedPrompts = ref<SavedPrompt[]>([]);
-const selectedPromptId = ref('');
-const customSystemPrompt = ref('');
 const isDraftFocusGlowing = ref(false);
+const showSkillCreator = ref(false);
 const isDeleteConfirmVisible = ref(false);
 const isNewChatConfirmVisible = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
@@ -240,10 +238,7 @@ function stopGeneration() {
 const homePage = useHomePage({
   chatInputRef,
   messageListRef,
-  savedPrompts,
   userInput,
-  customSystemPrompt,
-  selectedPromptId,
   loading,
   isDeleteConfirmVisible,
   isNewChatConfirmVisible,
@@ -268,8 +263,6 @@ const {
   handleSwitchSession,
   handleDeleteSession,
   confirmDeleteSession,
-  loadSavedPrompts,
-  loadSelectedPrompt,
   handleScroll, // UX-H1 — Smart scroll handler
   isAutoScrollEnabled, // UX-H1 — Auto-scroll state
 } = homePage;
@@ -306,7 +299,6 @@ const {
     isWord: hostIsWord,
   },
   settings: {
-    customSystemPrompt,
     agentMaxIterations,
     useSelectedText: ref(true), // GEN-L3: Always true
     excelFormulaLanguage,
@@ -342,6 +334,44 @@ function handleEditMessage(message: DisplayMessage) {
 
 const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
+// ── User Skills ──────────────────────────────────────────────────────────────
+const { skills: userSkills, skillsForHost } = useUserSkills();
+const currentHostLower = (
+  forHost({ outlook: 'outlook', powerpoint: 'powerpoint', excel: 'excel', word: 'word' }) || 'word'
+) as import('@/utils/skillParser').SkillHost;
+const userSkillsForHost = skillsForHost(currentHostLower);
+
+const { executeUserSkill } = useUserSkillExecution({
+  t,
+  history,
+  userInput,
+  loading,
+  abortController,
+  inputTextarea: computed(() => chatInputRef.value?.textareaEl),
+  isDraftFocusGlowing,
+  getOfficeSelection: async () => {
+    const { useOfficeSelection } = await import('@/composables/useOfficeSelection');
+    const { getOfficeSelection: get } = useOfficeSelection();
+    return get();
+  },
+  runAgentLoop,
+  resolveChatModelTier: () => {
+    const nonImageEntry = Object.entries(availableModels.value).find(
+      ([, m]) => m.type !== 'image',
+    );
+    return (nonImageEntry?.[0] as import('@/types').ModelTier) || selectedModelTier.value;
+  },
+  createDisplayMessage: imageActions.createDisplayMessage,
+  adjustTextareaHeight,
+  scrollToBottom,
+  scrollToMessageTop,
+});
+
+function handleExecuteUserSkill(id: string): void {
+  const skill = userSkills.value.find(s => s.id === id);
+  if (skill) executeUserSkill(skill);
+}
+
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
 provideHomePageContext({
   // State
@@ -353,9 +383,6 @@ provideHomePageContext({
   backendChecked,
   currentAction,
   userInput,
-  customSystemPrompt,
-  selectedPromptId,
-  savedPrompts,
   isDraftFocusGlowing,
   isAutoScrollEnabled,
   // Models
@@ -384,7 +411,6 @@ provideHomePageContext({
   executeNewChat,
   handleSwitchSession,
   handleDeleteSession,
-  loadSelectedPrompt,
   adjustTextareaHeight,
   // Computed
   inputPlaceholder,
@@ -400,14 +426,9 @@ watch(loading, async (isLoading, wasLoading) => {
 
 onBeforeMount(async () => {
   insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace';
-  loadSavedPrompts();
   await sessionManager.init();
   rebuildSessionFiles();
   await refreshCanValidateAiChanges();
-});
-
-onActivated(() => {
-  loadSavedPrompts();
 });
 
 onDeactivated(() => {

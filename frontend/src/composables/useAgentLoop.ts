@@ -74,7 +74,6 @@ interface AgentLoopHost {
 }
 
 interface AgentLoopSettings {
-  customSystemPrompt: Ref<string>;
   agentMaxIterations: Ref<number>;
   excelFormulaLanguage: Ref<ExcelFormulaLanguage>; // TOOL-M4: extended from 'en' | 'fr'
   userGender: Ref<string>;
@@ -173,7 +172,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
 
   // Destructure settings
   const {
-    customSystemPrompt,
     agentMaxIterations,
     excelFormulaLanguage,
     userGender,
@@ -746,7 +744,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     const storedLang = localStorage.getItem('localLanguage');
     const langKey = ['en', 'fr'].includes(storedLang || '') ? storedLang : 'fr';
     const lang = langKey === 'en' ? 'English' : 'Français';
-    const systemPrompt = customSystemPrompt.value || agentPrompt(lang);
+    const systemPrompt = agentPrompt(lang);
     const modelTier = resolveChatModelTier();
 
     // ARCH-H1: Use prepareMessages from useMessageOrchestration
