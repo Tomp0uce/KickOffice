@@ -1870,6 +1870,24 @@ try {
         if (index >= slides.items.length) throw new Error(`Slide ${slideNumber} does not exist.`);
         slides.getItemAt(index).copy();
         await context.sync();
+
+        if (isPowerPointApiSupported('1.5')) {
+          // copy() appends at the end — reload to find the new slide, move it right
+          // after the original, then navigate to it so the user lands on the duplicate.
+          const newSlides = context.presentation.slides;
+          newSlides.load('items/id');
+          await context.sync();
+          const copySlide = newSlides.items[newSlides.items.length - 1];
+          const targetIndex = index + 1; // 0-based: immediately after the original
+          if (newSlides.items.length - 1 !== targetIndex) {
+            copySlide.moveTo(targetIndex);
+            await context.sync();
+          }
+          context.presentation.setSelectedSlides([copySlide.id]);
+          await context.sync();
+          return `Slide ${slideNumber} duplicated. The copy is now slide ${slideNumber + 1}.`;
+        }
+
         return `Slide ${slideNumber} duplicated successfully.`;
       },
     },
