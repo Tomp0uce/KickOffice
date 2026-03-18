@@ -1,3 +1,12 @@
+---
+name: Réviser la slide
+description: "Analyse la slide courante via capture d'écran et fournit 3-5 suggestions concrètes d'amélioration : clarté du message, équilibre visuel, impact et cohérence avec le reste de la présentation."
+host: powerpoint
+executionMode: agent
+icon: Eye
+actionKey: review
+---
+
 # Review Quick Action Skill
 
 ## Purpose

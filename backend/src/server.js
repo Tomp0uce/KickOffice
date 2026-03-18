@@ -28,6 +28,7 @@ import { logsRouter } from './routes/logs.js'
 import { plotDigitizerRouter } from './routes/plotDigitizer.js'
 import { filesRouter } from './routes/files.js'
 import { iconsRouter } from './routes/icons.js'
+import { skillCreatorRouter } from './routes/skillCreator.js'
 import { logAndRespond } from './utils/http.js'
 
 const isProduction = process.env.NODE_ENV === 'production'
@@ -62,6 +63,15 @@ const infoLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests.' },
+})
+
+// Rate limiter for skill creator (LLM-powered, expensive per call)
+const skillCreatorLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many skill creation requests. Please try again in an hour.' },
 })
 
 // Rate limiter for frontend log submission
@@ -231,6 +241,7 @@ app.use('/api/logs', ensureUserCredentials, logsLimiter, logsRouter)
 app.use('/api/chart-extract', ensureUserCredentials, uploadLimiter, plotDigitizerRouter)
 app.use('/api/files', ensureLlmApiKey, ensureUserCredentials, uploadLimiter, filesRouter)
 app.use('/api/icons', ensureUserCredentials, infoLimiter, iconsRouter)
+app.use('/api/skill-creator', ensureLlmApiKey, ensureUserCredentials, skillCreatorLimiter, skillCreatorRouter)
 
 app.use((req, res) => {
   return logAndRespond(res, 404, { error: 'Route not found' }, `${req.method} ${req.originalUrl}`)

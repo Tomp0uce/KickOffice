@@ -1,3 +1,12 @@
+---
+name: Numériser un graphique
+description: "Analyse une image de graphique uploadée, extrait les données et les insère dans la feuille Excel, puis recrée un graphique correspondant. Utilise la vision IA pour la numérisation."
+host: excel
+executionMode: agent
+icon: BarChart
+actionKey: digitizeChart
+---
+
 # Chart Digitizer Quick Action Skill (Excel)
 
 ## Purpose

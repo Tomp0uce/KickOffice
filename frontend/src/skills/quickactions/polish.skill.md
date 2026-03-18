@@ -1,3 +1,12 @@
+---
+name: Polir le texte
+description: "Améliore la qualité globale du texte : fluidité, style, précision lexicale. Ne change pas le sens ni la structure, seulement l'expression. Retourne le texte poli dans la même langue."
+host: word
+executionMode: immediate
+icon: Sparkles
+actionKey: polish
+---
+
 # Polish Quick Action Skill
 
 ## Purpose

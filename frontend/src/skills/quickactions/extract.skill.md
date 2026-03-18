@@ -1,3 +1,12 @@
+---
+name: Extraire les actions
+description: "Extrait et liste toutes les actions, décisions et points de suivi identifiables dans l'email ou le texte sélectionné. Présente les résultats sous forme de liste structurée par catégorie."
+host: outlook
+executionMode: immediate
+icon: ListChecks
+actionKey: extract
+---
+
 # Extract Quick Action Skill
 
 ## Purpose

@@ -1,3 +1,12 @@
+---
+name: Corriger (Word)
+description: "Corrige l'orthographe et la grammaire du document Word sélectionné via Track Changes. Chaque correction est proposée avec proposeRevision — acceptable ou rejectable individuellement."
+host: word
+executionMode: agent
+icon: CheckSquare
+actionKey: word-proofread
+---
+
 # Word Proofread Quick Action Skill
 
 ## Purpose

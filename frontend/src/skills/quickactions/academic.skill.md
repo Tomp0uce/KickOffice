@@ -1,3 +1,12 @@
+---
+name: Style académique
+description: "Réécrit le texte sélectionné dans un style académique formel : vocabulaire précis, constructions syntaxiques élaborées, ton objectif et impersonnel. Adapté pour articles, rapports ou mémoires."
+host: word
+executionMode: immediate
+icon: GraduationCap
+actionKey: academic
+---
+
 # Academic Quick Action Skill
 
 ## Purpose

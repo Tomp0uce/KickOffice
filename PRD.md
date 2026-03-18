@@ -74,8 +74,9 @@ Contextual buttons at the top of the interface for one-click actions:
 
 - **Tooltips**: Each button shows a description on hover
 - **Disabled state**: Buttons grayed out during loading
-- **Saved prompts dropdown**: Quick access to custom prompts
-- **Host-specific actions**: Different actions per Office app
+- **User Skills dropdown**: One-click access to user-created skills; executes immediately on selected text
+- **Create skill button (`+`)**: Opens the Skill Creator modal
+- **Host-specific actions**: Different built-in actions per Office app
 
 ### 3.3 Message Display
 
@@ -142,7 +143,18 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Activity pulse**: Red animated dot with Terminal icon when agent is executing
 - **Hover tooltips**: Detailed token counts on hover
 
-### 3.7 Virtual File System (VFS)
+### 3.8 Skill Creator
+
+LLM-assisted modal for creating user skills without writing code:
+
+- **Step 1 — Describe**: Free-text description + host selector (Ctrl+Enter to submit)
+- **Step 2 — Generate**: Non-streaming LLM call to `POST /api/skill-creator`; the system prompt embeds full tool knowledge per host (Word/Excel/PPT/Outlook), execution mode guidance, and Theory of Mind writing principles
+- **Step 3 — Review**: Editable fields (name, description, host, execution mode, icon) + markdown textarea for skill content; Regenerate button returns to Step 1
+- **Step 4 — Test**: Executes the draft skill on currently selected text in the Office document; result appears in chat; user can return to review
+- **Save**: Adds skill to localStorage registry; appears immediately in Quick Actions Bar dropdown
+- **Rate limit**: 10 generations/hour/IP server-side
+
+### 3.9 Virtual File System (VFS)
 
 - **Sandboxed filesystem**: In-memory virtual filesystem for agent use
 - **User uploads**: Files stored in `/home/user/uploads/`
@@ -231,22 +243,19 @@ Contextual buttons at the top of the interface for one-click actions:
 - **Application version**
 - **Available models list** (read-only display)
 
-### 5.3 Custom Prompts Tab
+### 5.3 User Skills Library Tab
 
-- List of all saved prompts
-- New prompt add button
-- Inline editing (system prompt + user prompt)
-- Deletion (except last one)
-- Prompt preview with truncated display
+Replaces the former Custom Prompts and Built-in Prompts tabs.
 
-### 5.4 Built-in Prompts Tab
+- List of all user-created skills with name, host badge, execution mode badge, and description preview
+- Filter chips by host (Word / Excel / PowerPoint / Outlook / All)
+- Inline edit form per skill: name, description, host, execution mode, icon (Lucide name), markdown content
+- Export individual skill as `.skill.md` file (with YAML frontmatter)
+- Import skill from `.skill.md` file (generates new id to avoid collisions)
+- Create skill via LLM-assisted modal (see §3.8)
+- Automatic migration banner on first launch if legacy custom prompts exist in localStorage
 
-- Default prompts per application (Translate, Polish, Academic, Summarize, Proofread...)
-- Ability to edit each built-in prompt
-- Reset to default button
-- System and user prompt preview
-
-### 5.5 Tools Tab
+### 5.4 Tools Tab
 
 - Complete tool list with checkboxes (67 tools total)
 - Enable/disable per tool
@@ -895,7 +904,7 @@ When context limit is reached:
 | Audit trail                                 | No                           |
 | Sensitive data masking                      | No                           |
 | Session sharing                             | No                           |
-| Team-shared prompts                         | No                           |
+| Team-shared prompts (server-side)           | No — skills are local to each user's browser; sharing requires manual export/import of `.skill.md` files |
 | Email attachment analysis                   | Not planned for now          |
 | Calendar integration                        | Removed from scope           |
 

@@ -1,3 +1,12 @@
+---
+name: Pixel art Excel
+description: "Convertit une image uploadée en pixel art dans Excel en remplissant les cellules avec les couleurs correspondantes. Crée une représentation pixelisée artistique directement dans le classeur."
+host: excel
+executionMode: agent
+icon: Grid3X3
+actionKey: pixelArt
+---
+
 # Pixel Art Quick Action Skill (Excel)
 
 ## Purpose

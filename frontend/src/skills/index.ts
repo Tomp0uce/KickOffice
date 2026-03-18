@@ -1,174 +1,157 @@
 /**
- * Skills Loader
+ * Skills Loader — metadata-driven.
  *
- * Loads and combines skill documents for injection into agent prompts.
- * Skills are defensive prompting guidelines that prevent common Office.js errors.
+ * Built-in skills are imported via Vite ?raw at build-time.
+ * Frontmatter is parsed at module load (one-time cost, not per-request).
+ * getQuickActionSkill() signature is unchanged for backwards compatibility.
  */
 
 import { logService } from '@/utils/logger';
+import { parseSkill } from '@/utils/skillParser';
+import type { ParsedSkill } from '@/utils/skillParser';
 
-// Import skill documents as raw strings
-// Note: Vite supports ?raw suffix for importing file contents
+// Host skills (no frontmatter — always injected by host, not user-selectable)
 import commonSkill from './common.skill.md?raw';
 import wordSkill from './word.skill.md?raw';
 import excelSkill from './excel.skill.md?raw';
 import powerpointSkill from './powerpoint.skill.md?raw';
 import outlookSkill from './outlook.skill.md?raw';
 
-// Import Quick Action skills
-import bulletsSkill from './quickactions/bullets.skill.md?raw';
-import punchifySkill from './quickactions/punchify.skill.md?raw';
-import reviewSkill from './quickactions/review.skill.md?raw';
-import translateSkill from './quickactions/translate.skill.md?raw';
-import formalizeSkill from './quickactions/formalize.skill.md?raw';
-import conciseSkill from './quickactions/concise.skill.md?raw';
-import proofreadSkill from './quickactions/proofread.skill.md?raw';
-import pptProofreadSkill from './quickactions/ppt-proofread.skill.md?raw';
-import pptTranslateSkill from './quickactions/ppt-translate.skill.md?raw';
-import wordTranslateSkill from './quickactions/word-translate.skill.md?raw';
-import wordProofreadSkill from './quickactions/word-proofread.skill.md?raw';
-import wordReviewSkill from './quickactions/word-review.skill.md?raw';
-import polishSkill from './quickactions/polish.skill.md?raw';
-import academicSkill from './quickactions/academic.skill.md?raw';
-import summarySkill from './quickactions/summary.skill.md?raw';
-import extractSkill from './quickactions/extract.skill.md?raw';
-import replySkill from './quickactions/reply.skill.md?raw';
-import ingestSkill from './quickactions/ingest.skill.md?raw';
-import autographSkill from './quickactions/autograph.skill.md?raw';
-import chartDigitizerSkill from './quickactions/chart-digitizer.skill.md?raw';
-import pixelArtSkill from './quickactions/pixel-art.skill.md?raw';
-import explainExcelSkill from './quickactions/explain-excel.skill.md?raw';
-import formulaGeneratorSkill from './quickactions/formula-generator.skill.md?raw';
-import dataTrendSkill from './quickactions/data-trend.skill.md?raw';
+// Quick Action skills — raw imports
+import bulletsSkillRaw from './quickactions/bullets.skill.md?raw';
+import punchifySkillRaw from './quickactions/punchify.skill.md?raw';
+import reviewSkillRaw from './quickactions/review.skill.md?raw';
+import translateSkillRaw from './quickactions/translate.skill.md?raw';
+import formalizeSkillRaw from './quickactions/formalize.skill.md?raw';
+import conciseSkillRaw from './quickactions/concise.skill.md?raw';
+import proofreadSkillRaw from './quickactions/proofread.skill.md?raw';
+import pptProofreadSkillRaw from './quickactions/ppt-proofread.skill.md?raw';
+import pptTranslateSkillRaw from './quickactions/ppt-translate.skill.md?raw';
+import wordTranslateSkillRaw from './quickactions/word-translate.skill.md?raw';
+import wordProofreadSkillRaw from './quickactions/word-proofread.skill.md?raw';
+import wordReviewSkillRaw from './quickactions/word-review.skill.md?raw';
+import polishSkillRaw from './quickactions/polish.skill.md?raw';
+import academicSkillRaw from './quickactions/academic.skill.md?raw';
+import summarySkillRaw from './quickactions/summary.skill.md?raw';
+import extractSkillRaw from './quickactions/extract.skill.md?raw';
+import replySkillRaw from './quickactions/reply.skill.md?raw';
+import ingestSkillRaw from './quickactions/ingest.skill.md?raw';
+import autographSkillRaw from './quickactions/autograph.skill.md?raw';
+import chartDigitizerSkillRaw from './quickactions/chart-digitizer.skill.md?raw';
+import pixelArtSkillRaw from './quickactions/pixel-art.skill.md?raw';
+import explainExcelSkillRaw from './quickactions/explain-excel.skill.md?raw';
+import formulaGeneratorSkillRaw from './quickactions/formula-generator.skill.md?raw';
+import dataTrendSkillRaw from './quickactions/data-trend.skill.md?raw';
 
+export type { SkillHost, SkillExecutionMode, ParsedSkill, SkillMetadata } from '@/utils/skillParser';
+
+/** Backwards-compatible alias — capitalized host names used by useAgentPrompts and host skills. */
 export type OfficeHost = 'Word' | 'Excel' | 'PowerPoint' | 'Outlook';
-export type QuickActionKey =
-  | 'bullets'
-  | 'punchify'
-  | 'review'
-  | 'visual'
-  | 'translate'
-  | 'formalize'
-  | 'concise'
-  | 'proofread';
 
-const hostSkillMap: Record<OfficeHost, string> = {
+// ── Internal registry ─────────────────────────────────────────────────────────
+
+/** Raw skill files keyed by actionKey — order matches original quickActionSkillMap. */
+const rawSkillFiles: Record<string, string> = {
+  // PowerPoint
+  bullets: bulletsSkillRaw,
+  punchify: punchifySkillRaw,
+  review: reviewSkillRaw,
+  'ppt-proofread': pptProofreadSkillRaw,
+  'ppt-translate': pptTranslateSkillRaw,
+  // Word (agent-based, surgical)
+  'word-translate': wordTranslateSkillRaw,
+  'word-proofread': wordProofreadSkillRaw,
+  'word-review': wordReviewSkillRaw,
+  // Word / Outlook (non-agent)
+  translate: translateSkillRaw,
+  formalize: formalizeSkillRaw,
+  concise: conciseSkillRaw,
+  proofread: proofreadSkillRaw,
+  polish: polishSkillRaw,
+  academic: academicSkillRaw,
+  summary: summarySkillRaw,
+  // Outlook
+  extract: extractSkillRaw,
+  reply: replySkillRaw,
+  // Excel
+  ingest: ingestSkillRaw,
+  autograph: autographSkillRaw,
+  digitizeChart: chartDigitizerSkillRaw,
+  pixelArt: pixelArtSkillRaw,
+  explain: explainExcelSkillRaw,
+  formulaGenerator: formulaGeneratorSkillRaw,
+  dataTrend: dataTrendSkillRaw,
+};
+
+/** Parsed skills registry — populated once at module load. */
+const parsedSkills: Map<string, ParsedSkill> = new Map(
+  Object.entries(rawSkillFiles).map(([key, raw]) => [key, parseSkill(raw, key)]),
+);
+
+const hostSkillMap: Record<string, string> = {
   Word: wordSkill,
   Excel: excelSkill,
   PowerPoint: powerpointSkill,
   Outlook: outlookSkill,
 };
 
+// ── Host skills ───────────────────────────────────────────────────────────────
+
 /**
  * Get the combined skill document for a specific Office host.
- *
- * @param host - The Office application (Word, Excel, PowerPoint, Outlook)
- * @returns Combined skill markdown (common rules + host-specific rules)
+ * Returns common rules + host-specific rules concatenated.
  */
-export function getSkillForHost(host: OfficeHost): string {
+export function getSkillForHost(host: string): string {
   const hostSkill = hostSkillMap[host];
-
   if (!hostSkill) {
     logService.warn(`[Skills] Unknown host: ${host}, using common skills only`);
     return commonSkill;
   }
-
   return `${commonSkill}\n\n---\n\n${hostSkill}`;
 }
 
-/**
- * Get just the common skill document (shared rules).
- */
 export function getCommonSkill(): string {
   return commonSkill;
 }
 
-/**
- * Get just the host-specific skill document (without common rules).
- */
-export function getHostSpecificSkill(host: OfficeHost): string {
+export function getHostSpecificSkill(host: string): string {
   return hostSkillMap[host] || '';
 }
 
-/**
- * List all available hosts.
- */
-export function getAvailableHosts(): OfficeHost[] {
+export function getAvailableHosts(): string[] {
   return ['Word', 'Excel', 'PowerPoint', 'Outlook'];
 }
 
-/**
- * Quick Action skills map.
- */
-const quickActionSkillMap: Record<string, string> = {
-  // PowerPoint
-  bullets: bulletsSkill,
-  punchify: punchifySkill,
-  review: reviewSkill,
-
-  // PowerPoint proofread (surgical — uses searchAndReplaceInShape)
-  'ppt-proofread': pptProofreadSkill,
-
-  // PowerPoint translate (agent-based — injects translation directly into the slide)
-  'ppt-translate': pptTranslateSkill,
-
-  // Word (agent-based, chirurgical)
-  'word-translate': wordTranslateSkill,
-  'word-proofread': wordProofreadSkill,
-  'word-review': wordReviewSkill,
-
-  // Word / Outlook (non-agent)
-  translate: translateSkill,
-  formalize: formalizeSkill,
-  concise: conciseSkill,
-  proofread: proofreadSkill,
-  polish: polishSkill,
-  academic: academicSkill,
-  summary: summarySkill,
-
-  // Outlook
-  extract: extractSkill,
-  reply: replySkill,
-
-  // Excel
-  ingest: ingestSkill,
-  autograph: autographSkill,
-  digitizeChart: chartDigitizerSkill,
-  pixelArt: pixelArtSkill,
-  explain: explainExcelSkill,
-  formulaGenerator: formulaGeneratorSkill,
-  dataTrend: dataTrendSkill,
-};
+// ── Quick Action skills ───────────────────────────────────────────────────────
 
 /**
- * Get the skill document for a specific Quick Action.
- *
- * @param actionKey - The Quick Action key (e.g., 'bullets', 'translate', 'review')
- * @returns Skill markdown for the Quick Action, or undefined if not found
- *
- * @example
- * const skill = getQuickActionSkill('bullets')
- * if (skill) {
- *   // Inject as system message: { role: 'system', content: skill }
- * }
+ * Get the full raw .skill.md content for a Quick Action (for system prompt injection).
+ * Signature unchanged — backwards compatible with useQuickActions.ts.
  */
 export function getQuickActionSkill(actionKey: string): string | undefined {
-  return quickActionSkillMap[actionKey];
+  return parsedSkills.get(actionKey)?.raw;
 }
 
 /**
- * Check if a Quick Action has a corresponding skill file.
- *
- * @param actionKey - The Quick Action key
- * @returns true if a skill exists for this action
+ * Get the parsed metadata for a Quick Action skill (for UI display).
+ * Returns undefined if the action key has no corresponding skill.
  */
+export function getQuickActionSkillMetadata(actionKey: string) {
+  return parsedSkills.get(actionKey)?.metadata;
+}
+
+/**
+ * Get metadata for all built-in Quick Action skills.
+ * Useful for displaying a catalog of available built-in skills.
+ */
+export function getAllBuiltInSkillsMetadata() {
+  return Array.from(parsedSkills.values()).map((s) => s.metadata);
+}
+
 export function hasQuickActionSkill(actionKey: string): boolean {
-  return actionKey in quickActionSkillMap;
+  return parsedSkills.has(actionKey);
 }
 
-/**
- * List all available Quick Action skills.
- */
 export function getAvailableQuickActionSkills(): string[] {
-  return Object.keys(quickActionSkillMap);
+  return Array.from(parsedSkills.keys());
 }

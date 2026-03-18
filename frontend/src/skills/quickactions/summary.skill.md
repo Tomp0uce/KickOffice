@@ -1,3 +1,12 @@
+---
+name: Résumer
+description: "Résume le texte sélectionné en 3-5 bullet points denses et informatifs capturant tous les points essentiels. Idéal pour créer des résumés exécutifs ou des notes de lecture rapide."
+host: word
+executionMode: immediate
+icon: AlignLeft
+actionKey: summary
+---
+
 # Summary Quick Action Skill
 
 ## Purpose

@@ -14,8 +14,6 @@ import type { Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type ChatInput from '@/components/chat/ChatInput.vue';
 import type ChatMessageList from '@/components/chat/ChatMessageList.vue';
-import type { SavedPrompt } from '@/utils/savedPrompts';
-import { loadSavedPromptsFromStorage } from '@/utils/savedPrompts';
 import { TEXTAREA_MAX_HEIGHT_PX } from '@/constants/limits';
 import type { useSessionManager } from '@/composables/useSessionManager';
 import { resetVfs } from '@/utils/vfs';
@@ -30,10 +28,7 @@ const SCROLL_BOTTOM_THRESHOLD_PX = 100;
 export function useHomePage(deps: {
   chatInputRef: Ref<InstanceType<typeof ChatInput> | undefined>;
   messageListRef: Ref<InstanceType<typeof ChatMessageList> | undefined>;
-  savedPrompts: Ref<SavedPrompt[]>;
   userInput: Ref<string>;
-  customSystemPrompt: Ref<string>;
-  selectedPromptId: Ref<string>;
   loading: Ref<boolean>;
   isDeleteConfirmVisible: Ref<boolean>;
   isNewChatConfirmVisible: Ref<boolean>;
@@ -46,10 +41,7 @@ export function useHomePage(deps: {
   const {
     chatInputRef,
     messageListRef,
-    savedPrompts,
     userInput,
-    customSystemPrompt,
-    selectedPromptId,
     loading,
     isDeleteConfirmVisible,
     isNewChatConfirmVisible,
@@ -182,8 +174,6 @@ export function useHomePage(deps: {
     rebuildSessionFiles(); // clear session files — prevents leaking files into the new session
     resetVfs();            // clear VFS — new session starts with a clean filesystem
     userInput.value = '';
-    customSystemPrompt.value = '';
-    selectedPromptId.value = '';
     await nextTick();
     const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };
     el?.focus?.();
@@ -246,25 +236,6 @@ export function useHomePage(deps: {
     el?.focus?.();
   }
 
-  // ─── Saved prompts ─────────────────────────────────────────────────────────
-
-  function loadSavedPrompts() {
-    savedPrompts.value = loadSavedPromptsFromStorage([]);
-  }
-
-  function loadSelectedPrompt() {
-    const prompt = savedPrompts.value.find((p: SavedPrompt) => p.id === selectedPromptId.value);
-    if (!prompt) {
-      customSystemPrompt.value = '';
-      return;
-    }
-    customSystemPrompt.value = prompt.systemPrompt;
-    userInput.value = prompt.userPrompt;
-    adjustTextareaHeight();
-    const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };
-    el?.focus?.();
-  }
-
   return {
     adjustTextareaHeight,
     scrollToBottom,
@@ -279,8 +250,6 @@ export function useHomePage(deps: {
     confirmDeleteSession,
     handleRegenerate,
     handleEditMessage,
-    loadSavedPrompts,
-    loadSelectedPrompt,
     // UX-H1 — Smart scroll exports
     handleScroll,
     isAutoScrollEnabled,

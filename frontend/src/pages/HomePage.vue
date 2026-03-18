@@ -15,6 +15,20 @@
       <!-- UX-H1: Extracted sub-components -->
       <OfflineBanner />
       <AuthErrorBanner />
+      <MigrationDialog
+        v-if="showMigrationDialog"
+        :prompt-count="migrationPromptCount"
+        @convert="handleMigrationConvert"
+        @dismiss="handleMigrationDismiss"
+      />
+
+      <SkillCreatorModal
+        v-if="showSkillCreator"
+        @close="showSkillCreator = false"
+        @skill-created="showSkillCreator = false"
+        @test-skill="handleTestSkill"
+      />
+
       <SessionConfirmDialogs
         :is-delete-confirm-visible="isDeleteConfirmVisible"
         :is-new-chat-confirm-visible="isNewChatConfirmVisible"
@@ -25,13 +39,12 @@
       />
 
       <QuickActionsBar
-        v-model:selected-prompt-id="selectedPromptId"
         :quick-actions="quickActions ?? []"
         :loading="loading"
-        :saved-prompts="savedPrompts"
-        :select-prompt-title="t('selectPrompt')"
+        :user-skills-for-host="userSkillsForHost"
         @apply-action="applyQuickAction"
-        @load-prompt="loadSelectedPrompt"
+        @execute-user-skill="handleExecuteUserSkill"
+        @open-skill-creator="showSkillCreator = true"
       />
 
       <!-- ARCH-H2 — Props removed, uses context via provide/inject -->
@@ -94,6 +107,8 @@ import StatsBar from '@/components/chat/StatsBar.vue';
 import OfflineBanner from '@/components/chat/OfflineBanner.vue';
 import AuthErrorBanner from '@/components/chat/AuthErrorBanner.vue';
 import SessionConfirmDialogs from '@/components/chat/SessionConfirmDialogs.vue';
+import SkillCreatorModal from '@/components/skills/SkillCreatorModal.vue';
+import MigrationDialog from '@/components/MigrationDialog.vue';
 import { useAgentLoop } from '@/composables/useAgentLoop';
 import { useImageActions } from '@/composables/useImageActions';
 import { useOfficeInsert } from '@/composables/useOfficeInsert';
@@ -107,16 +122,15 @@ import { localStorageKey } from '@/utils/enum';
 import { isPowerPoint, isWord, isExcel, isOutlook, forHost } from '@/utils/hostDetection';
 import { acceptAiChangesInDocument, hasAiTrackedChanges } from '@/utils/wordTools';
 import { clearAllAgentHighlightsInWorkbook } from '@/utils/excelTools';
-import { type SavedPrompt } from '@/utils/savedPrompts';
 import { useHomePage } from '@/composables/useHomePage';
+import { useUserSkills } from '@/composables/useUserSkills';
+import { useUserSkillExecution } from '@/composables/useUserSkillExecution';
 import type { ExcelFormulaLanguage } from '@/utils/constant'; // TOOL-M4
 
 const { t } = useI18n();
 
-const savedPrompts = ref<SavedPrompt[]>([]);
-const selectedPromptId = ref('');
-const customSystemPrompt = ref('');
 const isDraftFocusGlowing = ref(false);
+const showSkillCreator = ref(false);
 const isDeleteConfirmVisible = ref(false);
 const isNewChatConfirmVisible = ref(false);
 const availableModels = ref<Record<string, ModelInfo>>({});
@@ -240,10 +254,7 @@ function stopGeneration() {
 const homePage = useHomePage({
   chatInputRef,
   messageListRef,
-  savedPrompts,
   userInput,
-  customSystemPrompt,
-  selectedPromptId,
   loading,
   isDeleteConfirmVisible,
   isNewChatConfirmVisible,
@@ -268,8 +279,6 @@ const {
   handleSwitchSession,
   handleDeleteSession,
   confirmDeleteSession,
-  loadSavedPrompts,
-  loadSelectedPrompt,
   handleScroll, // UX-H1 — Smart scroll handler
   isAutoScrollEnabled, // UX-H1 — Auto-scroll state
 } = homePage;
@@ -306,7 +315,6 @@ const {
     isWord: hostIsWord,
   },
   settings: {
-    customSystemPrompt,
     agentMaxIterations,
     useSelectedText: ref(true), // GEN-L3: Always true
     excelFormulaLanguage,
@@ -342,6 +350,64 @@ function handleEditMessage(message: DisplayMessage) {
 
 const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
+// ── User Skills ──────────────────────────────────────────────────────────────
+const { skills: userSkills, skillsForHost, checkAndMigrateOldPrompts, migrateOldPrompts, confirmMigrationDone, dismissMigration } = useUserSkills();
+
+// Migration dialog state
+const showMigrationDialog = ref(false);
+const migrationPromptCount = ref(0);
+
+function handleMigrationConvert(): void {
+  migrateOldPrompts();
+  confirmMigrationDone();
+  showMigrationDialog.value = false;
+}
+
+function handleMigrationDismiss(): void {
+  dismissMigration();
+  showMigrationDialog.value = false;
+}
+const currentHostLower = (
+  forHost({ outlook: 'outlook', powerpoint: 'powerpoint', excel: 'excel', word: 'word' }) || 'word'
+) as import('@/utils/skillParser').SkillHost;
+const userSkillsForHost = skillsForHost(currentHostLower);
+
+const { executeUserSkill } = useUserSkillExecution({
+  t,
+  history,
+  userInput,
+  loading,
+  abortController,
+  inputTextarea: computed(() => chatInputRef.value?.textareaEl),
+  isDraftFocusGlowing,
+  getOfficeSelection: async () => {
+    const { useOfficeSelection } = await import('@/composables/useOfficeSelection');
+    const { getOfficeSelection: get } = useOfficeSelection();
+    return get();
+  },
+  runAgentLoop,
+  resolveChatModelTier: () => {
+    const nonImageEntry = Object.entries(availableModels.value).find(
+      ([, m]) => m.type !== 'image',
+    );
+    return (nonImageEntry?.[0] as import('@/types').ModelTier) || selectedModelTier.value;
+  },
+  createDisplayMessage: imageActions.createDisplayMessage,
+  adjustTextareaHeight,
+  scrollToBottom,
+  scrollToMessageTop,
+});
+
+function handleExecuteUserSkill(id: string): void {
+  const skill = userSkills.value.find(s => s.id === id);
+  if (skill) executeUserSkill(skill);
+}
+
+function handleTestSkill(skillDraft: Omit<import('@/types/userSkill').UserSkill, 'id' | 'createdAt' | 'updatedAt'>): void {
+  // Execute as ephemeral skill (not saved) — result appears in chat
+  executeUserSkill({ ...skillDraft, id: 'preview', createdAt: 0, updatedAt: 0 });
+}
+
 // ARCH-H2 — Provide context to eliminate prop drilling (~44 bindings → 0)
 provideHomePageContext({
   // State
@@ -353,9 +419,6 @@ provideHomePageContext({
   backendChecked,
   currentAction,
   userInput,
-  customSystemPrompt,
-  selectedPromptId,
-  savedPrompts,
   isDraftFocusGlowing,
   isAutoScrollEnabled,
   // Models
@@ -384,7 +447,6 @@ provideHomePageContext({
   executeNewChat,
   handleSwitchSession,
   handleDeleteSession,
-  loadSelectedPrompt,
   adjustTextareaHeight,
   // Computed
   inputPlaceholder,
@@ -400,14 +462,20 @@ watch(loading, async (isLoading, wasLoading) => {
 
 onBeforeMount(async () => {
   insertType.value = (localStorage.getItem(localStorageKey.insertType) as InsertType) || 'replace';
-  loadSavedPrompts();
   await sessionManager.init();
   rebuildSessionFiles();
   await refreshCanValidateAiChanges();
-});
-
-onActivated(() => {
-  loadSavedPrompts();
+  // Check for legacy custom prompts to migrate (only once per install)
+  if (checkAndMigrateOldPrompts()) {
+    const stored = localStorage.getItem('savedPrompts');
+    if (stored) {
+      try {
+        const prompts = JSON.parse(stored) as Array<{ name: string; systemPrompt: string; userPrompt: string }>;
+        migrationPromptCount.value = prompts.filter(p => p.name !== 'Default' || p.systemPrompt || p.userPrompt).length;
+      } catch { migrationPromptCount.value = 1; }
+    }
+    showMigrationDialog.value = true;
+  }
 });
 
 onDeactivated(() => {

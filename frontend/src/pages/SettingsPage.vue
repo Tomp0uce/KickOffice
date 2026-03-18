@@ -65,9 +65,7 @@
               @open-feedback="showFeedbackDialog = true"
             />
 
-            <PromptsTab v-if="currentTab === 'prompts'" />
-
-            <BuiltinPromptsTab v-if="currentTab === 'builtinPrompts'" />
+            <SkillLibraryTab v-if="currentTab === 'skills'" @open-creator="() => {}" />
 
             <ToolsTab v-if="currentTab === 'tools'" />
           </template>
@@ -80,7 +78,7 @@
 
 <script lang="ts" setup>
 import type { ModelInfo } from '@/types';
-import { ArrowLeft, Globe, KeyRound, MessageSquare, Settings, Wrench } from 'lucide-vue-next';
+import { ArrowLeft, Globe, KeyRound, Wrench, Zap } from 'lucide-vue-next';
 import { onBeforeMount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
@@ -89,10 +87,9 @@ import { fetchModels, healthCheck } from '@/api/backend';
 import { logService } from '@/utils/logger';
 import CustomButton from '@/components/CustomButton.vue';
 import AccountTab from '@/components/settings/AccountTab.vue';
-import BuiltinPromptsTab from '@/components/settings/BuiltinPromptsTab.vue';
 import FeedbackDialog from '@/components/settings/FeedbackDialog.vue';
 import GeneralTab from '@/components/settings/GeneralTab.vue';
-import PromptsTab from '@/components/settings/PromptsTab.vue';
+import SkillLibraryTab from '@/components/settings/SkillLibraryTab.vue';
 import ToolsTab from '@/components/settings/ToolsTab.vue';
 import { migrateFromPlaintext, getUserKey, getUserEmail } from '@/utils/credentialStorage';
 
@@ -115,13 +112,7 @@ const accountTabRef = ref<InstanceType<typeof AccountTab> | null>(null);
 const tabs = [
   { id: 'account', label: 'account', defaultLabel: 'Account', icon: KeyRound },
   { id: 'general', label: 'general', defaultLabel: 'General', icon: Globe },
-  { id: 'prompts', label: 'prompts', defaultLabel: 'Prompts', icon: MessageSquare },
-  {
-    id: 'builtinPrompts',
-    label: 'builtinPrompts',
-    defaultLabel: 'Built-in Prompts',
-    icon: Settings,
-  },
+  { id: 'skills', label: 'skills', defaultLabel: 'Skills', icon: Zap },
   { id: 'tools', label: 'tools', defaultLabel: 'Tools', icon: Wrench },
 ];
 

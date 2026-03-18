@@ -1,3 +1,12 @@
+---
+name: Traduire (Word)
+description: "Traduit chirurgicalement le texte Word sélectionné avec suivi des modifications (Track Changes). Chaque segment traduit est proposé via proposeRevision — traçable et réversible."
+host: word
+executionMode: agent
+icon: Languages
+actionKey: word-translate
+---
+
 # Word Translate Quick Action Skill
 
 ## Purpose

@@ -7,7 +7,6 @@
 import { inject, provide, type InjectionKey, type Ref, type ComputedRef } from 'vue';
 import type { DisplayMessage, QuickAction, RenderSegment } from '@/types/chat';
 import type { ModelInfo, ModelTier } from '@/types';
-import type { SavedPrompt } from '@/utils/savedPrompts';
 import type { SessionStats } from '@/composables/useAgentLoop';
 import type { useSessionManager } from '@/composables/useSessionManager';
 
@@ -29,9 +28,6 @@ export interface HomePageContext {
   backendChecked: Ref<boolean>;
   currentAction: Ref<string>;
   userInput: Ref<string>;
-  customSystemPrompt: Ref<string>;
-  selectedPromptId: Ref<string>;
-  savedPrompts: Ref<SavedPrompt[]>;
   isDraftFocusGlowing: Ref<boolean>;
   isAutoScrollEnabled: Ref<boolean>; // UX-H1
 
@@ -65,7 +61,6 @@ export interface HomePageContext {
   executeNewChat: () => Promise<void>;
   handleSwitchSession: (sessionId: string) => Promise<void>;
   handleDeleteSession: () => void;
-  loadSelectedPrompt: () => void;
   adjustTextareaHeight: () => void;
 
   // ─── Computed ────────────────────────────────────────────────────────────

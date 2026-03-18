@@ -1,23 +1,31 @@
 <template>
   <div class="flex w-full flex-wrap items-center justify-center gap-2 rounded-md">
-    <SingleSelect
-      :model-value="selectedPromptId"
-      :key-list="savedPrompts.map(prompt => prompt.id)"
-      :placeholder="selectPromptTitle"
-      title=""
-      :fronticon="false"
-      class="max-w-xs! flex-1! bg-surface! text-xs!"
-      @update:model-value="
-        val => {
-          $emit('update:selectedPromptId', String(val));
-          $emit('load-prompt');
-        }
-      "
-    >
-      <template #item="{ item }">
-        {{ savedPrompts.find(prompt => prompt.id === item)?.name || item }}
-      </template>
-    </SingleSelect>
+    <!-- User Skills dropdown + create button -->
+    <div class="flex flex-1 items-center gap-1 max-w-xs">
+      <SingleSelect
+        :key-list="userSkillsForHost.map(s => s.id)"
+        :placeholder="t('mySkills') || 'Mes skills...'"
+        title=""
+        :fronticon="false"
+        class="flex-1! bg-surface! text-xs!"
+        @update:model-value="(id) => $emit('execute-user-skill', String(id))"
+      >
+        <template #item="{ item }">
+          {{ userSkillsForHost.find(s => s.id === item)?.name || item }}
+        </template>
+      </SingleSelect>
+      <CustomButton
+        :icon="Plus"
+        text=""
+        :title="t('createSkill') || 'Créer un skill'"
+        type="secondary"
+        :icon-size="14"
+        class="shrink-0! bg-surface! p-1.5!"
+        @click="$emit('open-skill-creator')"
+      />
+    </div>
+
+    <!-- Built-in quick action buttons (unchanged) -->
     <CustomButton
       v-for="action in quickActions"
       :key="action.key"
@@ -35,22 +43,24 @@
 </template>
 
 <script lang="ts" setup>
+import { Plus } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
 import CustomButton from '@/components/CustomButton.vue';
 import SingleSelect from '@/components/SingleSelect.vue';
 import type { QuickAction } from '@/types/chat';
-import type { SavedPrompt } from '@/utils/savedPrompts';
+import type { UserSkill } from '@/types/userSkill';
+
+const { t } = useI18n();
 
 defineProps<{
   quickActions: QuickAction[];
   loading: boolean;
-  savedPrompts: SavedPrompt[];
-  selectedPromptId: string;
-  selectPromptTitle: string;
+  userSkillsForHost: UserSkill[];
 }>();
 
 defineEmits<{
   (e: 'apply-action', key: string): void;
-  (e: 'update:selectedPromptId', value: string): void;
-  (e: 'load-prompt'): void;
+  (e: 'execute-user-skill', id: string): void;
+  (e: 'open-skill-creator'): void;
 }>();
 </script>

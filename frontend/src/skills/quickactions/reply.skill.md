@@ -1,3 +1,12 @@
+---
+name: Rédiger une réponse
+description: "Prépare un brouillon de réponse à l'email courant, adapté au ton et au contexte du message original. Place le curseur dans la zone de saisie pour que vous puissiez finaliser avant l'envoi."
+host: outlook
+executionMode: draft
+icon: Reply
+actionKey: reply
+---
+
 # Reply Quick Action Skill
 
 ## Purpose
