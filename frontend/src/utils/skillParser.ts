@@ -24,8 +24,8 @@ export interface ParsedSkill {
   raw: string; // full file content (for system prompt injection)
 }
 
-const VALID_HOSTS: SkillHost[] = ['word', 'excel', 'powerpoint', 'outlook', 'all'];
-const VALID_EXECUTION_MODES: SkillExecutionMode[] = ['immediate', 'draft', 'agent'];
+export const VALID_HOSTS: SkillHost[] = ['word', 'excel', 'powerpoint', 'outlook', 'all'];
+export const VALID_EXECUTION_MODES: SkillExecutionMode[] = ['immediate', 'draft', 'agent'];
 
 /**
  * Parse a raw .skill.md string into metadata + body.

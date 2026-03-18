@@ -10,7 +10,7 @@
 
 import { ref, computed } from 'vue';
 import { logService } from '@/utils/logger';
-import { parseSkill, serializeSkillToMd } from '@/utils/skillParser';
+import { parseSkill, serializeSkillToMd, VALID_HOSTS, VALID_EXECUTION_MODES } from '@/utils/skillParser';
 import type { SkillHost } from '@/utils/skillParser';
 import type { UserSkill } from '@/types/userSkill';
 import { SKILL_STORAGE_KEY, SKILL_MIGRATION_KEY } from '@/types/userSkill';
@@ -171,6 +171,7 @@ export function useUserSkills() {
         userPrompt: string;
       }>;
 
+      const newSkills: UserSkill[] = [];
       for (const p of prompts) {
         if (p.name === 'Default' && !p.systemPrompt && !p.userPrompt) continue;
         const lines: string[] = [];
@@ -180,14 +181,22 @@ export function useUserSkills() {
         if (p.userPrompt) {
           lines.push('', '## Message type', '', p.userPrompt);
         }
-        addSkill({
+        newSkills.push({
+          id: `skill_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           name: p.name,
           description: p.name,
           host: 'all',
           executionMode: 'immediate',
           icon: 'Zap',
           skillContent: lines.join('\n').trim(),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
         });
+      }
+
+      if (newSkills.length > 0) {
+        skills.value = [...skills.value, ...newSkills];
+        saveToStorage(); // single write instead of N writes
       }
     } catch (err) {
       logService.warn('[UserSkills] Migration failed', err);
@@ -222,9 +231,6 @@ export function useUserSkills() {
 
 // ── Validation ────────────────────────────────────────────────────────────────
 
-const VALID_HOSTS = ['word', 'excel', 'powerpoint', 'outlook', 'all'];
-const VALID_MODES = ['immediate', 'draft', 'agent'];
-
 export function isValidUserSkill(item: unknown): item is UserSkill {
   if (!item || typeof item !== 'object') return false;
   const o = item as Record<string, unknown>;
@@ -232,8 +238,8 @@ export function isValidUserSkill(item: unknown): item is UserSkill {
     typeof o['id'] === 'string' &&
     typeof o['name'] === 'string' &&
     typeof o['skillContent'] === 'string' &&
-    VALID_HOSTS.includes(o['host'] as string) &&
-    VALID_MODES.includes(o['executionMode'] as string)
+    VALID_HOSTS.includes(o['host'] as SkillHost) &&
+    VALID_EXECUTION_MODES.includes(o['executionMode'] as 'immediate' | 'draft' | 'agent')
   );
 }
 
