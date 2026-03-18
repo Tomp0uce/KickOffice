@@ -1,3 +1,12 @@
+---
+name: Analyser les tendances
+description: "Analyse les tendances et patterns dans les données sélectionnées. Identifie les anomalies, les progressions et les corrélations, puis fournit une interprétation synthétique des dynamiques."
+host: excel
+executionMode: agent
+icon: TrendingUp
+actionKey: dataTrend
+---
+
 # Data Trend Quick Action Skill (Excel)
 
 ## Purpose

@@ -1,3 +1,12 @@
+---
+name: Formaliser le ton
+description: "Transforme un texte casual ou informel en version professionnelle et formelle pour la communication business Outlook. Préserve le sens et la structure, élève uniquement le registre."
+host: outlook
+executionMode: immediate
+icon: Briefcase
+actionKey: formalize
+---
+
 # Formalize Quick Action Skill
 
 ## Purpose

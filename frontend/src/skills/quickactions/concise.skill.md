@@ -1,3 +1,12 @@
+---
+name: Rendre concis
+description: "Condense le texte sélectionné de 30 à 50% en éliminant les redondances et le superflu, tout en préservant toutes les informations clés et le ton du message original."
+host: outlook
+executionMode: immediate
+icon: Scissors
+actionKey: concise
+---
+
 # Concise Quick Action Skill
 
 ## Purpose

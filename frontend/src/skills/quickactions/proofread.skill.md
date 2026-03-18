@@ -1,3 +1,12 @@
+---
+name: Corriger le texte
+description: "Corrige les fautes d'orthographe, grammaire et syntaxe du texte sélectionné. Retourne le texte corrigé dans la même langue, sans modifier le style ni le sens du contenu."
+host: all
+executionMode: immediate
+icon: CheckSquare
+actionKey: proofread
+---
+
 # Proofread Quick Action Skill
 
 ## Purpose

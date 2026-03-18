@@ -1,3 +1,12 @@
+---
+name: Générer une formule
+description: "Génère la formule Excel appropriée à partir de votre description en langage naturel et l'insère dans la cellule sélectionnée avec une explication de son fonctionnement."
+host: excel
+executionMode: agent
+icon: Function
+actionKey: formulaGenerator
+---
+
 # Formula Generator Quick Action Skill (Excel)
 
 ## Purpose

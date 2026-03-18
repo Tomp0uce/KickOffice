@@ -1,3 +1,12 @@
+---
+name: Nettoyer les données
+description: "Nettoie et normalise les données de la plage sélectionnée : suppression des doublons, correction des formats incohérents, harmonisation de la casse et des types de données."
+host: excel
+executionMode: agent
+icon: Database
+actionKey: ingest
+---
+
 # Ingest Quick Action Skill (Excel)
 
 ## Purpose

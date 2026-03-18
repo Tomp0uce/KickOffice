@@ -1,3 +1,12 @@
+---
+name: Traduire le texte
+description: "Traduit le texte sélectionné entre français et anglais en détectant automatiquement la langue source. Préserve les formatages gras/italique/tableaux et les placeholders d'images {{PRESERVE_N}}."
+host: all
+executionMode: immediate
+icon: Languages
+actionKey: translate
+---
+
 # Translate Quick Action Skill
 
 ## Purpose

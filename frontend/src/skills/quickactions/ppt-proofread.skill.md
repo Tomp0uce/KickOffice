@@ -1,3 +1,12 @@
+---
+name: Corriger la slide
+description: "Corrige les fautes d'orthographe et grammaire sur la slide active en modifiant directement chaque shape concernée via les outils PowerPoint. Préserve tout le formatage visuel."
+host: powerpoint
+executionMode: agent
+icon: CheckCircle
+actionKey: ppt-proofread
+---
+
 # PowerPoint Proofread Quick Action Skill
 
 ## Purpose

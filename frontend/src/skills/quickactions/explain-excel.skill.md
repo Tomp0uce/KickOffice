@@ -1,3 +1,12 @@
+---
+name: Expliquer les formules
+description: "Explique en langage clair les formules, la structure et la logique des cellules sélectionnées. Décrit ce que chaque formule calcule et comment les données sont organisées."
+host: excel
+executionMode: immediate
+icon: HelpCircle
+actionKey: explain
+---
+
 # Explain Formula Quick Action Skill (Excel)
 
 ## Purpose

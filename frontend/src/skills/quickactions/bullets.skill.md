@@ -1,3 +1,12 @@
+---
+name: Reformuler en bullets
+description: "Transforme le texte sélectionné en 3-7 bullet points concis et percutants pour PowerPoint. Préserve la langue d'origine. Idéal pour convertir des paragraphes denses en points mémorables à afficher sur une slide."
+host: powerpoint
+executionMode: immediate
+icon: List
+actionKey: bullets
+---
+
 # Bullets Quick Action Skill
 
 ## Purpose

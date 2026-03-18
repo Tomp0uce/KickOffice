@@ -1,3 +1,12 @@
+---
+name: Punchifier le texte
+description: "Retravaille le texte de la slide pour le rendre plus percutant et mémorable. Renforce les verbes, élimine le jargon superflu et maximise l'impact en minimum de mots. Idéal pour les slides de pitch."
+host: powerpoint
+executionMode: immediate
+icon: Zap
+actionKey: punchify
+---
+
 # Punchify Quick Action Skill (PowerPoint Agent)
 
 ## Purpose

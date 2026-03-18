@@ -1,3 +1,12 @@
+---
+name: Traduire la slide
+description: "Traduit toutes les shapes textuelles de la slide active entre français et anglais en modifiant directement le contenu via les outils PowerPoint. Préserve la mise en forme."
+host: powerpoint
+executionMode: agent
+icon: Globe
+actionKey: ppt-translate
+---
+
 # PowerPoint Translate Quick Action Skill
 
 ## Purpose

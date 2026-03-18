@@ -1,3 +1,12 @@
+---
+name: Réviser le doc
+description: "Révise le document Word sélectionné et propose des améliorations sur le fond, la clarté et la cohérence via Track Changes. Fournit aussi un commentaire de synthèse sur la qualité globale."
+host: word
+executionMode: agent
+icon: Eye
+actionKey: word-review
+---
+
 # Document Review Quick Action Skill (Word)
 
 ## Purpose

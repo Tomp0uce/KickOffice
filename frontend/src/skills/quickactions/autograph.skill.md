@@ -1,3 +1,12 @@
+---
+name: Embellir le tableau
+description: "Embellit la plage ou le tableau sélectionné avec une mise en forme professionnelle : en-têtes mis en valeur, couleurs cohérentes, bordures, alignements et formats numériques adaptés."
+host: excel
+executionMode: agent
+icon: Palette
+actionKey: autograph
+---
+
 # Auto-Graph Quick Action Skill (Excel)
 
 ## Purpose
