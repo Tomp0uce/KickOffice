@@ -26,6 +26,7 @@
       data-message
       class="group flex items-end gap-4 [.user]:flex-row-reverse"
       :class="item.message.role === 'assistant' ? 'assistant' : 'user'"
+      style="content-visibility: auto; contain-intrinsic-block-size: auto 80px;"
     >
       <div
         class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left"

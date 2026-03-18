@@ -1,6 +1,6 @@
 # DESIGN_REVIEW.md
 
-**Last updated**: 2026-03-17
+**Last updated**: 2026-03-18
 **Status**: DR v12 fully triaged. All critical/high/medium/low items resolved or explicitly deferred. Remaining open items are architectural refactors and test coverage — no functional bugs outstanding.
 
 ---
@@ -9,7 +9,7 @@
 
 All items from audit cycles v9–v12 have been addressed. **56 items from v9–v11** are ✅ FIXED (Phases 1A–7A). **All 5 critical items from v12** are ✅ FIXED (2026-03-16). The complete v12 batch (41 items across error handling, UX, dead code, duplication, code quality, and OXML enhancements) was resolved across 2026-03-16 and 2026-03-17.
 
-Key deliverables: SSE error handling hardened (ERR-C1–C4, RACE-C1); session-switch race condition eliminated; frontend log forwarding to backend (ERR-M3); rate-limit floor (ERR-M4); upstream SSE reader cancellation (ERR-M5); request correlation IDs (ERR-L1); stream error Retry button (ERR-L2); HomePage decomposed (UX-H1 + QUAL-H2); dark mode fix (UX-L1); keyboard navigation for dropdowns (UX-M4); i18n gaps closed (UX-M1/M3/L2, DEAD-L1); `mutationDetector.ts` dedup (DUP-H1); `getVfsSandboxContext` dedup (DUP-M1); `createEvalExecutor` factory (DUP-M2); `buildScreenshotResult` helper (DUP-L1); full TypeScript `any` removal (QUAL-H1); JSON truncation fix in tokenManager (QUAL-M3); CSS injection hardening in markdown (QUAL-M4); env var validation in backend (QUAL-M5); backend log summary (QUAL-L1); `addAttachment` Outlook tool (FUNC-M2); Waterfall/Treemap/Funnel chart types (FUNC-L1); `reorderSlide` PPT tool (FUNC-L2); `acceptAiChanges`/`rejectAiChanges` + "Valider" button with proper WordApi 1.6 version guard (OXML-IMP3); `insertOoxml` Word tool (OXML-IMP4); `addComment`/`getComments` Word tools (OXML-IMP2); speaker notes via PPT native API (OXML-IMP5); `powerpointImageRegistry` cleared on session switch (QUAL-M2); `office-agents/` directory removed (ARCH-M3/DEAD-M1); tool counts synchronized to 100 across all docs (FUNC-M1).
+Key deliverables: SSE error handling hardened (ERR-C1–C4, RACE-C1); session-switch race condition eliminated; frontend log forwarding to backend (ERR-M3); rate-limit floor (ERR-M4); upstream SSE reader cancellation (ERR-M5); request correlation IDs (ERR-L1); stream error Retry button (ERR-L2); HomePage decomposed (UX-H1 + QUAL-H2); dark mode fix (UX-L1); keyboard navigation for dropdowns (UX-M4); i18n gaps closed (UX-M1/M3/L2, DEAD-L1); `mutationDetector.ts` dedup (DUP-H1); `getVfsSandboxContext` dedup (DUP-M1); `createEvalExecutor` factory (DUP-M2); `buildScreenshotResult` helper (DUP-L1); full TypeScript `any` removal (QUAL-H1); JSON truncation fix in tokenManager (QUAL-M3); CSS injection hardening in markdown (QUAL-M4); env var validation in backend (QUAL-M5); backend log summary (QUAL-L1); `addAttachment` Outlook tool (FUNC-M2); Waterfall/Treemap/Funnel chart types (FUNC-L1); `reorderSlide` PPT tool (FUNC-L2); `acceptAiChanges`/`rejectAiChanges` + "Valider" button with proper WordApi 1.6 version guard (OXML-IMP3); `insertOoxml` Word tool (OXML-IMP4); `addComment`/`getComments` Word tools (OXML-IMP2); speaker notes via PPT native API (OXML-IMP5); `powerpointImageRegistry` cleared on session switch (QUAL-M2); `office-agents/` directory removed (ARCH-M3/DEAD-M1); tool counts synchronized to 100 across all docs (FUNC-M1); CSS virtualization for ChatMessageList via `content-visibility: auto` (UX-M2); unit tests for `useLoopDetection`, `useSessionFiles`, `useMessageOrchestration`, `useToolExecutor` — 47 new tests (QUAL-M1).
 
 ---
 
@@ -55,30 +55,6 @@ PowerPoint tools use a dual `executePowerPoint` / `executeCommon` pattern; Word 
 **Impact**: Minor — functional but slightly harder to maintain.
 **Path**: Unify to always use `buildExecuteWrapper` + a secondary common-api wrapper.
 **Effort**: LOW
-
----
-
-### UX & Performance
-
-#### UX-M2 — ChatMessageList no virtualization [MEDIUM]
-
-No virtualization — all messages rendered in the DOM. For long conversations (50+ messages with tool calls), scroll jank is possible.
-
-**Impact**: Performance degradation on long sessions.
-**Path**: Consider `vue-virtual-scroller` or similar for conversations exceeding ~30 messages.
-**Effort**: HIGH
-
----
-
-### Code Quality
-
-#### QUAL-M1 — No unit tests for composables [MEDIUM]
-
-Test coverage exists only for utils (`common.test.ts`, `officeCodeValidator.test.ts`, `officeAction.test.ts`, `tokenManager.test.ts`). No composable has tests.
-
-**Impact**: Agent loop behavior changes validated only by manual testing.
-**Path**: Add tests for `useMessageOrchestration`, `useToolExecutor`, `useLoopDetection`, `useSessionFiles` — the most testable composables (pure logic, no Office.js dependency).
-**Effort**: HIGH
 
 ---
 
