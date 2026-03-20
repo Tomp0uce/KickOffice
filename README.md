@@ -13,8 +13,8 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane. Bulk-accept/reject via `acceptAiChanges`/`rejectAiChanges` tools or the "Valider" UI button
-- **Multi-Host Support** — Word (34 tools), Excel (27 tools), PowerPoint (24 tools), Outlook (9 tools), General (6 tools)
-- **Skill System** — 17 Quick Action skill files + 5 host skill files define agent behavior in Markdown
+- **Multi-Host Support** — Word (34 tools), Excel (28 tools), PowerPoint (24 tools), Outlook (9 tools), General (6 tools)
+- **Skill System** — 24 Quick Action skill files + 5 host skill files define agent behavior in Markdown
 - **Context Management** — Automatic context window compression: older tool results are truncated, recent iterations kept in full
 - **Secure Sandbox** — SES-based execution environment for safe dynamic code
 - **File Analysis** — Upload and analyze PDF, DOCX, XLSX, CSV documents (up to 50 MB)
@@ -123,11 +123,11 @@ Native Word revision markup via `docx-redline-js`:
 | Host           | Tools  | Highlights                                                                                    |
 | -------------- | ------ | --------------------------------------------------------------------------------------------- |
 | **Word**       | 34     | `proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `addComment`, `getComments`, `getDocumentOoxml`, `eval_wordjs`, Track Changes |
-| **Excel**      | 27     | `eval_officejs`, formulas, charts (incl. Waterfall/Treemap/Funnel), screenshots, CSV, pixel art, header detection |
+| **Excel**      | 28     | `eval_officejs`, formulas, charts (incl. Waterfall/Treemap/Funnel), screenshots, CSV, pixel art, header detection |
 | **PowerPoint** | 24     | `editSlideXml`, `reorderSlide`, `getSpeakerNotes`, `setSpeakerNotes`, slides, shapes, screenshots, icons (Iconify), `verifySlides` |
 | **Outlook**    | 9      | `eval_outlookjs`, `addAttachment`, email body/subject, recipients, rich content preservation  |
 | **General**    | 6      | `executeBash` (VFS), `calculateMath`, `getCurrentDate`, file operations                       |
-| **Total**      | **100** |                                                                                              |
+| **Total**      | **101** |                                                                                              |
 
 ---
 
@@ -135,15 +135,15 @@ Native Word revision markup via `docx-redline-js`:
 
 ### Word
 
-Translate, Polish, Academic, Summary, Proofread, Formalize, Concise
+Translate, Proofread, Polish, Academic, Summary, Formalize, Concise, Review
 
 ### Excel
 
-Clean (Ingest), Beautify (Autograph), Formula (Formula Generator), Data Trend, Explain Excel
+Clean (Ingest), Beautify (Autograph), Formula (Formula Generator), Data Trend, Explain Excel, Chart Digitizer, Pixel Art
 
 ### PowerPoint
 
-Bullets, Speaker Notes (Review), Impact (Punchify), Visual
+Bullets, Speaker Notes (Review), Impact (Punchify), Visual, Translate, Proofread
 
 ### Outlook
 
