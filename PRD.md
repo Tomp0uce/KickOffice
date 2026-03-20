@@ -257,7 +257,7 @@ Replaces the former Custom Prompts and Built-in Prompts tabs.
 
 ### 5.4 Tools Tab
 
-- Complete tool list with checkboxes (67 tools total)
+- Complete tool list with checkboxes (101 tools total)
 - Enable/disable per tool
 - Description for each tool
 - Preference persistence per Office host
@@ -360,8 +360,8 @@ Replaces the former Custom Prompts and Built-in Prompts tabs.
 | getSelectedCells      | Get values, address, dimensions of selection        | JSON with address, rowCount, columnCount, values (2D array)       |
 | getWorksheetData      | Get all data from used range                        | values, address, rowCount, columnCount                            |
 | getWorksheetInfo      | Get workbook structure                              | activeName, position, usedRange, totalSheets, sheetNames          |
-| getDataFromSheet      | Read from any sheet by name                         | data from specified sheet                                         |
 | getNamedRanges        | List all named ranges                               | names and formulas                                                |
+| getConditionalFormattingRules | List conditional formatting rules on a range | rules with type, conditions, format                           |
 | findData              | Search values workbook-wide with optional pagination | matches, totalFound, offset, hasMore, nextOffset                  |
 | getAllObjects          | List charts and pivot tables                        | object details                                                    |
 | getRangeAsCsv         | Export a range as compact CSV text                  | CSV rows (2–3× fewer tokens than JSON), with truncation indicator |
@@ -376,8 +376,17 @@ Replaces the former Custom Prompts and Built-in Prompts tabs.
 | clearRange              | Clear contents or formatting                            | address, clearContents, clearFormatting                                             |
 | modifyStructure         | Insert/delete/hide/unhide rows/columns, freeze panes    | sheetName, operation, dimension, reference, count                                   |
 | modifyWorkbookStructure | Create, delete, rename, or duplicate worksheets         | operation, sheetName, newName, tabColor                                             |
+| addWorksheet            | Add a new worksheet to the workbook                     | sheetName, position                                                                 |
 | createTable             | Convert range to structured table                       | address, hasHeaders, tableName, style                                               |
 | sortRange               | Sort data by column                                     | columnIndex, ascending, hasHeaders                                                  |
+| searchAndReplace        | Find and replace values in a sheet or range             | searchText, replaceText, sheetName, matchCase                                       |
+| setNamedRange           | Create or update a named range                          | name, address, sheetName                                                            |
+| protectWorksheet        | Protect or unprotect a worksheet                        | sheetName, protect, password                                                        |
+| importCsvToSheet        | Import CSV text into a sheet with type coercion         | csvText, sheetName, startAddress, hasHeaders                                        |
+| imageToSheet            | Convert an uploaded image to pixel art using cell colors | imageId, sheetName, startAddress, width, height                                    |
+| extract_chart_data      | Extract data points from a chart image (vision-based)   | imageId                                                                             |
+| clearAgentHighlights    | Remove all AI-applied highlight colors from workbook    | none                                                                                |
+| eval_officejs           | Execute custom Office.js code in an Excel.run context   | code, explanation                                                                   |
 
 ### 7.3 Formatting Tools
 
@@ -473,6 +482,8 @@ Replaces the former Custom Prompts and Built-in Prompts tabs.
 | getSlideContent      | Get all text from a specific slide                 | slideNumber (1-based)                           |
 | getShapes            | Get all shapes with properties                     | slideNumber (1-based)                           |
 | getAllSlidesOverview  | Get text overview of entire presentation           | none                                            |
+| getCurrentSlideIndex | Get the index of the slide currently viewed        | none — returns 1-based slide number             |
+| getSpeakerNotes      | Get speaker notes for a slide                      | slideNumber (1-based)                           |
 | screenshotSlide      | Capture a slide as PNG for visual verification     | slideNumber (1-based, optional)                 |
 | verifySlides         | Detect shape overflows and overlaps on all slides  | none — returns a text report of issues          |
 | searchIcons          | Search the Iconify icon library by keyword         | query, limit, prefix (icon set filter)          |
@@ -481,13 +492,21 @@ Replaces the former Custom Prompts and Built-in Prompts tabs.
 
 | Tool                     | Description                                             | Key Parameters                                    |
 | ------------------------ | ------------------------------------------------------- | ------------------------------------------------- |
-| insertContent            | **PREFERRED** - Add/replace content with Markdown       | content, slideNumber, shapeIdOrName               |
-| proposeShapeTextRevision | Modify shape text with diff tracking                    | slideNumber, shapeIdOrName, revisedText           |
-| addSlide                 | Add new slide — picks the best layout from the presentation's slide master by name | layout (Blank, Title, TitleAndContent...)         |
-| deleteSlide              | Delete slide by number                                  | slideNumber (1-based)                             |
-| duplicateSlide           | Copy a slide; insert duplicate after the original       | slideNumber (1-based)                             |
-| insertIcon               | Insert an Iconify icon as an image on a slide           | iconId ("prefix:name"), slideNumber, left, top, width, height, color |
-| editSlideXml             | Directly edit slide OOXML for operations beyond the API | slideNumber, code (JS with JSZip access), explanation |
+| insertContent                 | **PREFERRED** - Add/replace content with Markdown            | content, slideNumber, shapeIdOrName               |
+| proposeShapeTextRevision      | Modify shape text with diff tracking                         | slideNumber, shapeIdOrName, revisedText           |
+| replaceShapeParagraphs        | Replace paragraphs in a shape while preserving formatting    | slideNumber, shapeIdOrName, paragraphs            |
+| searchAndReplaceInShape       | Find and replace text in a specific shape                    | slideNumber, shapeIdOrName, searchText, replaceText |
+| searchAndFormatInPresentation | Search text across all slides and apply formatting           | searchText, format                                |
+| replaceSelectedText           | Replace the currently selected text                          | text                                              |
+| setSpeakerNotes               | Set speaker notes for a slide                                | slideNumber, notes                                |
+| addSlide                      | Add new slide — picks the best layout from the slide master  | layout (Blank, Title, TitleAndContent...)         |
+| deleteSlide                   | Delete slide by number                                       | slideNumber (1-based)                             |
+| duplicateSlide                | Copy a slide; insert duplicate after the original            | slideNumber (1-based)                             |
+| reorderSlide                  | Move a slide to a different position                         | slideNumber, targetPosition (1-based)             |
+| insertIcon                    | Insert an Iconify icon as an image on a slide                | iconId ("prefix:name"), slideNumber, left, top, width, height, color |
+| insertImageOnSlide            | Insert an uploaded image on a slide                          | imageId, slideNumber, left, top, width, height    |
+| eval_powerpointjs             | Execute custom Office.js code in a PowerPoint.run context    | code, explanation                                 |
+| editSlideXml                  | Directly edit slide OOXML for operations beyond the API      | slideNumber, code (JS with JSZip access), explanation |
 
 ### 8.3 Visual Verification Workflow
 
@@ -564,6 +583,8 @@ PowerPoint has NO native Track Changes. Two workarounds:
 | writeEmailBody  | **PREFERRED** - Modify email body | content, mode (Append/Insert/Replace), diffTracking |
 | setEmailSubject | Set email subject                 | subject                                             |
 | addRecipient    | Add recipients                    | field (to/cc/bcc), recipients (comma-separated)     |
+| addAttachment   | Add a file attachment to the email | url, attachmentType, attachmentName               |
+| eval_outlookjs  | Execute custom Office.js code in the Outlook mailbox context | code, explanation              |
 
 ### 9.3 Email Body Writing Modes
 
@@ -916,12 +937,12 @@ When context limit is reached:
 
 | Application    | Total   | Notable capabilities                                                        |
 | -------------- | ------- | --------------------------------------------------------------------------- |
-| **Word**       | 41      | Format-preserving edits, Track Changes, tables, comments, diff tracking     |
-| **Excel**      | 49      | Charts, formulas, screenshots, CSV export, workbook structure management, header detection |
-| **PowerPoint** | 22      | Slides, shapes, screenshots, layout verification, icon library, OOXML edit  |
-| **Outlook**    | 14      | Email compose/read, smart reply, email history protection                   |
+| **Word**       | 34      | Format-preserving edits, Track Changes, tables, comments, diff tracking     |
+| **Excel**      | 28      | Charts, formulas, screenshots, CSV export, workbook structure management, header detection, pixel art, chart digitizer |
+| **PowerPoint** | 24      | Slides, shapes, screenshots, layout verification, icon library, OOXML edit, speaker notes, slide reorder |
+| **Outlook**    | 9       | Email compose/read, smart reply, email history protection, attachments      |
 | **General**    | 6       | VFS, math, date, file operations                                            |
-| **Total**      | **139** |                                                                             |
+| **Total**      | **101** |                                                                             |
 
 ### 16.2 General Tools (All Apps)
 
