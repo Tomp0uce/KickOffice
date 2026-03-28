@@ -172,9 +172,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 ### Phase 1 — Security & Bugs (must fix before merge)
 
 #### Sub-phase 1.1 — Critical bugs [useAgentLoop + tokenManager zone]
-- [ ] `ROB-H1` | HIGH | T2 | contract | `tokenManager.ts:240` | Spread-copy messages to prevent mutation: `{ ...message }`
-- [ ] `ROB-H2` | HIGH | T1 | bug | `useAgentLoop.ts:583-592` | Replace `'\\n'` with `'\n'` in sanitizedEmail/sanitizedIntent
-- [ ] `ARCH-M1` | MEDIUM | T2 | bug | `useAgentLoop.ts:623-634` | Fix timer leak: clear first timeout before overwriting
+- [x] `ROB-H1` | HIGH | T2 | contract | `tokenManager.ts:240` | Spread-copy messages to prevent mutation (TDD: 2 mutation tests)
+- [x] `ROB-H2` | HIGH | T1 | bug | `useAgentLoop.ts:583-592` | Replaced `'\\n'` with `'\n'` in sanitizedEmail/sanitizedIntent
+- [x] `ARCH-M1` | MEDIUM | T2 | bug | `useAgentLoop.ts:623-634` | Split into textTimeoutId/htmlTimeoutId, both cleared in finally
 
 #### Sub-phase 1.2 — Security [backend zone]
 - [ ] `SEC-H1` | HIGH | T1 | security | `server.js:41` | Change `trust proxy: true` to `trust proxy: 1`
@@ -227,6 +227,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 
 <!-- Append fixes here as completed. Format: -->
 <!-- [YYYY-MM-DD] FIXED | TIER | CRITICALITY | ISSUE-ID | summary | files touched -->
+[2026-03-28] FIXED | T2 | HIGH | ROB-H1 | Spread-copy messages in prepareMessagesForContext to prevent caller mutation (TDD) | tokenManager.ts, tokenManager.test.ts
+[2026-03-28] FIXED | T1 | HIGH | ROB-H2 | Replaced '\\n' with '\n' in smart-reply XML delimiters | useAgentLoop.ts
+[2026-03-28] FIXED | T2 | MEDIUM | ARCH-M1 | Split timeoutId into textTimeoutId/htmlTimeoutId, both cleared in finally | useAgentLoop.ts
 
 ---
 
