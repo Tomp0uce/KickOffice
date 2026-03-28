@@ -207,9 +207,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 - [x] `ROB-M1` | MEDIUM | T1 | contract | `backend.ts:253-264` | Throw Error instead of returning '' from generateImage
 
 #### Sub-phase 3.3 — Observability & types [logger + tokenManager zone]
-- [ ] `OBS-M1` | MEDIUM | T3 | api | `logger.ts:144-167` | Unify logService method signatures
-- [ ] `ROB-M4` | MEDIUM | T2 | type_safety | `tokenManager.ts:86` | Define ContentPart type for truncateToBudget
-- [ ] `ROB-M2` | MEDIUM | T1 | contract | `useDocumentUndo.ts:271-373` | Remove redundant state resets from undo sub-functions
+- [x] `OBS-M1` | MEDIUM | T3 | api | `logger.ts:144-167` | Unify logService method signatures
+- [x] `ROB-M4` | MEDIUM | T2 | type_safety | `tokenManager.ts:86` | Define ContentPart type for truncateToBudget
+- [x] `ROB-M2` | MEDIUM | T1 | contract | `useDocumentUndo.ts:271-373` | Remove redundant state resets from undo sub-functions
 
 #### Sub-phase 3.4 — Documentation & deps [scattered]
 - [ ] `DOC-L2` | LOW | T1 | docs | `README.md:222` | Fix Quick Action count: 17→24
@@ -246,6 +246,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T2 | MEDIUM | DRY-M1 | Extracted BACKEND_URL to httpClient.ts, removed 2 local definitions | httpClient.ts, backend.ts, useSkillCreator.ts
 [2026-03-28] FIXED | T2 | MEDIUM | ARCH-M2 | Replaced 50-line inline PPT code with getCurrentSlideNumber+getSlideContentStandalone | useAgentLoop.ts
 [2026-03-28] FIXED | T1 | MEDIUM | ROB-M1 | generateImage throws Error instead of silent return '' | backend.ts
+[2026-03-28] FIXED | T3 | MEDIUM | OBS-M1 | Unified logService signatures: all methods now accept optional traffic param + extracted toDataRecord helper | logger.ts
+[2026-03-28] FIXED | T2 | MEDIUM | ROB-M4 | Replaced any[] with MessageContentPart[] in truncateToBudget overload | tokenManager.ts
+[2026-03-28] FIXED | T1 | MEDIUM | ROB-M2 | Removed redundant undoSnapshot/canUndo resets from 5 undo sub-functions (already cleared by parent) | useDocumentUndo.ts
 
 ---
 

@@ -80,7 +80,9 @@ class LogService {
     return {
       host: detectOfficeHost(),
       sessionId: this._currentSessionId,
-      userId: await import('./credentialStorage').then(m => m.getUserEmail()).catch(() => 'anonymous'),
+      userId: await import('./credentialStorage')
+        .then(m => m.getUserEmail())
+        .catch(() => 'anonymous'),
     };
   }
 
@@ -88,8 +90,8 @@ class LogService {
     level: LogEntry['level'],
     message: string,
     traffic: LogEntry['traffic'] = 'system',
-    data?: any,
-    errorObj?: any,
+    data?: Record<string, unknown>,
+    errorObj?: unknown,
   ) {
     if (LOG_LEVEL_MAP[level] < LOG_LEVEL_MAP[this._logLevel]) {
       return;
@@ -141,25 +143,30 @@ class LogService {
     }
   }
 
-  error(message: string, error?: any, data?: any) {
-    // Avoid infinite loop if we use console.error in original mode
+  private toDataRecord(data: unknown): Record<string, unknown> | undefined {
+    return data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : undefined;
+  }
+
+  error(message: string, error?: unknown, data?: unknown, traffic: LogEntry['traffic'] = 'system') {
     this.originalConsole.error(`[KO] ${message}`, error || '', data || '');
-    this.addEntry('error', message, 'system', data, error);
+    this.addEntry('error', message, traffic, this.toDataRecord(data), error);
   }
 
-  warn(message: string, data?: any) {
+  warn(message: string, data?: unknown, traffic: LogEntry['traffic'] = 'system') {
     this.originalConsole.warn(`[KO] ${message}`, data || '');
-    this.addEntry('warn', message, 'system', data);
+    this.addEntry('warn', message, traffic, this.toDataRecord(data));
   }
 
-  info(message: string, traffic: LogEntry['traffic'] = 'system', data?: any) {
+  info(message: string, traffic: LogEntry['traffic'] = 'system', data?: unknown) {
     this.originalConsole.info(`[KO] ${message}`, data || '');
-    this.addEntry('info', message, traffic, data);
+    this.addEntry('info', message, traffic, this.toDataRecord(data));
   }
 
-  debug(message: string, data?: any) {
+  debug(message: string, data?: unknown, traffic: LogEntry['traffic'] = 'system') {
     this.originalConsole.debug(`[KO] ${message}`, data || '');
-    this.addEntry('debug', message, 'system', data);
+    this.addEntry('debug', message, traffic, this.toDataRecord(data));
   }
 
   getSessionLogs(sessionId: string): LogEntry[] {

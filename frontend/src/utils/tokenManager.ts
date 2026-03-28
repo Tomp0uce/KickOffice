@@ -1,4 +1,5 @@
 import type { ChatRequestMessage } from '@/api/backend';
+import type { MessageContentPart } from '@/api/types';
 
 import { message as messageUtil } from '@/utils/message';
 import { logService } from '@/utils/logger';
@@ -87,12 +88,11 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
  *                  'tail' keeps the end (cuts beginning) — best for tool results, logs.
  */
 function truncateToBudget(content: string, budget: number, direction?: 'head' | 'tail'): string;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function truncateToBudget(
-  content: string | any[],
+  content: string | MessageContentPart[],
   budget: number,
   direction?: 'head' | 'tail',
-): string | any[];
+): string | MessageContentPart[];
 function truncateToBudget(
   content: unknown,
   budget: number,
