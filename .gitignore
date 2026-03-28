@@ -20,12 +20,22 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+*-audit.json
 
 # Generated manifests (produced by scripts/generate-manifests.js)
 generated-manifests/*.xml
 
 # Docker volumes
 backend-data/
+
+# Test coverage reports
+coverage/
+
+# Auto-generated project profile (qual-gate)
+project-profile.yaml
+
+# Ephemeral task tracker
+tasks/todo.md
 
 # Local Claude settings
 .claude/
