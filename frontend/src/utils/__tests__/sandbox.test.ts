@@ -44,7 +44,7 @@ class MockCompartment {
     const values = keys.map(k => this.globals[k]);
 
     // new Function creates an isolated scope; we inject globals as parameters.
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+
     try {
       const fn = new Function(...keys, `return ${code}`);
       const result = fn(...values);

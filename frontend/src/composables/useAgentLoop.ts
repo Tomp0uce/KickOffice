@@ -843,11 +843,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         try {
           const { executeOfficeAction } = await import('@/utils/officeAction');
           const slideNum = await getCurrentSlideNumber();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           const PPT = (window as unknown as Record<string, any>)['PowerPoint'];
           if (PPT?.run) {
             selectedText = await executeOfficeAction(() =>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               PPT.run((ctx: any) => getSlideContentStandalone(ctx, slideNum)),
             );
           }

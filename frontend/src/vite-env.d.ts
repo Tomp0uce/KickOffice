@@ -12,8 +12,6 @@ declare const __APP_VERSION__: string;
 // `declare const X: any` provides the runtime value; `declare namespace X` provides type-position
 // members (e.g. `context: Excel.RequestContext`, `as Word.Alignment`).
 // All members are typed as `any` — real types live in @types/office-js.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-namespace */
 
 declare const Excel: any;
 declare namespace Excel {
@@ -65,11 +63,8 @@ declare namespace Office {
   const CoercionType: any;
   type AsyncResult<T = any> = { value: T; status: string; error?: any };
 }
-/* eslint-enable @typescript-eslint/no-namespace */
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 interface Window {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Office: any;
 }
 

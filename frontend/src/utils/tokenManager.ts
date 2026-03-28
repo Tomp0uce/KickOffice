@@ -214,7 +214,6 @@ export function prepareMessagesForContext(
           : truncateToBudget(message.content, remainingBudget, 'head');
       if (!truncatedContent && !forceInclude) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       selectedMessages.push({ index, message: { ...message, content: truncatedContent as any } });
       selectedIndices.add(index);
       remainingBudget = 0;

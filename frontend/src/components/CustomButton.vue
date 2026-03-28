@@ -69,7 +69,7 @@ const classVar = computed(() => {
     case 'primary':
       return 'bg-accent text-white not-disabled:hover:bg-accent-hover not-disabled:hover:-translate-y-px';
     case 'secondary':
-      return 'border border-border bg-bg-secondary text-main not-disabled:hover:bg-accent/30! not-disabled:hover:text-white! not-disabled:hover:-translate-y-px';
+      return 'border border-border bg-bg-secondary text-main not-disabled:hover:bg-accent not-disabled:hover:text-white! not-disabled:hover:-translate-y-px';
     case 'tab':
       return 'flex-1 text-secondary not-disabled:data-[active=false]:hover:bg-accent/30 data-[active=true]:text-white data-[active=true]:bg-accent not-disabled:hover:text-white!';
     default:

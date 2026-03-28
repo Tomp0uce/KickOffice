@@ -1,14 +1,14 @@
 <template>
   <div class="flex w-full flex-wrap items-center justify-center gap-2 rounded-md">
     <!-- User Skills dropdown + create button -->
-    <div class="flex flex-1 items-center gap-1 max-w-xs">
+    <div class="flex flex-1 items-center gap-1 min-w-0 max-w-full">
       <SingleSelect
         :key-list="userSkillsForHost.map(s => s.id)"
         :placeholder="t('mySkills') || 'Mes skills...'"
-        title=""
+        :title="t('mySkills') || 'My skills'"
         :fronticon="false"
         class="flex-1! bg-surface! text-xs!"
-        @update:model-value="(id) => $emit('execute-user-skill', String(id))"
+        @update:model-value="id => $emit('execute-user-skill', String(id))"
       >
         <template #item="{ item }">
           {{ userSkillsForHost.find(s => s.id === item)?.name || item }}

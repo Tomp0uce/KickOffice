@@ -12,7 +12,7 @@
   <div ref="dropdownRef" class="sort-dropdown relative">
     <button
       ref="triggerRef"
-      class="flex h-7 w-full cursor-pointer items-center justify-between gap-1 rounded-md border border-border-secondary px-2 py-1.5 text-sm leading-[1.4] text-main transition-all duration-fast ease-apple hover:border-accent-hover focus:[.active]:border-accent-hover focus:[.active]:shadow-md"
+      class="flex h-7 w-full cursor-pointer items-center justify-between gap-1 rounded-md border border-border-secondary px-2 py-1.5 text-sm leading-[1.4] text-main transition-all duration-fast ease-apple hover:border-accent-hover focus-visible:border-accent-hover focus-visible:ring-2 focus-visible:ring-accent/30"
       :class="{ active: dropDownOpen }"
       :aria-haspopup="'listbox'"
       :aria-expanded="dropDownOpen"
@@ -29,7 +29,7 @@
     <div
       v-show="dropDownOpen"
       ref="optionsRef"
-      class="sort-options absolute z-10 mt-1 mb-1 max-h-50 min-w-37.5 overflow-hidden overflow-y-auto rounded-md border border-border-secondary bg-bg-tertiary shadow-lg"
+      class="sort-options absolute z-10 mt-1 mb-1 max-h-50 overflow-hidden overflow-y-auto rounded-md border border-border-secondary bg-bg-tertiary shadow-lg"
       role="listbox"
     >
       <button
@@ -134,7 +134,7 @@ function updatePosition() {
     dropdown.style.bottom = 'auto';
   }
 
-  let dropdownWidth = Math.max(rect.width, 160);
+  let dropdownWidth = Math.max(rect.width, 120);
   dropdown.style.left = '0px';
   dropdown.style.width = `${dropdownWidth}px`;
 }

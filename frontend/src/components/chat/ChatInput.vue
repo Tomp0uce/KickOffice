@@ -45,7 +45,7 @@
       />
 
       <button
-        class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent hover:bg-surface text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+        class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent hover:bg-surface text-secondary hover:text-accent disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/50"
         :title="$t('attachDocument')"
         :aria-label="$t('attachDocument')"
         :disabled="loading || processingFiles || attachedFiles.length >= 3"
@@ -65,7 +65,7 @@
 
       <button
         v-if="loading"
-        class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-danger text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+        class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-danger text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
         :title="stopLabel"
         :aria-label="stopLabel"
         @click="handleStop"
@@ -74,7 +74,7 @@
       </button>
       <button
         v-else
-        class="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+        class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-sm border-none bg-accent text-white disabled:cursor-not-allowed disabled:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
         :title="sendLabel"
         :disabled="(!modelValue.trim() && attachedFiles.length === 0) || !backendOnline"
         :aria-label="sendLabel"
@@ -90,7 +90,12 @@
       <button
         class="flex items-center gap-1 rounded-sm border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success hover:bg-success/20 focus:outline-none focus:ring-2 focus:ring-success/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         :disabled="validatingAiChanges"
-        :title="t('validateAiChangesTooltip', 'Accept AI track changes (Word) or clear AI cell highlights (Excel)')"
+        :title="
+          t(
+            'validateAiChangesTooltip',
+            'Accept AI track changes (Word) or clear AI cell highlights (Excel)',
+          )
+        "
         :aria-label="t('validateAiChanges', 'Validate AI changes')"
         @click="handleValidateAiChanges"
       >
@@ -105,7 +110,7 @@
       class="flex justify-start px-2 mt-0.5 opacity-0 transition-opacity duration-300"
       :class="{ 'opacity-100': isFocused }"
     >
-      <span class="text-[10px] text-secondary/60 font-medium">
+      <span class="text-[10px] text-tertiary font-medium">
         {{ t('shiftEnterHint', 'Shift + Enter for new line') }}
       </span>
     </div>

@@ -4,7 +4,7 @@ const markdownParser = createBaseMarkdownParser(false);
 
 // MarkdownIt renderer rules use `any` types per the library's own type definitions (env: any).
 // The types below match markdown-it's RenderRule signature exactly.
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 const defaultLinkRender =
   markdownParser.renderer.rules.link_open ??
   ((tokens: any[], idx: number, options: any, _env: any, self: any) =>
@@ -24,7 +24,6 @@ markdownParser.renderer.rules.link_open = (
 
   return defaultLinkRender(tokens, idx, options, env, self);
 };
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // Strict allowlist of safe HTML tags for markdown rendering
 const ALLOWED_TAGS = [

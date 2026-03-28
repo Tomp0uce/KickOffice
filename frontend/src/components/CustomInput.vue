@@ -12,7 +12,7 @@
         v-model="modelValue"
         :type="type"
         v-bind="$attrs"
-        class="box-border w-full rounded-md border border-border bg-bg-tertiary p-2 pr-10 text-sm text-main transition-all duration-200 ease-apple focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        class="box-border w-full rounded-md border border-border bg-bg-tertiary p-2 pr-10 text-sm text-main transition-all duration-fast ease-apple focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50"
         :placeholder="placeholder"
       />
       <button

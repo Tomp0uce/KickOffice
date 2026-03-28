@@ -6,11 +6,11 @@
       <div
         class="flex w-full items-center justify-between gap-1 overflow-visible rounded-2xl border border-border-secondary p-0 shadow-sm"
       >
-        <div class="flex flex-wrap items-center gap-4 p-1">
+        <div class="flex flex-wrap items-center gap-2 p-1">
           <CustomButton
             :icon="ArrowLeft"
             type="secondary"
-            class="border-none p-1!"
+            class="border-none p-1.5!"
             text=""
             :title="t('back')"
             @click="backToHome"
@@ -38,7 +38,7 @@
           :title="t(tab.label) || tab.defaultLabel"
           :icon="tab.icon"
           :icon-size="16"
-          class="flex-1 rounded-sm border-none! p-1!"
+          class="flex-1 rounded-sm border-none! p-1.5!"
           @click="currentTab = tab.id"
         />
       </div>

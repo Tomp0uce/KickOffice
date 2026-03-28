@@ -35,7 +35,11 @@ vi.mock('@/utils/logger', () => ({
   },
 }));
 
-import { prepareMessagesForContext, MAX_CONTEXT_CHARS, estimateContextUsagePercent } from '../tokenManager';
+import {
+  prepareMessagesForContext,
+  MAX_CONTEXT_CHARS,
+  estimateContextUsagePercent,
+} from '../tokenManager';
 import type { ChatRequestMessage } from '@/api/backend';
 import { message as messageUtil } from '@/utils/message';
 import { logService } from '@/utils/logger';
@@ -198,7 +202,6 @@ describe('prepareMessagesForContext — tool_call / tool response integrity', ()
     }
   });
 
-
   it('does not mutate the original messages when stripping orphaned tool_calls (ROB-H1)', () => {
     const original: ChatRequestMessage[] = [
       makeUserMsg('Do it'),
@@ -208,9 +211,7 @@ describe('prepareMessagesForContext — tool_call / tool response integrity', ()
     ];
 
     // Deep snapshot of tool_calls BEFORE the call
-    const toolCallsBefore = JSON.parse(
-      JSON.stringify((original[1] as AssistantMsg).tool_calls),
-    );
+    const toolCallsBefore = JSON.parse(JSON.stringify((original[1] as AssistantMsg).tool_calls));
 
     prepareMessagesForContext(original, 'System');
 
@@ -337,7 +338,7 @@ describe('getMessageContentLength — via estimateContextUsagePercent', () => {
   it('counts 1000 chars for each image_url part', () => {
     const msgWithImage: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: [{ type: 'image_url', image_url: { url: 'data:...' } }] as any,
     };
     const result = estimateContextUsagePercent([msgWithImage], '');
@@ -346,7 +347,7 @@ describe('getMessageContentLength — via estimateContextUsagePercent', () => {
     // Verify indirectly: adding a second image doubles the contribution
     const msgTwoImages: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: [
         { type: 'image_url', image_url: { url: 'data:...' } },
         { type: 'image_url', image_url: { url: 'data:...' } },
@@ -361,7 +362,7 @@ describe('getMessageContentLength — via estimateContextUsagePercent', () => {
   it('counts 200 chars for each file part', () => {
     const msgWithFile: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: [{ type: 'file', file: { file_id: 'f-123' } }] as any,
     };
     const result = estimateContextUsagePercent([msgWithFile], '');
@@ -372,12 +373,12 @@ describe('getMessageContentLength — via estimateContextUsagePercent', () => {
   it('counts text part length for text-type array parts', () => {
     const shortText: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: [{ type: 'text', text: 'hi' }] as any,
     };
     const longText: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: [{ type: 'text', text: 'h'.repeat(600_000) }] as any,
     };
     const shortResult = estimateContextUsagePercent([shortText], '');
@@ -389,7 +390,7 @@ describe('getMessageContentLength — via estimateContextUsagePercent', () => {
     // null content — JSON.stringify(null) = "null" (4 chars), should not throw
     const msgNull: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       content: null as any,
     };
     expect(() => estimateContextUsagePercent([msgNull], '')).not.toThrow();
@@ -650,8 +651,11 @@ describe('prepareMessagesForContext — force-include and truncation edge cases'
   it('handles messages with array content (vision) without coercing them', () => {
     const visionMsg: ChatRequestMessage = {
       role: 'user',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      content: [{ type: 'text', text: 'describe this' }, { type: 'image_url', image_url: { url: 'data:...' } }] as any,
+
+      content: [
+        { type: 'text', text: 'describe this' },
+        { type: 'image_url', image_url: { url: 'data:...' } },
+      ] as any,
     };
 
     const result = prepareMessagesForContext([visionMsg], 'System');
@@ -707,7 +711,9 @@ describe('prepareMessagesForContext — force-include and truncation edge cases'
     ];
 
     const result = prepareMessagesForContext(msgs, 'System');
-    const toolMsg = result.find(m => m.role === 'tool') as (ChatRequestMessage & { tool_call_id?: string }) | undefined;
+    const toolMsg = result.find(m => m.role === 'tool') as
+      | (ChatRequestMessage & { tool_call_id?: string })
+      | undefined;
 
     if (toolMsg) {
       expect(toolMsg.tool_call_id).toBe('tc-preserve');
