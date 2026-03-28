@@ -20,7 +20,11 @@ import {
 import { getDisplayLanguage } from '@/utils/common';
 import { getGeneralToolDefinitions } from '@/utils/generalTools';
 import { message as messageUtil } from '@/utils/message';
-import { powerpointImageRegistry } from '@/utils/powerpointTools';
+import {
+  powerpointImageRegistry,
+  getCurrentSlideNumber,
+  getSlideContentStandalone,
+} from '@/utils/powerpointTools';
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager';
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage';
 import { getToolsForHost } from '@/utils/toolProviderRegistry';
@@ -838,55 +842,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (wordCount < 5 && hostIsPowerPoint) {
         try {
           const { executeOfficeAction } = await import('@/utils/officeAction');
-          selectedText = await executeOfficeAction(() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const PPT = (window as unknown as Record<string, any>)['PowerPoint'];
-            if (!PPT?.run) return Promise.resolve('');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return PPT.run(async (context: any) => {
-              let activeSlideIndex = 0;
-              try {
-                if (typeof context.presentation.getSelectedSlides === 'function') {
-                  const selectedSlides = context.presentation.getSelectedSlides();
-                  selectedSlides.load('items/id');
-                  await context.sync();
-                  if (selectedSlides.items.length > 0) {
-                    const slides = context.presentation.slides;
-                    slides.load('items/id');
-                    await context.sync();
-                    const selectedId = selectedSlides.items[0].id;
-                    const idx = slides.items.findIndex((s: { id: string }) => s.id === selectedId);
-                    if (idx !== -1) activeSlideIndex = idx;
-                  }
-                }
-              } catch (e) {}
-
-              const slides = context.presentation.slides;
-              slides.load('items');
-              await context.sync();
-              if (activeSlideIndex >= slides.items.length) return '';
-              const slide = slides.items[activeSlideIndex];
-
-              const shapes = slide.shapes;
-              shapes.load('items');
-              await context.sync();
-
-              for (const shape of shapes.items) {
-                try {
-                  shape.textFrame.textRange.load('text');
-                } catch {}
-              }
-              await context.sync();
-
-              const texts = [];
-              for (const shape of shapes.items) {
-                try {
-                  texts.push((shape.textFrame.textRange.text || '').trim());
-                } catch {}
-              }
-              return texts.filter(Boolean).join('\n');
-            });
-          });
+          const slideNum = await getCurrentSlideNumber();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const PPT = (window as unknown as Record<string, any>)['PowerPoint'];
+          if (PPT?.run) {
+            selectedText = await executeOfficeAction(() =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              PPT.run((ctx: any) => getSlideContentStandalone(ctx, slideNum)),
+            );
+          }
           wordCount = selectedText
             .trim()
             .split(/\s+/)

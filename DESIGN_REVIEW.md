@@ -201,10 +201,10 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 - [x] `DOC-L1` | LOW | T1 | i18n | `en.json`, `fr.json` | Added `warningVfsWriteFailed` key
 
 #### Sub-phase 3.2 — DRY fixes [useQuickActions + backend zone]
-- [ ] `ARCH-M3` | MEDIUM | T2 | duplication | `useQuickActions.ts:387-438` | Extract `triggerFocusGlow()` helper
-- [ ] `DRY-M1` | MEDIUM | T2 | duplication | `backend.ts`, `useSkillCreator.ts` | Share BACKEND_URL lazy pattern from httpClient
-- [ ] `ARCH-M2` | MEDIUM | T2 | duplication | `useAgentLoop.ts:856-913` | Replace inline PPT code with `getCurrentSlideNumber` call
-- [ ] `ROB-M1` | MEDIUM | T1 | contract | `backend.ts:253-264` | Throw Error instead of returning '' from generateImage
+- [x] `ARCH-M3` | MEDIUM | T2 | duplication | `useQuickActions.ts:387-438` | Extract `triggerFocusGlow()` helper
+- [x] `DRY-M1` | MEDIUM | T2 | duplication | `backend.ts`, `useSkillCreator.ts` | Share BACKEND_URL lazy pattern from httpClient
+- [x] `ARCH-M2` | MEDIUM | T2 | duplication | `useAgentLoop.ts:856-913` | Replace inline PPT code with `getCurrentSlideNumber` call
+- [x] `ROB-M1` | MEDIUM | T1 | contract | `backend.ts:253-264` | Throw Error instead of returning '' from generateImage
 
 #### Sub-phase 3.3 — Observability & types [logger + tokenManager zone]
 - [ ] `OBS-M1` | MEDIUM | T3 | api | `logger.ts:144-167` | Unify logService method signatures
@@ -242,6 +242,10 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T1 | MEDIUM | ROB-M3 | Collapsed identical branch bodies in prepareMessagesForContext | tokenManager.ts
 [2026-03-28] FIXED | T1 | LOW | CLN-L2 | Translated French comments (Tâche 4/6) to English | useAgentLoop.ts
 [2026-03-28] FIXED | T1 | LOW | DOC-L1 | Added warningVfsWriteFailed i18n key | en.json, fr.json
+[2026-03-28] FIXED | T3 | MEDIUM | ARCH-M3 | Extracted focusInputWithGlow() helper (replaces 3 identical 12-line blocks) | useQuickActions.ts
+[2026-03-28] FIXED | T2 | MEDIUM | DRY-M1 | Extracted BACKEND_URL to httpClient.ts, removed 2 local definitions | httpClient.ts, backend.ts, useSkillCreator.ts
+[2026-03-28] FIXED | T2 | MEDIUM | ARCH-M2 | Replaced 50-line inline PPT code with getCurrentSlideNumber+getSlideContentStandalone | useAgentLoop.ts
+[2026-03-28] FIXED | T1 | MEDIUM | ROB-M1 | generateImage throws Error instead of silent return '' | backend.ts
 
 ---
 

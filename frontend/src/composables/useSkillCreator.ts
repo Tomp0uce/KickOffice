@@ -7,10 +7,13 @@
 
 import { ref } from 'vue';
 import { logService } from '@/utils/logger';
-import { fetchWithTimeoutAndRetry, getGlobalHeaders, generateRequestId } from '@/api/httpClient';
+import {
+  fetchWithTimeoutAndRetry,
+  getGlobalHeaders,
+  generateRequestId,
+  BACKEND_URL,
+} from '@/api/httpClient';
 import type { SkillHost, SkillExecutionMode } from '@/utils/skillParser';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 export interface SkillCreatorResult {
   name: string;

@@ -148,6 +148,22 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     saveSnapshot,
   } = options;
 
+  async function focusInputWithGlow(prefix: string) {
+    userInput.value = prefix;
+    adjustTextareaHeight();
+    isDraftFocusGlowing.value = true;
+    setTimeout(() => {
+      isDraftFocusGlowing.value = false;
+    }, 1500);
+    await nextTick();
+    const el = inputTextarea.value;
+    if (el) {
+      el.focus();
+      const len = userInput.value.length;
+      el.setSelectionRange(len, len);
+    }
+  }
+
   async function applyQuickAction(actionKey: string) {
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'));
 
@@ -418,54 +434,18 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
     }
 
     if (selectedOutlookQuickAction?.mode === 'smart-reply') {
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'mom') {
       if (pendingMoM) pendingMoM.value = true;
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'draft') {
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
