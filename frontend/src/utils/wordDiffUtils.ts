@@ -115,7 +115,10 @@ export async function applyRevisionToSelection(
     });
     resultOoxml = redlineResult.oxml;
   } catch (error: unknown) {
-    logService.error('[WordDiff] docx-redline-js error:', error instanceof Error ? error : new Error(String(error)));
+    logService.error(
+      '[WordDiff] docx-redline-js error:',
+      error instanceof Error ? error : new Error(String(error)),
+    );
     return {
       success: false,
       strategy: 'none',
@@ -137,7 +140,10 @@ export async function applyRevisionToSelection(
     await context.sync();
   } catch (insertError: unknown) {
     // Fallback: if insertOoxml fails (Word Online), use direct text replacement
-    logService.warn('[WordDiff] insertOoxml failed, falling back to insertText:', insertError instanceof Error ? insertError : new Error(String(insertError)));
+    logService.warn(
+      '[WordDiff] insertOoxml failed, falling back to insertText:',
+      insertError instanceof Error ? insertError : new Error(String(insertError)),
+    );
     try {
       selection.insertText(revisedText, 'Replace');
       await context.sync();
@@ -193,7 +199,7 @@ export async function applyRevisionToDocument(
   await context.sync();
 
   const items = paragraphs.items;
-  items.forEach((p: any) => p.load('text'));
+  items.forEach((p: { load: (s: string) => void }) => p.load('text'));
   await context.sync();
 
   const details: string[] = [];
@@ -210,7 +216,9 @@ export async function applyRevisionToDocument(
   try {
     for (const { originalText, revisedText } of revisions) {
       // Find the first paragraph whose trimmed text matches
-      const paraIndex = items.findIndex((p: any) => p.text.trim() === originalText.trim());
+      const paraIndex = items.findIndex(
+        (p: { text: string }) => p.text.trim() === originalText.trim(),
+      );
       if (paraIndex === -1) {
         details.push(
           `[NOT FOUND] "${originalText.slice(0, 60)}${originalText.length > 60 ? '…' : ''}"`,
@@ -240,9 +248,9 @@ export async function applyRevisionToDocument(
           generateRedlines: enableTrackChanges,
         });
         resultOoxml = redlineResult.oxml;
-      } catch (err: any) {
+      } catch (err: unknown) {
         details.push(
-          `[${paraIndex}] ERROR (redline): ${err.message || String(err)}`,
+          `[${paraIndex}] ERROR (redline): ${err instanceof Error ? err.message : String(err)}`,
         );
         failed++;
         continue;

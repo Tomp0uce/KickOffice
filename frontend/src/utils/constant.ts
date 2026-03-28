@@ -366,36 +366,53 @@ export const powerPointBuiltInPrompt = {
   },
 };
 
-export const getPowerPointBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_ppt_v5');
-  if (!stored) {
-    return powerPointBuiltInPrompt;
+// ARCH-M4: Generic factory for host-specific built-in prompt getters
+type BuiltInPromptMap = Record<
+  string,
+  {
+    system: (language: string) => string;
+    user: (text: string, language: string) => string;
   }
+>;
 
-  try {
-    const customPrompts = JSON.parse(stored);
-    const result = { ...powerPointBuiltInPrompt };
+function createBuiltInPromptGetter<T extends BuiltInPromptMap>(
+  storageKey: string,
+  defaults: T,
+  hostLabel: string,
+): () => T {
+  return () => {
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) return defaults;
 
-    Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof powerPointBuiltInPrompt;
-      if (result[typedKey]) {
-        result[typedKey] = {
-          system: (language: string) =>
-            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
-          user: (text: string, language: string) =>
-            customPrompts[key].user
-              .replace(/\[TEXT\]/g, () => text)
-              .replace(/\[LANGUAGE\]/g, () => language),
-        };
+    try {
+      const customPrompts = JSON.parse(stored);
+      const result = { ...defaults };
+
+      for (const [key, value] of Object.entries(customPrompts)) {
+        const typedKey = key as keyof T;
+        if (result[typedKey]) {
+          const custom = value as { system: string; user: string };
+          result[typedKey] = {
+            system: (language: string) => custom.system.replace(/\[LANGUAGE\]/g, () => language),
+            user: (text: string, language: string) =>
+              custom.user.replace(/\[TEXT\]/g, () => text).replace(/\[LANGUAGE\]/g, () => language),
+          } as T[keyof T];
+        }
       }
-    });
 
-    return result;
-  } catch (error) {
-    logService.error('Error loading custom PowerPoint built-in prompts:', error);
-    return powerPointBuiltInPrompt;
-  }
-};
+      return result;
+    } catch (error) {
+      logService.error(`Error loading custom ${hostLabel} built-in prompts:`, error);
+      return defaults;
+    }
+  };
+}
+
+export const getPowerPointBuiltInPrompt = createBuiltInPromptGetter(
+  'ki_Settings_BuiltInPrompts_ppt_v5',
+  powerPointBuiltInPrompt,
+  'PowerPoint',
+);
 
 export const outlookBuiltInPrompt = {
   reply: {
@@ -567,95 +584,20 @@ Transform the meeting notes provided by the user into a concise, structured meet
   },
 };
 
-export const getOutlookBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_outlook_v5');
-  if (!stored) {
-    return outlookBuiltInPrompt;
-  }
+export const getOutlookBuiltInPrompt = createBuiltInPromptGetter(
+  'ki_Settings_BuiltInPrompts_outlook_v5',
+  outlookBuiltInPrompt,
+  'Outlook',
+);
 
-  try {
-    const customPrompts = JSON.parse(stored);
-    const result = { ...outlookBuiltInPrompt };
+export const getExcelBuiltInPrompt = createBuiltInPromptGetter(
+  'ki_Settings_BuiltInPrompts_excel_v5',
+  excelBuiltInPrompt,
+  'Excel',
+);
 
-    Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof outlookBuiltInPrompt;
-      if (result[typedKey]) {
-        result[typedKey] = {
-          system: (language: string) =>
-            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
-          user: (text: string, language: string) =>
-            customPrompts[key].user
-              .replace(/\[TEXT\]/g, () => text)
-              .replace(/\[LANGUAGE\]/g, () => language),
-        };
-      }
-    });
-
-    return result;
-  } catch (error) {
-    logService.error('Error loading custom Outlook built-in prompts:', error);
-    return outlookBuiltInPrompt;
-  }
-};
-
-export const getExcelBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_excel_v5');
-  if (!stored) {
-    return excelBuiltInPrompt;
-  }
-
-  try {
-    const customPrompts = JSON.parse(stored);
-    const result = { ...excelBuiltInPrompt };
-
-    Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof excelBuiltInPrompt;
-      if (result[typedKey]) {
-        result[typedKey] = {
-          system: (language: string) =>
-            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
-          user: (text: string, language: string) =>
-            customPrompts[key].user
-              .replace(/\[TEXT\]/g, () => text)
-              .replace(/\[LANGUAGE\]/g, () => language),
-        };
-      }
-    });
-
-    return result;
-  } catch (error) {
-    logService.error('Error loading custom Excel built-in prompts:', error);
-    return excelBuiltInPrompt;
-  }
-};
-
-export const getBuiltInPrompt = () => {
-  const stored = localStorage.getItem('ki_Settings_BuiltInPrompts_word_v5');
-  if (!stored) {
-    return builtInPrompt;
-  }
-
-  try {
-    const customPrompts = JSON.parse(stored);
-    const result = { ...builtInPrompt };
-
-    Object.keys(customPrompts).forEach(key => {
-      const typedKey = key as keyof typeof builtInPrompt;
-      if (result[typedKey]) {
-        result[typedKey] = {
-          system: (language: string) =>
-            customPrompts[key].system.replace(/\[LANGUAGE\]/g, () => language),
-          user: (text: string, language: string) =>
-            customPrompts[key].user
-              .replace(/\[TEXT\]/g, () => text)
-              .replace(/\[LANGUAGE\]/g, () => language),
-        };
-      }
-    });
-
-    return result;
-  } catch (error) {
-    logService.error('Error loading custom built-in prompts:', error);
-    return builtInPrompt;
-  }
-};
+export const getBuiltInPrompt = createBuiltInPromptGetter(
+  'ki_Settings_BuiltInPrompts_word_v5',
+  builtInPrompt,
+  'Word',
+);

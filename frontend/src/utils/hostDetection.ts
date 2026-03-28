@@ -18,7 +18,8 @@ export function detectOfficeHost(): OfficeHostType {
 
   try {
     // Office.context.host is the official way
-    const host = (window as any).Office?.context?.host;
+    const w = window as unknown as Record<string, unknown>;
+    const host = (w['Office'] as { context?: { host?: string } } | undefined)?.context?.host;
     if (host === 'Word' || host === 'Document') {
       result = 'Word';
     } else if (host === 'Excel' || host === 'Workbook') {
@@ -33,13 +34,17 @@ export function detectOfficeHost(): OfficeHostType {
   }
 
   if (result === 'Unknown') {
-    if (typeof (window as any).Word !== 'undefined') {
+    const w = window as unknown as Record<string, unknown>;
+    if (typeof w['Word'] !== 'undefined') {
       result = 'Word';
-    } else if (typeof (window as any).Excel !== 'undefined') {
+    } else if (typeof w['Excel'] !== 'undefined') {
       result = 'Excel';
-    } else if (typeof (window as any).PowerPoint !== 'undefined') {
+    } else if (typeof w['PowerPoint'] !== 'undefined') {
       result = 'PowerPoint';
-    } else if (typeof (window as any).Office?.context?.mailbox !== 'undefined') {
+    } else if (
+      typeof (w['Office'] as { context?: { mailbox?: unknown } } | undefined)?.context?.mailbox !==
+      'undefined'
+    ) {
       result = 'Outlook';
     }
   }

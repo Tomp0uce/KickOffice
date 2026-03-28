@@ -72,13 +72,11 @@ jobs:
 
       - name: Audit frontend
         working-directory: frontend
-        run: npm ci && npm audit --audit-level=high
-        continue-on-error: true
+        run: npm ci && npm audit --audit-level=critical
 
       - name: Audit backend
         working-directory: backend
-        run: npm ci && npm audit --audit-level=high
-        continue-on-error: true
+        run: npm ci && npm audit --audit-level=critical
 
   docker:
     name: Docker build verification

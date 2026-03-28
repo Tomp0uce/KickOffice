@@ -1,5 +1,10 @@
 import type { Ref } from 'vue';
-import { chatStream, type ChatRequestMessage, type TokenUsage, type ApiToolDefinition } from '@/api/backend';
+import {
+  chatStream,
+  type ChatRequestMessage,
+  type TokenUsage,
+  type ApiToolDefinition,
+} from '@/api/backend';
 import type { ModelTier } from '@/types';
 import type { DisplayMessage } from '@/types/chat';
 
@@ -60,12 +65,13 @@ export function useAgentStream() {
       onToolCallDelta: toolCallDeltas => {
         if (options.currentAction) options.currentAction.value = '';
         for (const delta of toolCallDeltas) {
+          if (delta.index == null) continue;
           const idx = delta.index;
           if (!response.choices[0].message.tool_calls[idx]) {
             response.choices[0].message.tool_calls[idx] = {
-              id: delta.id,
+              id: delta.id ?? '',
               type: 'function',
-              function: { name: delta.function.name || '', arguments: '' },
+              function: { name: delta.function?.name || '', arguments: '' },
             };
           }
           if (delta.function?.arguments) {

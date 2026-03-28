@@ -144,9 +144,11 @@ class LogService {
   }
 
   private toDataRecord(data: unknown): Record<string, unknown> | undefined {
-    return data && typeof data === 'object' && !Array.isArray(data)
-      ? (data as Record<string, unknown>)
-      : undefined;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined;
+    if (data instanceof Error) {
+      return { name: data.name, message: data.message, stack: data.stack };
+    }
+    return data as Record<string, unknown>;
   }
 
   error(message: string, error?: unknown, data?: unknown, traffic: LogEntry['traffic'] = 'system') {

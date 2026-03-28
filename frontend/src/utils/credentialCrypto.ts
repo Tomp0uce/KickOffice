@@ -41,13 +41,40 @@ export async function getEncryptionKey(remember: boolean): Promise<CryptoKey | n
     return key;
   }
 
-  return crypto.subtle.importKey(
-    'jwk',
-    JSON.parse(keyData),
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt'],
-  );
+  let parsed: JsonWebKey;
+  try {
+    parsed = JSON.parse(keyData);
+  } catch {
+    logService.warn('[CredentialCrypto] Corrupted encryption key in storage — regenerating');
+    primaryStorage.removeItem(ENCRYPTION_KEY_NAME);
+    fallbackStorage.removeItem(ENCRYPTION_KEY_NAME);
+    // Fall through to key generation below instead of recursing
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+      'encrypt',
+      'decrypt',
+    ]);
+    const exported = await crypto.subtle.exportKey('jwk', key);
+    primaryStorage.setItem(ENCRYPTION_KEY_NAME, JSON.stringify(exported));
+    return key;
+  }
+
+  try {
+    return await crypto.subtle.importKey('jwk', parsed, { name: 'AES-GCM', length: 256 }, true, [
+      'encrypt',
+      'decrypt',
+    ]);
+  } catch {
+    logService.warn('[CredentialCrypto] Invalid encryption key in storage — regenerating');
+    primaryStorage.removeItem(ENCRYPTION_KEY_NAME);
+    fallbackStorage.removeItem(ENCRYPTION_KEY_NAME);
+    const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+      'encrypt',
+      'decrypt',
+    ]);
+    const exported = await crypto.subtle.exportKey('jwk', key);
+    primaryStorage.setItem(ENCRYPTION_KEY_NAME, JSON.stringify(exported));
+    return key;
+  }
 }
 
 /**

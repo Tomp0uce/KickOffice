@@ -30,7 +30,7 @@ turndownService.addRule('color', {
       (node.getAttribute('style')?.includes('color:') || node.hasAttribute('color'))
     );
   },
-  replacement: (content: string, node: any) => {
+  replacement: (content: string, node: Node) => {
     let color = '';
     const style = (node as HTMLElement).getAttribute('style') || '';
     const match = style.match(/color:\s*([^;"]+)/i); // Added " to avoid matching until end of style

@@ -1,8 +1,15 @@
 import type { ModelTier } from '@/types';
 
+export interface MessageContentPart {
+  type: string;
+  text?: string;
+  image_url?: { url: string };
+  file?: { file_id: string };
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string | any[];
+  content: string | MessageContentPart[];
   tool_calls?: Array<{
     id: string;
     type: 'function';
@@ -27,12 +34,22 @@ export interface TokenUsage {
   totalTokens: number;
 }
 
+export interface ToolCallDelta {
+  index: number;
+  id?: string;
+  type?: string;
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
 export interface ChatStreamOptions {
   messages: ChatRequestMessage[];
   modelTier: ModelTier;
   tools?: ApiToolDefinition[];
   onStream: (text: string) => void;
-  onToolCallDelta?: (toolCallDeltas: any[]) => void;
+  onToolCallDelta?: (toolCallDeltas: ToolCallDelta[]) => void;
   onFinishReason?: (finishReason: string | null) => void;
   onUsage?: (usage: TokenUsage) => void;
   abortSignal?: AbortSignal;
@@ -43,7 +60,7 @@ export interface ApiToolDefinition {
   function: {
     name: string;
     description?: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
     strict?: boolean;
   };
 }

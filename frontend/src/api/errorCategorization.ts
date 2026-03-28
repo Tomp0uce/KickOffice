@@ -47,9 +47,10 @@ export function categorizeError(error: unknown): CategorizedError {
 
   // Try structured error code first (from backend ErrorCodes registry)
   if (error instanceof Error && 'code' in error) {
-    const mapped = ERROR_CODE_MAP[(error as any).code];
+    const errorWithCode = error as Error & { code?: string; detail?: string };
+    const mapped = ERROR_CODE_MAP[errorWithCode.code ?? ''];
     if (mapped) {
-      const rawDetail = (error as any).detail as string | undefined;
+      const rawDetail = errorWithCode.detail;
       return rawDetail ? { ...mapped, rawDetail } : mapped;
     }
   }

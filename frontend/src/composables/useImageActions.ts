@@ -133,7 +133,7 @@ export function useImageActions(t: (key: string) => string) {
     // Use regex to safely extract base64 payload from data URL
     const base64Payload = imageSrc.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
     if (!base64Payload) throw new Error('Image base64 payload is empty');
-    await Word.run(async (ctx: any) => {
+    await Word.run(async (ctx: Word.RequestContext) => {
       const range = ctx.document.getSelection();
       range.insertInlinePictureFromBase64(base64Payload, type === 'replace' ? 'Replace' : 'After');
       await ctx.sync();
@@ -164,7 +164,7 @@ export function useImageActions(t: (key: string) => string) {
 
     try {
       if (typeof PowerPoint !== 'undefined' && PowerPoint.run) {
-        await PowerPoint.run(async (context: any) => {
+        await PowerPoint.run(async (context: PowerPoint.RequestContext) => {
           const slides = context.presentation.getSelectedSlides();
           slides.load('items');
           await context.sync();

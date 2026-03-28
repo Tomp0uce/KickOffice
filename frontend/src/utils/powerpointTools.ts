@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '@/types';
+import type JSZip from 'jszip';
 /**
  * PowerPoint interaction utilities.
  *
@@ -33,6 +34,28 @@ import { logService } from '@/utils/logger';
 declare const Office: any;
 declare const PowerPoint: any;
 
+/** Narrow interface for PowerPoint shape objects (PowerPoint.Shape is not exported from namespace) */
+interface PptShape {
+  textFrame: {
+    textRange: {
+      text: string;
+      load: (props: string) => void;
+      font: Record<string, unknown>;
+      paragraphs: {
+        load: (props: string) => void;
+        items: Array<{
+          textRange: {
+            textRuns: {
+              load: (props: string) => void;
+              items: Array<{ textRange: { text: string; font: Record<string, unknown> } }>;
+            };
+          };
+        }>;
+      };
+    };
+  };
+}
+
 // Mutation detection patterns for PowerPoint — ported from Office Agents
 const looksLikeMutationPpt = createMutationDetector([
   /\.insertSlide\s*\(/,
@@ -54,12 +77,15 @@ export function clearPowerpointImageRegistry(): void {
   powerpointImageRegistry.clear();
 }
 
-const runPowerPoint = <T>(action: (context: any) => Promise<T>): Promise<T> =>
+const runPowerPoint = <T>(action: (context: PowerPoint.RequestContext) => Promise<T>): Promise<T> =>
   executeOfficeAction(() => PowerPoint.run(action) as Promise<T>);
 
 type PowerPointToolTemplate = Omit<ToolDefinition, 'execute'> & {
-  executePowerPoint?: (context: any, args: Record<string, any>) => Promise<string>;
-  executeCommon?: (args: Record<string, any>) => Promise<string>;
+  executePowerPoint?: (
+    context: PowerPoint.RequestContext,
+    args: Record<string, unknown>,
+  ) => Promise<string>;
+  executeCommon?: (args: Record<string, unknown>) => Promise<string>;
 };
 
 export type PowerPointToolName =
@@ -95,10 +121,10 @@ export type PowerPointToolName =
 function isNonTextShape(shapeType: string): boolean {
   const t = shapeType.toLowerCase();
   return (
-    t === '13' ||            // numeric picture type
+    t === '13' || // numeric picture type
     t.includes('picture') || // picture / image
-    t === 'ole' ||           // OLE embedded objects (Excel charts, Word docs, etc.)
-    t === 'chart'            // native PowerPoint charts
+    t === 'ole' || // OLE embedded objects (Excel charts, Word docs, etc.)
+    t === 'chart' // native PowerPoint charts
   );
 }
 
@@ -109,7 +135,7 @@ function isNonTextShape(shapeType: string): boolean {
 export async function getCurrentSlideNumber(): Promise<number> {
   try {
     return await executeOfficeAction(() =>
-      PowerPoint.run(async (context: any) => {
+      PowerPoint.run(async (context: PowerPoint.RequestContext) => {
         let activeSlideIndex = 0;
         try {
           if (typeof context.presentation.getSelectedSlides === 'function') {
@@ -121,7 +147,7 @@ export async function getCurrentSlideNumber(): Promise<number> {
               slides.load('items/id');
               await context.sync();
               const selectedId = selectedSlides.items[0].id;
-              const idx = slides.items.findIndex((s: any) => s.id === selectedId);
+              const idx = slides.items.findIndex((s: { id: string }) => s.id === selectedId);
               if (idx !== -1) activeSlideIndex = idx;
             }
           }
@@ -142,7 +168,7 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
   try {
     const slideNumber = await getCurrentSlideNumber();
     await executeOfficeAction(() =>
-      PowerPoint.run(async (context: any) => {
+      PowerPoint.run(async (context: PowerPoint.RequestContext) => {
         // PPT-M5: Check for API support (1.5 required for notesSlide)
         if (!isPowerPointApiSupported('1.5')) {
           throw new Error('Speaker notes modification requires PowerPoint API 1.5 or newer.');
@@ -161,9 +187,13 @@ export async function setCurrentSlideSpeakerNotes(notes: string): Promise<boolea
         slide.load('id');
         await context.sync();
 
-        let notesPage: any;
+        type NotesPage = {
+          load: (props: string) => void;
+          notesTextFrame: { textRange: { text: string } };
+        };
+        let notesPage: NotesPage | null = null;
         try {
-          notesPage = slide.notesSlide;
+          notesPage = (slide as unknown as { notesSlide: NotesPage }).notesSlide;
         } catch {
           throw new Error('NOTES_SLIDE_UNAVAILABLE');
         }
@@ -199,9 +229,9 @@ export function getPowerPointSelection(): Promise<string> {
       Office.context.document.getSelectedDataAsync(
         Office.CoercionType.Text,
         { valueFormat: Office.ValueFormat.Unformatted },
-        (result: any) => {
+        (result: Office.AsyncResult<string>) => {
           if (result.status === Office.AsyncResultStatus.Succeeded) {
-            resolve((result.value as string) || '');
+            resolve(result.value || '');
           } else {
             logService.warn('PowerPoint selection error:', result.error?.message);
             resolve('');
@@ -231,7 +261,7 @@ export async function getPowerPointSelectionAsHtml(): Promise<string> {
 
   try {
     const htmlOut = await executeOfficeAction(async () => {
-      return PowerPoint.run(async (context: any) => {
+      return PowerPoint.run(async (context: PowerPoint.RequestContext) => {
         const textRanges = context.presentation.getSelectedTextRanges();
         textRanges.load('items');
         await context.sync();
@@ -306,7 +336,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
   if (isPowerPointApiSupported('1.5') && useHtml) {
     try {
       await executeOfficeAction(async () => {
-        await PowerPoint.run(async (context: any) => {
+        await PowerPoint.run(async (context: PowerPoint.RequestContext) => {
           const textRange = context.presentation.getSelectedTextRanges().getItemAt(0);
           await insertMarkdownIntoTextRange(context, textRange, normalizedNewlines);
           await context.sync();
@@ -314,7 +344,10 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
       });
       return;
     } catch (e: unknown) {
-      logService.warn('Modern PowerPoint Html insertion failed, falling back:', e instanceof Error ? e : new Error(String(e)));
+      logService.warn(
+        'Modern PowerPoint Html insertion failed, falling back:',
+        e instanceof Error ? e : new Error(String(e)),
+      );
     }
   }
 
@@ -326,7 +359,7 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
         Office.context.document.setSelectedDataAsync(
           htmlContent,
           { coercionType: Office.CoercionType.Html },
-          (result: any) => {
+          (result: Office.AsyncResult<string>) => {
             if (result.status === Office.AsyncResultStatus.Succeeded) {
               resolve();
             } else {
@@ -344,9 +377,14 @@ export async function insertIntoPowerPoint(text: string, useHtml = true): Promis
   });
 }
 
+type PptTextRange = {
+  font: { load: (p: string) => void; name: string; size: number; color: string };
+  paragraphs: { load: (p: string) => void; items: unknown[] };
+  insertHtml: (html: string, mode: string) => void;
+};
 export async function insertMarkdownIntoTextRange(
-  context: any,
-  textRange: any,
+  context: PowerPoint.RequestContext,
+  textRange: PptTextRange,
   text: string,
   forceStripBullets = false,
 ) {
@@ -380,7 +418,11 @@ export async function insertMarkdownIntoTextRange(
   textRange.insertHtml(html, 'Replace');
 }
 
-async function findShapeOnSlide(context: any, slideNumber: number, shapeIdOrName: string | number) {
+async function findShapeOnSlide(
+  context: PowerPoint.RequestContext,
+  slideNumber: number,
+  shapeIdOrName: string | number,
+) {
   const slides = context.presentation.slides;
   slides.load('items');
   await context.sync();
@@ -409,13 +451,13 @@ async function findShapeOnSlide(context: any, slideNumber: number, shapeIdOrName
   };
 }
 
-function fallbackToText(text: string, resolve: any, reject: any) {
+function fallbackToText(text: string, resolve: () => void, reject: (err: Error) => void) {
   // Pass true to strip list markers so it plays nice with shapes that are already natively bulleted.
   const fallbackText = stripRichFormattingSyntax(text, true);
   Office.context.document.setSelectedDataAsync(
     fallbackText,
     { coercionType: Office.CoercionType.Text },
-    (fallbackResult: any) => {
+    (fallbackResult: Office.AsyncResult<string>) => {
       if (fallbackResult.status === Office.AsyncResultStatus.Succeeded) {
         resolve();
       } else {
@@ -438,18 +480,24 @@ function isPowerPointApiSupported(version: string): boolean {
  * (layout/master) bullet points. When true, we should avoid inserting HTML
  * <ul>/<li> tags to prevent double-bullet rendering.
  */
-async function hasNativeBullets(context: any, textRange: any): Promise<boolean> {
+async function hasNativeBullets(
+  context: PowerPoint.RequestContext,
+  textRange: PptTextRange,
+): Promise<boolean> {
   try {
     const paragraphs = textRange.paragraphs;
     paragraphs.load('items');
     await context.sync();
     if (paragraphs.items.length > 0) {
       for (const para of paragraphs.items) {
-        para.load('bulletFormat/visible');
+        (para as { load: (p: string) => void }).load('bulletFormat/visible');
       }
       await context.sync();
       // Return true if ANY paragraph has native bullets
-      return paragraphs.items.some((p: any) => p.bulletFormat?.visible === true);
+      return paragraphs.items.some(
+        (p: unknown) =>
+          (p as { bulletFormat?: { visible?: boolean } }).bulletFormat?.visible === true,
+      );
     }
   } catch {
     // API not available or paragraphs inaccessible — assume no native bullets
@@ -470,7 +518,7 @@ function ensurePowerPointRunAvailable() {
  */
 function buildPowerPointExecute(
   def: PowerPointToolTemplate,
-): (args?: Record<string, any>) => Promise<string> {
+): (args?: Record<string, unknown>) => Promise<string> {
   return async (args = {}) => {
     try {
       if (def.executePowerPoint)
@@ -525,8 +573,8 @@ const powerpointToolDefinitions = createOfficeTools<
         },
         required: ['text'],
       },
-      executeCommon: async (args: Record<string, any>) => {
-        await insertIntoPowerPoint(args.text, true);
+      executeCommon: async (args: Record<string, unknown>) => {
+        await insertIntoPowerPoint(args.text as string, true);
         return 'Successfully replaced selected text.';
       },
     },
@@ -562,8 +610,10 @@ PARAMETERS:
         },
         required: ['slideNumber', 'shapeIdOrName', 'revisedText'],
       },
-      executePowerPoint: async (context, args: Record<string, any>) => {
-        const { slideNumber, shapeIdOrName, revisedText } = args;
+      executePowerPoint: async (context, args: Record<string, unknown>) => {
+        const slideNumber = args.slideNumber as number;
+        const shapeIdOrName = args.shapeIdOrName as string;
+        const revisedText = args.revisedText as string;
 
         try {
           const {
@@ -577,7 +627,10 @@ PARAMETERS:
               {
                 success: false,
                 error: error || `Shape "${shapeIdOrName}" not found on slide ${slideNumber}`,
-                availableShapes: shapes.map((s: any) => ({ id: s.id, name: s.name })),
+                availableShapes: shapes.map((s: { id: string; name: string }) => ({
+                  id: s.id,
+                  name: s.name,
+                })),
               },
               null,
               2,
@@ -668,8 +721,11 @@ PARAMETERS:
         },
         required: ['slideNumber', 'shapeIdOrName', 'searchText', 'replaceText'],
       },
-      executePowerPoint: async (context, args: Record<string, any>) => {
-        const { slideNumber, shapeIdOrName, searchText, replaceText } = args;
+      executePowerPoint: async (context, args: Record<string, unknown>) => {
+        const slideNumber = args.slideNumber as number;
+        const shapeIdOrName = args.shapeIdOrName as string;
+        const searchText = args.searchText as string;
+        const replaceText = args.replaceText as string;
         const replaceAll = args.replaceAll !== false;
 
         // Helper: XML-based surgical replacement via OOXML ZIP (truly preserves all formatting)
@@ -684,7 +740,7 @@ PARAMETERS:
           const slideIndex = Math.trunc(Number(slideNumber)) - 1;
           let replacements = 0;
           try {
-            await withSlideZip(context, slideIndex, async (zip: any, markDirty: () => void) => {
+            await withSlideZip(context, slideIndex, async (zip: JSZip, markDirty: () => void) => {
               const slideXmlStr = await zip.file('ppt/slides/slide1.xml')?.async('string');
               if (!slideXmlStr) throw new Error('Could not read slide XML');
 
@@ -703,10 +759,7 @@ PARAMETERS:
                   if (cNvPr) {
                     const spId = cNvPr.getAttribute('id');
                     const spName = cNvPr.getAttribute('name');
-                    if (
-                      spId === String(shapeIdOrName) ||
-                      spName === String(shapeIdOrName)
-                    ) {
+                    if (spId === String(shapeIdOrName) || spName === String(shapeIdOrName)) {
                       targetSp = sp;
                       break;
                     }
@@ -928,8 +981,13 @@ replaces the paragraph text, then re-applies those font properties so style is f
         },
         required: ['slideNumber', 'shapeIdOrName', 'paragraphReplacements'],
       },
-      executePowerPoint: async (context, args: Record<string, any>) => {
-        const { slideNumber, shapeIdOrName, paragraphReplacements } = args;
+      executePowerPoint: async (context, args: Record<string, unknown>) => {
+        const slideNumber = args.slideNumber as number;
+        const shapeIdOrName = args.shapeIdOrName as string;
+        const paragraphReplacements = args.paragraphReplacements as {
+          paragraphIndex: number;
+          newText: string;
+        }[];
 
         // XML fallback: edit paragraph text directly in OOXML, preserving all run formatting
         const tryXmlParagraphReplacement = async (): Promise<{
@@ -947,7 +1005,7 @@ replaces the paragraph text, then re-applies those font properties so style is f
           const slideIndex = Math.trunc(Number(slideNumber)) - 1;
           const results: { paragraphIndex: number; status: string }[] = [];
           try {
-            await withSlideZip(context, slideIndex, async (zip: any, markDirty: () => void) => {
+            await withSlideZip(context, slideIndex, async (zip: JSZip, markDirty: () => void) => {
               const slideXmlStr = await zip.file('ppt/slides/slide1.xml')?.async('string');
               if (!slideXmlStr) throw new Error('Could not read slide XML');
 
@@ -978,10 +1036,7 @@ replaces the paragraph text, then re-applies those font properties so style is f
               const searchRoot: Element = targetSp ?? doc.documentElement;
               const xmlParas = searchRoot.getElementsByTagNameNS(nsA, 'p');
 
-              for (const replacement of paragraphReplacements as {
-                paragraphIndex: number;
-                newText: string;
-              }[]) {
+              for (const replacement of paragraphReplacements) {
                 const { paragraphIndex, newText } = replacement;
                 if (paragraphIndex < 0 || paragraphIndex >= xmlParas.length) {
                   results.push({
@@ -1041,10 +1096,7 @@ replaces the paragraph text, then re-applies those font properties so style is f
           const paragraphs = textRange.paragraphs.items;
           const results: { paragraphIndex: number; status: string }[] = [];
 
-          for (const replacement of paragraphReplacements as {
-            paragraphIndex: number;
-            newText: string;
-          }[]) {
+          for (const replacement of paragraphReplacements) {
             const { paragraphIndex, newText } = replacement;
 
             if (paragraphIndex < 0 || paragraphIndex >= paragraphs.length) {
@@ -1148,7 +1200,10 @@ replaces the paragraph text, then re-applies those font properties so style is f
         },
         required: ['slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.5')) {
           return 'Error: getSpeakerNotes requires PowerPointApi 1.5 or later, which is not supported in this Office version.';
@@ -1165,7 +1220,14 @@ replaces the paragraph text, then re-applies those font properties so style is f
             `Error: slide ${slideNumber} does not exist. Presentation has ${slides.items.length} slides.`,
           );
         const slide = slides.getItemAt(index);
-        const notesPage = slide.notesSlide;
+        const notesPage = (
+          slide as unknown as {
+            notesSlide: {
+              load: (p: string) => void;
+              notesTextFrame: { textRange: { text: string } };
+            };
+          }
+        ).notesSlide;
         notesPage.load('notesTextFrame/textRange/text');
         await context.sync();
         const text = notesPage.notesTextFrame.textRange.text ?? '';
@@ -1189,7 +1251,10 @@ replaces the paragraph text, then re-applies those font properties so style is f
         },
         required: ['slideNumber', 'notes'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.5')) {
           return 'Error: setSpeakerNotes requires PowerPointApi 1.5 or later, which is not supported in this Office version.';
@@ -1204,7 +1269,14 @@ replaces the paragraph text, then re-applies those font properties so style is f
         if (index >= slides.items.length)
           throw new Error(`Error: slide ${slideNumber} does not exist.`);
         const slide = slides.getItemAt(index);
-        const notesPage = slide.notesSlide;
+        const notesPage = (
+          slide as unknown as {
+            notesSlide: {
+              load: (p: string) => void;
+              notesTextFrame: { textRange: { text: string } };
+            };
+          }
+        ).notesSlide;
         notesPage.load('notesTextFrame/textRange');
         await context.sync();
         notesPage.notesTextFrame.textRange.text = String(args.notes ?? '');
@@ -1243,7 +1315,10 @@ replaces the paragraph text, then re-applies those font properties so style is f
         },
         required: ['slideNumber', 'base64Data'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.4')) {
           return 'Error: insertImageOnSlide requires PowerPointApi 1.4 or later.';
@@ -1352,7 +1427,7 @@ try {
         suggestion:
           'Refer to the Office.js skill document for correct patterns. Remember: slide indices are 0-based.',
         mutationDetector: looksLikeMutationPpt,
-        buildSandboxContext: (context: any) => ({
+        buildSandboxContext: (context: PowerPoint.RequestContext) => ({
           context,
           PowerPoint: typeof PowerPoint !== 'undefined' ? PowerPoint : undefined,
           Office: typeof Office !== 'undefined' ? Office : undefined,
@@ -1387,8 +1462,13 @@ try {
         },
         required: ['content'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
-        const { content, slideNumber, shapeIdOrName } = args;
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
+        const content = args.content as string;
+        const slideNumber = args.slideNumber as number | undefined;
+        const shapeIdOrName = args.shapeIdOrName as string | undefined;
 
         if (shapeIdOrName) {
           if (!slideNumber)
@@ -1401,14 +1481,19 @@ try {
           );
 
           if (!shape) {
-            const availableShapes = shapes.map((s: any) => `'${s.name}' (id: ${s.id})`).join(', ');
+            const availableShapes = shapes
+              .map((s: { id: string; name: string }) => `'${s.name}' (id: ${s.id})`)
+              .join(', ');
             throw new Error(`Error: ${error}. Available shapes are: ${availableShapes}`);
           }
 
           // Detect body/content placeholders to prevent double-bullet rendering
           let isBodyPlaceholder = false;
           try {
-            const phType = String((shape as any).placeholderFormat?.type ?? '').toLowerCase();
+            const phType = String(
+              (shape as unknown as { placeholderFormat?: { type?: unknown } }).placeholderFormat
+                ?.type ?? '',
+            ).toLowerCase();
             const nameLower = ((shape.name as string) ?? '').toLowerCase();
             isBodyPlaceholder =
               phType === 'body' ||
@@ -1466,7 +1551,10 @@ try {
         },
         required: ['slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         const slideNumber = Number(args.slideNumber);
         if (!Number.isFinite(slideNumber) || slideNumber < 1) {
@@ -1502,7 +1590,10 @@ try {
         },
         required: [],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
 
         const slides = context.presentation.slides;
@@ -1512,7 +1603,7 @@ try {
         const bodyText = typeof args.body === 'string' ? args.body.trim() : undefined;
 
         // Discover real layout IDs from the presentation's slide masters
-        let addOptions: any = {};
+        let addOptions: Record<string, unknown> = {};
         let chosenLayoutName = '';
         try {
           const slideMasters = context.presentation.slideMasters;
@@ -1524,7 +1615,7 @@ try {
             master.layouts.load('items/id,items/name');
             await context.sync();
 
-            const availableLayouts: any[] = master.layouts.items;
+            const availableLayouts: { id: string; name: string }[] = master.layouts.items;
 
             // Score a layout name against the requested hint
             const scoreLayout = (name: string): number => {
@@ -1571,7 +1662,7 @@ try {
             };
 
             let bestScore = -1;
-            let bestLayout: any = null;
+            let bestLayout: { id: string; name: string } | null = null;
             for (const lo of availableLayouts) {
               const s = scoreLayout(lo.name ?? '');
               if (s > bestScore) {
@@ -1612,7 +1703,10 @@ try {
                 // Use placeholderFormat.type when available (PowerPoint.js 1.3+)
                 let phType = '';
                 try {
-                  phType = String((shape as any).placeholderFormat?.type ?? '').toLowerCase();
+                  phType = String(
+                    (shape as unknown as { placeholderFormat?: { type?: unknown } })
+                      .placeholderFormat?.type ?? '',
+                  ).toLowerCase();
                 } catch {}
                 const nameLower = ((shape.name as string) ?? '').toLowerCase();
 
@@ -1663,7 +1757,10 @@ try {
         },
         required: ['slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         const slideNumber = Number(args.slideNumber);
         if (!Number.isFinite(slideNumber) || slideNumber < 1)
@@ -1695,7 +1792,10 @@ try {
         },
         required: ['slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         const slideNumber = Number(args.slideNumber);
         if (!Number.isFinite(slideNumber) || slideNumber < 1)
@@ -1723,7 +1823,17 @@ try {
         }
         await context.sync();
 
-        const details = shapes.items.map((shape: any) => {
+        type ShapeInfo = {
+          id: string;
+          name: string;
+          type: string;
+          left: number;
+          top: number;
+          width: number;
+          height: number;
+          textFrame: { textRange: { text: string } };
+        };
+        const details = (shapes.items as ShapeInfo[]).map(shape => {
           let text = '';
           try {
             text = shape.textFrame.textRange.text;
@@ -1753,7 +1863,7 @@ try {
         properties: {},
         required: [],
       },
-      executePowerPoint: async (context: any) => {
+      executePowerPoint: async (context: PowerPoint.RequestContext) => {
         ensurePowerPointRunAvailable();
         const slides = context.presentation.slides;
         slides.load('items');
@@ -1769,7 +1879,7 @@ try {
             shapes.load('items,items/type');
             await context.sync();
 
-            const textShapes: any[] = [];
+            const textShapes: { textFrame: { textRange: { text: string } } }[] = [];
             for (let j = 0; j < shapes.items.length; j++) {
               const shape = shapes.items[j];
               const shapeType = String(shape.type || '').toLowerCase();
@@ -1851,7 +1961,10 @@ try {
         },
         required: [],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.5')) {
           return JSON.stringify({ error: 'screenshotSlide requires PowerPointApi 1.5 or later.' });
@@ -1864,7 +1977,7 @@ try {
         if (index < 0 || index >= slides.items.length)
           throw new Error(`Slide ${slideNumber} does not exist.`);
         const slide = slides.getItemAt(index);
-        const imageResult = (slide as any).getImageAsBase64({ width: 960 });
+        const imageResult = slide.getImageAsBase64({ width: 960 });
         await context.sync();
         const base64 = imageResult.value as string;
         return buildScreenshotResult(base64, `Screenshot of slide ${slideNumber}`);
@@ -1886,7 +1999,10 @@ try {
         },
         required: ['slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         const slideNumber = Number(args.slideNumber);
         if (!Number.isFinite(slideNumber) || slideNumber < 1)
@@ -1939,7 +2055,10 @@ try {
         },
         required: ['slideNumber', 'targetPosition'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.5')) {
           return 'Error: reorderSlide requires PowerPointApi 1.5 or later, which is not supported in this Office version.';
@@ -1955,12 +2074,17 @@ try {
         await context.sync();
         const totalSlides = slides.items.length;
         if (Math.trunc(slideNumber) > totalSlides)
-          throw new Error(`Error: slide ${slideNumber} does not exist. Presentation has ${totalSlides} slides.`);
+          throw new Error(
+            `Error: slide ${slideNumber} does not exist. Presentation has ${totalSlides} slides.`,
+          );
         if (Math.trunc(targetPosition) > totalSlides)
-          throw new Error(`Error: targetPosition ${targetPosition} exceeds slide count (${totalSlides}).`);
+          throw new Error(
+            `Error: targetPosition ${targetPosition} exceeds slide count (${totalSlides}).`,
+          );
         const fromIndex = Math.trunc(slideNumber) - 1;
         const toIndex = Math.trunc(targetPosition) - 1;
-        if (fromIndex === toIndex) return `Slide ${slideNumber} is already at position ${targetPosition}.`;
+        if (fromIndex === toIndex)
+          return `Slide ${slideNumber} is already at position ${targetPosition}.`;
         slides.getItemAt(fromIndex).moveTo(toIndex);
         await context.sync();
         return `Slide ${slideNumber} moved to position ${targetPosition}.`;
@@ -1977,7 +2101,10 @@ try {
         properties: {},
         required: [],
       },
-      executePowerPoint: async (context: any, _args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        _args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         const slides = context.presentation.slides;
         slides.load('items');
@@ -1989,12 +2116,19 @@ try {
 
         const issues: string[] = [];
 
+        type SlideShapeInfo = {
+          name: string;
+          left: number;
+          top: number;
+          width: number;
+          height: number;
+        };
         for (let i = 0; i < slides.items.length; i++) {
           const slide = slides.items[i];
           slide.shapes.load('items/id,items/name,items/left,items/top,items/width,items/height');
           await context.sync();
 
-          const shapes = slide.shapes.items.map((s: any) => ({
+          const shapes = (slide.shapes.items as SlideShapeInfo[]).map(s => ({
             name: s.name,
             left: s.left,
             top: s.top,
@@ -2063,7 +2197,10 @@ ALWAYS call markDirty() after modifying the zip.`,
         },
         required: ['slideNumber', 'code', 'explanation'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.5')) {
           return JSON.stringify({ error: 'editSlideXml requires PowerPointApi 1.5 or later.' });
@@ -2072,7 +2209,7 @@ ALWAYS call markDirty() after modifying the zip.`,
         if (!Number.isFinite(slideNumber) || slideNumber < 1)
           throw new Error('slideNumber must be >= 1.');
 
-        const validation = validateOfficeCode(args.code, 'PowerPoint');
+        const validation = validateOfficeCode(args.code as string, 'PowerPoint');
         if (!validation.valid) {
           return JSON.stringify({ error: 'Code validation failed', errors: validation.errors });
         }
@@ -2081,14 +2218,14 @@ ALWAYS call markDirty() after modifying the zip.`,
         const result = await withSlideZip(
           context,
           slideIndex,
-          async (zip: any, markDirty: () => void) => {
+          async (zip: JSZip, markDirty: () => void) => {
             const fn = new Function(
               'zip',
               'markDirty',
               'escapeXml',
               'DOMParser',
               'XMLSerializer',
-              `return (async () => { ${args.code} })()`,
+              `return (async () => { ${args.code as string} })()`,
             );
             return fn(zip, markDirty, escapeXml, DOMParser, XMLSerializer);
           },
@@ -2116,9 +2253,13 @@ ALWAYS call markDirty() after modifying the zip.`,
         },
         required: ['query'],
       },
-      executeCommon: async (args: Record<string, any>) => {
+      executeCommon: async (args: Record<string, unknown>) => {
         const { searchIconify } = await import('@/api/backend');
-        const results = await searchIconify(args.query, args.limit || 10, args.prefix);
+        const results = await searchIconify(
+          args.query as string,
+          (args.limit as number | undefined) || 10,
+          args.prefix as string | undefined,
+        );
         return JSON.stringify(results);
       },
     },
@@ -2150,7 +2291,10 @@ ALWAYS call markDirty() after modifying the zip.`,
         },
         required: ['iconId', 'slideNumber'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
         if (!isPowerPointApiSupported('1.4')) {
           return 'Error: insertIcon requires PowerPointApi 1.4 or later.';
@@ -2161,7 +2305,7 @@ ALWAYS call markDirty() after modifying the zip.`,
         const [prefix, name] = parts;
 
         const { fetchIconSvg } = await import('@/api/backend');
-        const svgText = await fetchIconSvg(prefix, name, args.color);
+        const svgText = await fetchIconSvg(prefix, name, args.color as string | undefined);
         const base64 = btoa(unescape(encodeURIComponent(svgText)));
 
         const slideNumber = Number(args.slideNumber);
@@ -2205,7 +2349,10 @@ ALWAYS call markDirty() after modifying the zip.`,
         },
         required: ['searchText'],
       },
-      executePowerPoint: async (context: any, args: Record<string, any>) => {
+      executePowerPoint: async (
+        context: PowerPoint.RequestContext,
+        args: Record<string, unknown>,
+      ) => {
         ensurePowerPointRunAvailable();
 
         const searchText: string = String(args.searchText);
@@ -2243,7 +2390,7 @@ ALWAYS call markDirty() after modifying the zip.`,
           await context.sync();
 
           // Phase A: load textRange.text for non-picture shapes to find candidates
-          const candidateShapes: any[] = [];
+          const candidateShapes: PptShape[] = [];
           for (let j = 0; j < shapes.items.length; j++) {
             const shape = shapes.items[j];
             const shapeType = String(shape.type || '').toLowerCase();
@@ -2268,7 +2415,7 @@ ALWAYS call markDirty() after modifying the zip.`,
           if (!textSyncOk) continue;
 
           // Phase B: filter shapes containing the search text, then load paragraphs
-          const matchingShapes: any[] = [];
+          const matchingShapes: PptShape[] = [];
           for (const shape of candidateShapes) {
             let shapeText = '';
             try {
@@ -2349,7 +2496,7 @@ ALWAYS call markDirty() after modifying the zip.`,
 );
 
 export async function getSlideContentStandalone(
-  context: any,
+  context: PowerPoint.RequestContext,
   slideNumber: number,
 ): Promise<string> {
   const slides = context.presentation.slides;
@@ -2366,7 +2513,11 @@ export async function getSlideContentStandalone(
   shapes.load('items,items/type');
   await context.sync();
 
-  const shapeEntries: { shape: any; idx: number }[] = [];
+  type OfficejsShape = {
+    textFrame: { textRange: { text: string; load: (p: string) => void } };
+    type: string;
+  };
+  const shapeEntries: { shape: OfficejsShape; idx: number }[] = [];
   for (let i = 0; i < shapes.items.length; i++) {
     const shape = shapes.items[i];
     const shapeType = String(shape.type || '').toLowerCase();
