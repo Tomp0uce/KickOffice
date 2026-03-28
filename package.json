@@ -1,0 +1,24 @@
+{
+  "name": "kickoffice",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "test:frontend": "cd frontend && npx vitest run",
+    "test:backend": "cd backend && npm test",
+    "test": "npm run test:frontend && npm run test:backend",
+    "lint": "cd frontend && npm run lint",
+    "typecheck": "cd frontend && npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx,vue}": [
+      "npx prettier --write"
+    ],
+    "backend/src/**/*.js": [
+      "npx prettier --write"
+    ]
+  }
+}

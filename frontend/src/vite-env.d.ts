@@ -34,6 +34,12 @@ declare namespace Excel {
   type ConditionalTextOperator = any;
   type IconSet = any;
   type ProtectionSelectionMode = any;
+  type ConditionalFormat = any;
+  type ConditionalRangeFormat = any;
+  type RangeAreas = any;
+  type NamedItem = any;
+  type Chart = any;
+  type PivotTable = any;
 }
 
 declare const Word: any;

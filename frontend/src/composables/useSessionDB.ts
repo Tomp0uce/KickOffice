@@ -194,7 +194,7 @@ export async function saveSession(sessionId: string, messages: DisplayMessage[])
     });
   } catch (putErr) {
     logService.error('[SessionDB] Failed to save session:', putErr);
-    messageUtil.error((i18n.global.t as any)('failedToSaveChatData'));
+    messageUtil.error((i18n.global.t as (key: string) => string)('failedToSaveChatData'));
   }
 }
 

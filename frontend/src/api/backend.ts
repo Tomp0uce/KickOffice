@@ -1,6 +1,11 @@
 import type { ModelInfo } from '@/types';
 import { logService } from '@/utils/logger';
-import { fetchWithTimeoutAndRetry, getGlobalHeaders, generateRequestId } from './httpClient';
+import {
+  fetchWithTimeoutAndRetry,
+  getGlobalHeaders,
+  generateRequestId,
+  BACKEND_URL,
+} from './httpClient';
 import type {
   ChatRequestMessage,
   ChatStreamOptions,
@@ -30,12 +35,6 @@ export type {
 } from './types';
 
 // ─────────────────────────────────────────────────────────────────────────────
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-
-if (!BACKEND_URL) {
-  throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env');
-}
 
 interface LogPayload {
   messages?: ChatRequestMessage[];
@@ -99,7 +98,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   // ERR-L1: Per-request ID for frontend↔backend log correlation
   const requestId = generateRequestId();
-  logService.debug(`[chatStream] requestId=${requestId}`, { traffic: 'llm' });
+  logService.debug(`[chatStream] requestId=${requestId}`, undefined, 'llm');
 
   const res = await fetchWithTimeoutAndRetry(
     `${BACKEND_URL}/api/chat`,
@@ -254,7 +253,7 @@ export async function generateImage(options: ImageGenerateOptions): Promise<stri
     return image.url;
   }
 
-  return '';
+  throw new Error('No image data in response');
 }
 
 export async function uploadFile(
@@ -343,7 +342,19 @@ export async function extractChartData(params: ChartExtractParams): Promise<Char
   return res.json();
 }
 
-export async function searchIconify(query: string, limit = 10, prefix?: string): Promise<any> {
+export interface IconifySearchResult {
+  icons: string[];
+  total: number;
+  limit: number;
+  start: number;
+  collections: Record<string, { name: string; total: number }>;
+}
+
+export async function searchIconify(
+  query: string,
+  limit = 10,
+  prefix?: string,
+): Promise<IconifySearchResult> {
   const params = new URLSearchParams({ query, limit: String(limit) });
   if (prefix) params.set('prefix', prefix);
   const res = await fetchWithTimeoutAndRetry(`${BACKEND_URL}/api/icons/search?${params}`, {

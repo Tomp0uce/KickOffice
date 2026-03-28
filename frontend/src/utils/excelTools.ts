@@ -172,9 +172,157 @@ async function safeGetSheet(
   return sheet;
 }
 
-type ExcelToolTemplate = OfficeToolTemplate<Excel.RequestContext> & {
-  executeExcel: (context: Excel.RequestContext, args: Record<string, any>) => Promise<string>;
+type ExcelToolTemplate = OfficeToolTemplate & {
+  executeExcel: (context: Excel.RequestContext, args: Record<string, unknown>) => Promise<string>;
 };
+
+// Per-tool argument interfaces (inferred from inputSchema definitions)
+interface CreateTableArgs {
+  address?: string;
+  hasHeaders?: boolean;
+  tableName?: string;
+  style?: string;
+}
+interface SetCellRangeArgs {
+  address: string;
+  sheetName?: string;
+  values?: (string | number | boolean | null)[][];
+  formulas?: string[][];
+  formatting?: {
+    bold?: boolean;
+    fillColor?: string;
+    fontColor?: string;
+    numberFormat?: string;
+    horizontalAlignment?: string;
+  };
+  copyToRange?: string;
+}
+interface ModifyStructureArgs {
+  operation: string;
+  dimension: string;
+  reference?: string;
+  count?: number;
+  sheetName?: string;
+}
+interface ManageObjectArgs {
+  operation: string;
+  objectType: string;
+  sheetName?: string;
+  source?: string;
+  chartType?: string;
+  title?: string;
+  name?: string;
+  anchor?: string;
+  seriesBy?: string;
+  hasHeaders?: boolean;
+}
+interface FormatRangeArgs {
+  address?: string;
+  fillColor?: string;
+  fontColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  fontSize?: number;
+  borders?: boolean;
+  horizontalAlignment?: string;
+  verticalAlignment?: string;
+  wrapText?: boolean;
+  fontName?: string;
+  borderStyle?: string;
+  borderColor?: string;
+  borderWeight?: string;
+  borderTopStyle?: string;
+  borderBottomStyle?: string;
+  borderLeftStyle?: string;
+  borderRightStyle?: string;
+  borderInsideHorizontalStyle?: string;
+  borderInsideVerticalStyle?: string;
+  borderTopColor?: string;
+  borderBottomColor?: string;
+  borderLeftColor?: string;
+  borderRightColor?: string;
+  borderInsideHorizontalColor?: string;
+  borderInsideVerticalColor?: string;
+  borderTopWeight?: string;
+  borderBottomWeight?: string;
+  borderLeftWeight?: string;
+  borderRightWeight?: string;
+  borderInsideHorizontalWeight?: string;
+  borderInsideVerticalWeight?: string;
+}
+interface SortRangeArgs {
+  address?: string;
+  columnIndex?: number;
+  ascending?: boolean;
+  hasHeaders?: boolean;
+}
+interface ClearRangeArgs {
+  address?: string;
+  clearType?: string;
+}
+interface SearchAndReplaceArgs {
+  searchText: string;
+  replaceText?: string;
+}
+interface AddWorksheetArgs {
+  name?: string;
+}
+interface ProtectWorksheetArgs {
+  sheetName?: string;
+  action: string;
+  password?: string;
+  allowAutoFilter?: boolean;
+  allowFormatCells?: boolean;
+  allowInsertRows?: boolean;
+}
+interface SetNamedRangeArgs {
+  name: string;
+  rangeAddress: string;
+}
+interface ApplyConditionalFormattingArgs {
+  address: string;
+  ruleType: string;
+  clearExisting?: boolean;
+  operator?: string;
+  formula1?: string;
+  formula2?: string;
+  text?: string;
+  textOperator?: string;
+  fillColor?: string;
+  fontColor?: string;
+  bold?: boolean;
+  colorScaleMinColor?: string;
+  colorScaleMidColor?: string;
+  colorScaleMaxColor?: string;
+  dataBarColor?: string;
+  iconSetStyle?: string;
+  stopIfTrue?: boolean;
+}
+interface GetConditionalFormattingRulesArgs {
+  address?: string;
+}
+interface GetAllObjectsArgs {
+  allSheets?: boolean;
+}
+interface ScreenshotRangeArgs {
+  sheetName?: string;
+  range?: string;
+}
+interface GetRangeAsCsvArgs {
+  sheetName?: string;
+  range?: string;
+  maxRows?: number;
+}
+interface ModifyWorkbookStructureArgs {
+  operation: string;
+  sheetName?: string;
+  newName?: string;
+  tabColor?: string;
+}
+interface DetectDataHeadersArgs {
+  address?: string;
+  sheetName?: string;
+}
 
 export type ExcelToolName =
   | 'getSelectedCells'
@@ -259,8 +407,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { sheetName, address } = args || {};
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const sheetName = args.sheetName as string | undefined;
+        const address = args.address as string | undefined;
 
         const sheet = sheetName
           ? await safeGetSheet(context, sheetName)
@@ -313,8 +462,13 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { address, hasHeaders = true, tableName, style = 'TableStyleMedium2' } = args;
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const {
+          address,
+          hasHeaders = true,
+          tableName,
+          style = 'TableStyleMedium2',
+        } = args as unknown as CreateTableArgs;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange();
@@ -389,8 +543,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['address'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { address, sheetName, values, formulas, formatting, copyToRange } = args;
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const { address, sheetName, values, formulas, formatting, copyToRange } =
+          args as unknown as SetCellRangeArgs;
         const formulaLocale = getExcelFormulaLanguage();
 
         const sheet = await safeGetSheet(context, sheetName);
@@ -420,7 +575,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           if (formatting.fontColor) range.format.font.color = formatting.fontColor;
           if (formatting.numberFormat) range.numberFormat = [[formatting.numberFormat]];
           if (formatting.horizontalAlignment) {
-            const alignMap: Record<string, any> = {
+            const alignMap: Record<string, Excel.HorizontalAlignment> = {
               Left: Excel.HorizontalAlignment.left,
               Center: Excel.HorizontalAlignment.center,
               Right: Excel.HorizontalAlignment.right,
@@ -478,8 +633,14 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['operation', 'dimension'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { operation, dimension, reference, count = 1, sheetName } = args;
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const {
+          operation,
+          dimension,
+          reference,
+          count = 1,
+          sheetName,
+        } = args as unknown as ModifyStructureArgs;
 
         const sheet = await safeGetSheet(context, sheetName);
 
@@ -487,7 +648,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           if (operation === 'unfreeze') {
             sheet.freezePanes.unfreeze();
           } else {
-            const ref = parseInt(reference, 10) || 1;
+            const ref = parseInt(reference ?? '', 10) || 1;
             if (dimension === 'rows') {
               sheet.freezePanes.freezeRows(ref);
             } else {
@@ -610,7 +771,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['operation', 'objectType'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
+      executeExcel: async (context, args: Record<string, unknown>) => {
         const {
           operation,
           objectType,
@@ -622,9 +783,9 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           anchor,
           seriesBy = 'columns',
           hasHeaders = true,
-        } = args as Record<string, any>;
+        } = args as unknown as ManageObjectArgs;
 
-        const chartTypeMap: Record<string, any> = {
+        const chartTypeMap: Record<string, Excel.ChartType> = {
           ColumnClustered: Excel.ChartType.columnClustered,
           ColumnStacked: Excel.ChartType.columnStacked,
           Line: Excel.ChartType.line,
@@ -665,24 +826,18 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
               if (seriesBy === 'columns' && dataRange.columnCount > 1) {
                 // Category labels = first column, EXCLUDING the top-left header cell so it
                 // never shows up as a data category (e.g. "Mois" must not appear in the axis).
-                categoryRange = dataRange
-                  .getColumn(0)
-                  .getOffsetRange(1, 0)
-                  .getResizedRange(-1, 0);
+                categoryRange = dataRange.getColumn(0).getOffsetRange(1, 0).getResizedRange(-1, 0);
                 // Plot data = remaining columns (row 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(0, 1).getResizedRange(0, -1);
               } else if (seriesBy === 'rows' && dataRange.rowCount > 1) {
                 // Category labels = first row, EXCLUDING the top-left header cell
-                categoryRange = dataRange
-                  .getRow(0)
-                  .getOffsetRange(0, 1)
-                  .getResizedRange(0, -1);
+                categoryRange = dataRange.getRow(0).getOffsetRange(0, 1).getResizedRange(0, -1);
                 // Plot data = remaining rows (column 0 used as series name headers by Excel)
                 plotRange = dataRange.getOffsetRange(1, 0).getResizedRange(-1, 0);
               }
             }
 
-            const excelChartType = chartTypeMap[chartType] || Excel.ChartType.columnClustered;
+            const excelChartType = chartTypeMap[chartType ?? ''] || Excel.ChartType.columnClustered;
             const seriesByEnum =
               seriesBy === 'rows' ? Excel.ChartSeriesBy.rows : Excel.ChartSeriesBy.columns;
             const chart = sheet.charts.add(excelChartType, plotRange, seriesByEnum);
@@ -850,7 +1005,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
+      executeExcel: async (context, rawArgs: Record<string, unknown>) => {
+        const args = rawArgs as unknown as FormatRangeArgs;
         const {
           address,
           fillColor,
@@ -866,7 +1022,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           borderStyle,
           borderColor,
           borderWeight,
-        } = args as Record<string, any>;
+        } = args;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange();
@@ -885,7 +1041,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           range.format.verticalAlignment = verticalAlignment as Excel.VerticalAlignment;
         }
 
-        const borderStyleMap: Record<string, any> = {
+        const borderStyleMap: Record<string, Excel.BorderLineStyle> = {
           continuous: Excel.BorderLineStyle.continuous,
           dash: Excel.BorderLineStyle.dash,
           dashDot: Excel.BorderLineStyle.dashDot,
@@ -896,7 +1052,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           slantDashDot: Excel.BorderLineStyle.slantDashDot,
         };
 
-        const borderWeightMap: Record<string, any> = {
+        const borderWeightMap: Record<string, Excel.BorderWeight> = {
           hairline: Excel.BorderWeight.hairline,
           thin: Excel.BorderWeight.thin,
           medium: Excel.BorderWeight.medium,
@@ -1007,13 +1163,13 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
+      executeExcel: async (context, args: Record<string, unknown>) => {
         const {
           address,
           columnIndex = 0,
           ascending = true,
           hasHeaders = true,
-        } = args as Record<string, any>;
+        } = args as unknown as SortRangeArgs;
 
         const range = address
           ? context.workbook.worksheets.getActiveWorksheet().getRange(address)
@@ -1024,11 +1180,11 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         hasHeaders ? range.getResizedRange(-1, 0).getOffsetRange(1, 0) : range;
 
         // Manual sort as fallback-safe approach
-        const values = range.values.slice();
+        const values: (string | number | boolean)[][] = range.values.slice();
         const headers = hasHeaders ? [values.shift()!] : [];
-        values.sort((a: any[], b: any[]) => {
-          const va = a[columnIndex];
-          const vb = b[columnIndex];
+        values.sort((a: (string | number | boolean)[], b: (string | number | boolean)[]) => {
+          const va = a[columnIndex as number];
+          const vb = b[columnIndex as number];
           if (va < vb) return ascending ? -1 : 1;
           if (va > vb) return ascending ? 1 : -1;
           return 0;
@@ -1060,7 +1216,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         sheets.load('items/name');
         await context.sync();
 
-        const sheetNames = sheets.items.map((s: any) => s.name);
+        const sheetNames = sheets.items.map((s: Excel.Worksheet) => s.name);
 
         return JSON.stringify(
           {
@@ -1102,8 +1258,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { address, clearType = 'all' } = args;
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const { address, clearType = 'all' } = args as unknown as ClearRangeArgs;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange();
@@ -1142,8 +1298,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['searchText'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const { searchText, replaceText } = args as Record<string, any>;
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const { searchText, replaceText } = args as unknown as SearchAndReplaceArgs;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const usedRange = sheet.getUsedRange();
@@ -1151,8 +1307,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         await context.sync();
 
         let matchCount = 0;
-        const newValues = usedRange.values.map((row: any[]) =>
-          row.map((cell: any) => {
+        const newValues = usedRange.values.map((row: unknown[]) =>
+          row.map((cell: unknown) => {
             const cellStr = String(cell);
             if (cellStr.includes(searchText)) {
               matchCount++;
@@ -1191,8 +1347,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const { name } = args as Record<string, any>;
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { name } = args as unknown as AddWorksheetArgs;
 
         const sheet = context.workbook.worksheets.add(name || undefined);
         sheet.activate();
@@ -1237,7 +1393,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['action'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
         const {
           sheetName,
           action,
@@ -1245,7 +1401,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           allowAutoFilter = false,
           allowFormatCells = false,
           allowInsertRows = false,
-        } = args as Record<string, any>;
+        } = args as unknown as ProtectWorksheetArgs;
 
         const sheet = await safeGetSheet(context, sheetName);
 
@@ -1285,7 +1441,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         return JSON.stringify(
           {
             totalNamedRanges: names.items.length,
-            items: names.items.map((item: any) => ({
+            items: names.items.map((item: { name: string; formula: string; value: unknown }) => ({
               name: item.name,
               formula: item.formula,
               value: item.value,
@@ -1315,8 +1471,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['name', 'rangeAddress'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const { name, rangeAddress } = args as Record<string, any>;
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { name, rangeAddress } = args as unknown as SetNamedRangeArgs;
 
         context.workbook.names.add(name, rangeAddress);
         await context.sync();
@@ -1426,7 +1582,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['address', 'ruleType'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
+      executeExcel: async (context, args: Record<string, unknown>) => {
         const {
           address,
           ruleType,
@@ -1445,17 +1601,17 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           dataBarColor = '#5B9BD5',
           iconSetStyle = 'threeTrafficLights1',
           stopIfTrue,
-        } = args;
+        } = args as unknown as ApplyConditionalFormattingArgs;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const targetRange = sheet.getRange(address);
-        const conditionalFormats: any = targetRange.conditionalFormats;
+        const conditionalFormats = targetRange.conditionalFormats;
 
         if (clearExisting) {
           conditionalFormats.clearAll();
         }
 
-        const ruleTypeMap: Record<string, any> = {
+        const ruleTypeMap: Record<string, Excel.ConditionalFormatType> = {
           cellValue: Excel.ConditionalFormatType.cellValue,
           containsText: Excel.ConditionalFormatType.containsText,
           custom: Excel.ConditionalFormatType.custom,
@@ -1469,10 +1625,10 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           throw new Error(`Unsupported conditional formatting ruleType: ${ruleType}`);
         }
 
-        const cf: any = conditionalFormats.add(selectedType);
+        const cf: Excel.ConditionalFormat = conditionalFormats.add(selectedType);
 
         if (ruleType === 'cellValue') {
-          const operatorMap: Record<string, any> = {
+          const operatorMap: Record<string, Excel.ConditionalCellValueOperator> = {
             between: Excel.ConditionalCellValueOperator.between,
             notBetween: Excel.ConditionalCellValueOperator.notBetween,
             equalTo: Excel.ConditionalCellValueOperator.equalTo,
@@ -1488,7 +1644,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
             operator: operatorMap[operator] ?? Excel.ConditionalCellValueOperator.greaterThan,
           };
         } else if (ruleType === 'containsText') {
-          const textOperatorMap: Record<string, any> = {
+          const textOperatorMap: Record<string, Excel.ConditionalTextOperator> = {
             contains: Excel.ConditionalTextOperator.contains,
             beginsWith: Excel.ConditionalTextOperator.beginsWith,
             endsWith: Excel.ConditionalTextOperator.endsWith,
@@ -1521,7 +1677,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           cf.dataBar.lowerBoundRule = { type: Excel.ConditionalFormatRuleType.lowestValue };
           cf.dataBar.upperBoundRule = { type: Excel.ConditionalFormatRuleType.highestValue };
         } else if (ruleType === 'iconSet') {
-          const iconSetMap: Record<string, any> = {
+          const iconSetMap: Record<string, Excel.IconSet> = {
             threeTrafficLights1: Excel.IconSet.threeTrafficLights1,
             threeArrows: Excel.IconSet.threeArrows,
             threeSymbols: Excel.IconSet.threeSymbols,
@@ -1532,7 +1688,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           cf.iconSet.style = iconSetMap[iconSetStyle] ?? Excel.IconSet.threeTrafficLights1;
         }
 
-        const applyTextAndFillFormat = (format: any) => {
+        const applyTextAndFillFormat = (format: Excel.ConditionalRangeFormat | undefined) => {
           if (!format) return;
           if (fillColor) format.fill.color = fillColor;
           if (fontColor) format.font.color = fontColor;
@@ -1569,8 +1725,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const { address } = args as Record<string, any>;
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { address } = args as unknown as GetConditionalFormattingRulesArgs;
 
         const sheet = context.workbook.worksheets.getActiveWorksheet();
         const targetRange = address ? sheet.getRange(address) : sheet.getUsedRangeOrNullObject();
@@ -1589,7 +1745,7 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           {
             address: targetRange.address,
             totalRules: conditionalFormats.items.length,
-            rules: conditionalFormats.items.map((rule: any) => ({
+            rules: conditionalFormats.items.map((rule: Excel.ConditionalFormat) => ({
               type: rule.type,
               priority: rule.priority,
               stopIfTrue: rule.stopIfTrue,
@@ -1629,14 +1785,21 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: ['searchTerm'],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
+      executeExcel: async (context, args: Record<string, unknown>) => {
         const {
           searchTerm,
           matchCase = false,
           matchEntireCell = false,
           useRegex = false,
           searchInFormulas = false,
-        } = args as Record<string, any>;
+        } = args as {
+          searchTerm: string;
+          sheetName?: string;
+          matchCase?: boolean;
+          matchEntireCell?: boolean;
+          useRegex?: boolean;
+          searchInFormulas?: boolean;
+        };
 
         let pattern: RegExp | null = null;
         if (useRegex) {
@@ -1653,7 +1816,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         sheets.load('items');
         await context.sync();
 
-        const allMatches: any[] = [];
+        const allMatches: { sheet: string; address: string; value: string | number | boolean }[] =
+          [];
 
         // Load values or formulas depending on search mode — formula search ported from Office Agents
         const dataProperty = searchInFormulas ? 'formulas' : 'values';
@@ -1707,8 +1871,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
           }
         }
 
-        const offset = args.offset || 0;
-        const maxResults = args.maxResults || 50;
+        const offset = (args.offset as number) || 0;
+        const maxResults = (args.maxResults as number) || 50;
         const page = allMatches.slice(offset, offset + maxResults);
         const hasMore = offset + maxResults < allMatches.length;
 
@@ -1743,8 +1907,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         },
         required: [],
       },
-      executeExcel: async (context, args: Record<string, any>) => {
-        const allSheets = args.allSheets === true; // default false
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const allSheets = (args as unknown as GetAllObjectsArgs).allSheets === true; // default false
 
         if (!allSheets) {
           const sheet = context.workbook.worksheets.getActiveWorksheet();
@@ -1757,12 +1921,12 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
 
           return JSON.stringify(
             {
-              charts: charts.items.map((c: any) => ({
+              charts: charts.items.map((c: { name: string; id: string }) => ({
                 name: c.name,
                 id: c.id,
                 sheetName: sheet.name,
               })),
-              pivotTables: pivotTables.items.map((p: any) => ({
+              pivotTables: pivotTables.items.map((p: { name: string; id: string }) => ({
                 name: p.name,
                 id: p.id,
                 sheetName: sheet.name,
@@ -1784,8 +1948,8 @@ const excelToolDefinitions = createOfficeTools<ExcelToolName, ExcelToolTemplate,
         }
         await context.sync();
 
-        const allCharts: any[] = [];
-        const allPivots: any[] = [];
+        const allCharts: { name: string; id: string; sheetName: string }[] = [];
+        const allPivots: { name: string; id: string; sheetName: string }[] = [];
         for (const sheet of worksheets.items) {
           for (const c of sheet.charts.items) {
             allCharts.push({ name: c.name, id: c.id, sheetName: sheet.name });
@@ -1854,7 +2018,7 @@ try {
         suggestion:
           'Refer to the Office.js skill document for correct patterns. Remember: Excel values must be 2D arrays.',
         mutationDetector: looksLikeMutation,
-        buildSandboxContext: (context) => ({
+        buildSandboxContext: context => ({
           context,
           Excel: typeof Excel !== 'undefined' ? Excel : undefined,
           Office: typeof Office !== 'undefined' ? Office : undefined,
@@ -1881,9 +2045,10 @@ try {
         },
         required: [],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const sheet = await safeGetSheet(context, args.sheetName);
-        const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange();
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { sheetName, range: rangeAddress } = args as ScreenshotRangeArgs;
+        const sheet = await safeGetSheet(context, sheetName);
+        const targetRange = rangeAddress ? sheet.getRange(rangeAddress) : sheet.getUsedRange();
 
         // Load dimensions for header composition — ported from Office Agents
         targetRange.load('address, rowCount, columnCount');
@@ -1906,10 +2071,13 @@ try {
           rows.push(row);
         }
 
-        const imageResult = (targetRange as any).getImage();
+        // getImage() is available in ExcelApi 1.7 but not in the base type definitions
+        const imageResult = (
+          targetRange as unknown as { getImage(): { value: string } }
+        ).getImage();
         await context.sync();
 
-        const base64 = imageResult.value as string;
+        const base64 = imageResult.value;
         const colWidths = cols.map(c => c.format.columnWidth);
         const rowHeights = rows.map(r => r.format.rowHeight);
         const { startRow, startCol } = parseRangeStart(targetRange.address);
@@ -1925,7 +2093,7 @@ try {
 
         return buildScreenshotResult(
           composited,
-          `Screenshot of range ${args.range || 'used range'} on sheet ${args.sheetName || 'active'} (with row/column headers)`,
+          `Screenshot of range ${rangeAddress || 'used range'} on sheet ${sheetName || 'active'} (with row/column headers)`,
         );
       },
     },
@@ -1950,20 +2118,21 @@ try {
         },
         required: [],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const sheet = await safeGetSheet(context, args.sheetName);
-        const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange();
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { sheetName, range: rangeAddress, maxRows: maxRowsArg } = args as GetRangeAsCsvArgs;
+        const sheet = await safeGetSheet(context, sheetName);
+        const targetRange = rangeAddress ? sheet.getRange(rangeAddress) : sheet.getUsedRange();
         targetRange.load('values,rowCount,columnCount');
         await context.sync();
 
-        const maxRows = args.maxRows || 500;
-        const values = targetRange.values;
+        const maxRows = maxRowsArg || 500;
+        const values: (string | number | boolean)[][] = targetRange.values;
         const rows = values.slice(0, maxRows);
 
         const csv = rows
-          .map((row: any[]) =>
+          .map(row =>
             row
-              .map((cell: any) => {
+              .map(cell => {
                 const str = String(cell ?? '');
                 if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                   return '"' + str.replace(/"/g, '""') + '"';
@@ -2007,8 +2176,9 @@ try {
         },
         required: ['operation'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const { operation, sheetName, newName, tabColor } = args;
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { operation, sheetName, newName, tabColor } =
+          args as unknown as ModifyWorkbookStructureArgs;
         const sheets = context.workbook.worksheets;
 
         switch (operation) {
@@ -2040,7 +2210,7 @@ try {
           case 'duplicate': {
             if (!sheetName) throw new Error('sheetName is required for duplicate operation.');
             const sheet = await safeGetSheet(context, sheetName);
-            const copy = (sheet as any).copy();
+            const copy = (sheet as unknown as { copy(): Excel.Worksheet }).copy();
             if (newName) copy.name = newName;
             await context.sync();
             return `Worksheet "${sheetName}" duplicated${newName ? ` as "${newName}"` : ''}.`;
@@ -2071,15 +2241,14 @@ try {
         },
         required: [],
       },
-      executeExcel: async (context, args) => {
-        const sheet = await safeGetSheet(context, args.sheetName);
-        const range = args.address
-          ? sheet.getRange(args.address)
-          : context.workbook.getSelectedRange();
+      executeExcel: async (context, args: Record<string, unknown>) => {
+        const { sheetName, address } = args as DetectDataHeadersArgs;
+        const sheet = await safeGetSheet(context, sheetName);
+        const range = address ? sheet.getRange(address) : context.workbook.getSelectedRange();
         range.load(['values', 'rowCount', 'columnCount', 'address']);
         await context.sync();
 
-        const values = range.values as any[][];
+        const values: (string | number | boolean)[][] = range.values;
         if (!values || values.length < 2 || values[0].length < 2) {
           return JSON.stringify({
             error: 'Range too small to detect headers (needs at least 2 rows and 2 columns).',
@@ -2089,8 +2258,9 @@ try {
         const rows = values.length;
         const cols = values[0].length;
 
-        const isText = (v: any) => typeof v === 'string' && v.trim().length > 0;
-        const isNumeric = (v: any) =>
+        const isText = (v: string | number | boolean) =>
+          typeof v === 'string' && v.trim().length > 0;
+        const isNumeric = (v: string | number | boolean) =>
           typeof v === 'number' ||
           (typeof v === 'string' &&
             v.trim() !== '' &&
@@ -2134,7 +2304,7 @@ try {
 
         return JSON.stringify(
           {
-            rangeAddress: (range as any).address,
+            rangeAddress: range.address,
             rowCount: rows,
             columnCount: cols,
             hasColumnHeaders,
@@ -2188,14 +2358,20 @@ try {
         },
         required: ['filePath'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
         const {
           filePath,
           sheetName,
           startCell = 'A1',
           delimiter = ',',
           overwrite = false,
-        } = args;
+        } = args as {
+          filePath: string;
+          sheetName?: string;
+          startCell?: string;
+          delimiter?: string;
+          overwrite?: boolean;
+        };
 
         const { readFile } = await import('@/utils/vfs');
         const csvContent = await readFile(filePath);
@@ -2234,15 +2410,13 @@ try {
         }
 
         const sheet = await safeGetSheet(context, sheetName);
-        const targetRange = sheet
-          .getRange(startCell)
-          .getResizedRange(data.length - 1, maxCols - 1);
+        const targetRange = sheet.getRange(startCell).getResizedRange(data.length - 1, maxCols - 1);
 
         if (!overwrite) {
           targetRange.load('values');
           await context.sync();
-          const hasData = targetRange.values.some((row: any[]) =>
-            row.some((cell: any) => cell !== '' && cell !== null),
+          const hasData = targetRange.values.some((row: unknown[]) =>
+            row.some((cell: unknown) => cell !== '' && cell !== null),
           );
           if (hasData) {
             throw new Error(
@@ -2251,7 +2425,7 @@ try {
           }
         }
 
-        targetRange.values = data as any[][];
+        targetRange.values = data;
         await context.sync();
 
         return JSON.stringify({
@@ -2287,9 +2461,10 @@ try {
         },
         required: [],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
-        const sheet = await safeGetSheet(context, args.sheetName);
-        const targetRange = args.range ? sheet.getRange(args.range) : sheet.getUsedRange();
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
+        const { sheetName, range: rangeArg } = args as { sheetName?: string; range?: string };
+        const sheet = await safeGetSheet(context, sheetName);
+        const targetRange = rangeArg ? sheet.getRange(rangeArg) : sheet.getUsedRange();
         targetRange.load('address');
         await context.sync();
 
@@ -2344,7 +2519,7 @@ try {
         },
         required: ['filePath', 'width', 'height'],
       },
-      executeExcel: async (context: Excel.RequestContext, args: Record<string, any>) => {
+      executeExcel: async (context: Excel.RequestContext, args: Record<string, unknown>) => {
         const {
           filePath,
           width: targetW,
@@ -2352,7 +2527,14 @@ try {
           sheetName,
           startCell = 'A1',
           cellSize = 6,
-        } = args;
+        } = args as {
+          filePath: string;
+          width: number;
+          height: number;
+          sheetName?: string;
+          startCell?: string;
+          cellSize?: number;
+        };
 
         if (targetW > 200 || targetH > 200 || targetW < 1 || targetH < 1) {
           throw new Error('Dimensions must be between 1 and 200.');
@@ -2446,7 +2628,9 @@ try {
         for (const [color, ranges] of colorRanges.entries()) {
           for (let i = 0; i < ranges.length; i += RANGES_PER_BATCH) {
             const batch = ranges.slice(i, i + RANGES_PER_BATCH);
-            const areas = (sheet as any).getRanges(batch.join(','));
+            const areas = (
+              sheet as unknown as { getRanges(address: string): Excel.RangeAreas }
+            ).getRanges(batch.join(','));
             areas.format.fill.color = color;
             queued += batch.length;
             if (queued >= RANGES_PER_BATCH) {
@@ -2504,13 +2688,13 @@ const extractChartDataTool: ToolDefinition = {
         description:
           'Real-world min and max values of the X axis as [min, max]. Example: [2000, 2024]. Determine this by reading the axis labels in the image.',
         items: { type: 'number' },
-      } as any,
+      },
       yAxisRange: {
         type: 'array',
         description:
           'Real-world min and max values of the Y axis as [min, max]. Example: [0, 50]. Determine this by reading the axis labels in the image.',
         items: { type: 'number' },
-      } as any,
+      },
       targetColor: {
         type: 'string',
         description:

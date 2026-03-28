@@ -4,7 +4,6 @@ import { logService } from '@/utils/logger';
 import { executeOfficeAction } from './officeAction';
 import { renderOfficeRichHtml, sanitizeHtml } from './markdown';
 
-
 import {
   generateVisualDiff,
   createOfficeTools,
@@ -29,23 +28,29 @@ export type OutlookToolName =
 
 type RecipientField = 'to' | 'cc' | 'bcc';
 
-function getMailbox(): any | null {
-  return (window as any).Office?.context?.mailbox ?? null;
+function getMailbox(): Office.Mailbox | null {
+  return (
+    (window as unknown as { Office?: { context?: { mailbox?: Office.Mailbox } } }).Office?.context
+      ?.mailbox ?? null
+  );
 }
 
-function getOfficeAsyncStatus(): any {
-  return (window as any).Office?.AsyncResultStatus;
+function getOfficeAsyncStatus(): typeof Office.AsyncResultStatus | undefined {
+  return (window as unknown as { Office?: typeof Office }).Office?.AsyncResultStatus;
 }
 
-function getOfficeCoercionType(): any {
-  return (window as any).Office?.CoercionType;
+function getOfficeCoercionType(): typeof Office.CoercionType | undefined {
+  return (window as unknown as { Office?: typeof Office }).Office?.CoercionType;
 }
 
 const runOutlook = <T>(action: () => Promise<T>): Promise<T> =>
   executeOfficeAction(action, 'outlook_action', OUTLOOK_ACTION_TIMEOUT_MS);
 
 type OutlookToolTemplate = OfficeToolTemplate & {
-  executeOutlook: (mailbox: any | null, args: Record<string, any>) => Promise<string>;
+  executeOutlook: (
+    mailbox: Office.Mailbox | null,
+    args: Record<string, unknown>,
+  ) => Promise<string>;
 };
 
 /**
@@ -79,14 +84,24 @@ type OutlookToolTemplate = OfficeToolTemplate & {
  * @returns The transformed result on success
  * @throws Error if the AsyncResult status is not Succeeded
  */
-function resolveAsyncResult(result: any, onSuccess: (value: any) => string): string {
+function resolveAsyncResult(
+  result: Office.AsyncResult<unknown>,
+  onSuccess: (value: unknown) => string,
+): string {
   if (result.status === getOfficeAsyncStatus()?.Succeeded) {
     return onSuccess(result.value);
   }
   throw new Error(`Error: ${result.error?.message || 'unknown error'}`);
 }
 
-function normalizeRecipient(recipient: any): { displayName: string; emailAddress: string } {
+type RecipientLike = {
+  displayName?: string;
+  name?: string;
+  emailAddress?: string;
+  address?: string;
+};
+
+function normalizeRecipient(recipient: unknown): { displayName: string; emailAddress: string } {
   if (!recipient) {
     return { displayName: '', emailAddress: '' };
   }
@@ -95,13 +110,16 @@ function normalizeRecipient(recipient: any): { displayName: string; emailAddress
     return { displayName: '', emailAddress: recipient.trim() };
   }
 
+  const r = recipient as RecipientLike;
   return {
-    displayName: recipient.displayName || recipient.name || '',
-    emailAddress: recipient.emailAddress || recipient.address || '',
+    displayName: r.displayName || r.name || '',
+    emailAddress: r.emailAddress || r.address || '',
   };
 }
 
-function normalizeRecipientsInput(recipients: any): any[] {
+type NormalizedRecipient = { displayName: string; emailAddress: string };
+
+function normalizeRecipientsInput(recipients: unknown): NormalizedRecipient[] {
   if (Array.isArray(recipients)) {
     return recipients.map(normalizeRecipient).filter(r => !!r.emailAddress);
   }
@@ -145,10 +163,11 @@ const outlookToolDefinitions = createOfficeTools<
       },
       executeOutlook: async mailbox => {
         if (!mailbox?.item) return 'No email item available.';
+        const item = mailbox.item;
 
         // First get HTML to capture images for preservation
         const htmlPromise = new Promise<string>((resolve, reject) => {
-          mailbox.item.body.getAsync(getOfficeCoercionType().Html, (result: any) => {
+          item.body.getAsync(getOfficeCoercionType().Html, (result: Office.AsyncResult<string>) => {
             if (result.status === getOfficeAsyncStatus()?.Succeeded) {
               resolve(result.value || '');
             } else {
@@ -174,8 +193,8 @@ const outlookToolDefinitions = createOfficeTools<
 
         // Fallback to plain text
         return new Promise<string>(resolve => {
-          mailbox.item.body.getAsync(getOfficeCoercionType().Text, (result: any) => {
-            resolve(resolveAsyncResult(result, value => value || ''));
+          item.body.getAsync(getOfficeCoercionType().Text, (result: Office.AsyncResult<string>) => {
+            resolve(resolveAsyncResult(result, value => String(value || '')));
           });
         });
       },
@@ -211,8 +230,18 @@ const outlookToolDefinitions = createOfficeTools<
         },
         required: ['content'],
       },
-      executeOutlook: async (mailbox, args: Record<string, any>) => {
-        const { content, mode = 'Prepend', diffTracking = false, originalText = '' } = args;
+      executeOutlook: async (mailbox, args: Record<string, unknown>) => {
+        const {
+          content,
+          mode = 'Prepend',
+          diffTracking = false,
+          originalText = '',
+        } = args as {
+          content: string;
+          mode?: string;
+          diffTracking?: boolean;
+          originalText?: string;
+        };
         if (!mailbox?.item?.body || typeof mailbox.item.body.setAsync !== 'function') {
           return 'Cannot write email body: compose mode is not available.';
         }
@@ -232,111 +261,124 @@ const outlookToolDefinitions = createOfficeTools<
             : renderOfficeRichHtml(processedContent);
 
         return new Promise<string>(resolve => {
-          const body = mailbox.item.body;
+          const body = mailbox.item!.body;
 
           if (mode === 'Replace') {
             // Safety guard to prevent deleting thread history
-            body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
-              if (getResult.status === getOfficeAsyncStatus()?.Succeeded) {
-                const existing = getResult.value || '';
-                // Common Outlook web/desktop thread markers
-                if (
-                  existing.includes('<div id="divRplyFwdMsg">') ||
-                  existing.includes('<hr tabindex="-1"') ||
-                  existing.includes('<hr ')
-                ) {
-                  logService.warn(
-                    'Thread history detected. Overriding "Replace" to "Insert" to protect email history.',
-                  );
-                  body.setSelectedDataAsync(
-                    html,
-                    { coercionType: getOfficeCoercionType().Html },
-                    (res: any) => {
-                      resolve(
-                        resolveAsyncResult(
-                          res,
-                          () => 'Replaced content at cursor (protected history).',
-                        ),
-                      );
-                    },
-                  );
-                  return;
+            body.getAsync(
+              getOfficeCoercionType().Html,
+              {},
+              (getResult: Office.AsyncResult<string>) => {
+                if (getResult.status === getOfficeAsyncStatus()?.Succeeded) {
+                  const existing = getResult.value || '';
+                  // Common Outlook web/desktop thread markers
+                  if (
+                    existing.includes('<div id="divRplyFwdMsg">') ||
+                    existing.includes('<hr tabindex="-1"') ||
+                    existing.includes('<hr ')
+                  ) {
+                    logService.warn(
+                      'Thread history detected. Overriding "Replace" to "Insert" to protect email history.',
+                    );
+                    body.setSelectedDataAsync(
+                      html,
+                      { coercionType: getOfficeCoercionType().Html },
+                      (res: Office.AsyncResult<void>) => {
+                        resolve(
+                          resolveAsyncResult(
+                            res,
+                            () => 'Replaced content at cursor (protected history).',
+                          ),
+                        );
+                      },
+                    );
+                    return;
+                  }
                 }
-              }
-              // Safe to replace if no history markers found
-              body.setAsync(html, { coercionType: getOfficeCoercionType().Html }, (res: any) => {
-                resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'));
-              });
-            });
+                // Safe to replace if no history markers found
+                body.setAsync(
+                  html,
+                  { coercionType: getOfficeCoercionType().Html },
+                  (res: Office.AsyncResult<void>) => {
+                    resolve(resolveAsyncResult(res, () => 'Successfully replaced email body.'));
+                  },
+                );
+              },
+            );
           } else if (mode === 'Prepend') {
             // Insert reply BEFORE the quoted thread history — standard email convention.
             // Detects Outlook thread separators and places new content before them.
-            body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
-              if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
-                resolve('Error: Could not read body to prepend.');
-                return;
-              }
-              const existing = getResult.value || '';
-              // Common Outlook web/desktop thread history markers
-              const separators = [
-                '<div id="divRplyFwdMsg">',
-                '<hr tabindex="-1"',
-                '<hr ',
-              ];
-              let insertPos = -1;
-              for (const sep of separators) {
-                const pos = existing.indexOf(sep);
-                if (pos !== -1 && (insertPos === -1 || pos < insertPos)) insertPos = pos;
-              }
-              let newBody: string;
-              if (insertPos !== -1) {
-                // Insert new reply before thread history
-                newBody =
-                  existing.substring(0, insertPos) +
-                  sanitizeHtml(html) +
-                  '<br/><br/>' +
-                  existing.substring(insertPos);
-              } else {
-                // No history found — prepend to body
-                newBody = sanitizeHtml(html) + (existing.trim() ? '<br/><br/>' + existing : '');
-              }
-              body.setAsync(
-                newBody,
-                { coercionType: getOfficeCoercionType().Html },
-                (setResult: any) => {
-                  resolve(
-                    resolveAsyncResult(setResult, () =>
-                      'Successfully prepended reply before email history.',
-                    ),
-                  );
-                },
-              );
-            });
+            body.getAsync(
+              getOfficeCoercionType().Html,
+              {},
+              (getResult: Office.AsyncResult<string>) => {
+                if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
+                  resolve('Error: Could not read body to prepend.');
+                  return;
+                }
+                const existing = getResult.value || '';
+                // Common Outlook web/desktop thread history markers
+                const separators = ['<div id="divRplyFwdMsg">', '<hr tabindex="-1"', '<hr '];
+                let insertPos = -1;
+                for (const sep of separators) {
+                  const pos = existing.indexOf(sep);
+                  if (pos !== -1 && (insertPos === -1 || pos < insertPos)) insertPos = pos;
+                }
+                let newBody: string;
+                if (insertPos !== -1) {
+                  // Insert new reply before thread history
+                  newBody =
+                    existing.substring(0, insertPos) +
+                    sanitizeHtml(html) +
+                    '<br/><br/>' +
+                    existing.substring(insertPos);
+                } else {
+                  // No history found — prepend to body
+                  newBody = sanitizeHtml(html) + (existing.trim() ? '<br/><br/>' + existing : '');
+                }
+                body.setAsync(
+                  newBody,
+                  { coercionType: getOfficeCoercionType().Html },
+                  (setResult: Office.AsyncResult<void>) => {
+                    resolve(
+                      resolveAsyncResult(
+                        setResult,
+                        () => 'Successfully prepended reply before email history.',
+                      ),
+                    );
+                  },
+                );
+              },
+            );
           } else if (mode === 'Append') {
-            body.getAsync(getOfficeCoercionType().Html, {}, (getResult: any) => {
-              if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
-                resolve('Error: Could not read body to append.');
-                return;
-              }
-              const existing = getResult.value || '';
-              const separator = existing.trim() ? '<br/><br/>' : '';
-              const newBody = existing + separator + sanitizeHtml(html);
-              body.setAsync(
-                newBody,
-                { coercionType: getOfficeCoercionType().Html },
-                (setResult: any) => {
-                  resolve(
-                    resolveAsyncResult(setResult, () => 'Successfully appended to email body.'),
-                  );
-                },
-              );
-            });
+            body.getAsync(
+              getOfficeCoercionType().Html,
+              {},
+              (getResult: Office.AsyncResult<string>) => {
+                if (getResult.status !== getOfficeAsyncStatus()?.Succeeded) {
+                  resolve('Error: Could not read body to append.');
+                  return;
+                }
+                const existing = getResult.value || '';
+                const separator = existing.trim() ? '<br/><br/>' : '';
+                const newBody = existing + separator + sanitizeHtml(html);
+                body.setAsync(
+                  newBody,
+                  { coercionType: getOfficeCoercionType().Html },
+                  (setResult: Office.AsyncResult<void>) => {
+                    resolve(
+                      resolveAsyncResult(setResult, () => 'Successfully appended to email body.'),
+                    );
+                  },
+                );
+              },
+            );
           } else {
             // Insert at cursor
             body.setSelectedDataAsync(
               html,
               { coercionType: getOfficeCoercionType().Html },
-              (res: any) => {
+              (res: Office.AsyncResult<void>) => {
                 resolve(
                   resolveAsyncResult(res, () =>
                     diffTracking ? 'Inserted visual diff.' : 'Successfully inserted at cursor.',
@@ -363,8 +405,8 @@ const outlookToolDefinitions = createOfficeTools<
 
         if (mailbox.item.subject && typeof mailbox.item.subject.getAsync === 'function') {
           return new Promise<string>(resolve => {
-            mailbox.item.subject.getAsync((result: any) => {
-              resolve(resolveAsyncResult(result, value => value || ''));
+            mailbox.item!.subject.getAsync((result: Office.AsyncResult<string>) => {
+              resolve(resolveAsyncResult(result, value => String(value || '')));
             });
           });
         }
@@ -387,14 +429,14 @@ const outlookToolDefinitions = createOfficeTools<
         },
         required: ['subject'],
       },
-      executeOutlook: async (mailbox, args: Record<string, any>) => {
-        const { subject } = args as Record<string, any>;
+      executeOutlook: async (mailbox, args: Record<string, unknown>) => {
+        const { subject } = args as { subject: string };
         if (!mailbox?.item?.subject || typeof mailbox.item.subject.setAsync !== 'function') {
           return 'Cannot set email subject: compose mode is not available.';
         }
 
         return new Promise<string>(resolve => {
-          mailbox.item.subject.setAsync(subject, (result: any) => {
+          mailbox.item!.subject.setAsync(subject, (result: Office.AsyncResult<void>) => {
             resolve(resolveAsyncResult(result, () => 'Successfully updated email subject.'));
           });
         });
@@ -418,8 +460,8 @@ const outlookToolDefinitions = createOfficeTools<
         const getField = (field: RecipientField) => {
           const fieldObject = item[field];
           if (fieldObject && typeof fieldObject.getAsync === 'function') {
-            return new Promise<any[]>(resolve => {
-              fieldObject.getAsync((result: any) => {
+            return new Promise<NormalizedRecipient[]>(resolve => {
+              fieldObject.getAsync((result: Office.AsyncResult<Office.EmailAddressDetails[]>) => {
                 if (
                   result.status === getOfficeAsyncStatus()?.Succeeded &&
                   Array.isArray(result.value)
@@ -465,7 +507,7 @@ const outlookToolDefinitions = createOfficeTools<
         },
         required: ['recipients'],
       },
-      executeOutlook: async (mailbox, args: Record<string, any>) => {
+      executeOutlook: async (mailbox, args: Record<string, unknown>) => {
         if (!mailbox?.item) return 'No email item available.';
 
         const field = getRecipientField(args.field);
@@ -480,7 +522,7 @@ const outlookToolDefinitions = createOfficeTools<
         }
 
         return new Promise<string>(resolve => {
-          fieldObject.addAsync(recipients, (result: any) => {
+          fieldObject.addAsync(recipients, (result: Office.AsyncResult<void>) => {
             resolve(
               resolveAsyncResult(
                 result,
@@ -530,8 +572,9 @@ const outlookToolDefinitions = createOfficeTools<
         },
         required: ['url', 'name'],
       },
-      executeOutlook: async (mailbox, args: Record<string, any>) => {
-        if (!mailbox?.item) return 'Error: No compose item available. Attachments can only be added in compose mode.';
+      executeOutlook: async (mailbox, args: Record<string, unknown>) => {
+        if (!mailbox?.item)
+          return 'Error: No compose item available. Attachments can only be added in compose mode.';
         if (typeof mailbox.item.addFileAttachmentAsync !== 'function') {
           return 'Error: addFileAttachmentAsync is not available. Requires MailboxApi 1.1+ in compose mode.';
         }
@@ -540,7 +583,7 @@ const outlookToolDefinitions = createOfficeTools<
         if (!name || typeof name !== 'string') return 'Error: name is required.';
 
         return new Promise<string>(resolve => {
-          mailbox.item.addFileAttachmentAsync(url, name, (result: any) => {
+          mailbox.item!.addFileAttachmentAsync(url, name, (result: Office.AsyncResult<string>) => {
             if (result.status === getOfficeAsyncStatus()?.Succeeded) {
               resolve(`File "${name}" attached successfully (attachment ID: ${result.value}).`);
             } else {
@@ -602,12 +645,15 @@ try {
         toolName: 'eval_outlookjs',
         suggestion:
           'Refer to the Office.js skill document for correct patterns. Remember: Outlook uses callbacks, not async/await.',
-        buildSandboxContext: (mailbox: any) => ({
+        buildSandboxContext: (mailbox: Office.Mailbox | null) => ({
           mailbox,
           Office:
-            typeof (window as any).Office !== 'undefined' ? (window as any).Office : undefined,
+            typeof (window as unknown as { Office?: unknown }).Office !== 'undefined'
+              ? (window as unknown as { Office?: unknown }).Office
+              : undefined,
         }),
-        catchHint: 'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
+        catchHint:
+          'Check callback patterns and Promise wrapping. Outlook uses callbacks, not async/await.',
       }),
     },
   },

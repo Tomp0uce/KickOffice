@@ -134,7 +134,9 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           if (!mailbox?.item) return resolve('');
           const htmlType = getOfficeHtmlCoercionType();
           if (!htmlType) {
-            getOutlookMailBody().then(resolve).catch(() => resolve(''));
+            getOutlookMailBody()
+              .then(resolve)
+              .catch(() => resolve(''));
             return;
           }
           mailbox.item.body.getAsync(htmlType, (result: OfficeAsyncResult<string>) => {
@@ -274,7 +276,7 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           }
         }
 
-        const escapeCell = (val: any) => {
+        const escapeCell = (val: string | number | boolean | null | undefined) => {
           if (val === null || val === undefined) return '';
           const str = String(val);
           if (str.includes('\t') || str.includes('\n') || str.includes('\r')) {
@@ -283,7 +285,7 @@ export function useOfficeSelection(options: UseOfficeSelectionOptions) {
           return str;
         };
 
-        return `[${targetRange.address}]\n${targetRange.values.map((row: any[]) => row.map(escapeCell).join('\t')).join('\n')}`;
+        return `[${targetRange.address}]\n${targetRange.values.map((row: (string | number | boolean | null)[]) => row.map(escapeCell).join('\t')).join('\n')}`;
       });
     }
 

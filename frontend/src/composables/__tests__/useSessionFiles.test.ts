@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { ref } from 'vue';
 import { useSessionFiles } from '../useSessionFiles';
 import type { DisplayMessage } from '@/types/chat';
@@ -82,8 +82,18 @@ describe('useSessionFiles', () => {
 
     it('deduplicates files across multiple messages', () => {
       const history = makeHistory([
-        { id: '1', role: 'user', content: '', attachedFiles: [{ filename: 'f.txt', content: '1' }] },
-        { id: '2', role: 'user', content: '', attachedFiles: [{ filename: 'f.txt', content: '2' }] },
+        {
+          id: '1',
+          role: 'user',
+          content: '',
+          attachedFiles: [{ filename: 'f.txt', content: '1' }],
+        },
+        {
+          id: '2',
+          role: 'user',
+          content: '',
+          attachedFiles: [{ filename: 'f.txt', content: '2' }],
+        },
       ]);
       const { sessionUploadedFiles, rebuildSessionFiles } = useSessionFiles({ history });
       rebuildSessionFiles();
@@ -103,7 +113,12 @@ describe('useSessionFiles', () => {
 
     it('clears previously added files before rebuilding', () => {
       const history = makeHistory([
-        { id: '1', role: 'user', content: '', attachedFiles: [{ filename: 'new.txt', content: '' }] },
+        {
+          id: '1',
+          role: 'user',
+          content: '',
+          attachedFiles: [{ filename: 'new.txt', content: '' }],
+        },
       ]);
       const { sessionUploadedFiles, addSessionFile, rebuildSessionFiles } = useSessionFiles({
         history,

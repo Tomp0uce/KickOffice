@@ -1,6 +1,6 @@
 # KickOffice
 
-AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 100 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
+AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Features a chat interface, autonomous document agent with 101 specialized tools, image generation, and quick AI actions—all running through a secure backend proxy.
 
 **Built for enterprise environments**: API keys never reach the client, all LLM traffic flows through a controlled backend, and no data is sent to third-party services.
 
@@ -9,7 +9,7 @@ AI-powered Microsoft Office add-in for Word, Excel, PowerPoint, and Outlook. Fea
 ## Features
 
 - **Chat Interface** — Converse with AI directly within Office apps
-- **Autonomous Agent** — 100 tools for document manipulation, data analysis, and automation
+- **Autonomous Agent** — 101 tools for document manipulation, data analysis, and automation
 - **Quick Actions** — One-click translate, polish, summarize, generate formulas, and more
 - **Image Generation** — Create and insert AI-generated images into documents
 - **Native Track Changes** — Word `proposeRevision` and `proposeDocumentRevision` generate real `<w:ins>/<w:del>` OOXML markup via docx-redline-js; users accept/reject in Word's Review pane. Bulk-accept/reject via `acceptAiChanges`/`rejectAiChanges` tools or the "Valider" UI button

@@ -105,6 +105,7 @@
   "agentActionFormatting": "🎨 Formatting text...",
   "agentUploadingFiles": "Upload and extract files...",
   "warningFileFallbackInline": "File sent inline (provider does not support /v1/files). Larger files may slow down responses.",
+  "warningVfsWriteFailed": "File context for \"{filename}\" could not be saved — the agent may lack access on the next turn.",
   "proofread": "Proofreading",
   "proofread_tooltip": "No selection required. The AI corrects grammar, spelling, punctuation and agreements via Track Changes.",
   "ppt_proofread_tooltip": "Surgically corrects spelling and grammar on the active slide without touching any formatting.",

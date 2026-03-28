@@ -1,4 +1,5 @@
 import type { ChatRequestMessage } from '@/api/backend';
+import type { MessageContentPart } from '@/api/types';
 
 import { message as messageUtil } from '@/utils/message';
 import { logService } from '@/utils/logger';
@@ -55,7 +56,12 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
   const iterationStartIndices: number[] = [];
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (msg.role === 'assistant' && 'tool_calls' in msg && msg.tool_calls && msg.tool_calls.length > 0) {
+    if (
+      msg.role === 'assistant' &&
+      'tool_calls' in msg &&
+      msg.tool_calls &&
+      msg.tool_calls.length > 0
+    ) {
       iterationStartIndices.push(i);
     }
   }
@@ -81,7 +87,17 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
  * @param direction 'head' keeps the beginning (cuts tail) — best for documents, mails, code.
  *                  'tail' keeps the end (cuts beginning) — best for tool results, logs.
  */
-function truncateToBudget(content: any, budget: number, direction: 'head' | 'tail' = 'head'): any {
+function truncateToBudget(content: string, budget: number, direction?: 'head' | 'tail'): string;
+function truncateToBudget(
+  content: string | MessageContentPart[],
+  budget: number,
+  direction?: 'head' | 'tail',
+): string | MessageContentPart[];
+function truncateToBudget(
+  content: unknown,
+  budget: number,
+  direction: 'head' | 'tail' = 'head',
+): unknown {
   if (typeof content !== 'string') return content; // L4 fix: Implicit coercion protection for vision arrays
   if (budget <= 0) return '';
   if (content.length <= budget) {
@@ -91,7 +107,8 @@ function truncateToBudget(content: any, budget: number, direction: 'head' | 'tai
 
   if (!hasWarnedTruncation) {
     messageUtil.warning(
-      (i18n.global.t as any)('errorTruncated') ?? 'Message was truncated due to context limits',
+      (i18n.global.t as (key: string) => string)('errorTruncated') ??
+        'Message was truncated due to context limits',
     );
     hasWarnedTruncation = true;
   }
@@ -120,7 +137,7 @@ function getMessageContentLength(message: ChatRequestMessage): number {
     length = message.content.length;
   } else if (Array.isArray(message.content)) {
     // CORRECTION (Step 2): Avoid JSON.stringify massif on Base64 strings
-    for (const part of message.content) {
+    for (const part of message.content as Array<{ type?: string; text?: string }>) {
       if (part.type === 'text' && part.text) {
         length += part.text.length;
       } else if (part.type === 'image_url') {
@@ -197,7 +214,8 @@ export function prepareMessagesForContext(
           : truncateToBudget(message.content, remainingBudget, 'head');
       if (!truncatedContent && !forceInclude) return;
 
-      selectedMessages.push({ index, message: { ...message, content: truncatedContent } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      selectedMessages.push({ index, message: { ...message, content: truncatedContent as any } });
       selectedIndices.add(index);
       remainingBudget = 0;
     }
@@ -225,15 +243,9 @@ export function prepareMessagesForContext(
     const message = nonSystemMessages[index];
     const messageLength = getMessageContentLength(message);
 
-    // If it's a tool call or tool response, we try to include the whole block if it fits
-    if (message.role === 'tool' || message.role === 'assistant') {
-      if (messageLength > remainingBudget) break;
-    } else {
-      // Normal user messages can break if they exceed budget, or we can truncate them
-      if (messageLength > remainingBudget) break;
-    }
+    if (messageLength > remainingBudget) break;
 
-    selectedMessages.push({ index, message });
+    selectedMessages.push({ index, message: { ...message } });
     selectedIndices.add(index);
     remainingBudget -= messageLength;
   }

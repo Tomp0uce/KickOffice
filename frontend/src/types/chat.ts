@@ -3,7 +3,7 @@ import type { Component } from 'vue';
 export interface ToolCallPart {
   id: string;
   name: string;
-  args: Record<string, any>;
+  args: Record<string, unknown>;
   status: 'pending' | 'running' | 'complete' | 'error';
   result?: string;
   screenshotSrc?: string;
@@ -16,7 +16,7 @@ export interface DisplayMessage {
   imageSrc?: string;
   richHtml?: string;
   toolCalls?: ToolCallPart[];
-  rawMessages?: any[];
+  rawMessages?: unknown[];
   timestamp?: number;
   attachedFiles?: Array<{ filename: string; content: string; fileId?: string }>;
   /** ERR-L2: Set to true when this assistant message ended with a stream interruption error */

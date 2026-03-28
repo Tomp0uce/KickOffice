@@ -86,7 +86,9 @@ export function useHomePage(deps: {
     if (Date.now() - programmaticScrollTs < 600) return;
 
     const rawContainer = messageListRef.value?.containerEl;
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    const container = ((rawContainer as { value?: HTMLElement } | null)?.value || rawContainer) as
+      | HTMLElement
+      | undefined;
     if (!container) return;
 
     // If user scrolls near the bottom, re-enable auto-scroll
@@ -97,7 +99,9 @@ export function useHomePage(deps: {
   async function scrollToBottom(mode: ScrollMode = 'auto', force = false) {
     await nextTick();
     const rawContainer = messageListRef.value?.containerEl;
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    const container = ((rawContainer as { value?: HTMLElement } | null)?.value || rawContainer) as
+      | HTMLElement
+      | undefined;
     if (!container) return;
 
     // UX-H1 — If forced, re-enable auto-scroll
@@ -152,7 +156,9 @@ export function useHomePage(deps: {
   async function scrollToConversationTop() {
     await nextTick();
     const rawContainer = messageListRef.value?.containerEl;
-    const container = ((rawContainer as any)?.value || rawContainer) as HTMLElement | undefined;
+    const container = ((rawContainer as { value?: HTMLElement } | null)?.value || rawContainer) as
+      | HTMLElement
+      | undefined;
     if (!container) return;
     // UX-H1 — Disable auto-scroll when explicitly scrolling to top
     isAutoScrollEnabled.value = false;
@@ -172,7 +178,7 @@ export function useHomePage(deps: {
     await sessionManager.newSession();
     resetSessionStats();
     rebuildSessionFiles(); // clear session files — prevents leaking files into the new session
-    resetVfs();            // clear VFS — new session starts with a clean filesystem
+    resetVfs(); // clear VFS — new session starts with a clean filesystem
     userInput.value = '';
     await nextTick();
     const el = chatInputRef.value?.textareaEl as unknown as { focus?: () => void };

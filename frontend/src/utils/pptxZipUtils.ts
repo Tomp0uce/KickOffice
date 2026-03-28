@@ -5,6 +5,7 @@
  */
 
 // Dynamic import to avoid bundle issues if jszip is not installed
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getJSZip(): Promise<any> {
   try {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -80,7 +81,7 @@ export async function withSlideZip(
     freshSlides.load('items/id');
     await context.sync();
 
-    const original = freshSlides.items.find((s: any) => s.id === slideId);
+    const original = freshSlides.items.find((s: { id: string }) => s.id === slideId);
     if (original) {
       original.delete();
       await context.sync();

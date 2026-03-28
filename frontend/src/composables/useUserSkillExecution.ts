@@ -12,6 +12,7 @@ import type { Ref } from 'vue';
 import type { UserSkill } from '@/types/userSkill';
 import type { ChatMessage } from '@/api/backend';
 import { chatStream, categorizeError } from '@/api/backend';
+import { getDisplayLanguage } from '@/utils/common';
 import { GLOBAL_STYLE_INSTRUCTIONS } from '@/utils/constant';
 import { message as messageUtil } from '@/utils/message';
 import { logService } from '@/utils/logger';
@@ -61,7 +62,7 @@ export function useUserSkillExecution(options: UseUserSkillExecutionOptions) {
       return;
     }
 
-    const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+    const lang = getDisplayLanguage();
 
     // ── Draft mode: pre-fill textarea and focus ──────────────────────────────
     if (skill.executionMode === 'draft') {
@@ -101,7 +102,9 @@ export function useUserSkillExecution(options: UseUserSkillExecutionOptions) {
       : `[UI language: ${lang}]`;
 
     const label = skill.name;
-    const preview = selectedText ? `${selectedText.substring(0, 100)}${selectedText.length > 100 ? '…' : ''}` : '';
+    const preview = selectedText
+      ? `${selectedText.substring(0, 100)}${selectedText.length > 100 ? '…' : ''}`
+      : '';
     history.value.push(createDisplayMessage('user', `[${label}]${preview ? ` ${preview}` : ''}`));
 
     const messages: ChatMessage[] = [

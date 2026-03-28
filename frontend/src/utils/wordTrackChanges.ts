@@ -12,7 +12,7 @@ const DEFAULT_AUTHOR = 'KickOffice AI';
 
 export interface TrackingState {
   available: boolean;
-  originalMode: any | null;
+  originalMode: unknown;
   changed: boolean;
 }
 
@@ -51,7 +51,10 @@ export async function setChangeTrackingForAi(
       changed = true;
     }
   } catch (error) {
-    logService.warn(`[ChangeTracking] ${sourceLabel}: unavailable`, error instanceof Error ? error : new Error(String(error)));
+    logService.warn(
+      `[ChangeTracking] ${sourceLabel}: unavailable`,
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 
   return { available, originalMode, changed };
@@ -81,7 +84,10 @@ export async function restoreChangeTracking(
     context.document.changeTrackingMode = trackingState.originalMode;
     await context.sync();
   } catch (error) {
-    logService.warn(`[ChangeTracking] ${sourceLabel}: restore failed`, error instanceof Error ? error : new Error(String(error)));
+    logService.warn(
+      `[ChangeTracking] ${sourceLabel}: restore failed`,
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 }
 

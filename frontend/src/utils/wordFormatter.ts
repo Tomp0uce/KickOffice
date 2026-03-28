@@ -37,7 +37,7 @@ class WordFormatter {
       const selection = context.document.getSelection();
       if (insertType.value === 'NoAction') return;
 
-      let location: any = 'Replace';
+      let location: 'Replace' | 'End' | 'After' = 'Replace';
       let finalHtml = html;
 
       if (insertType.value === 'append') {

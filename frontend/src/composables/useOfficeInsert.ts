@@ -23,7 +23,7 @@ const verboseLog = VERBOSE_LOGGING_ENABLED ? console.info.bind(console, '[KO-INS
 async function doOutlookInsert(
   content: string,
   richHtml: string | undefined,
-  copyToClipboard: Function,
+  copyToClipboard: (content: string, fallback?: boolean) => Promise<void>,
   t: (key: string) => string,
 ) {
   try {
@@ -54,7 +54,7 @@ async function doOutlookInsert(
 
 async function doPowerPointInsert(
   content: string,
-  copyToClipboard: Function,
+  copyToClipboard: (content: string, fallback?: boolean) => Promise<void>,
   t: (key: string) => string,
 ) {
   try {
@@ -68,7 +68,7 @@ async function doPowerPointInsert(
 
 async function doExcelInsert(
   content: string,
-  copyToClipboard: Function,
+  copyToClipboard: (content: string, fallback?: boolean) => Promise<void>,
   t: (key: string) => string,
 ) {
   try {
@@ -90,7 +90,7 @@ async function doWordInsert(
   type: InsertType,
   richHtml: string | undefined,
   useWordFormatting: boolean,
-  copyToClipboard: Function,
+  copyToClipboard: (content: string, fallback?: boolean) => Promise<void>,
   t: (key: string) => string,
   ccTag?: string, // If provided, insert into the pre-created Content Control (undo anchor)
 ) {
@@ -170,7 +170,12 @@ export function useOfficeInsert(options: UseOfficeInsertOptions) {
     insertImageToPowerPoint,
   } = options;
 
-  const documentUndo = useDocumentUndo({ hostIsWord, hostIsOutlook, hostIsExcel, hostIsPowerPoint });
+  const documentUndo = useDocumentUndo({
+    hostIsWord,
+    hostIsOutlook,
+    hostIsExcel,
+    hostIsPowerPoint,
+  });
 
   function normalizeInsertionContent(rawContent: string): string {
     return rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();

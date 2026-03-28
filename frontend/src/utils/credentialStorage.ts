@@ -10,8 +10,13 @@ import { logService } from './logger';
 
 const STORAGE_PREFIX = 'ko_cred_';
 
-// Log crypto availability on module load
-logCryptoStatus();
+let _cryptoStatusLogged = false;
+function ensureCryptoStatusLogged(): void {
+  if (!_cryptoStatusLogged) {
+    _cryptoStatusLogged = true;
+    logCryptoStatus();
+  }
+}
 
 /**
  * Safe localStorage setter with quota handling.
@@ -37,6 +42,7 @@ function safeSetItem(key: string, value: string): void {
  * This runs once at startup instead of on every credential read.
  */
 export async function migrateCredentialsOnStartup(): Promise<void> {
+  ensureCryptoStatusLogged();
   const remember = getRememberCredentials();
   const credentialKeys = ['litellmUserKey', 'litellmUserEmail'];
 

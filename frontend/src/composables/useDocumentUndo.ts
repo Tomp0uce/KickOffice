@@ -26,7 +26,7 @@ declare const Word: any;
 declare const Excel: any;
 declare const Office: any;
 
-interface UndoSnapshot {
+export interface UndoSnapshot {
   /** Which host the snapshot came from */
   host: 'word' | 'outlook' | 'excel' | 'powerpoint';
   /** Timestamp of the snapshot */
@@ -49,7 +49,7 @@ interface UndoSnapshot {
   /** Address of the captured range (e.g. "Sheet1!A1:C3") */
   excelRangeAddress?: string;
   /** Original cell values of the captured range */
-  excelValues?: any[][];
+  excelValues?: (string | number | boolean | null)[][];
 
   // PowerPoint
   /** Original plain-text content of the captured selection */
@@ -105,7 +105,7 @@ export function useDocumentUndo(options: {
    */
   async function captureWordSelectionAndWrap(): Promise<Partial<UndoSnapshot> | null> {
     const tag = `${UNDO_CC_TAG_PREFIX}${Date.now()}`;
-    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
+    return new Promise<Partial<UndoSnapshot> | null>(resolve => {
       Word.run(async (context: any) => {
         const selection = context.document.getSelection();
         const htmlResult = selection.getHtml();
@@ -126,7 +126,7 @@ export function useDocumentUndo(options: {
   }
 
   async function captureOutlookSelection(): Promise<string | null> {
-    return new Promise<string | null>((resolve) => {
+    return new Promise<string | null>(resolve => {
       const mailbox = getOutlookMailbox();
       const item = mailbox?.item;
       if (!(item?.body as any)?.getSelectedDataAsync) {
@@ -134,21 +134,18 @@ export function useDocumentUndo(options: {
         return;
       }
       // @ts-expect-error Office.js async callback
-      item.body.getSelectedDataAsync(
-        getOfficeHtmlCoercionType(),
-        (result: OfficeAsyncResult) => {
-          if (isOfficeAsyncSucceeded(result.status) && result.value) {
-            resolve(result.value as string);
-          } else {
-            resolve(null);
-          }
-        },
-      );
+      item.body.getSelectedDataAsync(getOfficeHtmlCoercionType(), (result: OfficeAsyncResult) => {
+        if (isOfficeAsyncSucceeded(result.status) && result.value) {
+          resolve(result.value as string);
+        } else {
+          resolve(null);
+        }
+      });
     });
   }
 
   async function captureExcelSelection(): Promise<Partial<UndoSnapshot> | null> {
-    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
+    return new Promise<Partial<UndoSnapshot> | null>(resolve => {
       Excel.run(async (context: any) => {
         const range = context.workbook.getSelectedRange();
         range.load(['address', 'values']);
@@ -156,14 +153,14 @@ export function useDocumentUndo(options: {
         resolve({
           host: 'excel',
           excelRangeAddress: range.address as string,
-          excelValues: range.values as any[][],
+          excelValues: range.values as (string | number | boolean | null)[][],
         });
       }).catch(() => resolve(null));
     });
   }
 
   async function capturePowerPointSelection(): Promise<Partial<UndoSnapshot> | null> {
-    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
+    return new Promise<Partial<UndoSnapshot> | null>(resolve => {
       if (typeof Office === 'undefined' || !Office?.context?.document?.getSelectedDataAsync) {
         resolve(null);
         return;
@@ -187,7 +184,7 @@ export function useDocumentUndo(options: {
    * cannot destroy the undo anchor.
    */
   async function captureWordBodyState(): Promise<Partial<UndoSnapshot> | null> {
-    return new Promise<Partial<UndoSnapshot> | null>((resolve) => {
+    return new Promise<Partial<UndoSnapshot> | null>(resolve => {
       Word.run(async (context: any) => {
         const ooxmlResult = context.document.body.getOoxml();
         await context.sync();
@@ -264,19 +261,17 @@ export function useDocumentUndo(options: {
   }
 
   async function undoWordBodyRestore(snapshot: UndoSnapshot): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       Word.run(async (context: any) => {
         context.document.body.insertOoxml(snapshot.wordBodyOoxml!, 'Replace');
         await context.sync();
-        undoSnapshot.value = null;
-        canUndo.value = false;
         resolve(true);
       }).catch(() => resolve(false));
     });
   }
 
   async function undoWordInsert(snapshot: UndoSnapshot): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       Word.run(async (context: any) => {
         const ccs = context.document.contentControls.getByTag(snapshot.contentControlTag!);
         ccs.load('items');
@@ -310,15 +305,13 @@ export function useDocumentUndo(options: {
           // Content control may already be gone after delete — OK
         }
 
-        undoSnapshot.value = null;
-        canUndo.value = false;
         resolve(true);
       }).catch(() => resolve(false));
     });
   }
 
   async function undoOutlookInsert(snapshot: UndoSnapshot): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       const mailbox = getOutlookMailbox();
       const item = mailbox?.item;
       if (!item?.body?.setSelectedDataAsync) {
@@ -329,13 +322,7 @@ export function useDocumentUndo(options: {
         snapshot.html ?? '',
         { coercionType: getOfficeHtmlCoercionType() },
         (result: OfficeAsyncResult) => {
-          if (isOfficeAsyncSucceeded(result.status)) {
-            undoSnapshot.value = null;
-            canUndo.value = false;
-            resolve(true);
-          } else {
-            resolve(false);
-          }
+          resolve(isOfficeAsyncSucceeded(result.status));
         },
       );
     });
@@ -343,21 +330,19 @@ export function useDocumentUndo(options: {
 
   async function undoExcelInsert(snapshot: UndoSnapshot): Promise<boolean> {
     if (!snapshot.excelRangeAddress || !snapshot.excelValues) return false;
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       Excel.run(async (context: any) => {
         // range.address includes sheet name (e.g. "Sheet1!A1:B2") — use workbook-level getRange
         const range = context.workbook.getRange(snapshot.excelRangeAddress!);
         range.values = snapshot.excelValues!;
         await context.sync();
-        undoSnapshot.value = null;
-        canUndo.value = false;
         resolve(true);
       }).catch(() => resolve(false));
     });
   }
 
   async function undoPowerPointInsert(snapshot: UndoSnapshot): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       if (typeof Office === 'undefined' || !Office?.context?.document?.setSelectedDataAsync) {
         resolve(false);
         return;
@@ -368,13 +353,7 @@ export function useDocumentUndo(options: {
         snapshot.pptText ?? '',
         { coercionType: Office.CoercionType.Text },
         (result: OfficeAsyncResult) => {
-          if (isOfficeAsyncSucceeded(result.status)) {
-            undoSnapshot.value = null;
-            canUndo.value = false;
-            resolve(true);
-          } else {
-            resolve(false);
-          }
+          resolve(isOfficeAsyncSucceeded(result.status));
         },
       );
     });

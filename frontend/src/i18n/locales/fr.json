@@ -105,6 +105,7 @@
   "agentActionFormatting": "🎨 Mise en forme du texte...",
   "agentUploadingFiles": "Extraction des fichiers...",
   "warningFileFallbackInline": "Fichier envoyé en ligne (le fournisseur ne supporte pas /v1/files). Les fichiers volumineux peuvent ralentir les réponses.",
+  "warningVfsWriteFailed": "Le contexte du fichier \"{filename}\" n'a pas pu être sauvegardé — l'agent pourrait ne plus y avoir accès au prochain tour.",
   "proofread": "Relecture",
   "proofread_tooltip": "Aucune sélection requise. L'IA corrige la grammaire, l'orthographe, la ponctuation et les accords via des modifications suivies (Track Changes).",
   "ppt_proofread_tooltip": "Corrige les fautes directement sur la diapositive active, de manière chirurgicale sans toucher à la mise en forme.",

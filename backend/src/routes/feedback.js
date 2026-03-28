@@ -1,39 +1,62 @@
-import express from 'express'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { ErrorCodes } from '../config/errorCodes.js'
-import { logAndRespond } from '../utils/http.js'
-import { getRecentRequests, getRecentToolUsage, logFeedbackSubmission } from '../utils/toolUsageLogger.js'
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { ErrorCodes } from '../config/errorCodes.js';
+import { logAndRespond } from '../utils/http.js';
+import {
+  getRecentRequests,
+  getRecentToolUsage,
+  logFeedbackSubmission,
+} from '../utils/toolUsageLogger.js';
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export const feedbackRouter = express.Router()
+export const feedbackRouter = express.Router();
 
-const FEEDBACK_DIR = path.join(__dirname, '../../logs/feedback')
+const FEEDBACK_DIR = path.join(__dirname, '../../logs/feedback');
 
 if (!fs.existsSync(FEEDBACK_DIR)) {
-  fs.mkdirSync(FEEDBACK_DIR, { recursive: true })
+  fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
 }
 
 feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const { comment, category, logs, chatHistory, systemContext } = req.body
+    const { sessionId } = req.params;
+    const { comment, category, logs, chatHistory, systemContext } = req.body;
 
     if (!comment || !category) {
-      return logAndRespond(res, 400, { code: ErrorCodes.FEEDBACK_MISSING_FIELDS, error: 'Comment and category are required' }, 'POST /api/feedback')
+      return logAndRespond(
+        res,
+        400,
+        { code: ErrorCodes.FEEDBACK_MISSING_FIELDS, error: 'Comment and category are required' },
+        'POST /api/feedback',
+      );
     }
 
-    req.logger.info('Feedback received from user', { traffic: 'system', category })
+    const VALID_CATEGORIES = ['bug', 'suggestion', 'quality', 'other'];
+    if (!VALID_CATEGORIES.includes(category)) {
+      return logAndRespond(
+        res,
+        400,
+        { error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` },
+        'POST /api/feedback',
+      );
+    }
 
-    const userId = req.logger.defaultMeta?.userId || 'anonymous'
-    const host = req.logger.defaultMeta?.host || 'unknown'
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(sessionId)) {
+      return logAndRespond(res, 400, { error: 'Invalid sessionId format' }, 'POST /api/feedback');
+    }
+
+    req.logger.info('Feedback received from user', { traffic: 'system', category });
+
+    const userId = req.logger.defaultMeta?.userId || 'anonymous';
+    const host = req.logger.defaultMeta?.host || 'unknown';
 
     // FB-M1: Include recent requests and tool usage
-    const recentRequests = getRecentRequests(userId, 4)
-    const toolUsageSnapshot = getRecentToolUsage(userId, 50)
+    const recentRequests = getRecentRequests(userId, 4);
+    const toolUsageSnapshot = getRecentToolUsage(userId, 50);
 
     const feedbackEntry = {
       timestamp: new Date().toISOString(),
@@ -47,19 +70,19 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
       chatHistory: chatHistory || [],
       recentRequests, // FB-M1: Last 4 backend requests
       toolUsageSnapshot, // FB-M1: Recent tool usage at feedback time
-    }
+    };
 
-    const dateStr = new Date().toISOString().replace(/:/g, '-').replace('T', '_').slice(0, 19)
-    const filename = `feedback_${category}_${dateStr}.json`
-    const filePath = path.join(FEEDBACK_DIR, filename)
+    const dateStr = new Date().toISOString().replace(/:/g, '-').replace('T', '_').slice(0, 19);
+    const filename = `feedback_${category}_${dateStr}.json`;
+    const filePath = path.join(FEEDBACK_DIR, filename);
 
-    await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2))
+    await fs.promises.writeFile(filePath, JSON.stringify(feedbackEntry, null, 2));
 
     // FB-M1: Log feedback submission to index
     try {
-      logFeedbackSubmission(userId, host, category, sessionId, filename)
+      logFeedbackSubmission(userId, host, category, sessionId, filename);
     } catch (indexError) {
-      req.logger.warn('Failed to log feedback to index', { error: indexError, traffic: 'system' })
+      req.logger.warn('Failed to log feedback to index', { error: indexError, traffic: 'system' });
     }
 
     req.logger.info('Feedback saved', {
@@ -70,11 +93,16 @@ feedbackRouter.post('/:sessionId', express.json({ limit: '20mb' }), async (req, 
       hasSystemContext: !!systemContext,
       recentRequestsCount: feedbackEntry.recentRequests.length,
       toolUsageSnapshotCount: feedbackEntry.toolUsageSnapshot.length,
-    })
+    });
 
-    res.json({ success: true, message: 'Feedback submitted successfully' })
+    res.json({ success: true, message: 'Feedback submitted successfully' });
   } catch (error) {
-    req.logger.error('Error handling feedback', { error })
-    logAndRespond(res, 500, { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error processing feedback' }, 'POST /api/feedback')
+    req.logger.error('Error handling feedback', { error });
+    logAndRespond(
+      res,
+      500,
+      { code: ErrorCodes.INTERNAL_ERROR, error: 'Internal server error processing feedback' },
+      'POST /api/feedback',
+    );
   }
-})
+});

@@ -1,4 +1,5 @@
 import type { ModelTier, ModelInfo, ToolCategory } from '@/types';
+import type { UndoSnapshot } from '@/composables/useDocumentUndo';
 import { ref, type Ref, type ComputedRef } from 'vue';
 
 import {
@@ -16,9 +17,14 @@ import {
   GLOBAL_STYLE_INSTRUCTIONS,
   getOutlookBuiltInPrompt,
 } from '@/utils/constant';
+import { getDisplayLanguage } from '@/utils/common';
 import { getGeneralToolDefinitions } from '@/utils/generalTools';
 import { message as messageUtil } from '@/utils/message';
-import { powerpointImageRegistry } from '@/utils/powerpointTools';
+import {
+  powerpointImageRegistry,
+  getCurrentSlideNumber,
+  getSlideContentStandalone,
+} from '@/utils/powerpointTools';
 import { prepareMessagesForContext, estimateContextUsagePercent } from '@/utils/tokenManager';
 import { getEnabledToolNamesFromStorage } from '@/utils/toolStorage';
 import { getToolsForHost } from '@/utils/toolProviderRegistry';
@@ -103,11 +109,11 @@ interface AgentLoopHelpers {
    * Preferred over captureBeforeInsert for the agent loop because agent tools that replace
    * whole paragraphs cannot destroy a body-OOXML snapshot (unlike the CC-based approach).
    */
-  captureDocumentState?: () => Promise<Partial<any> | null>;
+  captureDocumentState?: () => Promise<Partial<UndoSnapshot> | null>;
   /** Capture selection state before a quick action so undo is available afterwards */
-  captureBeforeInsert?: () => Promise<Partial<any> | null>;
+  captureBeforeInsert?: () => Promise<Partial<UndoSnapshot> | null>;
   /** Save the snapshot captured by captureDocumentState/captureBeforeInsert and mark undo available */
-  saveSnapshot?: (partial: Partial<any>, tag?: string) => void;
+  saveSnapshot?: (partial: Partial<UndoSnapshot>, tag?: string) => void;
 }
 
 interface UseAgentLoopOptions {
@@ -171,13 +177,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const { isOutlook: hostIsOutlook, isPowerPoint: hostIsPowerPoint, isExcel: hostIsExcel } = host;
 
   // Destructure settings
-  const {
-    agentMaxIterations,
-    excelFormulaLanguage,
-    userGender,
-    userFirstName,
-    userLastName,
-  } = settings;
+  const { agentMaxIterations, excelFormulaLanguage, userGender, userFirstName, userLastName } =
+    settings;
 
   // Destructure actions
   const { quickActions, outlookQuickActions, excelQuickActions, powerPointQuickActions } = actions;
@@ -194,7 +195,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   } = helpers;
 
   const currentAction = ref('');
-  const pendingSmartReply = ref(false);
   const pendingMoM = ref(false);
 
   const sessionStats = ref({
@@ -205,7 +205,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   });
 
   function resetSessionStats() {
-    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0, lastCallInputTokens: 0 };
+    sessionStats.value = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      lastCallInputTokens: 0,
+    };
   }
 
   function accumulateUsage(usage: TokenUsage) {
@@ -265,7 +270,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       function: {
         name: def.name,
         description: def.description,
-        parameters: def.inputSchema as Record<string, any>,
+        parameters: def.inputSchema as Record<string, unknown>,
       },
     }));
 
@@ -521,142 +526,79 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     await scrollToMessageTop();
   }
 
-  async function handleSmartReply(userMessage: string) {
-    pendingSmartReply.value = false;
-    const replyIntent = userMessage;
-    // Fetch the full email body for context
-    let emailBody = '';
-    try {
-      emailBody = await getOfficeSelection({ actionKey: 'reply' });
-    } catch (err) {
-      logService.warn('[AgentLoop] Failed to fetch email body for smart reply', err);
-    }
-    if (!emailBody) {
-      messageUtil.error(t('selectEmailPrompt'));
-      return;
-    }
-    // M2: Centralized LocalStorage Language Preference with validation
-    const storedLang = localStorage.getItem('localLanguage');
-    const validLangs = ['en', 'fr'];
-    const langKey = validLangs.includes(storedLang || '') ? storedLang : 'fr'; // Default to fr safely
-    const lang = langKey === 'en' ? 'English' : 'Français';
-
-    const replyPrompt = getOutlookBuiltInPrompt()['reply'];
-    const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
-    const sanitizedEmail =
-      '\\n<email_content>\\n' +
-      emailBody.replace(new RegExp('</?email_content>', 'g'), '') +
-      '\\n<' +
-      '/email_content>\\n';
-    const sanitizedIntent =
-      '\\n<user_intent>\\n' +
-      replyIntent.replace(new RegExp('</?user_intent>', 'g'), '') +
-      '\\n<' +
-      '/user_intent>\\n';
-    const userMsg = replyPrompt
-      .user(sanitizedEmail, lang)
-      .replace('[REPLY_INTENT]', sanitizedIntent);
+  // ARCH-M6: Shared one-shot stream helper for SmartReply / MoM
+  async function streamOneShot(messages: ChatMessage[], logTag: string): Promise<void> {
     history.value.push(createDisplayMessage('assistant', ''));
-    // Don't scroll here — empty assistant bubble is hidden, would scroll to top of chat.
     try {
       await chatStream({
-        messages: [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: userMsg },
-        ],
+        messages,
         modelTier: resolveChatModelTier(),
         onStream: (text: string) => {
-          const message = history.value[history.value.length - 1];
-          message.role = 'assistant';
-          message.content = text;
-          // No auto-scroll during streaming: user can freely scroll.
+          const idx = history.value.length - 1;
+          history.value[idx] = { ...history.value[idx], role: 'assistant', content: text };
         },
         onUsage: accumulateUsage,
         abortSignal: abortController.value?.signal,
       });
-      const lastMessage = history.value[history.value.length - 1];
+      const lastIdx = history.value.length - 1;
+      const lastMessage = history.value[lastIdx];
       if (!lastMessage?.content?.trim()) {
-        lastMessage.content = t('noModelResponse');
+        history.value[lastIdx] = { ...lastMessage, content: t('noModelResponse') };
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      logService.error('[AgentLoop] Smart reply chatStream failed', err);
-      const lastMessage = history.value[history.value.length - 1];
+      logService.error(`[AgentLoop] ${logTag} chatStream failed`, err);
+      const errIdx = history.value.length - 1;
       const errInfo = categorizeError(err);
       if (errInfo.type === 'auth') {
-        lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
+        history.value[errIdx] = {
+          ...history.value[errIdx],
+          content: `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`,
+        };
       } else {
-        lastMessage.content = errInfo.rawDetail
+        const errContent = errInfo.rawDetail
           ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
           : t(errInfo.i18nKey);
+        history.value[errIdx] = { ...history.value[errIdx], content: errContent };
       }
     }
-    // Scroll to top of the completed response
     await scrollToMessageTop();
   }
 
   async function handleMoM(userMessage: string) {
     pendingMoM.value = false;
 
-    const storedLang = localStorage.getItem('localLanguage');
-    const validLangs = ['en', 'fr'];
-    const langKey = validLangs.includes(storedLang || '') ? storedLang : 'fr';
-    const lang = langKey === 'en' ? 'English' : 'Français';
+    const lang = getDisplayLanguage();
 
     const momPrompt = getOutlookBuiltInPrompt()['mom'];
     const systemMsg = momPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
     const userMsg = momPrompt.user(userMessage, lang);
 
-    history.value.push(createDisplayMessage('assistant', ''));
-    // Don't scroll here — empty assistant bubble is hidden, would scroll to top of chat.
-    try {
-      await chatStream({
-        messages: [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: userMsg },
-        ],
-        modelTier: resolveChatModelTier(),
-        onStream: (text: string) => {
-          const message = history.value[history.value.length - 1];
-          message.role = 'assistant';
-          message.content = text;
-        },
-        onUsage: accumulateUsage,
-        abortSignal: abortController.value?.signal,
-      });
-      const lastMessage = history.value[history.value.length - 1];
-      if (!lastMessage?.content?.trim()) {
-        lastMessage.content = t('noModelResponse');
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      logService.error('[AgentLoop] MoM chatStream failed', err);
-      const lastMessage = history.value[history.value.length - 1];
-      const errInfo = categorizeError(err);
-      if (errInfo.type === 'auth') {
-        lastMessage.content = `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`;
-      } else {
-        lastMessage.content = errInfo.rawDetail
-          ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
-          : t(errInfo.i18nKey);
-      }
-    }
-    // Scroll to top of the completed response
-    await scrollToMessageTop();
+    await streamOneShot(
+      [
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: userMsg },
+      ],
+      'MoM',
+    );
   }
 
   async function fetchSelectionWithTimeout() {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let textTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let htmlTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let localSelectedText = '';
     try {
       const timeoutPromise = new Promise<string>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000);
+        textTimeoutId = setTimeout(() => reject(new Error('getOfficeSelection timeout')), 3000);
       }).catch(() => '') as Promise<string>;
 
       if (!hostIsExcel) {
         // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
         const htmlPromise = new Promise<string>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000);
+          htmlTimeoutId = setTimeout(
+            () => reject(new Error('getOfficeSelectionAsHtml timeout')),
+            3000,
+          );
         }).catch(() => '') as Promise<string>;
 
         try {
@@ -692,7 +634,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     } catch (error) {
       logService.warn('[AgentLoop] Failed to fetch selection before sending message', error);
     } finally {
-      if (timeoutId) clearTimeout(timeoutId);
+      if (textTimeoutId) clearTimeout(textTimeoutId);
+      if (htmlTimeoutId) clearTimeout(htmlTimeoutId);
     }
     return localSelectedText;
   }
@@ -700,7 +643,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   async function processChat(
     userMessage: string,
     visionImages?: Array<{ filename: string; dataUri: string; imageId?: string }>,
-    injectedContext?: string,
     selectionContext?: string,
     uploadedFiles?: Array<{ filename: string; content: string; fileId?: string }>,
   ) {
@@ -714,9 +656,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         // generated image matches the document content the user is working on.
         let imagePrompt = userMessage;
         if (selectionContext) {
-          const truncatedContext = selectionContext.length > 2000
-            ? selectionContext.slice(0, 2000) + '…'
-            : selectionContext;
+          const truncatedContext =
+            selectionContext.length > 2000
+              ? selectionContext.slice(0, 2000) + '…'
+              : selectionContext;
           imagePrompt = `${userMessage}\n\nDocument context: ${truncatedContext}`;
         }
         const imageSrc = await generateImage({ prompt: imagePrompt });
@@ -740,15 +683,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       return;
     }
 
-    // M2: Centralized LocalStorage Language Preference with validation
-    const storedLang = localStorage.getItem('localLanguage');
-    const langKey = ['en', 'fr'].includes(storedLang || '') ? storedLang : 'fr';
-    const lang = langKey === 'en' ? 'English' : 'Français';
+    const lang = getDisplayLanguage();
     const systemPrompt = agentPrompt(lang);
     const modelTier = resolveChatModelTier();
 
     // ARCH-H1: Use prepareMessages from useMessageOrchestration
-    let messages = await prepareMessages(systemPrompt, uploadedFiles, injectedContext);
+    let messages = await prepareMessages(systemPrompt, uploadedFiles);
 
     // Additional context injections (selection, vision images)
     try {
@@ -789,13 +729,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           textContent += `\n\n<uploaded_images>\nThe following images are available in session memory:\n${imageContextLines.join('\n')}\nTo embed an image in a slide, use insertImageOnSlide with the filename. To extract chart data into Excel, use extract_chart_data with the imageId.\n</uploaded_images>`;
         }
 
-        const parts: any[] = [{ type: 'text', text: String(textContent) }];
+        const parts: { type: string; text?: string; image_url?: { url: string } }[] = [
+          { type: 'text', text: String(textContent) },
+        ];
         for (const img of sessionUploadedImages.value) {
           // Use provider fileId when available (avoids re-sending base64 bytes each iteration)
           const imageUrl = img.fileId ?? img.dataUri;
           parts.push({ type: 'image_url', image_url: { url: imageUrl } });
         }
-        (messages[lastUserIdx] as any).content = parts;
+        (messages[lastUserIdx] as { role: string; content: unknown }).content = parts;
       }
     }
 
@@ -805,32 +747,32 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   // ARCH-H1: Extract Quick Actions management
   const { applyQuickAction } = useQuickActions({
     t,
-    history,
-    userInput,
-    loading,
-    imageLoading,
-    backendOnline,
-    abortController,
-    inputTextarea,
-    isDraftFocusGlowing,
-    availableModels,
-    selectedModelTier,
-    firstChatModelTier,
-    hostIsOutlook,
-    hostIsPowerPoint,
-    hostIsExcel,
+    refs: {
+      history,
+      userInput,
+      loading,
+      imageLoading,
+      backendOnline,
+      abortController,
+      inputTextarea,
+      isDraftFocusGlowing,
+    },
+    models: { availableModels },
+    hosts: { hostIsOutlook, hostIsPowerPoint, hostIsExcel },
     quickActions,
     outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
-    createDisplayMessage,
-    adjustTextareaHeight,
-    scrollToBottom,
-    scrollToMessageTop,
-    getOfficeSelection,
-    getOfficeSelectionAsHtml,
-    runAgentLoop,
-    resolveChatModelTier,
+    helpers: {
+      createDisplayMessage,
+      adjustTextareaHeight,
+      scrollToBottom,
+      scrollToMessageTop,
+      getOfficeSelection,
+      getOfficeSelectionAsHtml,
+      runAgentLoop,
+      resolveChatModelTier,
+    },
     pendingMoM,
     captureBeforeInsert,
     saveSnapshot,
@@ -900,53 +842,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (wordCount < 5 && hostIsPowerPoint) {
         try {
           const { executeOfficeAction } = await import('@/utils/officeAction');
-          selectedText = await executeOfficeAction(() => {
-            const PPT = (window as any).PowerPoint;
-            if (!PPT) return Promise.resolve('');
-            return PPT.run(async (context: any) => {
-              let activeSlideIndex = 0;
-              try {
-                if (typeof context.presentation.getSelectedSlides === 'function') {
-                  const selectedSlides = context.presentation.getSelectedSlides();
-                  selectedSlides.load('items/id');
-                  await context.sync();
-                  if (selectedSlides.items.length > 0) {
-                    const slides = context.presentation.slides;
-                    slides.load('items/id');
-                    await context.sync();
-                    const selectedId = selectedSlides.items[0].id;
-                    const idx = slides.items.findIndex((s: any) => s.id === selectedId);
-                    if (idx !== -1) activeSlideIndex = idx;
-                  }
-                }
-              } catch (e) {}
-
-              const slides = context.presentation.slides;
-              slides.load('items');
-              await context.sync();
-              if (activeSlideIndex >= slides.items.length) return '';
-              const slide = slides.items[activeSlideIndex];
-
-              const shapes = slide.shapes;
-              shapes.load('items');
-              await context.sync();
-
-              for (const shape of shapes.items) {
-                try {
-                  shape.textFrame.textRange.load('text');
-                } catch {}
-              }
-              await context.sync();
-
-              const texts = [];
-              for (const shape of shapes.items) {
-                try {
-                  texts.push((shape.textFrame.textRange.text || '').trim());
-                } catch {}
-              }
-              return texts.filter(Boolean).join('\n');
-            });
-          });
+          const slideNum = await getCurrentSlideNumber();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const PPT = (window as unknown as Record<string, any>)['PowerPoint'];
+          if (PPT?.run) {
+            selectedText = await executeOfficeAction(() =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              PPT.run((ctx: any) => getSlideContentStandalone(ctx, slideNum)),
+            );
+          }
           wordCount = selectedText
             .trim()
             .split(/\s+/)
@@ -972,12 +876,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     await scrollToMessageTop(); // Scroll to top of user message just sent
 
     try {
-      // Smart reply interception: when user sends after clicking "Reply" quick action
-      if (pendingSmartReply.value && hostIsOutlook) {
-        await handleSmartReply(userMessage);
-        return;
-      }
-
       // MoM interception: when user sends notes after clicking "MoM" quick action
       if (pendingMoM.value && hostIsOutlook) {
         await handleMoM(userMessage);
@@ -1029,17 +927,17 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 const binaryStr = atob(base64Data);
                 const bytes = new Uint8Array(binaryStr.length);
                 for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(
-                  err => {
-                    logService.warn('[AgentLoop] VFS write failed for uploaded image', err);
-                    // ERR-C3: Surface VFS failure so agent context gap is visible to user
-                    messageUtil.warning(
-                      t('warningVfsWriteFailed') ||
-                        `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
-                    );
-                  },
-                );
-              } catch { /* best-effort */ }
+                vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(err => {
+                  logService.warn('[AgentLoop] VFS write failed for uploaded image', err);
+                  // ERR-C3: Surface VFS failure so agent context gap is visible to user
+                  messageUtil.warning(
+                    t('warningVfsWriteFailed') ||
+                      `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
+                  );
+                });
+              } catch {
+                /* best-effort */
+              }
 
               // Point 3 Fix: Store in PPT registry for tool access (by filename AND imageId)
               if (hostIsPowerPoint) {
@@ -1055,7 +953,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 filename: result.filename,
                 content: result.extractedText,
               };
-              // Tâche 4: Try to upload to LLM provider for file_id referencing (best-effort)
+              // Try to upload to LLM provider for file_id referencing (best-effort)
               try {
                 const platformResult = await uploadFileToPlatform(file);
                 if (platformResult.fileId) {
@@ -1091,7 +989,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
               });
             }
           }
-          // Persist file info on the user message for session restore (Tâche 6)
+          // Persist file info on the user message for session restore
           if (newTextFiles.length > 0) {
             history.value[userMsgIdx].attachedFiles = newTextFiles;
           }
@@ -1107,7 +1005,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       // Capture document state before agent modifies the document (enables undo).
       // captureDocumentState snapshots full body OOXML (Word) so para-level replacements
       // by agent tools cannot destroy the undo anchor (unlike the CC approach).
-      let undoSnapshot: Partial<any> | null = null;
+      let undoSnapshot: Partial<UndoSnapshot> | null = null;
       try {
         const captureFn = captureDocumentState ?? captureBeforeInsert;
         if (captureFn) undoSnapshot = await captureFn();
@@ -1122,23 +1020,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           fullMessage = t('pptVisualPrefix') + '\n' + selectedText;
         } else {
           // Truncate selected text to avoid overwhelming the image model with too much content
-          const truncatedText = selectedText.length > 2000
-            ? selectedText.slice(0, 2000) + '…'
-            : selectedText;
+          const truncatedText =
+            selectedText.length > 2000 ? selectedText.slice(0, 2000) + '…' : selectedText;
           fullMessage = t('imageGenerationPrompt').replace('{text}', truncatedText);
         }
-        await processChat(
-          fullMessage.trim(),
-          undefined,
-          undefined,
-          undefined,
-          uploadedFilesForChat,
-        );
+        await processChat(fullMessage.trim(), undefined, undefined, uploadedFilesForChat);
       } else {
         // Pass selectedText as selectionContext: injected into LLM payload only, not shown in UI
         await processChat(
           fullMessage.trim(),
-          undefined,
           undefined,
           selectedText || undefined,
           uploadedFilesForChat,

@@ -331,7 +331,9 @@ chatRouter.post('/sync', async (req, res) => {
     req.logger.info(`POST /api/chat/sync upstream request initiated`, {
       traffic: 'llm',
       url: '/v1/chat/completions',
-      body,
+      model: body.model,
+      messageCount: body.messages?.length,
+      toolCount: body.tools?.length || 0,
     })
 
     const response = await chatCompletion({

@@ -175,21 +175,26 @@ export function getOutlookDocumentContext(): Promise<string> {
       // itemType: 'message' | 'appointment' — compose vs read determined by presence of setAsync
       const itemType: string = item.itemType || (item.body?.setAsync ? 'compose' : 'read');
 
-      const contextObj: Record<string, any> = { itemType, subject, sender };
+      const contextObj: Record<string, unknown> = { itemType, subject, sender };
 
       // Try to read recipients (compose mode only)
       if (item.to?.getAsync) {
-        item.to.getAsync((toResult: any) => {
-          if (
-            toResult.status === Office?.AsyncResultStatus?.Succeeded &&
-            Array.isArray(toResult.value)
-          ) {
-            contextObj.recipients = toResult.value
-              .map((r: any) => r.emailAddress || r.displayName || '')
-              .slice(0, 5);
-          }
-          readBody();
-        });
+        item.to.getAsync(
+          (toResult: {
+            status: string;
+            value?: { emailAddress?: string; displayName?: string }[];
+          }) => {
+            if (
+              toResult.status === Office?.AsyncResultStatus?.Succeeded &&
+              Array.isArray(toResult.value)
+            ) {
+              contextObj.recipients = toResult.value
+                .map(r => r.emailAddress || r.displayName || '')
+                .slice(0, 5);
+            }
+            readBody();
+          },
+        );
       } else {
         readBody();
       }
@@ -199,14 +204,17 @@ export function getOutlookDocumentContext(): Promise<string> {
           resolve(JSON.stringify(contextObj, null, 2));
           return;
         }
-        item.body.getAsync(Office?.CoercionType?.Text, (result: any) => {
-          if (result.status === Office?.AsyncResultStatus?.Succeeded) {
-            const bodyText = String(result.value || '');
-            contextObj.bodySnippet =
-              bodyText.substring(0, 300) + (bodyText.length > 300 ? '...' : '');
-          }
-          resolve(JSON.stringify(contextObj, null, 2));
-        });
+        item.body.getAsync(
+          Office?.CoercionType?.Text,
+          (result: { status: string; value?: string }) => {
+            if (result.status === Office?.AsyncResultStatus?.Succeeded) {
+              const bodyText = String(result.value || '');
+              contextObj.bodySnippet =
+                bodyText.substring(0, 300) + (bodyText.length > 300 ? '...' : '');
+            }
+            resolve(JSON.stringify(contextObj, null, 2));
+          },
+        );
       }
     } catch {
       resolve('');
@@ -256,6 +264,7 @@ export async function getWordDocumentContext(): Promise<string> {
         }
 
         // Load content controls if available
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let contentControls: any = null;
         try {
           contentControls = body.contentControls;
@@ -313,6 +322,7 @@ export async function getWordDocumentContext(): Promise<string> {
         let contentControlInfo: { title: string; tag: string; type: string }[] = [];
         try {
           if (contentControls?.items?.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             contentControlInfo = contentControls.items.map((cc: any) => ({
               title: cc.title || '',
               tag: cc.tag || '',
@@ -323,7 +333,7 @@ export async function getWordDocumentContext(): Promise<string> {
           // ignore
         }
 
-        const result: Record<string, any> = {
+        const result: Record<string, unknown> = {
           pageCount: props.pageCount,
           wordCount: props.wordCount,
           paragraphCount: paragraphs.items.length,

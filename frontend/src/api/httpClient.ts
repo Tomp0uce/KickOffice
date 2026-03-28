@@ -1,6 +1,20 @@
 import { getUserKey, getUserEmail } from '@/utils/credentialStorage';
 import { logService } from '@/utils/logger';
 
+// Lazy env validation — fail at first API call, not at import time.
+// IMPORTANT: Always use in template literals (`${BACKEND_URL}/path`).
+let _backendUrlCache: string | undefined;
+export const BACKEND_URL = {
+  toString() {
+    if (!_backendUrlCache) {
+      _backendUrlCache = String(import.meta.env.VITE_BACKEND_URL ?? '');
+      if (!_backendUrlCache)
+        throw new Error('VITE_BACKEND_URL is required. Please define it in frontend/.env');
+    }
+    return _backendUrlCache;
+  },
+};
+
 // Timeouts by model tier — reasoning models need more time (up to 6 min LLM + overhead)
 const BASE_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS) || 180_000;
 const TIMEOUT_BY_TIER: Record<string, number> = {

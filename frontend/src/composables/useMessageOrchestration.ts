@@ -7,6 +7,11 @@
  * - Injects uploaded files (text files, platform file IDs)
  * - Injects rich content preservation instructions
  *
+ * **Mutation contract**: The inject* functions (injectDocumentContext, injectUploadedFiles,
+ * injectRichContentInstructions) mutate the `messages` array in-place for performance —
+ * the array is freshly built by `buildChatMessages()` each call and never shared.
+ * `injectUploadedFiles` also mutates SessionFile.contentInjectedAt to track injection state.
+ *
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
@@ -62,9 +67,8 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    * Fetches document metadata (sheets, slides, email info) and appends to last user message.
    *
    * @param messages - Messages array to modify (modified in-place)
-   * @returns The modified messages array
    */
-  async function injectDocumentContext(messages: ChatMessage[]): Promise<ChatMessage[]> {
+  async function injectDocumentContext(messages: ChatMessage[]): Promise<void> {
     try {
       let docContextJson = '';
       if (hostIsExcel) docContextJson = await getExcelDocumentContext();
@@ -82,8 +86,6 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
       // Document context is optional — continue without it if it fails
       logService.warn('[MessageOrchestration] Failed to inject document context', err);
     }
-
-    return messages;
   }
 
   /**
@@ -97,24 +99,9 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    *
    * @param messages - Messages array to modify (modified in-place)
    * @param uploadedFiles - Files to inject
-   * @param injectedContext - Legacy string-based file content (deprecated, kept for compatibility)
-   * @returns The modified messages array
    */
-  function injectUploadedFiles(
-    messages: ChatMessage[],
-    uploadedFiles?: SessionFile[],
-    injectedContext?: string,
-  ): ChatMessage[] {
-    // Legacy string-based injection (kept for any call sites that still pass it)
-    if (injectedContext) {
-      const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
-      if (lastUserIdx !== -1 && typeof messages[lastUserIdx].content === 'string') {
-        messages[lastUserIdx].content +=
-          `\n\n<attached_files>\n${injectedContext}\n</attached_files>`;
-      }
-    }
-
-    if (!uploadedFiles || uploadedFiles.length === 0) return messages;
+  function injectUploadedFiles(messages: ChatMessage[], uploadedFiles?: SessionFile[]): void {
+    if (!uploadedFiles || uploadedFiles.length === 0) return;
 
     // Separate files that haven't been sent yet from files already seen by the LLM.
     // Mutating contentInjectedAt in-place updates the SessionFile objects stored in
@@ -133,7 +120,9 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
         const hasFileRefs = newFiles.some(f => f.fileId);
         if (hasFileRefs && typeof messages[lastUserIdx].content === 'string') {
           // Convert to multipart content array for platform file IDs
-          const parts: any[] = [{ type: 'text', text: messages[lastUserIdx].content as string }];
+          const parts: { type: string; text?: string; file?: { file_id: string } }[] = [
+            { type: 'text', text: messages[lastUserIdx].content as string },
+          ];
           for (const f of newFiles) {
             if (f.fileId) {
               parts.push({ type: 'file', file: { file_id: f.fileId } });
@@ -166,14 +155,18 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
           `Use the vfsReadFile tool to access their content if needed.]`;
         const content = messages[lastUserIdx].content;
         if (typeof content === 'string') {
-          messages[lastUserIdx].content = content + note;
+          messages[lastUserIdx] = { ...messages[lastUserIdx], content: content + note };
         } else if (Array.isArray(content)) {
-          (content as any[]).push({ type: 'text', text: note });
+          messages[lastUserIdx] = {
+            ...messages[lastUserIdx],
+            content: [
+              ...(content as { type: string; text?: string }[]),
+              { type: 'text', text: note },
+            ],
+          };
         }
       }
     }
-
-    return messages;
   }
 
   /**
@@ -181,14 +174,12 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    * Used for Word/Outlook to preserve embedded images and formatting.
    *
    * @param messages - Messages array to modify (modified in-place)
-   * @returns The modified messages array
    */
-  function injectRichContentInstructions(messages: ChatMessage[]): ChatMessage[] {
+  function injectRichContentInstructions(messages: ChatMessage[]): void {
     const richContext = getLastRichContext();
     if (richContext?.hasRichContent && messages[0]?.role === 'system') {
       messages[0].content += getPreservationInstruction(richContext);
     }
-    return messages;
   }
 
   /**
@@ -201,18 +192,16 @@ export function useMessageOrchestration(options: UseMessageOrchestrationOptions)
    *
    * @param systemPrompt - System prompt to use
    * @param uploadedFiles - Optional uploaded files to include
-   * @param injectedContext - Optional legacy file content
    * @returns Messages ready for LLM
    */
   async function prepareMessages(
     systemPrompt: string,
     uploadedFiles?: SessionFile[],
-    injectedContext?: string,
   ): Promise<ChatMessage[]> {
-    let messages = buildChatMessages(systemPrompt);
-    messages = await injectDocumentContext(messages);
-    messages = injectUploadedFiles(messages, uploadedFiles, injectedContext);
-    messages = injectRichContentInstructions(messages);
+    const messages = buildChatMessages(systemPrompt);
+    await injectDocumentContext(messages);
+    injectUploadedFiles(messages, uploadedFiles);
+    injectRichContentInstructions(messages);
     return messages;
   }
 

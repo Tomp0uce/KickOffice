@@ -10,7 +10,12 @@
 
 import { ref, computed } from 'vue';
 import { logService } from '@/utils/logger';
-import { parseSkill, serializeSkillToMd, VALID_HOSTS, VALID_EXECUTION_MODES } from '@/utils/skillParser';
+import {
+  parseSkill,
+  serializeSkillToMd,
+  VALID_HOSTS,
+  VALID_EXECUTION_MODES,
+} from '@/utils/skillParser';
 import type { SkillHost } from '@/utils/skillParser';
 import type { UserSkill } from '@/types/userSkill';
 import { SKILL_STORAGE_KEY, SKILL_MIGRATION_KEY } from '@/types/userSkill';
@@ -68,7 +73,7 @@ export function useUserSkills() {
   }
 
   function updateSkill(id: string, updates: Partial<Omit<UserSkill, 'id' | 'createdAt'>>): void {
-    const idx = skills.value.findIndex((s) => s.id === id);
+    const idx = skills.value.findIndex(s => s.id === id);
     if (idx === -1) return;
     const updated = [...skills.value];
     updated[idx] = { ...updated[idx], ...updates, updatedAt: Date.now() };
@@ -77,14 +82,14 @@ export function useUserSkills() {
   }
 
   function deleteSkill(id: string): void {
-    skills.value = skills.value.filter((s) => s.id !== id);
+    skills.value = skills.value.filter(s => s.id !== id);
     saveToStorage();
   }
 
   // ── Filtered view ────────────────────────────────────────────────────────────
 
   function skillsForHost(host: SkillHost) {
-    return computed(() => skills.value.filter((s) => s.host === host || s.host === 'all'));
+    return computed(() => skills.value.filter(s => s.host === host || s.host === 'all'));
   }
 
   // ── Export / Import ──────────────────────────────────────────────────────────
@@ -102,7 +107,10 @@ export function useUserSkills() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${skill.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.skill.md`;
+    a.download = `${skill.name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')}.skill.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -150,7 +158,8 @@ export function useUserSkills() {
       }
       // Skip the default empty placeholder prompt
       const real = prompts.filter(
-        (p: any) => p.name !== 'Default' || p.systemPrompt || p.userPrompt,
+        (p: { name?: string; systemPrompt?: string; userPrompt?: string }) =>
+          p.name !== 'Default' || p.systemPrompt || p.userPrompt,
       );
       return real.length > 0;
     } catch {

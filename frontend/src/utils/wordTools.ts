@@ -1,4 +1,4 @@
-import type { ToolDefinition } from '@/types';
+import type { ToolDefinition, ToolArgs } from '@/types';
 import { logService } from '@/utils/logger';
 import { executeOfficeAction } from './officeAction';
 import { sandboxedEval } from './sandbox';
@@ -29,6 +29,29 @@ import {
   WORD_CODE_TRUNCATE_SHORT,
   WORD_CODE_TRUNCATE_LONG,
 } from '@/constants/limits';
+
+// ROB-M1: Narrow interfaces for Word API methods missing from @types/office-js.
+// These exist at runtime (Word API 1.3+) but are absent from the bundled type definitions.
+// Using standalone interfaces instead of extending Word.* (not exportable from ambient namespace).
+interface TrackedChangesCollection {
+  load(properties: string): void;
+  items: TrackedChangeItem[];
+}
+interface TrackedChangeItem {
+  id: number;
+  authorName: string;
+  text: string;
+  date: Date;
+  accept(): void;
+  reject(): void;
+}
+interface WordCommentItem {
+  id: number;
+  authorName: string;
+  content: string;
+  createdDate: string;
+  replies: { items: Array<{ content: string; authorName: string }> };
+}
 
 export type WordToolName =
   | 'getSelectedText'
@@ -178,8 +201,8 @@ async function applyHeadingBuiltinStyles(
   }
 }
 
-type WordToolTemplate = OfficeToolTemplate<Word.RequestContext> & {
-  executeWord: (context: Word.RequestContext, args: Record<string, any>) => Promise<string>;
+type WordToolTemplate = OfficeToolTemplate & {
+  executeWord: (context: Word.RequestContext, args: ToolArgs) => Promise<string>;
 };
 
 const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, ToolDefinition>(
@@ -251,7 +274,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['content'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const {
           content,
           location = 'Replace',
@@ -266,7 +289,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         const { inList, styles } = await readInsertionContext(context);
 
         // If replacing and preserving formatting, we save the font props
-        let savedFont: any = null;
+        let savedFont: { name: string; size: number; style: string } | null = null;
         if (location === 'Replace' && preserveFormatting && target === 'Selection') {
           range.load('font/name,font/size,styleBuiltIn');
           await context.sync();
@@ -281,7 +304,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         const adjustedHtml = inList ? stripOuterListTags(html) : html;
         const styledHtml = applyInheritedStyles(adjustedHtml, styles);
 
-        const insertedRange = range.insertHtml(styledHtml, location as any);
+        const insertedRange = range.insertHtml(styledHtml, location as Word.InsertLocation);
 
         if (savedFont && preserveFormatting) {
           insertedRange.font.name = savedFont.name;
@@ -338,11 +361,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { bold, italic, underline, fontSize, fontColor, highlightColor } = args as Record<
-          string,
-          any
-        >;
+      executeWord: async (context, args: ToolArgs) => {
+        const { bold, italic, underline, fontSize, fontColor, highlightColor } = args;
 
         const range = context.document.getSelection();
         range.load('text');
@@ -391,13 +411,13 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['searchText', 'replaceText'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const {
           searchText,
           replaceText,
           matchCase = false,
           matchWholeWord = false,
-        } = args as Record<string, any>;
+        } = args as ToolArgs;
         if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
           throw new Error(
             'Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.',
@@ -477,7 +497,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['searchText'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const {
           searchText,
           matchCase = false,
@@ -590,12 +610,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['searchText'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const {
-          searchText,
-          matchCase = false,
-          matchWholeWord = false,
-        } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { searchText, matchCase = false, matchWholeWord = false } = args as ToolArgs;
         if (typeof searchText === 'string' && searchText.length > WORD_SEARCH_TEXT_MAX_LENGTH) {
           throw new Error(
             'Error: searchText cannot exceed 255 characters in Word. Please search for a smaller distinctive phrase (e.g., 5-10 words) instead of selecting entire paragraphs.',
@@ -683,7 +699,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const tagName =
           typeof args.tagName === 'string' && args.tagName.trim() ? args.tagName.trim() : 'format';
         const fontName =
@@ -810,9 +826,9 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { alignment, lineSpacing, spaceBefore, spaceAfter, leftIndent, firstLineIndent } =
-          args as Record<string, any>;
+          args as ToolArgs;
 
         const selection = context.document.getSelection();
         const paragraphs = selection.paragraphs;
@@ -856,8 +872,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['address'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { address, textToDisplay } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { address, textToDisplay } = args as ToolArgs;
 
         const range = context.document.getSelection();
         const linkRange =
@@ -899,8 +915,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['row', 'column', 'text'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { row, column, text, tableIndex = 0 } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { row, column, text, tableIndex = 0 } = args as ToolArgs;
 
         const tables = context.document.body.tables;
         tables.load('items');
@@ -940,7 +956,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { tableIndex = 0, location = 'After', count = 1, values } = args;
 
         const tables = context.document.body.tables;
@@ -980,7 +996,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { tableIndex = 0, location = 'After', count = 1, values } = args;
 
         const tables = context.document.body.tables;
@@ -1016,8 +1032,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['target', 'index'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { tableIndex = 0, target, index, count = 1 } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { tableIndex = 0, target, index, count = 1 } = args as ToolArgs;
 
         const tables = context.document.body.tables;
         tables.load('items');
@@ -1062,7 +1078,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['row', 'column'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const {
           tableIndex = 0,
           row,
@@ -1073,7 +1089,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
           fontColor,
           bold,
           italic,
-        } = args as Record<string, any>;
+        } = args as ToolArgs;
 
         const tables = context.document.body.tables;
         tables.load('items');
@@ -1122,7 +1138,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['target', 'text'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { target, type = 'Primary', text } = args;
 
         const section = context.document.sections.getFirst() as any;
@@ -1144,8 +1160,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['text'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { text } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { text } = args as ToolArgs;
 
         const range = context.document.getSelection() as any;
         range.insertFootnote(text);
@@ -1173,8 +1189,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['textSegment', 'comment'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { textSegment, comment } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { textSegment, comment } = args as ToolArgs;
 
         const range = context.document.getSelection() as any;
         // Perform a search within the selected range
@@ -1214,7 +1230,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         return JSON.stringify(
           {
             count: comments.items.length,
-            comments: comments.items.map((comment: any) => ({
+            comments: comments.items.map((comment: WordCommentItem) => ({
               authorName: comment.authorName || '',
               content: comment.content || '',
             })),
@@ -1249,9 +1265,9 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { topMargin, bottomMargin, leftMargin, rightMargin, orientation, paperSize } =
-          args as Record<string, any>;
+          args as ToolArgs;
 
         const section = context.document.sections.getFirst() as any;
         const pageSetup = section.pageSetup;
@@ -1282,8 +1298,8 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['index'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
-        const { index } = args as Record<string, any>;
+      executeWord: async (context, args: ToolArgs) => {
+        const { index } = args as ToolArgs;
 
         const paragraphs = context.document.body.paragraphs;
         paragraphs.load('items');
@@ -1336,7 +1352,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: [],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { location = 'After' } = args;
 
         const range = context.document.getSelection() as any;
@@ -1406,7 +1422,7 @@ const wordToolDefinitions = createOfficeTools<WordToolName, WordToolTemplate, To
         },
         required: ['styleBuiltIn'],
       },
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { styleBuiltIn, paragraphIndex, target = 'selection' } = args;
 
         if (paragraphIndex !== undefined && paragraphIndex !== null) {
@@ -1506,7 +1522,7 @@ To apply font color to specific words, use \`searchAndFormat\` AFTER the revisio
         required: ['revisedText'],
       },
 
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { revisedText, enableTrackChanges = true } = args;
 
         const result = await applyRevisionToSelection(context, revisedText, enableTrackChanges);
@@ -1578,7 +1594,7 @@ the full document without requiring the user to select anything.
         required: ['revisions'],
       },
 
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { revisions, enableTrackChanges = true } = args;
 
         const result = await applyRevisionToDocument(context, revisions, enableTrackChanges);
@@ -1643,7 +1659,7 @@ Your code should:
         required: ['code', 'explanation'],
       },
 
-      executeWord: async (context, args: Record<string, any>) => {
+      executeWord: async (context, args: ToolArgs) => {
         const { target = 'selection', paragraphIndex, code, explanation } = args;
 
         // 1. Get the target range
@@ -1716,11 +1732,12 @@ Your code should:
               null,
               2,
             );
-          } catch (insertError: any) {
+          } catch (insertError: unknown) {
+            const errMsg = insertError instanceof Error ? insertError.message : String(insertError);
             return JSON.stringify(
               {
                 success: false,
-                error: `insertOoxml failed: ${insertError.message || String(insertError)}`,
+                error: `insertOoxml failed: ${errMsg}`,
                 explanation,
               },
               null,
@@ -1761,13 +1778,15 @@ Your code should:
         },
         required: [],
       },
-      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+      executeWord: async (context: Word.RequestContext, args: ToolArgs) => {
         if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
           return 'Error: acceptAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
         }
         const targetAuthor: string =
           args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
-        const changes = (context.document as any).trackedChanges;
+        const changes = (
+          context.document as unknown as { trackedChanges: TrackedChangesCollection }
+        ).trackedChanges;
         changes.load('items/authorName');
         await context.sync();
         let accepted = 0;
@@ -1800,13 +1819,15 @@ Your code should:
         },
         required: [],
       },
-      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+      executeWord: async (context: Word.RequestContext, args: ToolArgs) => {
         if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
           return 'Error: rejectAiChanges requires WordApi 1.6 or later, which is not supported in this Office version.';
         }
         const targetAuthor: string =
           args.author || localStorage.getItem('redlineAuthor') || 'KickOffice AI';
-        const changes = (context.document as any).trackedChanges;
+        const changes = (
+          context.document as unknown as { trackedChanges: TrackedChangesCollection }
+        ).trackedChanges;
         changes.load('items/authorName');
         await context.sync();
         let rejected = 0;
@@ -1854,7 +1875,7 @@ Generates the full <pkg:package> or <w:body> fragment with native Word namespace
         },
         required: ['ooxml'],
       },
-      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+      executeWord: async (context: Word.RequestContext, args: ToolArgs) => {
         const { ooxml, location = 'Replace' } = args as { ooxml: string; location?: string };
         if (!ooxml || typeof ooxml !== 'string') return 'Error: ooxml is required.';
         const validLocations = ['Replace', 'Before', 'After', 'Start', 'End'];
@@ -1907,7 +1928,7 @@ Writes the full XML to a VFS file for detailed inspection.
         },
         required: [],
       },
-      executeWord: async (context: Word.RequestContext, args: Record<string, any>) => {
+      executeWord: async (context: Word.RequestContext, args: ToolArgs) => {
         const scope = args.scope || 'body';
         const outputFile = args.outputFile || '/home/user/uploads/ooxml-body.xml';
 
@@ -2077,7 +2098,7 @@ try {
         suggestion:
           'Refer to the Office.js skill document for correct patterns. Common issues: missing load() before reading properties, missing context.sync() to commit changes.',
         mutationDetector: looksLikeMutationWord,
-        buildSandboxContext: (context) => ({
+        buildSandboxContext: context => ({
           context,
           Word: typeof Word !== 'undefined' ? Word : undefined,
           Office: typeof Office !== 'undefined' ? Office : undefined,
@@ -2109,7 +2130,8 @@ export async function acceptAiChangesInDocument(): Promise<string> {
       if (!Office.context.requirements.isSetSupported('WordApi', '1.6')) {
         return 'Cette fonctionnalité nécessite Word 2019+ (WordApi 1.6). Acceptez les modifications manuellement dans le volet Révision.';
       }
-      const changes = (context.document as any).trackedChanges;
+      const changes = (context.document as unknown as { trackedChanges: TrackedChangesCollection })
+        .trackedChanges;
       changes.load('items/authorName');
       await context.sync();
       let accepted = 0;
@@ -2141,12 +2163,11 @@ export async function hasAiTrackedChanges(): Promise<boolean> {
   const targetAuthor = localStorage.getItem('redlineAuthor') || 'KickOffice AI';
   try {
     return await runWord(async (context: Word.RequestContext) => {
-      const changes = (context.document as any).trackedChanges;
+      const changes = (context.document as unknown as { trackedChanges: TrackedChangesCollection })
+        .trackedChanges;
       changes.load('items/authorName');
       await context.sync();
-      return changes.items.some(
-        (change: any) => change.authorName === targetAuthor,
-      );
+      return changes.items.some((change: TrackedChangeItem) => change.authorName === targetAuthor);
     });
   } catch {
     return false;

@@ -11,8 +11,9 @@
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 
-import { type Ref, type ComputedRef, ref, nextTick } from 'vue';
+import { type Ref, type ComputedRef, nextTick } from 'vue';
 import type { ModelTier, ModelInfo } from '@/types';
+import type { UndoSnapshot } from '@/composables/useDocumentUndo';
 import type {
   DisplayMessage,
   ExcelQuickAction,
@@ -22,7 +23,14 @@ import type {
 } from '@/types/chat';
 import type { ChatMessage } from '@/api/backend';
 
-import { chatStream, generateImage, categorizeError, uploadFile, uploadFileToPlatform } from '@/api/backend';
+import {
+  chatStream,
+  generateImage,
+  categorizeError,
+  uploadFile,
+  uploadFileToPlatform,
+} from '@/api/backend';
+import { getDisplayLanguage } from '@/utils/common';
 import {
   GLOBAL_STYLE_INSTRUCTIONS,
   getBuiltInPrompt,
@@ -48,11 +56,8 @@ import { logService } from '@/utils/logger';
 import { getQuickActionSkill } from '@/skills';
 import { writeFile as vfsWriteFile } from '@/utils/vfs';
 
-export interface UseQuickActionsOptions {
-  // Translation function
-  t: (key: string) => string;
-
-  // Refs
+// DRY-H1: Grouped sub-interfaces to reduce ambient coupling
+export interface QuickActionRefs {
   history: Ref<DisplayMessage[]>;
   userInput: Ref<string>;
   loading: Ref<boolean>;
@@ -61,24 +66,19 @@ export interface UseQuickActionsOptions {
   abortController: Ref<AbortController | null>;
   inputTextarea: Ref<HTMLTextAreaElement | undefined>;
   isDraftFocusGlowing: Ref<boolean>;
+}
 
-  // Models
+export interface QuickActionModels {
   availableModels: Ref<Record<string, ModelInfo>>;
-  selectedModelTier: Ref<ModelTier>;
-  firstChatModelTier: Ref<ModelTier>;
+}
 
-  // Host detection
+export interface QuickActionHosts {
   hostIsOutlook: boolean;
   hostIsPowerPoint: boolean;
   hostIsExcel: boolean;
+}
 
-  // Quick Actions
-  quickActions: ComputedRef<QuickAction[] | undefined>;
-  outlookQuickActions?: Ref<OutlookQuickAction[]>;
-  excelQuickActions: Ref<ExcelQuickAction[]>;
-  powerPointQuickActions: Ref<PowerPointQuickAction[]>;
-
-  // Helper functions
+export interface QuickActionHelpers {
   createDisplayMessage: (
     role: DisplayMessage['role'],
     content: string,
@@ -87,56 +87,82 @@ export interface UseQuickActionsOptions {
   adjustTextareaHeight: () => void;
   scrollToBottom: () => Promise<void>;
   scrollToMessageTop?: () => Promise<void>;
-
-  // Office selection helpers
-  getOfficeSelection: (opts?: any) => Promise<string>;
-  getOfficeSelectionAsHtml: (opts?: any) => Promise<string>;
-
-  // Agent loop for executeWithAgent actions
+  getOfficeSelection: (opts?: {
+    includeOutlookSelectedText?: boolean;
+    actionKey?: string;
+  }) => Promise<string>;
+  getOfficeSelectionAsHtml: (opts?: {
+    includeOutlookSelectedText?: boolean;
+    actionKey?: string;
+  }) => Promise<string>;
   runAgentLoop: (messages: ChatMessage[], modelTier: ModelTier) => Promise<void>;
-
-  // Model tier resolver
   resolveChatModelTier: () => ModelTier;
+}
 
-  // Pending MoM flag (set to true when MoM mode is activated, checked by useAgentLoop)
+export interface UseQuickActionsOptions {
+  t: (key: string) => string;
+  refs: QuickActionRefs;
+  models: QuickActionModels;
+  hosts: QuickActionHosts;
+  quickActions: ComputedRef<QuickAction[] | undefined>;
+  outlookQuickActions?: Ref<OutlookQuickAction[]>;
+  excelQuickActions: Ref<ExcelQuickAction[]>;
+  powerPointQuickActions: Ref<PowerPointQuickAction[]>;
+  helpers: QuickActionHelpers;
   pendingMoM?: Ref<boolean>;
-
-  // Undo support: capture document state before quick action runs
-  captureBeforeInsert?: () => Promise<Partial<any> | null>;
-  saveSnapshot?: (partial: Partial<any>, tag?: string) => void;
+  captureBeforeInsert?: () => Promise<Partial<UndoSnapshot> | null>;
+  saveSnapshot?: (partial: Partial<UndoSnapshot>, tag?: string) => void;
 }
 
 export function useQuickActions(options: UseQuickActionsOptions) {
   const {
     t,
-    history,
-    userInput,
-    loading,
-    imageLoading,
-    backendOnline,
-    abortController,
-    inputTextarea,
-    isDraftFocusGlowing,
-    availableModels,
-    hostIsOutlook,
-    hostIsPowerPoint,
-    hostIsExcel,
+    refs: {
+      history,
+      userInput,
+      loading,
+      imageLoading,
+      backendOnline,
+      abortController,
+      inputTextarea,
+      isDraftFocusGlowing,
+    },
+    models: { availableModels },
+    hosts: { hostIsOutlook, hostIsPowerPoint, hostIsExcel },
     quickActions,
     outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
-    createDisplayMessage,
-    adjustTextareaHeight,
-    scrollToBottom,
-    scrollToMessageTop,
-    getOfficeSelection,
-    getOfficeSelectionAsHtml,
-    runAgentLoop,
-    resolveChatModelTier,
+    helpers: {
+      createDisplayMessage,
+      adjustTextareaHeight,
+      scrollToBottom,
+      scrollToMessageTop,
+      getOfficeSelection,
+      getOfficeSelectionAsHtml,
+      runAgentLoop,
+      resolveChatModelTier,
+    },
     pendingMoM,
     captureBeforeInsert,
     saveSnapshot,
   } = options;
+
+  async function focusInputWithGlow(prefix: string) {
+    userInput.value = prefix;
+    adjustTextareaHeight();
+    isDraftFocusGlowing.value = true;
+    setTimeout(() => {
+      isDraftFocusGlowing.value = false;
+    }, 1500);
+    await nextTick();
+    const el = inputTextarea.value;
+    if (el) {
+      el.focus();
+      const len = userInput.value.length;
+      el.setSelectionRange(len, len);
+    }
+  }
 
   async function applyQuickAction(actionKey: string) {
     if (!backendOnline.value) return messageUtil.error(t('backendOffline'));
@@ -177,7 +203,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
     if (actionKey === 'visual' && hostIsPowerPoint) {
       const imageModelTier = (Object.entries(availableModels.value) as [string, ModelInfo][]).find(
         ([_, info]) => info.type === 'image',
-      )?.[0] as ModelTier;
+      )?.[0] as ModelTier | undefined;
       if (!imageModelTier) {
         return messageUtil.error(t('imageError') || 'No image model configured.');
       }
@@ -235,7 +261,7 @@ export function useQuickActions(options: UseQuickActionsOptions) {
       }
 
       // Build user-facing label indicating which mode was used
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const lang = getDisplayLanguage();
       const modeLabel =
         imageContextMode === 'selection'
           ? lang === 'English'
@@ -265,7 +291,6 @@ Constraints:
 1. Respond in ${lang}.
 2. OUTPUT ONLY the image prompt, ready to be sent directly to an image generation API. No explanation, no preamble.`;
 
-      type ChatMessage = { role: string; content: any };
       // Build vision user message when we have a screenshot.
       // - selection mode: include both the screenshot (style/tone) and the selected text (what to illustrate)
       // - slide mode: screenshot alone is the source
@@ -273,7 +298,7 @@ Constraints:
         const imagePart = { type: 'image_url', image_url: { url: slideScreenshotUri! } };
         if (imageContextMode === 'selection') {
           return {
-            role: 'user',
+            role: 'user' as const,
             content: [
               imagePart,
               {
@@ -294,7 +319,7 @@ ${visualRequirements}`,
           };
         }
         return {
-          role: 'user',
+          role: 'user' as const,
           content: [
             imagePart,
             {
@@ -307,7 +332,10 @@ ${visualRequirements}`,
 
       const promptMessages: ChatMessage[] = slideScreenshotUri
         ? [{ role: 'system', content: systemMsg }, buildVisionUserMessage()]
-        : [{ role: 'system', content: systemMsg }, { role: 'user', content: visualPrompt.user(imageContext || '', lang) }];
+        : [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: visualPrompt.user(imageContext || '', lang) },
+          ];
 
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(
@@ -324,7 +352,7 @@ ${visualRequirements}`,
       try {
         let imagePrompt = '';
         await chatStream({
-          messages: promptMessages as any,
+          messages: promptMessages,
           modelTier: resolveChatModelTier(),
           onStream: async (text: string) => {
             imagePrompt = text;
@@ -366,7 +394,7 @@ ${visualRequirements}`,
     // PPT-H2: "review" — screenshots current slide + gathers overview, then runs agent loop
     // Does NOT require selected text (bypasses the selectedText guard below)
     if (actionKey === 'review' && hostIsPowerPoint) {
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const lang = getDisplayLanguage();
       const actionLabel = selectedQuickAction?.label || t(actionKey);
       history.value.push(createDisplayMessage('user', `[${actionLabel}]`));
 
@@ -406,61 +434,24 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
     }
 
     if (selectedOutlookQuickAction?.mode === 'smart-reply') {
-      pendingSmartReply.value = true;
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'mom') {
       if (pendingMoM) pendingMoM.value = true;
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
     if (selectedOutlookQuickAction?.mode === 'draft') {
-      userInput.value = selectedOutlookQuickAction.prefix || '';
-      adjustTextareaHeight();
-      isDraftFocusGlowing.value = true;
-      setTimeout(() => {
-        isDraftFocusGlowing.value = false;
-      }, 1500);
-      await nextTick();
-      const el = inputTextarea.value;
-      if (el) {
-        el.focus();
-        const len = userInput.value.length;
-        el.setSelectionRange(len, len);
-      }
+      await focusInputWithGlow(selectedOutlookQuickAction.prefix || '');
       return;
     }
 
     // IMAGE-UPLOAD actions: open file picker, upload image, then run agent with chart digitizer skill
     if (hostIsExcel && selectedExcelQuickAction?.imageUpload) {
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const lang = getDisplayLanguage();
       return new Promise<void>(resolve => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
@@ -468,12 +459,18 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
         fileInput.onchange = async () => {
           const file = fileInput.files?.[0];
-          if (!file) { resolve(); return; }
+          if (!file) {
+            resolve();
+            return;
+          }
 
           const actionLabel = selectedExcelQuickAction.label || t(actionKey);
           history.value.push(createDisplayMessage('user', `[${actionLabel}] ${file.name}`));
 
-          if (loading.value) { resolve(); return; }
+          if (loading.value) {
+            resolve();
+            return;
+          }
           loading.value = true;
           abortController.value = new AbortController();
 
@@ -490,7 +487,9 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
             try {
               const platformResult = await uploadFileToPlatform(file, 'vision');
               if (platformResult.fileId) fileId = platformResult.fileId;
-            } catch { /* inline fallback */ }
+            } catch {
+              /* inline fallback */
+            }
 
             // Write image to VFS so tools like imageToSheet can access it via filePath
             if (result.imageBase64) {
@@ -531,7 +530,7 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
               content: [
                 { type: 'text', text: userText },
                 { type: 'image_url', image_url: { url: imageUrl } },
-              ] as any,
+              ],
             };
 
             const skillContent = getQuickActionSkill(actionKey);
@@ -540,10 +539,12 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
               : `You are an expert chart data extractor. ${GLOBAL_STYLE_INSTRUCTIONS}`;
 
             // Capture undo state before the agent modifies the document
-            let undoSnapshot: Partial<any> | null = null;
+            let undoSnapshot: Partial<UndoSnapshot> | null = null;
             try {
               if (captureBeforeInsert) undoSnapshot = await captureBeforeInsert();
-            } catch { /* best-effort */ }
+            } catch {
+              /* best-effort */
+            }
 
             await runAgentLoop(
               [{ role: 'system', content: systemMsg }, userMessage],
@@ -552,7 +553,11 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
             // Mark undo as available now that the agent has finished modifying the document
             if (undoSnapshot && saveSnapshot) {
-              try { saveSnapshot(undoSnapshot); } catch { /* best-effort */ }
+              try {
+                saveSnapshot(undoSnapshot);
+              } catch {
+                /* best-effort */
+              }
             }
           } catch (err) {
             logService.error('[QuickActions] digitizeChart error', err);
@@ -646,7 +651,7 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       let userMsg = '';
 
       // Resolve UI language once — used for skill injection and fallback prompts
-      const lang = localStorage.getItem('localLanguage') === 'en' ? 'English' : 'Français';
+      const lang = getDisplayLanguage();
 
       // SKILL-L1: Try to load skill file first (priority 1)
       const skillContent = getQuickActionSkill(actionKey);
@@ -712,10 +717,12 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
       if (selectedQuickAction?.executeWithAgent) {
         // Capture undo state before the agent modifies the document
-        let undoSnapshotQA: Partial<any> | null = null;
+        let undoSnapshotQA: Partial<UndoSnapshot> | null = null;
         try {
           if (captureBeforeInsert) undoSnapshotQA = await captureBeforeInsert();
-        } catch { /* best-effort */ }
+        } catch {
+          /* best-effort */
+        }
 
         await runAgentLoop(
           [
@@ -727,7 +734,11 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
 
         // Mark undo as available now that the agent has finished
         if (undoSnapshotQA && saveSnapshot) {
-          try { saveSnapshot(undoSnapshotQA); } catch { /* best-effort */ }
+          try {
+            saveSnapshot(undoSnapshotQA);
+          } catch {
+            /* best-effort */
+          }
         }
       } else {
         history.value.push(createDisplayMessage('assistant', ''));
@@ -786,9 +797,6 @@ Format your response as numbered suggestions. Be concrete and direct. Do NOT sug
       abortController.value = null;
     }
   }
-
-  // Dummy ref for pendingSmartReply (used in smart-reply mode)
-  const pendingSmartReply = ref(false);
 
   return {
     applyQuickAction,
