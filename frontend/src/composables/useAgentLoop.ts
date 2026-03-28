@@ -173,13 +173,8 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   const { isOutlook: hostIsOutlook, isPowerPoint: hostIsPowerPoint, isExcel: hostIsExcel } = host;
 
   // Destructure settings
-  const {
-    agentMaxIterations,
-    excelFormulaLanguage,
-    userGender,
-    userFirstName,
-    userLastName,
-  } = settings;
+  const { agentMaxIterations, excelFormulaLanguage, userGender, userFirstName, userLastName } =
+    settings;
 
   // Destructure actions
   const { quickActions, outlookQuickActions, excelQuickActions, powerPointQuickActions } = actions;
@@ -196,7 +191,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   } = helpers;
 
   const currentAction = ref('');
-  const pendingSmartReply = ref(false);
   const pendingMoM = ref(false);
 
   const sessionStats = ref({
@@ -207,7 +201,12 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   });
 
   function resetSessionStats() {
-    sessionStats.value = { inputTokens: 0, outputTokens: 0, totalTokens: 0, lastCallInputTokens: 0 };
+    sessionStats.value = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      lastCallInputTokens: 0,
+    };
   }
 
   function accumulateUsage(usage: TokenUsage) {
@@ -524,10 +523,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   }
 
   // ARCH-M6: Shared one-shot stream helper for SmartReply / MoM
-  async function streamOneShot(
-    messages: ChatMessage[],
-    logTag: string,
-  ): Promise<void> {
+  async function streamOneShot(messages: ChatMessage[], logTag: string): Promise<void> {
     history.value.push(createDisplayMessage('assistant', ''));
     try {
       await chatStream({
@@ -551,7 +547,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       const errIdx = history.value.length - 1;
       const errInfo = categorizeError(err);
       if (errInfo.type === 'auth') {
-        history.value[errIdx] = { ...history.value[errIdx], content: `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}` };
+        history.value[errIdx] = {
+          ...history.value[errIdx],
+          content: `⚠️ ${t('credentialsRequiredTitle')}\n\n${t('credentialsRequired')}`,
+        };
       } else {
         const errContent = errInfo.rawDetail
           ? `${t(errInfo.i18nKey)}\n\n> ${errInfo.rawDetail}`
@@ -560,46 +559,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       }
     }
     await scrollToMessageTop();
-  }
-
-  async function handleSmartReply(userMessage: string) {
-    pendingSmartReply.value = false;
-    const replyIntent = userMessage;
-    // Fetch the full email body for context
-    let emailBody = '';
-    try {
-      emailBody = await getOfficeSelection({ actionKey: 'reply' });
-    } catch (err) {
-      logService.warn('[AgentLoop] Failed to fetch email body for smart reply', err);
-    }
-    if (!emailBody) {
-      messageUtil.error(t('selectEmailPrompt'));
-      return;
-    }
-    const lang = getDisplayLanguage();
-
-    const replyPrompt = getOutlookBuiltInPrompt()['reply'];
-    const systemMsg = replyPrompt.system(lang) + `\n\n${GLOBAL_STYLE_INSTRUCTIONS}`;
-    const sanitizedEmail =
-      '\n<email_content>\n' +
-      emailBody.replace(new RegExp('</?email_content>', 'g'), '') +
-      '\n<' +
-      '/email_content>\n';
-    const sanitizedIntent =
-      '\n<user_intent>\n' +
-      replyIntent.replace(new RegExp('</?user_intent>', 'g'), '') +
-      '\n<' +
-      '/user_intent>\n';
-    const userMsg = replyPrompt
-      .user(sanitizedEmail, lang)
-      .replace('[REPLY_INTENT]', sanitizedIntent);
-    await streamOneShot(
-      [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg },
-      ],
-      'Smart reply',
-    );
   }
 
   async function handleMoM(userMessage: string) {
@@ -632,7 +591,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
       if (!hostIsExcel) {
         // F1: Extract formatted HTML natively and convert to markdown to preserve styling (Word, PPT, Outlook)
         const htmlPromise = new Promise<string>((_, reject) => {
-          htmlTimeoutId = setTimeout(() => reject(new Error('getOfficeSelectionAsHtml timeout')), 3000);
+          htmlTimeoutId = setTimeout(
+            () => reject(new Error('getOfficeSelectionAsHtml timeout')),
+            3000,
+          );
         }).catch(() => '') as Promise<string>;
 
         try {
@@ -677,7 +639,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   async function processChat(
     userMessage: string,
     visionImages?: Array<{ filename: string; dataUri: string; imageId?: string }>,
-    injectedContext?: string,
     selectionContext?: string,
     uploadedFiles?: Array<{ filename: string; content: string; fileId?: string }>,
   ) {
@@ -691,9 +652,10 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
         // generated image matches the document content the user is working on.
         let imagePrompt = userMessage;
         if (selectionContext) {
-          const truncatedContext = selectionContext.length > 2000
-            ? selectionContext.slice(0, 2000) + '…'
-            : selectionContext;
+          const truncatedContext =
+            selectionContext.length > 2000
+              ? selectionContext.slice(0, 2000) + '…'
+              : selectionContext;
           imagePrompt = `${userMessage}\n\nDocument context: ${truncatedContext}`;
         }
         const imageSrc = await generateImage({ prompt: imagePrompt });
@@ -722,7 +684,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     const modelTier = resolveChatModelTier();
 
     // ARCH-H1: Use prepareMessages from useMessageOrchestration
-    let messages = await prepareMessages(systemPrompt, uploadedFiles, injectedContext);
+    let messages = await prepareMessages(systemPrompt, uploadedFiles);
 
     // Additional context injections (selection, vision images)
     try {
@@ -763,7 +725,9 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           textContent += `\n\n<uploaded_images>\nThe following images are available in session memory:\n${imageContextLines.join('\n')}\nTo embed an image in a slide, use insertImageOnSlide with the filename. To extract chart data into Excel, use extract_chart_data with the imageId.\n</uploaded_images>`;
         }
 
-        const parts: { type: string; text?: string; image_url?: { url: string } }[] = [{ type: 'text', text: String(textContent) }];
+        const parts: { type: string; text?: string; image_url?: { url: string } }[] = [
+          { type: 'text', text: String(textContent) },
+        ];
         for (const img of sessionUploadedImages.value) {
           // Use provider fileId when available (avoids re-sending base64 bytes each iteration)
           const imageUrl = img.fileId ?? img.dataUri;
@@ -779,14 +743,32 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
   // ARCH-H1: Extract Quick Actions management
   const { applyQuickAction } = useQuickActions({
     t,
-    refs: { history, userInput, loading, imageLoading, backendOnline, abortController, inputTextarea, isDraftFocusGlowing },
+    refs: {
+      history,
+      userInput,
+      loading,
+      imageLoading,
+      backendOnline,
+      abortController,
+      inputTextarea,
+      isDraftFocusGlowing,
+    },
     models: { availableModels },
     hosts: { hostIsOutlook, hostIsPowerPoint, hostIsExcel },
     quickActions,
     outlookQuickActions,
     excelQuickActions,
     powerPointQuickActions,
-    helpers: { createDisplayMessage, adjustTextareaHeight, scrollToBottom, scrollToMessageTop, getOfficeSelection, getOfficeSelectionAsHtml, runAgentLoop, resolveChatModelTier },
+    helpers: {
+      createDisplayMessage,
+      adjustTextareaHeight,
+      scrollToBottom,
+      scrollToMessageTop,
+      getOfficeSelection,
+      getOfficeSelectionAsHtml,
+      runAgentLoop,
+      resolveChatModelTier,
+    },
     pendingMoM,
     captureBeforeInsert,
     saveSnapshot,
@@ -930,12 +912,6 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
     await scrollToMessageTop(); // Scroll to top of user message just sent
 
     try {
-      // Smart reply interception: when user sends after clicking "Reply" quick action
-      if (pendingSmartReply.value && hostIsOutlook) {
-        await handleSmartReply(userMessage);
-        return;
-      }
-
       // MoM interception: when user sends notes after clicking "MoM" quick action
       if (pendingMoM.value && hostIsOutlook) {
         await handleMoM(userMessage);
@@ -987,17 +963,17 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 const binaryStr = atob(base64Data);
                 const bytes = new Uint8Array(binaryStr.length);
                 for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(
-                  err => {
-                    logService.warn('[AgentLoop] VFS write failed for uploaded image', err);
-                    // ERR-C3: Surface VFS failure so agent context gap is visible to user
-                    messageUtil.warning(
-                      t('warningVfsWriteFailed') ||
-                        `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
-                    );
-                  },
-                );
-              } catch { /* best-effort */ }
+                vfsWriteFile(`/home/user/uploads/${result.filename}`, bytes).catch(err => {
+                  logService.warn('[AgentLoop] VFS write failed for uploaded image', err);
+                  // ERR-C3: Surface VFS failure so agent context gap is visible to user
+                  messageUtil.warning(
+                    t('warningVfsWriteFailed') ||
+                      `File context for "${result.filename}" could not be saved — the agent may lack access on the next turn.`,
+                  );
+                });
+              } catch {
+                /* best-effort */
+              }
 
               // Point 3 Fix: Store in PPT registry for tool access (by filename AND imageId)
               if (hostIsPowerPoint) {
@@ -1013,7 +989,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
                 filename: result.filename,
                 content: result.extractedText,
               };
-              // Tâche 4: Try to upload to LLM provider for file_id referencing (best-effort)
+              // Try to upload to LLM provider for file_id referencing (best-effort)
               try {
                 const platformResult = await uploadFileToPlatform(file);
                 if (platformResult.fileId) {
@@ -1049,7 +1025,7 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
               });
             }
           }
-          // Persist file info on the user message for session restore (Tâche 6)
+          // Persist file info on the user message for session restore
           if (newTextFiles.length > 0) {
             history.value[userMsgIdx].attachedFiles = newTextFiles;
           }
@@ -1080,23 +1056,15 @@ export function useAgentLoop(options: UseAgentLoopOptions) {
           fullMessage = t('pptVisualPrefix') + '\n' + selectedText;
         } else {
           // Truncate selected text to avoid overwhelming the image model with too much content
-          const truncatedText = selectedText.length > 2000
-            ? selectedText.slice(0, 2000) + '…'
-            : selectedText;
+          const truncatedText =
+            selectedText.length > 2000 ? selectedText.slice(0, 2000) + '…' : selectedText;
           fullMessage = t('imageGenerationPrompt').replace('{text}', truncatedText);
         }
-        await processChat(
-          fullMessage.trim(),
-          undefined,
-          undefined,
-          undefined,
-          uploadedFilesForChat,
-        );
+        await processChat(fullMessage.trim(), undefined, undefined, uploadedFilesForChat);
       } else {
         // Pass selectedText as selectionContext: injected into LLM payload only, not shown in UI
         await processChat(
           fullMessage.trim(),
-          undefined,
           undefined,
           selectedText || undefined,
           uploadedFilesForChat,

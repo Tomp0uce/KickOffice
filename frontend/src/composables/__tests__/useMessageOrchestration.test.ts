@@ -149,7 +149,7 @@ describe('useMessageOrchestration', () => {
         { word: true },
       );
       const msgs = buildChatMessages('sys');
-      await expect(injectDocumentContext(msgs)).resolves.toBeDefined();
+      await expect(injectDocumentContext(msgs)).resolves.toBeUndefined();
     });
   });
 
@@ -164,16 +164,6 @@ describe('useMessageOrchestration', () => {
       const original = msgs[1].content;
       injectUploadedFiles(msgs);
       expect(msgs[1].content).toBe(original);
-    });
-
-    it('appends legacy injectedContext to the last user message', () => {
-      const { buildChatMessages, injectUploadedFiles } = makeOrchestration([
-        { id: '1', role: 'user', content: 'analyze this' },
-      ]);
-      const msgs = buildChatMessages('sys');
-      injectUploadedFiles(msgs, undefined, 'legacy file content');
-      expect(msgs[1].content as string).toContain('<attached_files>');
-      expect(msgs[1].content as string).toContain('legacy file content');
     });
 
     it('injects new inline file content and marks contentInjectedAt', () => {
@@ -193,9 +183,7 @@ describe('useMessageOrchestration', () => {
         { id: '1', role: 'user', content: 'summarize' },
       ]);
       const msgs = buildChatMessages('sys');
-      injectUploadedFiles(msgs, [
-        { filename: 'doc.pdf', content: '', fileId: 'file_abc123' },
-      ]);
+      injectUploadedFiles(msgs, [{ filename: 'doc.pdf', content: '', fileId: 'file_abc123' }]);
       expect(Array.isArray(msgs[1].content)).toBe(true);
       const parts = msgs[1].content as any[];
       const filePart = parts.find((p: any) => p.type === 'file');

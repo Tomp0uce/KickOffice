@@ -194,11 +194,11 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 ### Phase 3 — Code Quality Quick Wins (T1/T2)
 
 #### Sub-phase 3.1 — Dead code cleanup [useAgentLoop + useQuickActions zone]
-- [ ] `DRY-M3` | MEDIUM | T1 | dead_code | `useQuickActions.ts:770,388` | Remove dead `pendingSmartReply` ref and write
-- [ ] `CLN-M1` | MEDIUM | T2 | dead_code | `useMessageOrchestration.ts:97-110` | Remove dead `injectedContext` parameter
-- [ ] `ROB-M3` | MEDIUM | T1 | dead_code | `tokenManager.ts:233-238` | Collapse identical branch bodies
-- [ ] `CLN-L2` | LOW | T1 | convention | `useAgentLoop.ts:1014,1050` | Translate French comments to English
-- [ ] `DOC-L1` | LOW | T1 | i18n | `en.json`, `fr.json` | Add `warningVfsWriteFailed` key
+- [x] `DRY-M3` | MEDIUM | T1 | dead_code | `useQuickActions.ts`, `useAgentLoop.ts` | Removed dead pendingSmartReply + handleSmartReply (agent mode kept per user decision)
+- [x] `CLN-M1` | MEDIUM | T2 | dead_code | `useMessageOrchestration.ts`, `useAgentLoop.ts` | Removed dead injectedContext parameter from full chain
+- [x] `ROB-M3` | MEDIUM | T1 | dead_code | `tokenManager.ts:233-238` | Collapsed identical branch bodies
+- [x] `CLN-L2` | LOW | T1 | convention | `useAgentLoop.ts:1014,1050` | Translated French comments to English
+- [x] `DOC-L1` | LOW | T1 | i18n | `en.json`, `fr.json` | Added `warningVfsWriteFailed` key
 
 #### Sub-phase 3.2 — DRY fixes [useQuickActions + backend zone]
 - [ ] `ARCH-M3` | MEDIUM | T2 | duplication | `useQuickActions.ts:387-438` | Extract `triggerFocusGlow()` helper
@@ -237,6 +237,11 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T3 | HIGH | CI-H2 | Added husky + lint-staged pre-commit hooks | package.json, .husky/pre-commit
 [2026-03-28] FIXED | T3 | MEDIUM | CI-M1 | Docker build verification in pr-checks.yml | .github/workflows/pr-checks.yml
 [2026-03-28] FIXED | T2 | MEDIUM | CI-M2 | npm audit step in pr-checks.yml | .github/workflows/pr-checks.yml
+[2026-03-28] FIXED | T1 | MEDIUM | DRY-M3 | Removed dead pendingSmartReply + handleSmartReply (agent mode kept) | useAgentLoop.ts, useQuickActions.ts
+[2026-03-28] FIXED | T2 | MEDIUM | CLN-M1 | Removed dead injectedContext parameter from full chain | useAgentLoop.ts, useMessageOrchestration.ts, test
+[2026-03-28] FIXED | T1 | MEDIUM | ROB-M3 | Collapsed identical branch bodies in prepareMessagesForContext | tokenManager.ts
+[2026-03-28] FIXED | T1 | LOW | CLN-L2 | Translated French comments (Tâche 4/6) to English | useAgentLoop.ts
+[2026-03-28] FIXED | T1 | LOW | DOC-L1 | Added warningVfsWriteFailed i18n key | en.json, fr.json
 
 ---
 

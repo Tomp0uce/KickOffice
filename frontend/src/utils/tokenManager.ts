@@ -55,7 +55,12 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
   const iterationStartIndices: number[] = [];
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
-    if (msg.role === 'assistant' && 'tool_calls' in msg && msg.tool_calls && msg.tool_calls.length > 0) {
+    if (
+      msg.role === 'assistant' &&
+      'tool_calls' in msg &&
+      msg.tool_calls &&
+      msg.tool_calls.length > 0
+    ) {
       iterationStartIndices.push(i);
     }
   }
@@ -83,8 +88,16 @@ function summarizeOldToolResults(messages: ChatRequestMessage[]): ChatRequestMes
  */
 function truncateToBudget(content: string, budget: number, direction?: 'head' | 'tail'): string;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function truncateToBudget(content: string | any[], budget: number, direction?: 'head' | 'tail'): string | any[];
-function truncateToBudget(content: unknown, budget: number, direction: 'head' | 'tail' = 'head'): unknown {
+function truncateToBudget(
+  content: string | any[],
+  budget: number,
+  direction?: 'head' | 'tail',
+): string | any[];
+function truncateToBudget(
+  content: unknown,
+  budget: number,
+  direction: 'head' | 'tail' = 'head',
+): unknown {
   if (typeof content !== 'string') return content; // L4 fix: Implicit coercion protection for vision arrays
   if (budget <= 0) return '';
   if (content.length <= budget) {
@@ -94,7 +107,8 @@ function truncateToBudget(content: unknown, budget: number, direction: 'head' | 
 
   if (!hasWarnedTruncation) {
     messageUtil.warning(
-      (i18n.global.t as (key: string) => string)('errorTruncated') ?? 'Message was truncated due to context limits',
+      (i18n.global.t as (key: string) => string)('errorTruncated') ??
+        'Message was truncated due to context limits',
     );
     hasWarnedTruncation = true;
   }
@@ -229,13 +243,7 @@ export function prepareMessagesForContext(
     const message = nonSystemMessages[index];
     const messageLength = getMessageContentLength(message);
 
-    // If it's a tool call or tool response, we try to include the whole block if it fits
-    if (message.role === 'tool' || message.role === 'assistant') {
-      if (messageLength > remainingBudget) break;
-    } else {
-      // Normal user messages can break if they exceed budget, or we can truncate them
-      if (messageLength > remainingBudget) break;
-    }
+    if (messageLength > remainingBudget) break;
 
     selectedMessages.push({ index, message: { ...message } });
     selectedIndices.add(index);
