@@ -177,9 +177,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 - [x] `ARCH-M1` | MEDIUM | T2 | bug | `useAgentLoop.ts:623-634` | Split into textTimeoutId/htmlTimeoutId, both cleared in finally
 
 #### Sub-phase 1.2 — Security [backend zone]
-- [ ] `SEC-H1` | HIGH | T1 | security | `server.js:41` | Change `trust proxy: true` to `trust proxy: 1`
-- [ ] `SEC-H2` | HIGH | T3 | security | `backend/package.json:24` | Replace xlsx with exceljs or pin past CVE
-- [ ] `OBS-H1` | HIGH | T1 | logging | `chat.js:334` | Replace full body logging with metadata-only
+- [x] `SEC-H1` | HIGH | T1 | security | `server.js:41` | Changed `trust proxy: true` to `1` (single hop)
+- [x] `SEC-H2` | HIGH | T3 | security | `backend/package.json:24` | Migrated xlsx→exceljs, separated CSV handling (TDD: 4 tests)
+- [x] `OBS-H1` | HIGH | T1 | logging | `chat.js:334` | Replaced full body logging with metadata (model, messageCount, toolCount)
 
 ### Phase 2 — CI/CD Pipeline (T3/T4, infrastructure)
 
@@ -230,6 +230,9 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T2 | HIGH | ROB-H1 | Spread-copy messages in prepareMessagesForContext to prevent caller mutation (TDD) | tokenManager.ts, tokenManager.test.ts
 [2026-03-28] FIXED | T1 | HIGH | ROB-H2 | Replaced '\\n' with '\n' in smart-reply XML delimiters | useAgentLoop.ts
 [2026-03-28] FIXED | T2 | MEDIUM | ARCH-M1 | Split timeoutId into textTimeoutId/htmlTimeoutId, both cleared in finally | useAgentLoop.ts
+[2026-03-28] FIXED | T1 | HIGH | SEC-H1 | Changed trust proxy: true to 1 (single nginx hop) | server.js
+[2026-03-28] FIXED | T3 | HIGH | SEC-H2 | Migrated xlsx→exceljs (CVE-2023-30533), separated CSV as plain text (TDD: 4 tests) | upload.js, package.json, upload.test.js
+[2026-03-28] FIXED | T1 | HIGH | OBS-H1 | Replaced full body logging with metadata-only in sync endpoint | chat.js
 
 ---
 

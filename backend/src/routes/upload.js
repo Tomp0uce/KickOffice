@@ -3,7 +3,7 @@ import multer from 'multer'
 import { fileTypeFromBuffer } from 'file-type'
 import { PDFParse } from 'pdf-parse'
 import mammoth from 'mammoth'
-import * as xlsx from 'xlsx'
+import ExcelJS from 'exceljs'
 import { ErrorCodes } from '../config/errorCodes.js'
 import { logAndRespond } from '../utils/http.js'
 import logger from '../utils/logger.js'
@@ -77,23 +77,33 @@ uploadRouter.post('/', upload.single('file'), async (req, res) => {
         return logAndRespond(res, 400, { code: ErrorCodes.DOCX_EXTRACTION_FAILED, error: 'Failed to extract text from DOCX. The file may be corrupted.' }, 'POST /api/upload')
       }
     } 
-    // XLSX / CSV Extraction
+    // CSV — plain text, no library needed
+    else if (mimeType === 'text/csv' || filename.toLowerCase().endsWith('.csv')) {
+      extractedText = file.buffer.toString('utf-8')
+    }
+    // XLSX Extraction (ExcelJS — replaces xlsx which had CVE-2023-30533)
     else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      mimeType === 'text/csv' ||
-      filename.toLowerCase().endsWith('.xlsx') ||
-      filename.toLowerCase().endsWith('.csv')
+      filename.toLowerCase().endsWith('.xlsx')
     ) {
-      const workbook = xlsx.read(file.buffer, { type: 'buffer' })
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(file.buffer)
       const allCsv = []
-      
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName]
-        if (!sheet) continue
-        
-        const csv = xlsx.utils.sheet_to_csv(sheet)
-        if (csv.trim()) {
-          allCsv.push(`--- Sheet: ${sheetName} ---\n${csv}`)
+
+      for (const worksheet of workbook.worksheets) {
+        const rows = []
+        worksheet.eachRow((row) => {
+          const cells = row.values.slice(1).map(v => {
+            if (v == null) return ''
+            const s = String(v instanceof Object && 'result' in v ? v.result : v)
+            return s.includes(',') || s.includes('"') || s.includes('\n')
+              ? `"${s.replace(/"/g, '""')}"`
+              : s
+          })
+          rows.push(cells.join(','))
+        })
+        if (rows.length > 0) {
+          allCsv.push(`--- Sheet: ${worksheet.name} ---\n${rows.join('\n')}`)
         }
       }
       extractedText = allCsv.join('\n\n')

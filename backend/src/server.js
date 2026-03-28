@@ -38,7 +38,7 @@ const app = express()
 
 // Trust proxy for Synology/nginx reverse proxy compatibility
 // Allows express-rate-limit to correctly identify client IPs via X-Forwarded-For
-app.set('trust proxy', true)
+app.set('trust proxy', 1)
 
 const chatLimiter = rateLimit({
   windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
