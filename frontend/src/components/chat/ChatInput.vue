@@ -58,7 +58,7 @@
         type="file"
         ref="fileInputEl"
         class="hidden"
-        accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.png,.jpeg,.jpg"
+        accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.png,.jpeg,.jpg,.webp,.gif"
         multiple
         @change="onFileSelected"
       />
@@ -232,6 +232,8 @@ const allowedTypes = [
   'text/markdown',
   'image/png',
   'image/jpeg',
+  'image/webp',
+  'image/gif',
 ];
 
 const handleDragOver = (e: DragEvent) => {
@@ -287,6 +289,8 @@ const processFiles = async (fileList: FileList) => {
     '.png',
     '.jpeg',
     '.jpg',
+    '.webp',
+    '.gif',
   ];
   let rejectedCount = 0;
   let oversizedCount = 0;

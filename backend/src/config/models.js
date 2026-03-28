@@ -41,7 +41,7 @@ if (!LLM_API_KEY) {
 
 const models = {
   standard: {
-    id: process.env.MODEL_STANDARD || 'gpt-5.1',
+    id: process.env.MODEL_STANDARD || 'gpt-5.2',
     label: process.env.MODEL_STANDARD_LABEL || 'Standard',
     maxTokens: parsePositiveInt('MODEL_STANDARD_MAX_TOKENS', 32000, 'MODEL_STANDARD_MAX_TOKENS'),
     contextWindow: parsePositiveInt(
@@ -54,7 +54,7 @@ const models = {
     type: 'chat',
   },
   reasoning: {
-    id: process.env.MODEL_REASONING || 'gpt-5.1',
+    id: process.env.MODEL_REASONING || 'gpt-5.2',
     label: process.env.MODEL_REASONING_LABEL || 'Reasoning',
     maxTokens: parsePositiveInt('MODEL_REASONING_MAX_TOKENS', 65000, 'MODEL_REASONING_MAX_TOKENS'),
     contextWindow: parsePositiveInt(
