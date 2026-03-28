@@ -184,12 +184,12 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 ### Phase 2 — CI/CD Pipeline (T3/T4, infrastructure)
 
 #### Sub-phase 2.1 — PR checks workflow
-- [ ] `CI-H1` | HIGH | T4 | ci | `.github/workflows/pr-checks.yml` | Create PR check workflow: lint, tsc, test (frontend+backend), build
-- [ ] `CI-H2` | HIGH | T3 | ci | root `package.json` | Add husky + lint-staged for pre-commit hooks
+- [x] `CI-H1` | HIGH | T4 | ci | `.github/workflows/pr-checks.yml` | Created PR check workflow: lint, tsc, test, build, Docker, audit
+- [x] `CI-H2` | HIGH | T3 | ci | root `package.json` | Added husky + lint-staged for pre-commit hooks
 
 #### Sub-phase 2.2 — CI hardening
-- [ ] `CI-M1` | MEDIUM | T3 | ci | `.github/workflows/pr-checks.yml` | Add Docker Compose build verification step
-- [ ] `CI-M2` | MEDIUM | T2 | ci | `.github/workflows/pr-checks.yml` | Add `npm audit` dependency scanning
+- [x] `CI-M1` | MEDIUM | T3 | ci | `.github/workflows/pr-checks.yml` | Docker build verification included in pr-checks.yml
+- [x] `CI-M2` | MEDIUM | T2 | ci | `.github/workflows/pr-checks.yml` | npm audit included in pr-checks.yml (audit-level=high, continue-on-error)
 
 ### Phase 3 — Code Quality Quick Wins (T1/T2)
 
@@ -233,6 +233,10 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T1 | HIGH | SEC-H1 | Changed trust proxy: true to 1 (single nginx hop) | server.js
 [2026-03-28] FIXED | T3 | HIGH | SEC-H2 | Migrated xlsx→exceljs (CVE-2023-30533), separated CSV as plain text (TDD: 4 tests) | upload.js, package.json, upload.test.js
 [2026-03-28] FIXED | T1 | HIGH | OBS-H1 | Replaced full body logging with metadata-only in sync endpoint | chat.js
+[2026-03-28] FIXED | T4 | HIGH | CI-H1 | Created pr-checks.yml: lint, tsc, test, build, Docker build, npm audit | .github/workflows/pr-checks.yml
+[2026-03-28] FIXED | T3 | HIGH | CI-H2 | Added husky + lint-staged pre-commit hooks | package.json, .husky/pre-commit
+[2026-03-28] FIXED | T3 | MEDIUM | CI-M1 | Docker build verification in pr-checks.yml | .github/workflows/pr-checks.yml
+[2026-03-28] FIXED | T2 | MEDIUM | CI-M2 | npm audit step in pr-checks.yml | .github/workflows/pr-checks.yml
 
 ---
 
