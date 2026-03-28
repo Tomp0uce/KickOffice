@@ -59,3 +59,30 @@
 
 ### Score delta
 Strict: 65 → ~76 (+11) | Mechanical: 67 → ~77 (+10) | Subjective: 63 → ~69 (+6)
+
+---
+
+## 2026-03-28 — Design Review v14 Cycle (feat/user-skills)
+
+### What was found
+- [CI/CD] HIGH: Zero PR checks, no automated testing, no pre-commit hooks — codebase had excellent local tooling with zero CI enforcement
+- [Security] MEDIUM: `x-request-id` header accepted without validation — potential log injection vector via ANSI codes or newlines
+- [Robustness] MEDIUM: ExcelJS formula cells with null result produced literal "null" in CSV output
+- [Observability] HIGH: logService method signatures inconsistent — traffic param unreachable on warn/error/debug
+- [Security] MEDIUM: Backend routes lacked input validation (no category allowlist, no description length limit, no sessionId format check)
+
+### What was fixed
+- CI-H1/H2/M1/M2: Complete CI/CD pipeline — single biggest score delta (+65 on CI category)
+- OBS-M1: Logger refactor — `toDataRecord()` helper with `Error instanceof` guard prevents empty `{}` serialization
+- REV-H1: Formula null — `v.result ?? ''` prevents literal "null" in ExcelJS formula output
+- REV-M1: UUID validation — regex check on x-request-id prevents log injection
+- REV-M2/M3/M4: Backend input validation — category allowlist, description max length, sessionId format regex
+
+### Rules to prevent recurrence
+- Backend input validation: Every POST route must validate all user-provided fields (allowlist, length, format regex) — not just existence checks
+- Error serialization: `Error` objects have non-enumerable properties (message, stack, name) — casting to `Record<string, unknown>` produces `{}`; always use `instanceof Error` guard
+- Request ID validation: Any header used in logging must be validated (UUID format, length limit) to prevent log injection
+- ExcelJS formula cells: `v.result` can be `null` even when `v` is a formula object — always use nullish coalescing
+
+### Score delta
+Strict: 69 → ~78 (+9) | Mechanical: 73 → ~84 (+11) | Subjective: 64 (unchanged)

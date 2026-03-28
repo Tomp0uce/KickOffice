@@ -1,298 +1,205 @@
-# KickOffice — Claude Code Instructions
+# CLAUDE.md — KickOffice
+
+> **KickOffice** — Microsoft Office add-in (Word, Excel, PowerPoint, Outlook) powered by LLM agents.
+> This file is read on every turn. Keep it concise and high-signal. Target: < 200 lines.
+
+---
+
+## Language Rule
+
+**All generated content must be in English** — documentation, comments, commit messages, variable names, error messages, PR descriptions, and test labels.
+Exception: user-created skill files (`.skill.md`) which the user writes in their language of choice.
+
+---
+
+## Project Overview
+
+KickOffice is a Microsoft Office add-in that provides an AI-powered chat interface inside the Office task pane. It executes tools directly on the active document (Word, Excel, PowerPoint) or email (Outlook) via Office.js APIs.
+
+**Stack:** Vue 3 + TypeScript + Tailwind CSS v4 + Vite (frontend) · Node.js/Express SSE proxy (backend) · LiteLLM (production) / OpenAI (testing) · Vitest (unit) + Playwright (e2e) · Docker Compose on Synology DS416play.
+
+**Architecture:** Composable-based frontend (`useAgentLoop` orchestrates tool execution, `useQuickActions` handles one-click actions), ToolProviderRegistry maps hosts to tool definitions, Express backend proxies LLM calls with rate limiting and auth.
+
+---
+
+## Workflow Orchestration
+
+### 1. Plan Mode Default
+
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions).
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing.
+- Use plan mode for verification steps, not just building.
+- Write detailed specs upfront to reduce ambiguity.
+
+### 2. Subagent Strategy
+
+- Use subagents liberally to keep the main context window clean.
+- Offload research, exploration, and parallel analysis to subagents.
+- For complex problems, throw more compute at it via subagents.
+- One task per subagent for focused execution.
+
+### 3. Self-Improvement Loop
+
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern.
+- Write rules for yourself that prevent the same mistake.
+- Ruthlessly iterate on these lessons until mistake rate drops.
+- Review lessons at session start for relevant project context.
+
+### 4. Verification Before Done
+
+- Never mark a task complete without proving it works.
+- Run `npm run build` in `frontend/` for any frontend change.
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness.
+
+### 5. Demand Elegance (Balanced)
+
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution."
+- Skip this for simple, obvious fixes — don't over-engineer.
+- Challenge your own work before presenting it.
+
+### 6. Autonomous Bug Fixing
+
+- When given a bug report: just fix it. Don't ask for hand-holding.
+- Read logs, errors, failing tests — then resolve them.
+- Zero context switching required from the user.
+- Go fix failing CI tests without being told how.
+
+---
+
+## Task Management
+
+1. **Plan First**: Write plan to `tasks/todo.md` with checkable items.
+2. **Verify Plan**: Check in before starting implementation.
+3. **Track Progress**: Mark items `[x]` complete as you go — do not batch.
+4. **Explain Changes**: High-level summary at each step.
+5. **Document Results**: Add review section to `tasks/todo.md`.
+6. **Capture Lessons**: Update `tasks/lessons.md` after corrections.
+
+---
+
+## Core Principles
+
+- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+- **No Sycophancy**: Disagree when warranted. Flag bad ideas directly. Don't just agree.
+
+---
 
 ## Decision Checkpoints
 
-### 1. Implementation choices — ask before coding
+Ask **only** when there is genuine ambiguity. Two triggers:
+1. **Multiple valid approaches** with meaningfully different trade-offs.
+2. **A smarter approach exists** than what was requested.
 
-Ask **only** when there is genuine ambiguity in _how_ to implement something. The two cases that require a question:
+**Do NOT ask** when there is only one sensible implementation — just do it.
 
-1. **Multiple valid approaches exist** — there are at least two reasonable paths with meaningfully different trade-offs (effort, risk, dependencies, maintenance cost).
-2. **A smarter approach exists than what was requested** — you judge that a different solution would better serve the goal (less complexity, fewer dependencies, safer, more maintainable).
-
-**Do NOT ask** when there is only one sensible implementation, or when the request and its implementation are both clear — just do it.
-
-Each option presented must include:
-- What it does (short description)
-- Trade-offs (pros/cons, risks)
-- Effort estimate
-- Your recommendation clearly labelled "(Recommandé)"
-
-### 2. Unclear requirements — ask before coding
-
-Ask when a request is genuinely ambiguous — i.e. two different interpretations would lead to meaningfully different implementations.
-
-**Do NOT ask** to confirm something that is clear from context, or to seek reassurance before acting.
-
-**Triggers:**
-- Missing scope where it materially changes what to build ("fix the performance" → which component? which metric?)
-- A request with conflicting constraints visible in the code
-- A request where you cannot determine the target state without guessing
-
-### Question format
-
-Use the `AskUserQuestion` tool. 1–2 questions max, 2–4 options per question. Recommendation goes first, labelled "(Recommandé)".
+Format: `AskUserQuestion` tool, 1–2 questions, 2–4 options. Recommendation labelled "(Recommandé)".
 
 ---
 
-## Branch naming
+## Code Standards
 
-Feature/fix branches: `fix/<slug>` or `feat/<slug>`. Claude-initiated branches use the format `claude/<slug>-<id>` (auto-generated by the harness).
+### Frontend
 
----
+- **All user-visible strings**: use `t()` / i18n keys — no hardcoded strings.
+- **Booleans**: MUST be prefixed with `is` or `has`.
+- **Constants**: Use `frontend/src/constants/limits.ts` for all magic numbers.
+- **Error handling**: Use `getErrorMessage(error: unknown)` from `common.ts`. Use `error: unknown` (not `error: any`).
+- **Logging**: Use `logService.warn/error` from `logger.ts` — never raw `console.warn/error`.
+- **Router**: `createMemoryHistory` — avoids URL manipulation conflicts with Office iframe host.
+- **LSP**: `typescript-language-server` is active. Use `goToDefinition`, `findReferences`, `hover` before editing. Do not guess type shapes.
 
-## Stack
-
-- **Frontend**: Vue 3 + TypeScript + Tailwind CSS v4 + Vite — Office add-in (Word, Excel, PowerPoint, Outlook)
-- **Backend**: Node.js/Express SSE proxy to an OpenAI-compatible API (LiteLLM in production, OpenAI directly for testing)
-- **Tests**: Vitest (unit) + Playwright (e2e)
-- **CI**: Docker Compose for local dev and prod
-
-## Test conventions
-
-- Test files live in `__tests__/` subdirectories next to the module under test
-- Use `vi.mock()` before imports for modules that touch Office.js, DOM, or env vars
-- Mirror the source directory structure: `composables/__tests__/`, `utils/__tests__/`
-
----
-
-## 1) Scope
-
-- This guide applies to the whole repository unless a more specific guide exists in a nested directory.
-- Follow system/developer/user instructions first when conflicts occur.
-
-### Companion documents
-
-| File | Purpose |
-| ---- | ------- |
-| [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) | Open architectural items (ARCH-H2/H3, ARCH-M2, ARCH-L1, UX-M2, QUAL-M1) + deferred context/token items — read before making architectural changes |
-| [PRD.md](./PRD.md) | Product Requirements Document — single source of truth for features, user personas, acceptance criteria. **Read before implementing new features.** |
-| [SKILLS_GUIDE.md](./SKILLS_GUIDE.md) | How to create and modify skill files for Quick Actions and host guidance |
-
----
-
-## 2) Product and Architecture Snapshot
-
-KickOffice is a Microsoft Office add-in with:
-
-- `frontend/` (Vue 3 + Vite + TypeScript): task pane UI, chat/agent/image UX, Office.js tool execution.
-- `backend/` (Express, modular): secure proxy for model calls and model configuration exposure.
-- `manifests-templates/`: manifest templates used to generate runtime manifests.
-- `scripts/generate-manifests.js`: script that generates `manifest-office.xml` and `manifest-outlook.xml` from root `.env`.
-
-### Docker & Deployment Constraints
-
-**CRITICAL Hardware Compatibility Requirement**:
-
-- **MUST use `node:22-slim`** (Debian-based, glibc) for backend
-- **MUST use `nginxinc/nginx-unprivileged:stable`** (Debian-based, non-root) for frontend serving
-- **DO NOT use Alpine Linux images** — incompatible with older Intel Celeron processors (Synology DS416play) due to musl libc + AVX instruction issues
-
-Both containers run as non-root users. Frontend listens on port 8080 internally (docker-compose maps to `${FRONTEND_PORT}:8080`).
-
-### Frontend architecture
-
-The frontend follows a composable-based architecture:
-
-- **Pages**: `HomePage.vue` (minimal orchestration), `SettingsPage.vue` (decomposed into tab components)
-- **Components**: `chat/ChatHeader.vue`, `chat/ChatInput.vue`, `chat/ChatMessageList.vue`, `chat/QuickActionsBar.vue`, `chat/StatsBar.vue`, `chat/ToolCallBlock.vue`, `chat/MarkdownRenderer.vue`, `chat/OfflineBanner.vue`, `chat/AuthErrorBanner.vue`, `chat/SessionConfirmDialogs.vue`, `settings/AccountTab.vue`, `settings/GeneralTab.vue`, `settings/PromptsTab.vue`, `settings/BuiltinPromptsTab.vue`, `settings/ToolsTab.vue`, `settings/FeedbackDialog.vue`, `CustomButton.vue`, `CustomInput.vue`, `SingleSelect.vue`, `SettingCard.vue`, `Message.vue`
-- **Composables** (21 files): `useHomePage.ts`, `useHomePageContext.ts`, `useAgentLoop.ts`, `useAgentStream.ts`, `useToolExecutor.ts`, `useLoopDetection.ts`, `useAgentPrompts.ts`, `useOfficeSelection.ts`, `useImageActions.ts`, `useOfficeInsert.ts`, `useHealthCheck.ts`, `useQuickActions.ts`, `useSessionFiles.ts`, `useSessionManager.ts`, `useSessionDB.ts`, `useMessageOrchestration.ts`, `useDocumentUndo.ts`, `quickActions/useWordQuickActions.ts`, `quickActions/useExcelQuickActions.ts`, `quickActions/useOutlookQuickActions.ts`, `quickActions/usePowerPointQuickActions.ts`
-- **Constants**: `limits.ts` (centralized magic numbers: upload sizes, timeouts, buffer sizes, icon sizes)
-- **Router**: `createMemoryHistory` — avoids URL manipulation conflicts with Office iframe host
-- **Utils**: `tokenManager.ts`, `wordTools.ts`, `excelTools.ts`, `powerpointTools.ts`, `outlookTools.ts`, `generalTools.ts`, `wordDiffUtils.ts`, `wordTrackChanges.ts`, `wordFormatter.ts`, `toolProviderRegistry.ts`, `officeCodeValidator.ts`, `markdown.ts`, `pptxZipUtils.ts`, `mutationDetector.ts`, `common.ts`, `hostDetection.ts`, `toolStorage.ts`, `richContentPreserver.ts`, `richContextStore.ts`, `credentialCrypto.ts`, `credentialStorage.ts`, `cryptoPolyfill.ts`, `officeAction.ts`, `officeDocumentContext.ts`, `officeOutlook.ts`, `officeRichText.ts`, `sandbox.ts`, `lockdown.ts`, `vfs.ts`, `savedPrompts.ts`
-- **Skills**: `frontend/src/skills/` — 5 host skills + 24 Quick Action skills (all `.skill.md` files)
-
-### Backend architecture
-
-```
-backend/src/
-├── server.js              # Entry point: middleware setup, route mounting
-├── config/
-│   ├── env.js             # Environment variable loading
-│   ├── models.js          # Model tier config, buildChatBody(), isGpt5Model()
-│   └── limits.js          # Centralized backend limits (file sizes, etc.)
-├── middleware/
-│   ├── auth.js            # ensureLlmApiKey, ensureUserCredentials
-│   └── validate.js        # Re-exports from validators/ (chatValidator, toolValidator, etc.)
-├── routes/
-│   ├── chat.js            # POST /api/chat (streaming), POST /api/chat/sync
-│   ├── health.js          # GET /health
-│   ├── image.js           # POST /api/image
-│   ├── models.js          # GET /api/models
-│   ├── upload.js          # POST /api/upload
-│   ├── files.js           # POST /api/files (proxy to /v1/files)
-│   ├── icons.js           # GET /api/icons/search, GET /api/icons/svg/:prefix/:name
-│   ├── feedback.js        # POST /api/feedback
-│   ├── logs.js            # POST /api/logs (frontend log aggregation)
-│   └── plotDigitizer.js   # POST /api/chart-extract
-├── services/
-│   ├── llmClient.js       # LLM API client (chatCompletion, imageGeneration, RateLimitError)
-│   ├── plotDigitizerService.js
-│   └── imageStore.js
-└── utils/
-    ├── http.js            # fetchWithTimeout, logAndRespond, sanitizeErrorText
-    ├── logger.js          # Winston logger with daily rotation (console + file)
-    └── toolUsageLogger.js # Tool usage metrics tracking
-```
-
-Manifest outputs:
-
-- `manifest-office.xml`: Word + Excel + PowerPoint TaskPane add-in.
-- `manifest-outlook.xml`: Outlook Mail add-in.
-
-**Important**: Do not hand-edit generated manifest files. Update templates and/or `.env`, then regenerate.
-
----
-
-## 3) API Contract Rules
-
-### Image responses
-
-Compatible providers may return `data[0].b64_json` or `data[0].url`. Keep support for both.
-
-### Chat responses
-
-- Streaming path (`/api/chat`) consumes SSE `data:` lines. Agent loop primarily uses streaming.
-- Sync path (`/api/chat/sync`) expects OpenAI-compatible `choices/message/tool_calls`.
-
-### Model parameter compatibility
-
-- `ChatGPT-*` model IDs do not support `temperature` / token-limit parameters (`isChatGptModel` check).
-- GPT-5 models use `max_completion_tokens`; non-GPT-5 use `max_tokens` (`isGpt5Model` check).
-- **CRITICAL**: `reasoning_effort: 'none'` is NOT a valid OpenAI API value — causes empty responses. Valid values: `'low'`, `'medium'`, `'high'`. Omit entirely when not needed.
-- `buildChatBody` in `config/models.js` is the single source of truth for request shaping.
-
----
-
-## 4) Frontend Editing Guidelines
-
-- Keep type names explicit and stable.
-- Avoid silent failures; surface understandable errors.
-- **All user-visible strings must use `t()` / i18n keys** — no hardcoded French or English strings.
-- **Naming**: Booleans MUST be prefixed with `is` or `has`.
-- **Constants**: Use `frontend/src/constants/limits.ts` for all magic numbers. Use `ICON_SIZE_SM` (14), `ICON_SIZE_MD` (16), `ICON_SIZE_LG` (20) for icon sizes.
-- **Error handling**: Use `getErrorMessage(error: unknown)` from `common.ts` in all catch blocks. Use `error: unknown` (not `error: any`) in catch clauses.
-- **Logging**: Use `logService.warn/error` from `logger.ts` — never raw `console.warn/error` in production code.
-- **TypeScript LSP**: The `typescript-language-server` plugin is installed and active. **Must be used** for all frontend edits via the built-in `LSP` tool — use `goToDefinition`, `findReferences`, `hover`, `goToImplementation`, `incomingCalls`, and `outgoingCalls` to navigate types, resolve imports, inspect call hierarchies, and verify signatures before editing. Do not guess type shapes from filenames alone.
-
-Current tool landscape:
-
-- Word: 34 tools (`proposeRevision`, `proposeDocumentRevision`, `editDocumentXml`, `insertOoxml`, `acceptAiChanges`, `rejectAiChanges`, `addComment`, `getComments`, `eval_wordjs`, `getDocumentOoxml`, and 24 more)
-- Excel: 28 tools (`eval_officejs`, `screenshotRange`, `getRangeAsCsv`, `detectDataHeaders`, `modifyWorkbookStructure`, `importCsvToSheet`, `imageToSheet`, `extract_chart_data`, and 20 more — includes Waterfall/Treemap/Funnel chart types)
-- PowerPoint: 24 tools (`screenshotSlide`, `editSlideXml`, `reorderSlide`, `getSpeakerNotes`, `setSpeakerNotes`, `searchIcons`, `insertIcon`, `eval_powerpointjs`, `verifySlides`, and 15 more)
-- Outlook: 9 tools (`eval_outlookjs`, `addAttachment`, and 7 more)
-- General: 6 tools (`executeBash` VFS, `calculateMath`, `getCurrentDate`, file operations)
-- **Total**: 101 tools
-
-**Agent Stability Features**:
-
-- **Skills System**: `.skill.md` files in `frontend/src/skills/` — 5 host skills + 24 Quick Action skills loaded via `getQuickActionSkill()` / host skill loaders in `useAgentPrompts.ts`
-- **Code Validator**: Pre-execution validation for `eval_*` tools in `officeCodeValidator.ts`
-- **Track Changes**: `proposeRevision` (selection) and `proposeDocumentRevision` (document-wide) both use `applyRedlineToOxml()` from `@ansonlai/docx-redline-js`. Pattern: disable TC → `insertOoxml` with `w:ins`/`w:del` → restore TC. `acceptAiChanges`/`rejectAiChanges` use `Office.context.requirements.isSetSupported('WordApi', '1.6')` guard and `context.document.trackedChanges` (property, not method).
-- **ToolProviderRegistry**: Singleton in `toolProviderRegistry.ts`. Maps host names to tool providers. Auto-initializes with ES6 static imports at module load.
-- **Context Management**: `tokenManager.ts` — `prepareMessagesForContext()` prunes messages to fit within 1.2M chars. `summarizeOldToolResults()` (Phase 7A) compresses tool results from iterations older than the last 3, keeping recent context intact. `truncateJsonToolResult()` preserves JSON structure when truncating tool results.
-- **Session Persistence**: `useSessionFiles.ts` manages uploaded files. Each `DisplayMessage` stores `attachedFiles?: Array<{filename, content, fileId?}>`. Call `rebuildSessionFiles()` after `history` replace from IndexedDB. Session switch is blocked while agent loop is running (3-layer protection in `useSessionManager`, `useHomePage`, `ChatHeader.vue`).
-- **Log Sanitization**: Payloads with Base64 images MUST pass through `sanitizePayloadForLogs` before logging.
-- **Log Forwarding**: `logService.startFlushTimer()` sends warn/error entries to `POST /api/logs` every 30 s. Call at app boot in `main.ts`.
-- **Request Correlation**: `generateRequestId()` in `backend.ts` creates a UUID per chat request. Sent as `X-Request-Id` request header; server middleware uses incoming ID to correlate frontend and backend log entries.
-- **Stream Error Recovery**: `DisplayMessage.streamError?: boolean` set to `true` when `stream_interrupted` is detected. `ChatMessageList.vue` shows an amber Retry button on the failed message.
-- **Mutation Detector**: `createMutationDetector(patterns)` factory in `mutationDetector.ts` shared by all three eval tool hosts.
-- **Eval Tool Factory**: `createEvalExecutor<TCtx>(config)` in `common.ts` — all four `eval_*` tools use this factory. Host-specific config: sandbox context builder, mutation detector, suggestion text, optional pre-execute hook.
-- **VFS Sandbox Context**: `getVfsSandboxContext()` in `vfs.ts` — shared across wordTools, excelTools, powerpointTools eval tools.
-
----
-
-## 5) Backend Editing Guidelines
+### Backend
 
 - Keep proxy logic provider-agnostic.
 - Log upstream errors server-side; return sanitized messages to clients.
 - Never leak API keys or environment secrets.
-- Validation is in `middleware/validate.js` (delegates to `validators/` domain files).
-- Preserve timeouts: 300s for standard/reasoning, 180s for image.
-- `RateLimitError` from `llmClient.js`: when retries exhausted on 429, thrown with `Retry-After` parsed. Both chat routes catch it → `429 RATE_LIMITED`.
 - Use `logAndRespond()` from `utils/http.js` for all error responses.
-- **Do not send `reasoning_effort: 'none'`** — omit or use `low`/`medium`/`high`**.
-- **CI**: `.github/workflows/bump-version.yml` uses `permissions: contents: write` for version bump pushes.
-- **Node.js**: `"engines": { "node": ">=20.19.0 || >=22.0.0" }`. Maintain Node.js 22 in Dockerfiles.
+- Preserve timeouts: 300s for standard/reasoning, 180s for image.
+- `buildChatBody` in `config/models.js` is the single source of truth for request shaping.
+- **CRITICAL**: `reasoning_effort: 'none'` is NOT valid — causes empty responses. See `tasks/lessons.md` L01.
+
+### Test Conventions
+
+- Test files live in `__tests__/` subdirectories next to the module under test.
+- Use `vi.mock()` before imports for modules that touch Office.js, DOM, or env vars.
+- Mirror the source directory structure: `composables/__tests__/`, `utils/__tests__/`.
 
 ---
 
-## 6) Documentation Guidelines
+## Domain Knowledge
 
-- **Language**: All `.md` files in this repository must be written in **English**, except user-created custom skill files (`.skill.md` in the user's localStorage or imported files) which the user writes in their language of choice — those are not under agent control.
-- When updating `README.md`: prefer incremental updates, keep tool counts accurate, reflect implemented capabilities only (no roadmap).
-- Keep the model tiers table in sync with `backend/src/config/models.js` and `backend/.env.example`.
-
----
-
-## 7) Product Requirements Document (PRD.md) Guidelines
-
-**Update PRD.md when the change is significant enough that a product manager would want to know about it.**
-
-### When to update PRD.md ✅
-
-- New tool categories or major new capabilities
-- New external integrations or services
-- New user-facing workflows or multi-step interaction patterns
-- Changes to supported formats, file size limits, or platform support
-- New Quick Actions or agent behaviors visible to the end user
-
-### When NOT to update PRD.md ❌
-
-- Bug fixes, error handling, stability fixes
-- Performance optimizations with no user-facing behavior change
-- Internal refactoring, code cleanup, architectural changes
-- Adding optional parameters without changing core function
-- UI micro-adjustments, documentation-only changes, developer experience changes
-
-### Content guidelines
-
-- Focus on **what** the product does from a **user perspective**, not implementation details
-- No code snippets, library names, file paths, or function names in PRD
-- **Language**: English only
+- **Hosts**: Word (34 tools), Excel (28), PowerPoint (24), Outlook (9), General (6) — 101 total.
+- **Skills**: `.skill.md` files in `frontend/src/skills/` — host skills + Quick Action skills.
+- **Manifests**: Generated from `manifests-templates/` + root `.env` via `scripts/generate-manifests.js`. Never hand-edit generated files.
+- **Office.js constraints**: PowerPoint has no host-specific `run()` context — uses `Office.context.document` with `CoercionType.Text`. Word eval tools use SES `Compartment` sandbox.
+- **Context management**: `tokenManager.ts` prunes messages to fit 1.2M chars. `summarizeOldToolResults()` compresses tool results older than 3 iterations.
 
 ---
 
-## 8) PowerPoint Agent
+## Docker & Deployment
 
-- **Persona**: Expert in visual communication and public speaking.
-- **Style**: Concise, punchy, structured (bullet points), slide-oriented.
-- **API layer**: Uses Office Common API (`Office.context.document`) with `CoercionType.Text`. No host-specific `run()` context in PowerPoint.
-- **Quick actions**: Bullets, Review (slide feedback), Impact (Punchify), Visual (draft mode), Translate, Proofread.
+**CRITICAL — Synology DS416play (Intel Celeron) compatibility:**
+- **MUST use `node:22-slim`** (Debian-based) for backend.
+- **MUST use `nginxinc/nginx-unprivileged:stable`** (Debian-based) for frontend.
+- **DO NOT use Alpine Linux images** — musl libc + AVX instruction issues.
 
----
-
-## 9) Known Issues
-
-Consult [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for the current open and deferred items list. All critical items are resolved. Open high-priority items are architectural refactors (ARCH-H2: useAgentLoop oversized, ARCH-H3: monolithic tool files) and test coverage (QUAL-M1). No functional bugs are outstanding.
+Both containers run as non-root. Frontend listens on port 8080 internally (`FRONTEND_PORT:8080`).
+Node.js engine: `>=20.19.0 || >=22.0.0`. Maintain Node.js 22 in Dockerfiles.
 
 ---
 
-## 10) Validation Checklist Before Commit
+## Security Rules
+
+- Never introduce command injection, XSS, SQL injection, or OWASP Top 10 vulnerabilities.
+- If insecure code is written, fix it immediately.
+- Base64 image payloads MUST pass through `sanitizePayloadForLogs` before logging.
+- `eval_*` tools are sandboxed via `officeCodeValidator.ts` + SES `Compartment`. Code is validated before `new Function()` execution.
+
+---
+
+## Git & Collaboration
+
+- Branch naming: `feat/<slug>` or `fix/<slug>`. Claude-initiated: `claude/<slug>-<id>`.
+- Commit messages: imperative mood, describe the *why*. In English.
+- Confirm before: force-push, branch deletion, PR creation, any action visible to others.
+
+### PR Workflow
+
+Before committing, update docs **in this order**:
+1. `PRD.md` — if user-facing features changed (product perspective, no code details)
+2. `README.md` — newly developed features; keep tool counts accurate
+3. `CHANGELOG.md` — standard entry
+
+---
+
+## Validation Checklist Before Commit
 
 - Run `npm run build` in `frontend/` for any frontend change.
 - Verify touched UI flows if applicable.
 - Ensure changed docs match actual code behavior.
-- If changing templates, manifest generation, ports, or host URLs: regenerate manifests.
+- If changing templates/manifests/ports: regenerate manifests.
 - If changing model parameters in `config/models.js`: test both streaming and sync paths.
-- If changing tool definitions: verify tool count stays under `MAX_TOOLS` (default 128).
+- If changing tool definitions: verify count stays under `MAX_TOOLS` (128).
 - **Dockerfiles**: Only Debian-based images. Never Alpine.
 
 ---
 
-## 11) Pull Request Workflow
+## Documentation Hierarchy
 
-Before committing and opening a PR, update documentation **in this order**:
-
-1. **`PRD.md`** — if user-facing features changed (product perspective only, no implementation details)
-2. **`README.md`** — newly developed features, concisely; keep tool counts accurate
-3. **`CHANGELOG.md`** — standard changelog entry
-
-Then commit, push, and open the PR. See global `git-workflow.md` for commit message format and PR creation steps.
+| Layer | Location | Purpose |
+|---|---|---|
+| Global context | `~/.claude/CLAUDE.md` | Consistent behavior across all projects |
+| Project context | `CLAUDE.md` (this file) | KickOffice-specific rules and structure |
+| Product spec | `PRD.md` | Full product requirements — source of truth for features |
+| Design health | `DESIGN_REVIEW.md` | Open architectural items, scores, fix plan |
+| Skills guide | `SKILLS_GUIDE.md` | How to create and modify skill files |
+| Task tracking | `tasks/todo.md` | Active work items with checkboxes |
+| Lessons learned | `tasks/lessons.md` | Mistake patterns and prevention rules |
 
 ---
 
-## 12) Error Prevention Rules
-
-1. **Command Chaining**: On Linux/bash, use `&&` for sequential dependent commands.
-2. **NPM Scripts**: Do not run `npm run check` or `npm run type-check` unless verified in `package.json`. Use `npx tsc --noEmit` for type checking.
-3. **Git**: Never use `--no-verify`, `--force` on shared branches, or `reset --hard` without explicit user instruction. Create new commits rather than amending published ones.
+*Last updated: 2026-03-28*
