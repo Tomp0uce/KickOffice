@@ -39,13 +39,11 @@
         }}</span>
         <div
           class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-          :class="
-            litellmConfigured ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-          "
+          :class="litellmConfigured ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'"
         >
           <div
             class="h-2 w-2 rounded-full"
-            :class="litellmConfigured ? 'bg-green-500' : 'bg-yellow-500'"
+            :class="litellmConfigured ? 'bg-success' : 'bg-warning'"
           />
           {{
             litellmConfigured ? t('litellmCredentialsConfigured') : t('litellmCredentialsMissing')
@@ -69,13 +67,13 @@
 
     <!-- Crypto Warning -->
     <SettingCard v-if="!cryptoAvailable">
-      <div class="flex items-start gap-2 rounded-md bg-yellow-50 p-2">
+      <div class="flex items-start gap-2 rounded-md bg-warning/10 p-2">
         <span class="text-2xl">⚠️</span>
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-yellow-800">
+          <span class="text-sm font-semibold text-warning">
             {{ t('cryptoNotAvailableTitle') }}
           </span>
-          <span class="text-xs text-yellow-700">
+          <span class="text-xs text-warning/80">
             {{ t('cryptoNotAvailableMessage') }}
           </span>
         </div>

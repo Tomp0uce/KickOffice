@@ -1,7 +1,13 @@
 <template>
   <Teleport to="body">
     <Transition name="toast-slide">
-      <div v-if="visible" class="toast-container" :class="`toast-${type}`">
+      <div
+        v-if="visible"
+        class="toast-container"
+        :class="`toast-${type}`"
+        role="alert"
+        aria-live="polite"
+      >
         <div class="toast-content">
           <div class="toast-icon">
             <AlertCircle v-if="type === 'error'" />
@@ -124,64 +130,64 @@ onUnmounted(() => {
 }
 
 .toast-error {
-  border: 1px solid rgb(252 165 165 / 80%);
-  color: #991b1b;
-  background: linear-gradient(135deg, rgb(254 226 226 / 98%) 0%, rgb(254 226 226 / 95%) 100%);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-background-primary));
 }
 
 .toast-error .toast-icon svg {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .toast-error .toast-progress {
-  background: linear-gradient(90deg, #dc2626, #ef4444);
+  background: var(--color-danger);
 }
 
 .toast-success {
-  border: 1px solid rgb(134 239 172 / 80%);
-  color: #14532d;
-  background: linear-gradient(135deg, rgb(220 252 231 / 98%) 0%, rgb(220 252 231 / 95%) 100%);
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-background-primary));
 }
 
 .toast-success .toast-icon svg {
-  color: #16a34a;
+  color: var(--color-success);
 }
 
 .toast-success .toast-progress {
-  background: linear-gradient(90deg, #16a34a, #22c55e);
+  background: var(--color-success);
 }
 
 .toast-info {
-  border: 1px solid rgb(147 197 253 / 80%);
-  color: #1e3a8a;
-  background: linear-gradient(135deg, rgb(224 242 254 / 98%) 0%, rgb(224 242 254 / 95%) 100%);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--color-background-primary));
 }
 
 .toast-info .toast-icon svg {
-  color: #2563eb;
+  color: var(--color-info);
 }
 
 .toast-info .toast-progress {
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  background: var(--color-info);
 }
 
 .toast-warning {
-  border: 1px solid rgb(252 211 77 / 80%);
-  color: #78350f;
-  background: linear-gradient(135deg, rgb(254 243 199 / 98%) 0%, rgb(254 243 199 / 95%) 100%);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-background-primary));
 }
 
 .toast-warning .toast-icon svg {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .toast-warning .toast-progress {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  background: var(--color-warning);
 }
 
 .toast-slide-enter-active,
 .toast-slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transition: all 0.3s cubic-bezier(0.3, 1, 0.3, 1);
 }
 
 .toast-slide-enter-from {

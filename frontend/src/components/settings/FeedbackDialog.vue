@@ -4,19 +4,20 @@
     aria-modal="true"
     role="dialog"
   >
-    <div ref="dialogRef" class="card-base w-full max-w-md flex flex-col gap-4 bg-surface p-4">
+    <div ref="dialogRef" class="card-base w-full max-w-md flex flex-col gap-4 bg-surface p-3">
       <h3 class="text-lg font-semibold text-main">
         {{ t('feedbackTitle') || 'Report Bug / Feedback' }}
       </h3>
 
-      <div v-if="success" class="rounded-md bg-green-100 p-3 text-green-800 text-sm">
+      <div v-if="success" class="rounded-md bg-success/10 p-3 text-success text-sm">
         {{ t('feedbackSuccess') || 'Thank you for your feedback!' }}
       </div>
       <div v-else class="flex flex-col gap-3">
-        <label class="text-sm font-semibold text-main">{{
+        <label for="feedback-category" class="text-sm font-semibold text-main">{{
           t('feedbackCategory') || 'Category'
         }}</label>
         <select
+          id="feedback-category"
           v-model="category"
           class="rounded-md border border-border p-2 text-sm bg-bg-secondary text-main"
         >
@@ -25,13 +26,14 @@
           <option value="other">{{ t('feedbackOther') || 'Other' }}</option>
         </select>
 
-        <label class="text-sm font-semibold text-main">{{
+        <label for="feedback-comment" class="text-sm font-semibold text-main">{{
           t('feedbackComment') || 'Comment'
         }}</label>
         <textarea
+          id="feedback-comment"
           v-model="comment"
           rows="4"
-          class="rounded-md border border-border p-2 text-sm bg-bg-secondary text-main focus:border-accent focus:outline-none"
+          class="rounded-md border border-border p-2 text-sm bg-bg-secondary text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
           :placeholder="
             t('feedbackPlaceholder') || 'Please describe the issue or your suggestion here...'
           "
@@ -49,7 +51,7 @@
           </label>
         </div>
 
-        <div v-if="error" class="text-xs text-red-500 mt-1">{{ error }}</div>
+        <div v-if="error" class="text-xs text-danger mt-1">{{ error }}</div>
 
         <div class="flex justify-end gap-2 mt-4">
           <CustomButton type="secondary" :text="t('cancel') || 'Cancel'" @click="$emit('close')" />

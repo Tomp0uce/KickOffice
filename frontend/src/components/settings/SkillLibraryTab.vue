@@ -1,8 +1,5 @@
 <template>
-  <div
-    role="tabpanel"
-    class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1"
-  >
+  <div role="tabpanel" class="flex w-full flex-1 flex-col items-center gap-2 bg-bg-secondary p-1">
     <div
       class="flex h-full w-full flex-col gap-2 overflow-auto rounded-md border border-border-secondary p-2 shadow-sm"
     >
@@ -38,7 +35,8 @@
         <button
           v-for="f in hostFilters"
           :key="f.value"
-          class="rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+          class="rounded-full px-2 py-0.5 text-xs font-medium cursor-pointer transition-colors duration-fast"
+          :aria-pressed="activeFilter === f.value"
           :class="
             activeFilter === f.value
               ? 'bg-accent text-white'
@@ -70,25 +68,21 @@
         <!-- Skill header row -->
         <div class="flex items-start justify-between p-2.5">
           <div class="flex min-w-0 flex-1 items-center gap-1.5">
-            <component
-              :is="resolveIcon(skill.icon)"
-              class="shrink-0 text-accent"
-              :size="14"
-            />
+            <component :is="resolveIcon(skill.icon)" class="shrink-0 text-accent" :size="14" />
             <span class="truncate text-sm font-semibold text-main">{{ skill.name }}</span>
-            <span
-              class="shrink-0 rounded bg-bg-secondary px-1 py-0.5 text-xs text-secondary"
-            >{{ skill.host }}</span>
-            <span
-              class="shrink-0 rounded bg-bg-secondary px-1 py-0.5 text-xs text-secondary"
-            >{{ skill.executionMode }}</span>
+            <span class="shrink-0 rounded bg-bg-secondary px-1 py-0.5 text-xs text-secondary">{{
+              skill.host
+            }}</span>
+            <span class="shrink-0 rounded bg-bg-secondary px-1 py-0.5 text-xs text-secondary">{{
+              skill.executionMode
+            }}</span>
           </div>
           <div class="ml-1 flex shrink-0 gap-0.5">
             <CustomButton
               type="secondary"
               :title="t('export') || 'Exporter'"
               :icon="Download"
-              class="border-none! bg-surface! p-1!"
+              class="border-none! bg-surface! p-1.5!"
               :icon-size="13"
               text=""
               @click="exportSkillToFile(skill)"
@@ -97,7 +91,7 @@
               type="secondary"
               :title="t('edit') || 'Modifier'"
               :icon="Edit2"
-              class="border-none! bg-surface! p-1!"
+              class="border-none! bg-surface! p-1.5!"
               :icon-size="13"
               text=""
               @click="startEdit(skill)"
@@ -106,7 +100,7 @@
               type="secondary"
               :title="t('delete') || 'Supprimer'"
               :icon="Trash2"
-              class="border-none! bg-surface! p-1!"
+              class="border-none! bg-surface! p-1.5!"
               :icon-size="13"
               text=""
               @click="handleDelete(skill.id)"
@@ -123,10 +117,7 @@
         </p>
 
         <!-- Inline edit form -->
-        <div
-          v-if="editingId === skill.id"
-          class="border-t border-border px-2.5 pb-2.5 pt-2"
-        >
+        <div v-if="editingId === skill.id" class="border-t border-border px-2.5 pb-2.5 pt-2">
           <!-- Name + Icon -->
           <div class="mb-2 flex gap-2">
             <div class="flex-1">
@@ -135,7 +126,7 @@
               }}</label>
               <input
                 v-model="editForm.name"
-                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm text-main focus:border-accent focus:outline-none"
+                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
               />
             </div>
             <div class="w-20">
@@ -144,7 +135,7 @@
               }}</label>
               <input
                 v-model="editForm.icon"
-                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm text-main focus:border-accent focus:outline-none"
+                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-sm text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 placeholder="Zap"
               />
             </div>
@@ -156,7 +147,7 @@
           }}</label>
           <textarea
             v-model="editForm.description"
-            class="mb-2 w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs leading-normal text-main focus:border-accent focus:outline-none"
+            class="mb-2 w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs leading-normal text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             rows="2"
           />
 
@@ -166,7 +157,7 @@
               <label class="mb-0.5 block text-xs font-semibold text-secondary">Host</label>
               <select
                 v-model="editForm.host"
-                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs text-main focus:border-accent focus:outline-none"
+                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
               >
                 <option value="word">Word</option>
                 <option value="excel">Excel</option>
@@ -179,7 +170,7 @@
               <label class="mb-0.5 block text-xs font-semibold text-secondary">Mode</label>
               <select
                 v-model="editForm.executionMode"
-                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs text-main focus:border-accent focus:outline-none"
+                class="w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 text-xs text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
               >
                 <option value="immediate">Direct (chat)</option>
                 <option value="draft">Brouillon</option>
@@ -194,7 +185,7 @@
           }}</label>
           <textarea
             v-model="editForm.skillContent"
-            class="mb-3 w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 font-mono text-xs leading-normal text-main focus:border-accent focus:outline-none"
+            class="mb-3 w-full rounded-sm border border-border bg-bg-secondary px-2 py-1 font-mono text-xs leading-normal text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             rows="8"
           />
 
@@ -278,9 +269,29 @@ const { skills, updateSkill, deleteSkill, exportSkillToFile, importSkillFromFile
 // ── Icon resolver ─────────────────────────────────────────────────────────────
 
 const iconMap: Record<string, LucideIcon> = {
-  AlignLeft, BarChart, Briefcase, CheckCircle, CheckSquare, Database, Eye,
-  Globe, GraduationCap, Grid3X3, HelpCircle, Languages, List, ListChecks,
-  Mail, Palette, Reply, Scissors, Sparkles, Table, TrendingUp, Wand2, Zap,
+  AlignLeft,
+  BarChart,
+  Briefcase,
+  CheckCircle,
+  CheckSquare,
+  Database,
+  Eye,
+  Globe,
+  GraduationCap,
+  Grid3X3,
+  HelpCircle,
+  Languages,
+  List,
+  ListChecks,
+  Mail,
+  Palette,
+  Reply,
+  Scissors,
+  Sparkles,
+  Table,
+  TrendingUp,
+  Wand2,
+  Zap,
 };
 
 function resolveIcon(name: string): LucideIcon {
@@ -303,9 +314,7 @@ const activeFilter = ref<FilterValue>('all-filter');
 
 const filteredSkills = computed(() => {
   if (activeFilter.value === 'all-filter') return skills.value;
-  return skills.value.filter(
-    (s) => s.host === activeFilter.value || s.host === 'all',
-  );
+  return skills.value.filter(s => s.host === activeFilter.value || s.host === 'all');
 });
 
 // ── Edit ──────────────────────────────────────────────────────────────────────

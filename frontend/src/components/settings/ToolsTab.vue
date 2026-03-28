@@ -45,7 +45,7 @@
             v-model="redlineAuthor"
             type="text"
             placeholder="KickOffice AI"
-            class="rounded border border-border-secondary bg-surface px-2 py-1 text-xs text-main focus:border-accent focus:outline-none"
+            class="rounded border border-border-secondary bg-surface px-2 py-1 text-xs text-main focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             @blur="saveRedlineSettings"
           />
           <span class="text-xs text-secondary/70">

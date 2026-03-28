@@ -2,7 +2,9 @@
   <div class="mt-2 mb-1 rounded-sm border border-border-secondary bg-bg-secondary overflow-hidden">
     <button
       type="button"
-      class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] tracking-wider text-secondary hover:bg-bg-tertiary transition-colors text-left"
+      class="w-full flex items-center gap-1.5 px-2 py-1 text-[10px] tracking-wider text-secondary cursor-pointer hover:bg-bg-tertiary transition-colors duration-fast text-left"
+      :aria-label="props.toolCall.name + ' — ' + (props.toolCall.status || 'running')"
+      :aria-expanded="expanded"
       @click="expanded = !expanded"
     >
       <component :is="expanded ? ChevronDown : ChevronRight" :size="10" />
@@ -24,7 +26,7 @@
       >
         <div
           class="text-[10px] uppercase mb-1"
-          :class="props.toolCall.status === 'error' ? 'text-red-400' : 'text-secondary'"
+          :class="props.toolCall.status === 'error' ? 'text-danger' : 'text-secondary'"
         >
           {{ props.toolCall.status === 'error' ? t('toolCall.error') : t('toolCall.result') }}
         </div>
@@ -32,7 +34,7 @@
           class="text-[10px] max-h-32 overflow-y-auto whitespace-pre-wrap break-words rounded p-1"
           :class="
             props.toolCall.status === 'error'
-              ? 'text-red-400 bg-red-50 dark:bg-red-950/20'
+              ? 'text-danger bg-danger/5 dark:bg-danger/10'
               : 'text-main/70 bg-bg-secondary'
           "
           >{{ props.toolCall.result }}</pre
@@ -83,9 +85,9 @@ const statusIconClass = computed(() => {
     case 'running':
       return 'animate-spin text-accent';
     case 'complete':
-      return 'text-green-500';
+      return 'text-success';
     case 'error':
-      return 'text-red-500';
+      return 'text-danger';
     default:
       return 'animate-spin text-secondary';
   }

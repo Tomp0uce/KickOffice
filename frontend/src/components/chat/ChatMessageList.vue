@@ -26,7 +26,7 @@
       data-message
       class="group flex items-end gap-4 [.user]:flex-row-reverse"
       :class="item.message.role === 'assistant' ? 'assistant' : 'user'"
-      style="content-visibility: auto; contain-intrinsic-block-size: auto 80px;"
+      style="content-visibility: auto; contain-intrinsic-block-size: auto 80px"
     >
       <div
         class="flex min-w-0 flex-1 flex-col gap-1 group-[.assistant]:items-start group-[.assistant]:text-left group-[.user]:items-end group-[.user]:text-left"
@@ -38,7 +38,7 @@
               (item.message.toolCalls && item.message.toolCalls.length > 0) ||
               item.message.imageSrc
             "
-            class="group max-w-[98%] min-w-0 rounded-md border border-border-secondary p-1 text-sm leading-[1.4] [overflow-wrap:anywhere] text-main/90 shadow-sm group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:bg-accent/10"
+            class="group min-w-0 rounded-md border border-border-secondary p-1 text-sm leading-[1.4] [overflow-wrap:anywhere] text-main/90 shadow-sm group-[.assistant]:max-w-[98%] group-[.assistant]:bg-bg-tertiary group-[.assistant]:text-left group-[.user]:max-w-[85%] group-[.user]:bg-accent/10"
           >
             <template v-for="(segment, idx) in item.segments" :key="`${item.key}-segment-${idx}`">
               <MarkdownRenderer
@@ -111,7 +111,7 @@
                 (item.message.toolCalls && item.message.toolCalls.length > 0) ||
                 item.message.imageSrc)
             "
-            class="text-[10px] text-secondary/60 px-1"
+            class="text-[10px] text-tertiary px-1"
           >
             {{ formatTime(item.message.timestamp) }}
           </div>
@@ -155,7 +155,7 @@
             :text="context.t('retry', 'Retry')"
             :icon="RotateCcw"
             type="secondary"
-            class="bg-surface! p-1! text-xs! text-amber-600! border border-amber-400/40 rounded!"
+            class="bg-surface! p-1! text-xs! text-warning! border border-warning/40 rounded!"
             :icon-size="11"
             @click="context.handleRegenerate()"
           />
@@ -177,7 +177,7 @@
             text=""
             :icon="Undo2"
             type="secondary"
-            class="bg-surface! p-1.5! text-amber-600!"
+            class="bg-surface! p-1.5! text-warning!"
             :icon-size="12"
             @click="context.undoLastInsert()"
           />

@@ -97,12 +97,9 @@
         <span class="text-sm font-semibold text-secondary">{{ t('backendStatus') }}</span>
         <div
           class="flex items-center gap-1 rounded-md px-2 py-1 text-xs"
-          :class="backendOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+          :class="backendOnline ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'"
         >
-          <div
-            class="h-2 w-2 rounded-full"
-            :class="backendOnline ? 'bg-green-500' : 'bg-red-500'"
-          />
+          <div class="h-2 w-2 rounded-full" :class="backendOnline ? 'bg-success' : 'bg-danger'" />
           {{ backendOnline ? t('backendOnline') : t('backendOffline') }}
         </div>
       </div>
@@ -124,7 +121,7 @@
         }}</span>
         <CustomButton
           type="secondary"
-          class="max-w-[160px] shrink-0"
+          class="max-w-[120px] shrink-0"
           :text="t('feedbackButtonText')"
           @click="emit('open-feedback')"
         />

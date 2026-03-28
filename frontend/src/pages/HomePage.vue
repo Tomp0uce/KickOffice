@@ -1,5 +1,7 @@
 <template>
-  <div class="items-center relative flex h-full w-full flex-col justify-center bg-bg-secondary p-1">
+  <div
+    class="items-center relative flex h-full w-full min-w-[280px] flex-col justify-center bg-bg-secondary p-1"
+  >
     <div class="relative flex h-full w-full flex-col gap-1 rounded-md">
       <ChatHeader
         :settings-title="t('settings')"
@@ -352,7 +354,14 @@ function handleEditMessage(message: DisplayMessage) {
 const { insertMessageToDocument, copyMessageToClipboard, undoLastInsert, canUndo } = officeInsert;
 
 // ── User Skills ──────────────────────────────────────────────────────────────
-const { skills: userSkills, skillsForHost, checkAndMigrateOldPrompts, migrateOldPrompts, confirmMigrationDone, dismissMigration } = useUserSkills();
+const {
+  skills: userSkills,
+  skillsForHost,
+  checkAndMigrateOldPrompts,
+  migrateOldPrompts,
+  confirmMigrationDone,
+  dismissMigration,
+} = useUserSkills();
 
 // Migration dialog state
 const showMigrationDialog = ref(false);
@@ -368,9 +377,12 @@ function handleMigrationDismiss(): void {
   dismissMigration();
   showMigrationDialog.value = false;
 }
-const currentHostLower = (
-  forHost({ outlook: 'outlook', powerpoint: 'powerpoint', excel: 'excel', word: 'word' }) || 'word'
-) as import('@/utils/skillParser').SkillHost;
+const currentHostLower = (forHost({
+  outlook: 'outlook',
+  powerpoint: 'powerpoint',
+  excel: 'excel',
+  word: 'word',
+}) || 'word') as import('@/utils/skillParser').SkillHost;
 const userSkillsForHost = skillsForHost(currentHostLower);
 
 const { executeUserSkill } = useUserSkillExecution({
@@ -388,9 +400,7 @@ const { executeUserSkill } = useUserSkillExecution({
   },
   runAgentLoop,
   resolveChatModelTier: () => {
-    const nonImageEntry = Object.entries(availableModels.value).find(
-      ([, m]) => m.type !== 'image',
-    );
+    const nonImageEntry = Object.entries(availableModels.value).find(([, m]) => m.type !== 'image');
     return (nonImageEntry?.[0] as import('@/types').ModelTier) || selectedModelTier.value;
   },
   createDisplayMessage: imageActions.createDisplayMessage,
@@ -404,7 +414,9 @@ function handleExecuteUserSkill(id: string): void {
   if (skill) executeUserSkill(skill);
 }
 
-function handleTestSkill(skillDraft: Omit<import('@/types/userSkill').UserSkill, 'id' | 'createdAt' | 'updatedAt'>): void {
+function handleTestSkill(
+  skillDraft: Omit<import('@/types/userSkill').UserSkill, 'id' | 'createdAt' | 'updatedAt'>,
+): void {
   // Execute as ephemeral skill (not saved) — result appears in chat
   executeUserSkill({ ...skillDraft, id: 'preview', createdAt: 0, updatedAt: 0 });
 }
@@ -471,9 +483,17 @@ onBeforeMount(async () => {
     const stored = localStorage.getItem('savedPrompts');
     if (stored) {
       try {
-        const prompts = JSON.parse(stored) as Array<{ name: string; systemPrompt: string; userPrompt: string }>;
-        migrationPromptCount.value = prompts.filter(p => p.name !== 'Default' || p.systemPrompt || p.userPrompt).length;
-      } catch { migrationPromptCount.value = 1; }
+        const prompts = JSON.parse(stored) as Array<{
+          name: string;
+          systemPrompt: string;
+          userPrompt: string;
+        }>;
+        migrationPromptCount.value = prompts.filter(
+          p => p.name !== 'Default' || p.systemPrompt || p.userPrompt,
+        ).length;
+      } catch {
+        migrationPromptCount.value = 1;
+      }
     }
     showMigrationDialog.value = true;
   }

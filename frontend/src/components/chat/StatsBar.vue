@@ -14,7 +14,7 @@
       </span>
       <div
         v-if="(contextWindowTokens ?? 0) > 0 && sessionStats.inputTokens > 0"
-        class="ml-1 flex items-center gap-1 w-20"
+        class="ml-1 flex items-center gap-1 w-16"
         :title="
           contextPctNum >= 80
             ? t('stats.contextWarning', { pct: contextPct })
@@ -27,25 +27,28 @@
       >
         <div class="h-1.5 flex-1 bg-border rounded-full overflow-hidden">
           <div
-            class="h-full transition-all"
+            class="h-full transition-all duration-medium"
             :class="contextBarColor"
             :style="{ width: contextPctClamped + '%' }"
           ></div>
         </div>
-        <span class="text-[9px]" :class="contextTextColor">{{ contextPct }}%</span>
+        <span class="text-[10px]" :class="contextTextColor">{{ contextPct }}%</span>
       </div>
     </div>
 
     <!-- Model selector (custom, opens upward) + model name -->
     <div
       v-if="availableModels && selectedModelTier !== undefined"
-      class="relative flex items-center gap-1.5 ml-2 shrink-0"
+      class="relative flex items-center gap-1.5 ml-2 min-w-0"
       @click.stop
     >
       <!-- Trigger button -->
       <button
         type="button"
-        class="flex items-center gap-0.5 h-5 cursor-pointer rounded border border-border bg-surface px-1 text-[9px] text-secondary hover:border-accent focus:outline-none focus:ring-1 focus:ring-primary/50"
+        class="flex items-center gap-0.5 h-5 cursor-pointer rounded border border-border bg-surface px-1 text-[10px] text-secondary hover:border-accent focus:outline-none focus:ring-1 focus:ring-primary/50"
+        :aria-label="t('stats.modelSelector', 'Select model')"
+        :aria-haspopup="true"
+        :aria-expanded="dropdownOpen"
         style="font-family: inherit"
         @click="dropdownOpen = !dropdownOpen"
       >
@@ -63,21 +66,28 @@
       </button>
 
       <!-- Dropdown list — opens UPWARD -->
-      <ul
-        v-if="dropdownOpen"
-        class="absolute right-0 bottom-full mb-1 z-50 min-w-full rounded border border-border bg-surface shadow-md text-[9px] text-secondary overflow-hidden"
-        style="font-family: inherit"
+      <Transition
+        enter-active-class="transition-all duration-fast ease-apple"
+        leave-active-class="transition-all duration-fast ease-apple"
+        enter-from-class="opacity-0 translate-y-1"
+        leave-to-class="opacity-0 translate-y-1"
       >
-        <li
-          v-for="(info, tier) in availableModels"
-          :key="tier"
-          class="cursor-pointer px-2 py-1 hover:bg-accent/10"
-          :class="{ 'font-semibold text-accent': tier === selectedModelTier }"
-          @click="selectTier(String(tier))"
+        <ul
+          v-if="dropdownOpen"
+          class="absolute right-0 bottom-full mb-1 z-50 min-w-full rounded border border-border bg-surface shadow-md text-[10px] text-secondary overflow-hidden"
+          style="font-family: inherit"
         >
-          {{ info.label }}
-        </li>
-      </ul>
+          <li
+            v-for="(info, tier) in availableModels"
+            :key="tier"
+            class="cursor-pointer px-2 py-1 hover:bg-accent/10"
+            :class="{ 'font-semibold text-accent': tier === selectedModelTier }"
+            @click="selectTier(String(tier))"
+          >
+            {{ info.label }}
+          </li>
+        </ul>
+      </Transition>
 
       <span v-if="modelName" class="truncate text-secondary/80">{{ modelName }}</span>
     </div>
@@ -146,15 +156,15 @@ const contextPctClamped = computed(() => Math.min(contextPctNum.value, 100).toFi
 
 const contextBarColor = computed(() => {
   const pct = contextPctNum.value;
-  if (pct >= 90) return 'bg-red-500';
-  if (pct >= 70) return 'bg-orange-400';
-  return 'bg-green-500';
+  if (pct >= 90) return 'bg-danger';
+  if (pct >= 70) return 'bg-warning';
+  return 'bg-success';
 });
 
 const contextTextColor = computed(() => {
   const pct = contextPctNum.value;
-  if (pct >= 90) return 'text-red-500';
-  if (pct >= 70) return 'text-orange-400';
+  if (pct >= 90) return 'text-danger';
+  if (pct >= 70) return 'text-warning';
   return '';
 });
 
