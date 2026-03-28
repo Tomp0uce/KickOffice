@@ -25,6 +25,9 @@ npm-debug.log*
 # Generated manifests (produced by scripts/generate-manifests.js)
 generated-manifests/*.xml
 
+# Test coverage reports
+coverage/
+
 # Docker volumes
 backend-data/
 
