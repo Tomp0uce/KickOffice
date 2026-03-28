@@ -5,10 +5,9 @@
  */
 
 // Dynamic import to avoid bundle issues if jszip is not installed
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 async function getJSZip(): Promise<any> {
   try {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore — jszip is an optional dependency; install with: cd frontend && npm install jszip
     const JSZip = await import('jszip');
     return JSZip.default;

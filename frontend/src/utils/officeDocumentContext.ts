@@ -264,7 +264,7 @@ export async function getWordDocumentContext(): Promise<string> {
         }
 
         // Load content controls if available
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         let contentControls: any = null;
         try {
           contentControls = body.contentControls;
@@ -322,7 +322,6 @@ export async function getWordDocumentContext(): Promise<string> {
         let contentControlInfo: { title: string; tag: string; type: string }[] = [];
         try {
           if (contentControls?.items?.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             contentControlInfo = contentControls.items.map((cc: any) => ({
               title: cc.title || '',
               tag: cc.tag || '',

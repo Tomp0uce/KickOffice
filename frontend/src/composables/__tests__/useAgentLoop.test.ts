@@ -1261,7 +1261,7 @@ describe('useAgentLoop', () => {
       const saveSnapshot = vi.fn();
 
       const opts = buildOptions();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       (opts.helpers as any).captureDocumentState = captureDocumentState;
       (opts.helpers as any).saveSnapshot = saveSnapshot;
 
@@ -1279,7 +1279,7 @@ describe('useAgentLoop', () => {
       const saveSnapshot = vi.fn();
 
       const opts = buildOptions();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       (opts.helpers as any).captureDocumentState = captureDocumentState;
       (opts.helpers as any).saveSnapshot = saveSnapshot;
 
@@ -1299,7 +1299,7 @@ describe('useAgentLoop', () => {
       const saveSnapshot = vi.fn();
 
       const opts = buildOptions();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       (opts.helpers as any).captureDocumentState = captureDocumentState;
       (opts.helpers as any).saveSnapshot = saveSnapshot;
 

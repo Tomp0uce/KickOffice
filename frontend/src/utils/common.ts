@@ -180,7 +180,7 @@ export function createOfficeTools<TName extends string, TTemplate extends object
  */
 export function buildExecuteWrapper<TTemplate extends Record<string, unknown>>(
   executeKey: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   runner: <T>(action: (context: any) => Promise<T>) => Promise<T>,
 ): (definition: TTemplate) => (args?: ToolArgs) => Promise<string> {
   return (def: TTemplate) =>
