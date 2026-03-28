@@ -215,7 +215,7 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 - [x] `DOC-L2` | LOW | T1 | docs | `README.md:222` | Fix Quick Action count: 17→24 (already correct at 24)
 - [x] `DOC-L3` | LOW | T1 | docs | `README.md:3,12` | Fix tool count: 100→101
 - [x] `SEC-L1` | LOW | T1 | types | `package.json` | Add diff-match-patch + @types/diff-match-patch, remove shim
-- [x] `SEC-L2` | LOW | T1 | deps | `package.json` | Removed unused focus-trap dependency
+- [x] `SEC-L2` | LOW | T1 | deps | `package.json` | focus-trap kept — used by @vueuse/integrations/useFocusTrap in FeedbackDialog
 - [x] `OBS-L1` | LOW | T2 | init | `credentialStorage.ts:14` | Defer logCryptoStatus to first credential access
 - [~] `CLN-L1` | LOW | T2 | convention | `enum.ts` + 14 sites | DEFERRED: 24 raw localStorage calls across 12 files — T3 scope
 - [x] `CLN-L3` | LOW | T1 | type | `common.ts:148` | Removed phantom generic, added JSDoc
@@ -252,7 +252,7 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T1 | LOW | DOC-L2 | README tool count already correct at 24 quick actions — verified
 [2026-03-28] FIXED | T1 | LOW | DOC-L3 | Fixed README tool count 100→101 | README.md
 [2026-03-28] FIXED | T1 | LOW | SEC-L1 | Added diff-match-patch + @types as direct deps, removed manual shim | package.json, shims.d.ts
-[2026-03-28] FIXED | T1 | LOW | SEC-L2 | Removed unused focus-trap dependency | package.json
+[2026-03-28] FIXED | T1 | LOW | SEC-L2 | Verified focus-trap used by @vueuse/integrations/useFocusTrap — kept as direct dep | package.json
 [2026-03-28] FIXED | T2 | LOW | OBS-L1 | Deferred logCryptoStatus from module load to migrateCredentialsOnStartup | credentialStorage.ts
 [2026-03-28] FIXED | T1 | LOW | CLN-L3 | Removed phantom generic TContext, added JSDoc, updated 2 call sites | common.ts, wordTools.ts, excelTools.ts
 [2026-03-28] FIXED | T2 | MEDIUM | DRY-M2 | Documented inject* mutation contract in module JSDoc | useMessageOrchestration.ts

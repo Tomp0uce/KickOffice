@@ -60,7 +60,7 @@ export function sandboxedEval(
 
   // Audit trail: log host and truncated code for debugging
   const preview = code.length > 200 ? `${code.slice(0, 200)}…` : code;
-  logService.debug(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`, { traffic: 'system' });
+  logService.debug(`[sandbox] host=${host ?? 'unspecified'} code=${preview}`);
 
   // Wrap in async IIFE and execute
   return compartment.evaluate(`(async () => { ${code} })()`);

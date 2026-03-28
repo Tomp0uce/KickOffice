@@ -98,7 +98,7 @@ export async function chatStream(options: ChatStreamOptions): Promise<void> {
 
   // ERR-L1: Per-request ID for frontend↔backend log correlation
   const requestId = generateRequestId();
-  logService.debug(`[chatStream] requestId=${requestId}`, { traffic: 'llm' });
+  logService.debug(`[chatStream] requestId=${requestId}`, undefined, 'llm');
 
   const res = await fetchWithTimeoutAndRetry(
     `${BACKEND_URL}/api/chat`,
