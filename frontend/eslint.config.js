@@ -13,7 +13,7 @@ export default [
   },
   {
     linterOptions: {
-      reportUnusedDisableDirectives: 'off',
+      reportUnusedDisableDirectives: false,
     },
   },
   {
