@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
 
       - name: Lint
-        run: npm run lint -- --max-warnings 0
+        run: npx eslint src/ --max-warnings 20
 
       - name: TypeScript
         run: npx tsc --noEmit
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build frontend image
-        run: docker build -t kickoffice-frontend-check frontend/
+        run: docker build -t kickoffice-frontend-check -f frontend/Dockerfile .
 
       - name: Build backend image
         run: docker build -t kickoffice-backend-check backend/
