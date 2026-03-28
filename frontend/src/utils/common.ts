@@ -1,8 +1,22 @@
 import DiffMatchPatch from 'diff-match-patch';
-import type { ToolDefinition } from '@/types';
+import type { ToolDefinition, ToolArgs } from '@/types';
 import { validateOfficeCode, type OfficeHost } from './officeCodeValidator';
 import { sandboxedEval, type SandboxHost } from './sandbox';
 import { logService } from './logger';
+
+// ARCH-H4: Centralized language resolution — replaces 9× duplicated pattern
+const VALID_LANGS = ['en', 'fr'] as const;
+type LangKey = (typeof VALID_LANGS)[number];
+
+export function getDisplayLanguage(): string {
+  try {
+    const stored = localStorage.getItem('localLanguage');
+    const key: LangKey = VALID_LANGS.includes(stored as LangKey) ? (stored as LangKey) : 'fr';
+    return key === 'en' ? 'English' : 'Français';
+  } catch {
+    return 'Français';
+  }
+}
 
 // R17/CH5 — Generate a visual diff HTML string (insertions in blue/underline, deletions in red/strikethrough)
 export function generateVisualDiff(originalText: unknown, newText: unknown): string {
@@ -83,12 +97,7 @@ export function getErrorMessage(error: unknown): string {
  * Falls back to getErrorMessage() for non-Office errors.
  */
 export function getDetailedOfficeError(error: unknown): string {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'debugInfo' in error &&
-    'message' in error
-  ) {
+  if (error && typeof error === 'object' && 'debugInfo' in error && 'message' in error) {
     const officeError = error as {
       message: string;
       code?: string;
@@ -129,10 +138,8 @@ export function getDetailedOfficeError(error: unknown): string {
  * - PowerPoint: { executePowerPoint: (context: PowerPoint.RequestContext, args: Record<string, unknown>) => Promise<string> }
  * - Outlook: { executeOutlook: (item: Office.MessageCompose, args: Record<string, unknown>) => Promise<string> }
  */
-// TContext is a phantom generic used by call sites to document context type — not used in the body
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-// @ts-ignore TS6133 intentional phantom generic
-export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>;
+/** Base template for host-specific tool definitions. Context type (Word.RequestContext, etc.) is defined by each host's extended type. */
+export type OfficeToolTemplate = Omit<ToolDefinition, 'execute'>;
 
 /**
  * Generic factory that wraps host-specific tool templates with a uniform `execute` method.
@@ -141,7 +148,7 @@ export type OfficeToolTemplate<TContext = any> = Omit<ToolDefinition, 'execute'>
  */
 export function createOfficeTools<TName extends string, TTemplate extends object, TDef>(
   definitions: Record<TName, TTemplate>,
-  buildExecute: (definition: TTemplate) => (args?: Record<string, any>) => Promise<string>,
+  buildExecute: (definition: TTemplate) => (args?: ToolArgs) => Promise<string>,
 ): Record<TName, TDef> {
   return Object.fromEntries(
     Object.entries(definitions).map(([name, def]) => [
@@ -171,12 +178,13 @@ export function createOfficeTools<TName extends string, TTemplate extends object
  *   <T>(action: (ctx: Word.RequestContext) => Promise<T>) => executeOfficeAction(() => Word.run(action))
  * )
  */
-export function buildExecuteWrapper<TTemplate extends Record<string, any>>(
+export function buildExecuteWrapper<TTemplate extends Record<string, unknown>>(
   executeKey: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runner: <T>(action: (context: any) => Promise<T>) => Promise<T>,
-): (definition: TTemplate) => (args?: Record<string, any>) => Promise<string> {
+): (definition: TTemplate) => (args?: ToolArgs) => Promise<string> {
   return (def: TTemplate) =>
-    async (args: Record<string, any> = {}): Promise<string> => {
+    async (args: ToolArgs = {}): Promise<string> => {
       const hostExecute = def[executeKey];
       if (!hostExecute || typeof hostExecute !== 'function') {
         return JSON.stringify(
@@ -191,7 +199,7 @@ export function buildExecuteWrapper<TTemplate extends Record<string, any>>(
       }
 
       try {
-        return await runner((context: any) => hostExecute(context, args));
+        return await runner(context => hostExecute(context, args));
       } catch (error: unknown) {
         return JSON.stringify(
           {
@@ -280,7 +288,7 @@ export interface EvalToolConfig<TCtx> {
  * ```
  */
 export function createEvalExecutor<TCtx>(config: EvalToolConfig<TCtx>) {
-  return async (ctx: TCtx, args: Record<string, any>): Promise<string> => {
+  return async (ctx: TCtx, args: ToolArgs): Promise<string> => {
     const { code, explanation } = args;
 
     const validation = validateOfficeCode(code, config.host);

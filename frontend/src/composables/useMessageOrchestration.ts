@@ -7,6 +7,11 @@
  * - Injects uploaded files (text files, platform file IDs)
  * - Injects rich content preservation instructions
  *
+ * **Mutation contract**: The inject* functions (injectDocumentContext, injectUploadedFiles,
+ * injectRichContentInstructions) mutate the `messages` array in-place for performance —
+ * the array is freshly built by `buildChatMessages()` each call and never shared.
+ * `injectUploadedFiles` also mutates SessionFile.contentInjectedAt to track injection state.
+ *
  * Extracted from useAgentLoop.ts as part of ARCH-H1 refactoring.
  */
 

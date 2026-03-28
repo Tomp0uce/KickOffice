@@ -212,14 +212,14 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 - [x] `ROB-M2` | MEDIUM | T1 | contract | `useDocumentUndo.ts:271-373` | Remove redundant state resets from undo sub-functions
 
 #### Sub-phase 3.4 — Documentation & deps [scattered]
-- [ ] `DOC-L2` | LOW | T1 | docs | `README.md:222` | Fix Quick Action count: 17→24
-- [ ] `DOC-L3` | LOW | T1 | docs | `README.md:3,12` | Fix tool count: 100→101
-- [ ] `SEC-L1` | LOW | T1 | types | `package.json` | Add @types/diff-match-patch, remove shim
-- [ ] `SEC-L2` | LOW | T1 | deps | `package.json` | Verify focus-trap usage or remove
-- [ ] `OBS-L1` | LOW | T2 | init | `credentialStorage.ts:14` | Defer logCryptoStatus to explicit init
-- [ ] `CLN-L1` | LOW | T2 | convention | `enum.ts` + 14 sites | Use localStorageKey everywhere or drop module
-- [ ] `CLN-L3` | LOW | T1 | type | `common.ts:148` | Replace phantom generic with JSDoc
-- [ ] `DRY-M2` | MEDIUM | T2 | mutation | `useMessageOrchestration.ts:66-187` | Document or refactor inject* mutation pattern
+- [x] `DOC-L2` | LOW | T1 | docs | `README.md:222` | Fix Quick Action count: 17→24 (already correct at 24)
+- [x] `DOC-L3` | LOW | T1 | docs | `README.md:3,12` | Fix tool count: 100→101
+- [x] `SEC-L1` | LOW | T1 | types | `package.json` | Add diff-match-patch + @types/diff-match-patch, remove shim
+- [x] `SEC-L2` | LOW | T1 | deps | `package.json` | Removed unused focus-trap dependency
+- [x] `OBS-L1` | LOW | T2 | init | `credentialStorage.ts:14` | Defer logCryptoStatus to first credential access
+- [~] `CLN-L1` | LOW | T2 | convention | `enum.ts` + 14 sites | DEFERRED: 24 raw localStorage calls across 12 files — T3 scope
+- [x] `CLN-L3` | LOW | T1 | type | `common.ts:148` | Removed phantom generic, added JSDoc
+- [x] `DRY-M2` | MEDIUM | T2 | mutation | `useMessageOrchestration.ts:66-187` | Documented inject* mutation contract in module JSDoc
 
 ---
 
@@ -249,6 +249,13 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 [2026-03-28] FIXED | T3 | MEDIUM | OBS-M1 | Unified logService signatures: all methods now accept optional traffic param + extracted toDataRecord helper | logger.ts
 [2026-03-28] FIXED | T2 | MEDIUM | ROB-M4 | Replaced any[] with MessageContentPart[] in truncateToBudget overload | tokenManager.ts
 [2026-03-28] FIXED | T1 | MEDIUM | ROB-M2 | Removed redundant undoSnapshot/canUndo resets from 5 undo sub-functions (already cleared by parent) | useDocumentUndo.ts
+[2026-03-28] FIXED | T1 | LOW | DOC-L2 | README tool count already correct at 24 quick actions — verified
+[2026-03-28] FIXED | T1 | LOW | DOC-L3 | Fixed README tool count 100→101 | README.md
+[2026-03-28] FIXED | T1 | LOW | SEC-L1 | Added diff-match-patch + @types as direct deps, removed manual shim | package.json, shims.d.ts
+[2026-03-28] FIXED | T1 | LOW | SEC-L2 | Removed unused focus-trap dependency | package.json
+[2026-03-28] FIXED | T2 | LOW | OBS-L1 | Deferred logCryptoStatus from module load to migrateCredentialsOnStartup | credentialStorage.ts
+[2026-03-28] FIXED | T1 | LOW | CLN-L3 | Removed phantom generic TContext, added JSDoc, updated 2 call sites | common.ts, wordTools.ts, excelTools.ts
+[2026-03-28] FIXED | T2 | MEDIUM | DRY-M2 | Documented inject* mutation contract in module JSDoc | useMessageOrchestration.ts
 
 ---
 
@@ -271,6 +278,7 @@ Only one workflow exists: `bump-version.yml` (version bump on main push). No PR 
 |----------|---------|-----------------|-------------|--------|
 | ARCH-H2/H3 | Monolithic files (useAgentLoop 1137 LOC, excelTools 2800, powerpointTools 2452, wordTools 2175) | Feature set still evolving post-beta; splitting causes multi-file churn with no functional gain | 2026-03-19 | Revisit when tool additions slow |
 | TOKEN-M1 | Token limit calibration — MAX_CONTEXT_CHARS (1.2M) conservative estimate | Requires 2+ weeks usage data | 2026-03-19 | After beta usage data |
+| CLN-L1 | 24 raw localStorage calls across 12 files should use localStorageKey enum | T3 scope — 12 files, 24 call sites | 2026-03-28 | Next dr-run cycle |
 
 ---
 
