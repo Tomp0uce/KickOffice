@@ -1,4 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock the global logger to prevent console output and DailyRotateFile initialization.
+// models.js calls logger.warn() at import time when LLM_API_KEY is not set.
+vi.mock('../../utils/logger.js', () => ({
+  default: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
 import { buildChatBody, isGpt5Model, isChatGptModel } from '../models.js';
 
 // ─── isGpt5Model ───────────────────────────────────────────────────────────────

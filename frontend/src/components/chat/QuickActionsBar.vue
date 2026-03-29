@@ -1,12 +1,13 @@
 <template>
   <div class="flex w-full flex-wrap items-center justify-center gap-2 rounded-md">
     <!-- User Skills dropdown + create button -->
-    <div class="flex flex-1 items-center gap-1 min-w-0 max-w-full">
+    <div class="flex flex-1 items-center gap-1 min-w-0">
       <SingleSelect
         :key-list="userSkillsForHost.map(s => s.id)"
         :placeholder="t('mySkills') || 'Mes skills...'"
         :title="t('mySkills') || 'My skills'"
         :fronticon="false"
+        :show-label="false"
         class="flex-1! bg-surface! text-xs!"
         @update:model-value="id => $emit('execute-user-skill', String(id))"
       >
@@ -20,25 +21,27 @@
         :title="t('createSkill') || 'Créer un skill'"
         type="secondary"
         :icon-size="14"
-        class="shrink-0! bg-surface! p-1.5!"
+        class="shrink-0! bg-surface! p-1.5! mr-1!"
         @click="$emit('open-skill-creator')"
       />
     </div>
 
-    <!-- Built-in quick action buttons (unchanged) -->
-    <CustomButton
-      v-for="action in quickActions"
-      :key="action.key"
-      :title="$t(action.tooltipKey || action.key + '_tooltip')"
-      text=""
-      :icon="action.icon"
-      type="secondary"
-      :icon-size="16"
-      class="shrink-0! bg-surface! p-1.5!"
-      :disabled="loading"
-      :aria-label="action.label"
-      @click="$emit('apply-action', action.key)"
-    />
+    <!-- Built-in quick action buttons -->
+    <div class="flex items-center gap-1 shrink-0">
+      <CustomButton
+        v-for="action in quickActions"
+        :key="action.key"
+        :title="$t(action.tooltipKey || action.key + '_tooltip')"
+        text=""
+        :icon="action.icon"
+        type="secondary"
+        :icon-size="16"
+        class="shrink-0! bg-surface! p-1.5!"
+        :disabled="loading"
+        :aria-label="action.label"
+        @click="$emit('apply-action', action.key)"
+      />
+    </div>
   </div>
 </template>
 
