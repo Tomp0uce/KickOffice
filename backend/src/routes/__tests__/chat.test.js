@@ -22,6 +22,19 @@ vi.mock('../../utils/toolUsageLogger.js', () => ({
   logChatRequest: vi.fn(),
 }));
 
+// Mock the global logger to prevent console output and filesystem writes during tests.
+// Without this, logAndRespond() (via http.js) and models.js both call the real Winston
+// logger which writes to stdout and creates a rotating log file transport.
+vi.mock('../../utils/logger.js', () => ({
+  default: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    http: vi.fn(),
+  },
+}));
+
 import { chatCompletion, handleErrorResponse, RateLimitError } from '../../services/llmClient.js';
 import { chatRouter } from '../chat.js';
 
