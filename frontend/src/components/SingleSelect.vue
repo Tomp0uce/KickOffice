@@ -1,5 +1,6 @@
 <template>
   <div
+    v-if="showLabel"
     :class="tight ? 'mb-0' : 'mb-3'"
     class="flex items-center gap-2 text-sm font-medium text-main"
   >
@@ -155,6 +156,7 @@ const {
   iconSize = 18,
   customFrontIcon = null,
   required = false,
+  showLabel = true,
 } = defineProps<{
   title: string;
   icon?: Component | null;
@@ -165,5 +167,6 @@ const {
   customFrontIcon?: Component | null;
   keyList: string[];
   required?: boolean;
+  showLabel?: boolean;
 }>();
 </script>
