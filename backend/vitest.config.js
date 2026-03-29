@@ -8,6 +8,10 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       LLM_API_KEY: 'test-key-vitest',
+      // Set a non-gpt-5.2 standard model so buildChatBody sets tool_choice:'auto'
+      // (gpt-5.2 is excluded from tool_choice — see models.js). Without this,
+      // CI uses the default 'gpt-5.2' and the tools test fails.
+      MODEL_STANDARD: 'gpt-4o',
     },
   },
 });
